@@ -31,7 +31,7 @@
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | done |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | done |
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | done |
-| M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | in_progress |
+| M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | done |
 | M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
 | M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | done |
 | M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | done |
@@ -262,7 +262,7 @@
 
 验收（大）：
 
-- [ ] M5.1–M5.3 done；CHANGELOG 含 `0.6.0`
+- [x] M5.1–M5.3 done；CHANGELOG 含 `0.6.0`
 
 ---
 
