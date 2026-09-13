@@ -9,12 +9,14 @@
 | M2.1 / v0.2.1 | 最小 FastAPI 壳：health / 矩阵 / daily / realtime |
 | **M2.2 / v0.2.2** | preferences、缺能力 409、禁品牌硬编码 |
 | **M2.3 / v0.2.3** | API 与 ReplayProvider 同标的同日口径对齐 |
+| **M4.2 / v0.4.2** | `/api/research/report`、`/api/review/report`（经 agents 插件） |
 
 ## 安装与运行
 
 ```powershell
 cd D:\workspace\git\stock-platform
 python -m pip install -e ".\packages\providers[dev]"
+python -m pip install -e ".\packages\agents[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
 cd apps\workbench
 python -m pytest -q
@@ -31,6 +33,8 @@ python -m stock_platform_workbench
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
 | GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
+| GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
+| GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
 
 ## 约束

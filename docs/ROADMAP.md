@@ -28,7 +28,7 @@
 | M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | done |
 | M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | done |
 | M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | done |
-| M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | in_progress |
+| M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | done |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | done |
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | done |
 | M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | planned |
@@ -225,7 +225,7 @@
 
 验收（大）：
 
-- [ ] M4.1–M4.2 done；CHANGELOG 含 `0.5.0`
+- [x] M4.1–M4.2 done；CHANGELOG 含 `0.5.0`
 
 ---
 
