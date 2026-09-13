@@ -18,7 +18,7 @@
 | M0.3 | CI 绿 + 文档交叉链接检查 | 小 | `v0.0.3` | done |
 | M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | planned |
 | M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | done |
-| M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | planned |
+| M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | done |
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | planned |
 | M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
 | M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | planned |
@@ -106,7 +106,10 @@
 
 验收：
 
-- [ ] daily + realtime 适配器（录制回放测）
+- [x] `ReplayProvider.get_daily` / `get_realtime` + fixtures
+- [x] 归一化：手/元/小数制；`pct_unit=percent` 显式转换
+- [x] 港美代码在取数前被 `normalize_symbol` 拒绝
+- [x] ADR 0004
 
 #### M1.3 → `v0.1.3`
 

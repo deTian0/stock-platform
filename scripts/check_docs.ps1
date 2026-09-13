@@ -23,6 +23,7 @@ $required = @(
   'docs/architecture/0001-target-architecture.md',
   'docs/architecture/0002-m0-2-contracts.md',
   'docs/architecture/0003-providers-normalize-symbol.md',
+  'docs/architecture/0004-replay-daily-realtime.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
