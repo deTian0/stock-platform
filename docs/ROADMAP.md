@@ -15,7 +15,7 @@
 | M0 | 工程架子 + 契约草稿 | 大 | `v0.1.0` | planned（当前在 `v0.0.x` 搭架子） |
 | M0.1 | 空仓脚手架与 Git | 小 | `v0.0.1` | done |
 | M0.2 | 契约草案评审定稿 | 小 | `v0.0.2` | done |
-| M0.3 | CI 绿 + 文档交叉链接检查 | 小 | `v0.0.3` | planned |
+| M0.3 | CI 绿 + 文档交叉链接检查 | 小 | `v0.0.3` | done |
 | M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | planned |
 | M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | planned |
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | planned |
@@ -72,8 +72,9 @@
 
 验收：
 
-- [ ] GitHub Actions（或等价）对 docs / 脚本做基础检查
-- [ ] `release_tag.ps1 -DryRun` 文档示例可跑通
+- [x] GitHub Actions 对 docs / 脚本做基础检查（`check_docs.ps1` + DryRun）
+- [x] `release_tag.ps1 -DryRun` 文档示例可跑通（已存在 tag 时仅提示）
+- [x] README / versioning 写明自检与 DryRun 流程
 
 #### M0 完成 → `v0.1.0`
 

@@ -36,9 +36,11 @@
 2. `CHANGELOG.md` 将 `[Unreleased]` 收成新版本节，日期为当天
 3. 写入 `VERSION`（无 `v`）
 4. 提交：`chore(release): vX.Y.Z`
-5. 执行：
+5. 先 DryRun，再正式打 tag：
 
 ```powershell
+.\scripts\check_docs.ps1
+.\scripts\release_tag.ps1 -Version X.Y.Z -Kind patch|minor|major -Message "简短说明" -DryRun
 .\scripts\release_tag.ps1 -Version X.Y.Z -Kind patch|minor|major -Message "简短说明"
 ```
 
@@ -52,7 +54,7 @@
 - 校验 `VERSION` 文件与 `-Version` 参数一致
 - 拒绝覆盖已存在 tag
 - 创建 **annotated** tag：`vX.Y.Z`
-- 支持 `-DryRun` 只打印将执行的命令
+- 支持 `-DryRun`：只校验 VERSION 并打印将执行的 tag 命令；**不**因 tag 已存在或工作区不干净而失败（仅提示）
 
 ## 分支策略（起步）
 

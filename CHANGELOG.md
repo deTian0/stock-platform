@@ -8,6 +8,18 @@
 
 - （无）
 
+## [0.0.3] - 2026-09-13
+
+### Added
+
+- `scripts/check_docs.ps1`：必选文件、VERSION↔CHANGELOG、Markdown 相对链接检查
+- CI：docs 自检 + `release_tag.ps1 -DryRun`
+
+### Changed
+
+- `release_tag.ps1`：`-DryRun` 不再因 tag 已存在或脏工作区失败
+- README / versioning：补充 DryRun 与自检示例
+
 ## [0.0.2] - 2026-09-13
 
 ### Added
@@ -28,6 +40,7 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/local/stock-platform/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/local/stock-platform/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/local/stock-platform/releases/tag/v0.0.1

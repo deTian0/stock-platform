@@ -45,20 +45,10 @@ $versionFile = Join-Path $root 'VERSION'
 if (-not (Test-Path $versionFile)) {
   throw "VERSION file missing at $versionFile"
 }
+$tag = "v$Version"
 $fileVersion = (Get-Content $versionFile -Raw).Trim()
 if ($fileVersion -ne $Version) {
   throw "VERSION file is '$fileVersion' but -Version is '$Version'. Update VERSION first."
-}
-
-$tag = "v$Version"
-$existing = git tag -l $tag
-if ($existing) {
-  throw "Tag $tag already exists. Refusing to move tags."
-}
-
-$status = git status --porcelain
-if ($status) {
-  throw "Working tree not clean. Commit or stash before tagging.`n$status"
 }
 
 $fullMessage = @"
@@ -75,9 +65,27 @@ Write-Host "Tag:     $tag"
 Write-Host "Kind:    $Kind"
 
 if ($DryRun) {
+  $existing = git tag -l $tag
+  if ($existing) {
+    Write-Host "[DryRun] note: tag $tag already exists (would refuse without -DryRun)"
+  }
+  $status = git status --porcelain
+  if ($status) {
+    Write-Host "[DryRun] note: working tree not clean (would refuse without -DryRun)"
+  }
   Write-Host "[DryRun] git tag -a $tag -m <message>"
   Write-Host $fullMessage
   exit 0
+}
+
+$existing = git tag -l $tag
+if ($existing) {
+  throw "Tag $tag already exists. Refusing to move tags."
+}
+
+$status = git status --porcelain
+if ($status) {
+  throw "Working tree not clean. Commit or stash before tagging.`n$status"
 }
 
 git tag -a $tag -m $fullMessage
