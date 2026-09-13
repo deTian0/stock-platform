@@ -26,6 +26,7 @@ $required = @(
   'docs/architecture/0004-replay-daily-realtime.md',
   'docs/architecture/0005-em-get-capability-matrix.md',
   'docs/architecture/0006-workbench-shell.md',
+  'docs/architecture/0007-fail-closed-alignment.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',

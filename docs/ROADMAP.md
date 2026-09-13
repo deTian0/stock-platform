@@ -22,8 +22,8 @@
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | done |
 | M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
 | M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | done |
-| M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | planned |
-| M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | planned |
+| M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | done |
+| M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | done |
 | M3 | 选股 / PIT 回测内核迁入 | 大 | `v0.4.0` | planned |
 | M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | planned |
 | M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | planned |
@@ -148,19 +148,21 @@
 
 验收：
 
-- [ ] 缺 minute 等能力时 API **409** fail-closed（矩阵细节）
-- [ ] 通用路径无硬编码单一数据源品牌（测试护栏）
+- [x] 缺 minute 等能力时 API **409** fail-closed（矩阵细节）
+- [x] 通用路径无硬编码单一数据源品牌（路由源码扫描 + 响应断言）
+- [x] `PUT /api/settings/preferences` 不绕过 usable
+- [x] ADR 0007
 
 #### M2.3 → `v0.2.3`
 
 验收：
 
-- [ ] 同标的/同日与批处理（replay）口径对齐验收
+- [x] 同标的/同日：API daily 与直接 `ReplayProvider.get_daily` 字段一致
 
 验收（大）：
 
-- [ ] 通用路径无硬编码单一数据源品牌
-- [ ] 缺 minute 等能力时 UI/API fail-closed
+- [x] 通用路径无硬编码单一数据源品牌
+- [x] 缺 minute 等能力时 UI/API fail-closed
 
 ---
 
