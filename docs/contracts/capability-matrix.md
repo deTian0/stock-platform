@@ -48,10 +48,13 @@ CapabilityStatus {
 
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
-| `astock_http` | a-stock-data 库化 | M1 | daily, realtime, adj_factor, … 渐进 |
+| `replay` | fixtures | **M1.2 已实现** | daily, realtime |
+| `astock_http` | a-stock-data 库化 | M1.3 声明 pending；live 后续 | daily, realtime, … |
 | `tickflow` | TSP 内置 | M2 | 按档位 |
 | `yaml_custom` | 用户 YAML | M2 | 声明集 |
 | `global_http` | global-stock-data | M5 | 美港集 |
+
+运行时：`stock_platform_providers.build_capability_matrix` / `register_builtin_providers`。
 
 ## 插件失败隔离
 

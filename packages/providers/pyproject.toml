@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-providers"
-version = "0.1.2"
+version = "0.1.3"
 description = "Unified market-data providers for stock-platform (A-share first)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,8 @@ authors = [{ name = "stock-platform" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+http = ["requests>=2.28"]
+dev = ["pytest>=8.0", "requests>=2.28"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
