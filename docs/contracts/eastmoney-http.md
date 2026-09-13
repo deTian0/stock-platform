@@ -1,0 +1,28 @@
+# 东财请求规范
+
+> 状态：Accepted（M1.3）  
+> 实现：`stock_platform_providers.eastmoney`
+
+## 硬规则
+
+1. **禁止**对 `*.eastmoney.com` 使用裸 `requests.get` / `urllib` / `httpx`。
+2. **必须**使用 `em_get(...)` 或同一进程内的 `EastmoneyClient.get(...)`。
+3. 非东财源（腾讯 / 新浪 / mootdx / 同花顺等）**不要**走 `em_get`（会被 URL 校验拒绝）。
+
+## 限流
+
+| 项 | 默认 | 覆盖 |
+|----|------|------|
+| 最小间隔 | 1.0s | 环境变量 `EM_MIN_INTERVAL` |
+| 抖动 | 0.1–0.5s | 客户端构造时注入 `rng` |
+| 并发 | 进程内锁串行 | — |
+
+批量任务建议 `EM_MIN_INTERVAL=1.5`～`2`。
+
+## 依赖
+
+```powershell
+pip install "stock-platform-providers[http]"
+```
+
+单测使用注入 `transport`，不访问公网。

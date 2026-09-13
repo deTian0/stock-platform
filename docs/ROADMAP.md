@@ -19,7 +19,7 @@
 | M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | planned |
 | M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | done |
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | done |
-| M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | planned |
+| M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | done |
 | M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
 | M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | planned |
 | M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | planned |
@@ -115,13 +115,16 @@
 
 验收：
 
-- [ ] 东财限流单点 + 能力矩阵注册
+- [x] `em_get` / `EastmoneyClient` 串行限流 + 拒绝非东财 URL
+- [x] `build_capability_matrix` + 七项注册表；`replay` usable / `astock_http` pending
+- [x] 文档 `docs/contracts/eastmoney-http.md`：禁止裸东财请求
+- [x] ADR 0005
 
 验收（大 M1 → `v0.2.0`）：
 
-- [ ] daily + realtime 契约测试（录制回放）通过
-- [ ] ticker 归一化 + 非 A 股拒绝
-- [ ] 文档声明：新代码禁止直连东财 URL
+- [x] daily + realtime 契约测试（录制回放）通过
+- [x] ticker 归一化 + 非 A 股拒绝
+- [x] 文档声明：新代码禁止直连东财 URL
 
 ---
 
