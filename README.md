@@ -15,7 +15,7 @@
 **已完成（M0 / v0.1.0）**：仓库工程化、契约定稿、里程碑与 tag 流程、CI 冒烟。  
 **已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
 **已完成（M2 / v0.3.0）**：FastAPI 工作台壳 + 能力矩阵路由 + fail-closed。  
-**下一步（M3）**：选股 / PIT 回测内核迁入。
+**进行中（M3）**：`packages/research` — v0.3.1 起 lvrev 内核。
 
 ## 仓库布局
 
@@ -25,6 +25,7 @@ stock-platform/
 │   └── workbench/          # FastAPI 最小壳（M2.1+）
 ├── packages/
 │   └── providers/          # 统一 Vendor（M1+）
+│   └── research/           # lvrev / PIT（M3+）
 ├── docs/
 │   ├── ROADMAP.md          # 大/小里程碑与验收
 │   ├── versioning.md       # tag 与发版规则

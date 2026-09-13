@@ -27,6 +27,7 @@ $required = @(
   'docs/architecture/0005-em-get-capability-matrix.md',
   'docs/architecture/0006-workbench-shell.md',
   'docs/architecture/0007-fail-closed-alignment.md',
+  'docs/architecture/0008-research-lvrev-pit.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
@@ -38,7 +39,10 @@ $required = @(
   'packages/providers/src/stock_platform_providers/__init__.py',
   'apps/workbench/README.md',
   'apps/workbench/pyproject.toml',
-  'apps/workbench/src/stock_platform_workbench/__init__.py'
+  'apps/workbench/src/stock_platform_workbench/__init__.py',
+  'packages/research/README.md',
+  'packages/research/pyproject.toml',
+  'packages/research/src/stock_platform_research/__init__.py'
 )
 
 $failed = $false
