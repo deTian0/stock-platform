@@ -8,6 +8,15 @@
 
 - （无）
 
+## [0.5.1] - 2026-09-13
+
+### Added
+
+- `MarketStrategy` / `get_market_strategy`：CN/US/HK 时区、会话、settle、limit
+- US/HK 明确 `buy_to_sell_delay_days=0`、`has_limits=False`（不套用 A 股）
+- ADR 0010；契约 `market-strategy.md` 美港表定稿
+- （同树预置）US/HK `normalize_symbol` 与 `GlobalReplayProvider`，验收见 0.5.2 / 0.5.3
+
 ## [0.5.0] - 2026-09-13
 
 ### Added
@@ -187,7 +196,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/local/stock-platform/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/local/stock-platform/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/local/stock-platform/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/local/stock-platform/compare/v0.4.0...v0.4.1

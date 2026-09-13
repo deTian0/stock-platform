@@ -1,8 +1,7 @@
-"""A-share symbol normalization.
+"""A-share / US / HK symbol normalization.
 
-Aligns with TradingAgents `_normalize_ticker` / `_get_prefix` and
-a-stock-data BSE segment rules. Chinese-name resolution is intentionally
-out of scope for M1.1 (no mootdx dependency yet).
+CN path aligns with TradingAgents `_normalize_ticker` and a-stock-data BSE rules.
+US / HK are separate markets — never routed through CN digit-only rules.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ import re
 from .errors import SymbolError
 
 _PATH_SAFE = re.compile(r"^[A-Za-z0-9._\-\^]+$")
+_US_TICKER = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 
 def is_bse_symbol(code: str) -> bool:
@@ -34,26 +34,7 @@ def exchange_prefix(code: str) -> str:
     return "sz"
 
 
-def normalize_symbol(symbol: str, *, market: str = "CN") -> str:
-    """Return a pure 6-digit A-share code.
-
-    Accepts forms such as ``600519``, ``SH600519``, ``600519.SH``, ``sz000001``.
-    Rejects HK (4–5 digit / ``.HK``) and US-style tickers on the CN path.
-
-    Parameters
-    ----------
-    symbol:
-        Raw ticker from user / LLM / vendor.
-    market:
-        Only ``CN`` is implemented. Other markets raise ``SymbolError`` until M5.
-    """
-    if market != "CN":
-        raise SymbolError(
-            f"market={market!r} is not supported yet; only CN is available until M5."
-        )
-    if not isinstance(symbol, str) or not symbol.strip():
-        raise SymbolError(f"ticker must be a non-empty string, got {symbol!r}")
-
+def _normalize_cn(symbol: str) -> str:
     original = symbol.strip()
     if re.search(r"[\u4e00-\u9fff]", original):
         raise SymbolError(
@@ -68,7 +49,7 @@ def normalize_symbol(symbol: str, *, market: str = "CN") -> str:
                 raise SymbolError(
                     f"{original!r} is a Hong Kong ticker. "
                     "CN providers only accept 6-digit A-share codes "
-                    "(e.g. 600519). Use global providers at M5."
+                    "(e.g. 600519). Pass market='HK' for Hong Kong."
                 )
             s = s[: -len(suffix)]
             break
@@ -88,13 +69,83 @@ def normalize_symbol(symbol: str, *, market: str = "CN") -> str:
     if s.isdigit() and len(s) in (4, 5):
         raise SymbolError(
             f"{original!r} looks like a Hong Kong numeric code. "
-            "CN providers only accept 6-digit A-share codes."
+            "CN providers only accept 6-digit A-share codes. Pass market='HK'."
         )
     if s and not s.isdigit():
         raise SymbolError(
             f"{original!r} is not an A-share code. "
-            "CN providers only accept 6-digit numeric codes (e.g. 600519)."
+            "CN providers only accept 6-digit numeric codes (e.g. 600519). "
+            "Pass market='US' for US tickers."
         )
     raise SymbolError(
         f"{original!r} is not a valid A-share code (need exactly 6 digits, got {s!r})."
     )
+
+
+def _normalize_hk(symbol: str) -> str:
+    original = symbol.strip()
+    if not original:
+        raise SymbolError("HK ticker must be a non-empty string")
+    if re.search(r"[\u4e00-\u9fff]", original):
+        raise SymbolError(f"{original!r}: HK path does not resolve Chinese names")
+
+    s = original.upper().replace(" ", "")
+    if s.startswith("HK") and len(s) > 2 and s[2:].replace(".", "").isdigit():
+        s = s[2:]
+    if s.endswith(".HK"):
+        s = s[:-3]
+    if s.startswith("0") and s[1:].isdigit() and len(s) > 5:
+        # keep as-is until length check
+        pass
+    if not s.isdigit() or len(s) > 5:
+        raise SymbolError(
+            f"{original!r} is not a Hong Kong numeric ticker "
+            "(expect 1–5 digits or *.HK, e.g. 00700 / 0700.HK)."
+        )
+    return s.zfill(5)
+
+
+def _normalize_us(symbol: str) -> str:
+    original = symbol.strip()
+    if not original:
+        raise SymbolError("US ticker must be a non-empty string")
+    if re.search(r"[\u4e00-\u9fff]", original):
+        raise SymbolError(f"{original!r}: US path does not resolve Chinese names")
+
+    s = original.upper().replace(" ", "")
+    for suffix in (".US", ".NYSE", ".NASDAQ"):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)]
+            break
+    # Yahoo-style class shares: BRK-B → BRK.B
+    s = s.replace("-", ".")
+    if s.isdigit():
+        raise SymbolError(
+            f"{original!r} looks numeric; US path expects letter tickers (e.g. AAPL). "
+            "Use market='HK' for Hong Kong codes."
+        )
+    if not _US_TICKER.fullmatch(s):
+        raise SymbolError(
+            f"{original!r} is not a valid US ticker after parse ({s!r})."
+        )
+    return s
+
+
+def normalize_symbol(symbol: str, *, market: str = "CN") -> str:
+    """Normalize a ticker for the given ``market`` (``CN`` / ``US`` / ``HK``).
+
+    CN returns a 6-digit A-share code and **rejects** HK / US forms.
+    HK returns a zero-padded 5-digit code (``00700``).
+    US returns an uppercase letter ticker (``AAPL``, ``BRK.B``).
+    """
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise SymbolError(f"ticker must be a non-empty string, got {symbol!r}")
+
+    m = str(market).strip().upper()
+    if m == "CN":
+        return _normalize_cn(symbol)
+    if m == "HK":
+        return _normalize_hk(symbol)
+    if m == "US":
+        return _normalize_us(symbol)
+    raise SymbolError(f"market={market!r} is not supported; expected CN, US, or HK.")

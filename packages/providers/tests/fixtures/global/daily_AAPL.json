@@ -1,0 +1,30 @@
+{
+  "bars": [
+    {
+      "symbol": "AAPL",
+      "date": "2026-09-01",
+      "open": 220.0,
+      "high": 225.0,
+      "low": 219.0,
+      "close": 224.0,
+      "volume": 50000000,
+      "amount": 11200000000,
+      "prev_close": 218.0,
+      "change_pct": 2.7523,
+      "pct_unit": "percent"
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2026-09-02",
+      "open": 224.0,
+      "high": 228.0,
+      "low": 223.0,
+      "close": 227.0,
+      "volume": 48000000,
+      "amount": 10800000000,
+      "prev_close": 224.0,
+      "change_pct": 1.3393,
+      "pct_unit": "percent"
+    }
+  ]
+}

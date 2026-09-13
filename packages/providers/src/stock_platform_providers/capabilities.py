@@ -90,6 +90,28 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             pending_reason="Live HTTP adapter not wired yet; use em_get for EM calls only",
         )
     )
+    reg.register(
+        ProviderDeclaration(
+            name="global_replay",
+            display="Global US/HK replay fixtures",
+            kind="builtin",
+            datasets=frozenset({"daily", "realtime"}),
+            available=True,
+            status="ok",
+            note="Offline US/HK fixtures; no CN T+1/limit assumptions",
+        )
+    )
+    reg.register(
+        ProviderDeclaration(
+            name="global_http",
+            display="Global HTTP (US/HK)",
+            kind="builtin",
+            datasets=frozenset({"daily", "realtime"}),
+            available=False,
+            status="pending",
+            pending_reason="Live global vendor not wired; use global_replay + MarketStrategy",
+        )
+    )
 
 
 def build_capability_matrix(

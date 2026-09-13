@@ -1,0 +1,14 @@
+{
+  "quote": {
+    "symbol": "00700",
+    "name": "Tencent",
+    "price": 392.0,
+    "prev_close": 388.0,
+    "change": 4.0,
+    "pct": 1.0309,
+    "pct_unit": "percent",
+    "volume": 18000000,
+    "amount": 7056000000,
+    "asof_ts": 1725260400000
+  }
+}

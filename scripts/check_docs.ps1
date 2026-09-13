@@ -29,6 +29,7 @@ $required = @(
   'docs/architecture/0007-fail-closed-alignment.md',
   'docs/architecture/0008-research-lvrev-pit.md',
   'docs/architecture/0009-agent-plugins.md',
+  'docs/architecture/0010-market-strategy-global.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',

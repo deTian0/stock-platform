@@ -31,7 +31,10 @@
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | done |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | done |
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | done |
-| M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | planned |
+| M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | in_progress |
+| M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
+| M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | planned |
+| M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | planned |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
 
@@ -232,6 +235,34 @@
 ## M5 — 美港 → `v0.6.0`
 
 **目标**：独立市场策略；不复用 A 股涨跌停/T+1 假设。
+
+### 小里程碑
+
+#### M5.1 → `v0.5.1`
+
+验收：
+
+- [x] `get_market_strategy`：CN/US/HK 时区、会话、settle、limit
+- [x] US/HK `buy_to_sell_delay_days=0` 且 `has_limits=False`
+- [x] ADR 0010；`market-strategy.md` 美港表定稿
+
+#### M5.2 → `v0.5.2`
+
+验收：
+
+- [ ] `normalize_symbol(..., market="US"|"HK")`
+- [ ] CN 路径继续拒绝港美形态
+
+#### M5.3 → `v0.5.3`
+
+验收：
+
+- [ ] `GlobalReplayProvider` + fixtures（AAPL / 00700）
+- [ ] 能力矩阵注册 `global_replay` / `global_http`(pending)
+
+验收（大）：
+
+- [ ] M5.1–M5.3 done；CHANGELOG 含 `0.6.0`
 
 ---
 

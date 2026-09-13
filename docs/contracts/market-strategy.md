@@ -47,15 +47,20 @@ market_id ∈ { "CN", "US", "HK" }
 
 ---
 
-## US / HK — 占位（M5 展开）
+## US / HK — M5 定稿（不得套用 CN）
 
 | 项 | US | HK |
 |----|----|-----|
 | `market_id` | `US` | `HK` |
 | 时区 | `America/New_York` | `Asia/Hong_Kong` |
-| A 股式涨跌停 | **无** | **无** |
-| A 股 T+1 | **不套用** | **不套用** |
+| 会话（简表） | 09:30–16:00 | 09:30–12:00、13:00–16:00 |
+| 股票「当日可卖」 | **允许**（`buy_to_sell_delay_days=0`） | **允许** |
+| A 股式涨跌停 | **无**（`has_limits=False`） | **无** |
+| 代码归一化 | 大写字母 ticker（`AAPL` / `BRK.B`） | 5 位补零（`00700`） |
 | 进入 CN `normalize_symbol` | 必须失败 | 必须失败 |
+| Vendor（M5） | `global_replay` fixtures；`global_http` pending | 同左 |
+
+实现：`packages/providers` → `get_market_strategy` / `GlobalReplayProvider`。
 
 ---
 
@@ -80,7 +85,7 @@ MarketStrategy:
 |--------|------|
 | 北交所是否进 v1 | 可解析；默认宇宙 **可选排除**（`include_bse`） |
 | ETF / 指数是否共用股票规则 | **否**；经 `asset_type` + `settle_rule` / `limit_rules` 分支 |
-| 美港何时写细表 | M5；本文件仅冻结「不得套用 CN 假设」 |
+| 美港何时写细表 | **M5 已写**；见上表与 ADR 0010 |
 
 ## 参考
 

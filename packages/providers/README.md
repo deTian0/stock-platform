@@ -10,6 +10,7 @@
 | M1.2 / v0.1.2 | `ReplayProvider` daily + realtime 录制回放 |
 | **M1.3 / v0.1.3** | `em_get` 东财限流单点 + `build_capability_matrix` |
 | **M1 / v0.2.0** | 大里程碑收口（上列能力齐备） |
+| **M5.1+ / v0.5.1** | `MarketStrategy` CN/US/HK；`normalize_symbol(market=)`；`GlobalReplayProvider` |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
@@ -30,8 +31,10 @@ python -m pip install -e ".[http]"
 
 | 符号 | 作用 |
 |------|------|
-| `normalize_symbol` / `exchange_prefix` / `is_bse_symbol` | A 股代码 |
-| `ReplayTransport` / `ReplayProvider` | fixtures 回放 |
+| `normalize_symbol` / `exchange_prefix` / `is_bse_symbol` | CN / US / HK 代码（`market=`） |
+| `get_market_strategy` / `MarketStrategy` | 市场策略表（settle / limit / 时区） |
+| `ReplayTransport` / `ReplayProvider` | CN fixtures 回放 |
+| `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
 | `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口 |
 | `build_capability_matrix` / `register_builtin_providers` | 能力路由 |
 | `SymbolError` | 非法代码 |
