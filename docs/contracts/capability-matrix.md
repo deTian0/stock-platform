@@ -48,11 +48,12 @@ CapabilityStatus {
 
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
-| `replay` | fixtures | **M1.2 已实现** | daily, realtime |
+| `replay` | fixtures | **M1.2 已实现** | daily, realtime（CN） |
 | `astock_http` | a-stock-data 库化 | M1.3 声明 pending；live 后续 | daily, realtime, … |
+| `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
+| `global_http` | global-stock-data 配方 | M5 pending；勿整仓搬 Skill | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |
 | `yaml_custom` | 用户 YAML | M2 | 声明集 |
-| `global_http` | global-stock-data | M5 | 美港集 |
 
 运行时：`stock_platform_providers.build_capability_matrix` / `register_builtin_providers`。
 

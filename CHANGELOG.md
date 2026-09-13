@@ -4,9 +4,9 @@
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- （无）
+- 契约跟进探索结论：`datasets.md` US/HK 符号与 volume（股）分支；能力矩阵标明 `global_replay`；ADR 0010 吸收边界（Skill 非 pip 依赖）
 
 ## [0.6.0] - 2026-09-13
 

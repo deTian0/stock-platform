@@ -18,14 +18,23 @@ asset_type ∈ { "stock", "etf", "index" }
 
 标的主数据（instruments）建议列：`symbol`, `name`, `code`, `exchange`, `asset_type`, `source`, `list_date?`, `status?`。
 
-## Ticker（A 股路径）
+## Ticker（按 market）
+
+### CN（A 股路径）
 
 | 规则 | 说明 |
 |------|------|
 | 内部 `symbol` | 6 位数字字符串，如 `600519`、`000001` |
-| 归一化 | 未来 `packages/providers.normalize_symbol()` 唯一入口 |
+| 归一化 | `normalize_symbol(..., market="CN")` 唯一入口 |
 | 拒绝 | 港股（4–5 位 / `.HK`）、美股代码进入 A 股路径 |
 | 北交所 | v1 默认**纳入归一化但可选宇宙过滤**；号段 43/83/87/88/92 等在策略层配置 |
+
+### US / HK（M5）
+
+| 市场 | 内部 `symbol` | 归一化入口 | 备注 |
+|------|---------------|------------|------|
+| US | 大写字母 ticker（`AAPL`、`BRK.B`） | `market="US"` | 不得进 CN 路径 |
+| HK | **5 位**补零（`00700`） | `market="HK"` | 接受 `0700.HK` / `700`；不得进 CN 路径 |
 
 ## 核心数据集字段
 
@@ -33,18 +42,18 @@ asset_type ∈ { "stock", "etf", "index" }
 
 | 字段 | 类型 | 必填 | 单位 / 语义 |
 |------|------|------|-------------|
-| `symbol` | str | ✅ | 6 位 |
+| `symbol` | str | ✅ | **按 market**：CN=6 位；US=字母；HK=5 位 |
 | `asset_type` | str | 建议 | stock/etf/index |
 | `source` | str | 建议 | Provider 名 |
 | `date` | date | ✅ | **交易日**；内部列名对齐 TSP：`date`（不是 `trade_date`） |
-| `open/high/low/close` | float | ✅ | 元；入库可为不复权，enriched 层见下 |
-| `volume` | float | ✅ | **手**（1 手 = 100 股） |
-| `amount` | float | ✅ | **元**（成交额） |
-| `pre_close` | float | 建议 | 元 |
+| `open/high/low/close` | float | ✅ | 标价货币（CN=元；US=USD；HK=HKD）；入库可为不复权，enriched 层见下 |
+| `volume` | float | ✅ | **CN=手**（1 手 = 100 股）；**US/HK=股（shares）**，禁止按 A 股手换算 |
+| `amount` | float | ✅ | 成交额（与价格同币种） |
+| `pre_close` | float | 建议 | 与价格同币种 |
 | `change_pct` | float | 建议 | **小数制**；可缺，由下游用涨跌额/昨收推导 |
 | `quote_ts` | int64? | 可选 | 毫秒行情时间戳；缺失为 null |
 
-自验：`amount ÷ volume ÷ 100 ≈ 当日均价`（量能异常日除外）。
+自验（**仅 CN**）：`amount ÷ volume ÷ 100 ≈ 当日均价`（量能异常日除外）。US/HK 用 `amount ÷ volume ≈ 均价`。
 
 ### `adj_factor`（除权因子）
 
@@ -64,15 +73,15 @@ asset_type ∈ { "stock", "etf", "index" }
 |------|------|------|-------------|
 | `symbol` | str | ✅ | |
 | `name` | str | 建议 | |
-| `price` | float | ✅ | 最新价（元） |
-| `prev_close` | float | 建议 | 昨收（元） |
-| `change_amount` | float | 建议 | 涨跌额（元） |
+| `price` | float | ✅ | 最新价（与 market 币种一致） |
+| `prev_close` | float | 建议 | 昨收 |
+| `change_amount` | float | 建议 | 涨跌额 |
 | `change_pct` | float | 建议 | **小数制**入口：`0.0366` = 3.66% |
 | `amplitude` | float | 建议 | **小数制**入口 |
 | `turnover_rate` | float | 建议 | **小数制**入口：`0.05` = 5% |
-| `volume` | float | ✅ | **手** |
-| `amount` | float | 建议 | **元** |
-| `asof_ts` | int64 或 datetime | ✅ | 快照时刻；存储为 **Unix 毫秒 UTC**，展示转 Asia/Shanghai。禁止把「上海墙钟 naive」当 UTC 入库 |
+| `volume` | float | ✅ | **CN=手**；**US/HK=股** |
+| `amount` | float | 建议 | 成交额（与价格同币种） |
+| `asof_ts` | int64 或 datetime | ✅ | 快照时刻；存储为 **Unix 毫秒 UTC**，展示转该 market 时区。禁止把「本地墙钟 naive」当 UTC 入库 |
 
 百分制源必须在 Provider/`pct_unit` 配置中**显式**声明并 `/100`；未声明时 `change_pct` 仅允许有文档的截面判定，`amplitude`/`turnover_rate` 应置 null 交下游重算。
 
