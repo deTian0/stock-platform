@@ -1,0 +1,40 @@
+# CI
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Required files exist
+        run: |
+          test -f VERSION
+          test -f README.md
+          test -f docs/ROADMAP.md
+          test -f docs/versioning.md
+          test -f docs/architecture/0001-target-architecture.md
+          test -f docs/contracts/datasets.md
+          test -f docs/contracts/capability-matrix.md
+          test -f docs/contracts/market-strategy.md
+          test -f scripts/release_tag.ps1
+          test -f packages/providers/README.md
+          test -f apps/workbench/README.md
+
+      - name: VERSION is semver-ish
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          echo "VERSION=$ver"
+          echo "$ver" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.+-]+)?$'
+
+      - name: CHANGELOG mentions VERSION
+        run: |
+          ver=$(tr -d '[:space:]' < VERSION)
+          grep -q "\[$ver\]" CHANGELOG.md
