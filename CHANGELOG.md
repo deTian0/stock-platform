@@ -8,6 +8,16 @@
 
 - （无）
 
+## [0.1.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M0 完成**：工程架子、契约 Accepted、CI/文档自检、SemVer tag 流程可协作
+
+### Notes
+
+- 仍无可运行行情/选股业务；下一阶段 M1（`v0.2.0`）开始 `packages/providers` 可安装实现
+
 ## [0.0.3] - 2026-09-13
 
 ### Added
@@ -40,7 +50,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/local/stock-platform/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/local/stock-platform/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/local/stock-platform/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/local/stock-platform/releases/tag/v0.0.1
