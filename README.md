@@ -15,7 +15,8 @@
 **已完成（M0 / v0.1.0）**：仓库工程化、契约定稿、里程碑与 tag 流程、CI 冒烟。  
 **已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
 **已完成（M2 / v0.3.0）**：FastAPI 工作台壳 + 能力矩阵路由 + fail-closed。  
-**进行中（M3）**：`packages/research` — v0.3.1 起 lvrev 内核。
+**已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
+**下一步（M4）**：投研 Agent 插件化（去内嵌抓取）。
 
 ## 仓库布局
 

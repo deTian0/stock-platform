@@ -8,6 +8,20 @@
 
 - （无）
 
+## [0.4.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M3 完成**：`packages/research` 选股/回测内核
+  - lvrev 评分与入场闸门（迁自 a-stock-engine）
+  - PIT long-only（T 信号 / T+1 open）+ 防未来函数
+  - 盘前截面批处理 CLI `stock-platform-score`
+
+### Notes
+
+- a-stock-engine 视为参考实现；平台权威评分路径为本包
+- 下一步 M4：TradingAgents 研报插件化（去内嵌抓取）
+
 ## [0.3.3] - 2026-09-13
 
 ### Added
@@ -140,7 +154,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/local/stock-platform/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/local/stock-platform/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/local/stock-platform/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/local/stock-platform/compare/v0.3.0...v0.3.1
