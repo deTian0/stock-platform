@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.3.3] - 2026-09-13
+
+### Added
+
+- `score_cross_section_csv` + 控制台入口 `stock-platform-score`（盘前批处理）
+
 ## [0.3.2] - 2026-09-13
 
 ### Added
@@ -134,7 +140,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/local/stock-platform/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/local/stock-platform/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/local/stock-platform/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/local/stock-platform/compare/v0.2.3...v0.3.0
