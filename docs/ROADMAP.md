@@ -33,7 +33,7 @@
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | done |
 | M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | in_progress |
 | M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
-| M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | planned |
+| M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | done |
 | M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | planned |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
@@ -250,8 +250,8 @@
 
 验收：
 
-- [ ] `normalize_symbol(..., market="US"|"HK")`
-- [ ] CN 路径继续拒绝港美形态
+- [x] `normalize_symbol(..., market="US"|"HK")`
+- [x] CN 路径继续拒绝港美形态
 
 #### M5.3 → `v0.5.3`
 

@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.5.2] - 2026-09-13
+
+### Added
+
+- M5.2 验收：`normalize_symbol(market="US"|"HK")`；CN 路径继续拒港美
+
 ## [0.5.1] - 2026-09-13
 
 ### Added
@@ -196,7 +202,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/local/stock-platform/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/local/stock-platform/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/local/stock-platform/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/local/stock-platform/compare/v0.4.1...v0.4.2
