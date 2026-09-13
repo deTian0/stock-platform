@@ -1,0 +1,28 @@
+# packages/research
+
+选股 / 回测研究内核。安装名：`stock-platform-research`。
+
+## 状态
+
+| 版本 | 能力 |
+|------|------|
+| **M3.1 / v0.3.1** | `score_lvrev` / `apply_entry_gates` / `apply_risk_gates`（迁自 a-stock-engine） |
+| **M3.2** | `run_pit_long_only` + 防未来函数列护栏 |
+
+## 安装
+
+```powershell
+cd D:\workspace\git\stock-platform\packages\research
+python -m pip install -e ".[dev]"
+python -m pytest -q
+```
+
+## 来源
+
+- `lvrev.py` / `gates.py` ← a-stock-engine `src/lvrev_scorer.py` + `apply_risk_gates`
+- 权重锁定 W_DEFAULT / W_VALUE（engine v4.29）
+
+## 约束
+
+- 评分不得使用 `fwd_*` / `next_*` 等未来列（`assert_no_lookahead_columns`）
+- 信号日与成交日分离：信号用 T 收盘特征，成交用 T+1 open

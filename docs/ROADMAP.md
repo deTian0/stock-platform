@@ -25,7 +25,7 @@
 | M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | done |
 | M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | done |
 | M3 | 选股 / PIT 回测内核迁入 | 大 | `v0.4.0` | planned |
-| M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | planned |
+| M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | done |
 | M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | planned |
 | M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | planned |
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | planned |
@@ -169,7 +169,35 @@
 
 ## M3 — 选股回测内核 → `v0.4.0`
 
-**目标**：lvrev / PIT 回测权威路径在本仓；engine 旧路径标记废弃。
+**目标**：lvrev / PIT 回测权威路径在本仓；engine 旧路径标记为参考。
+
+### 小里程碑
+
+#### M3.1 → `v0.3.1`
+
+验收：
+
+- [x] `packages/research` 可安装
+- [x] `score_lvrev` / `apply_entry_gates` / `apply_risk_gates`
+- [x] pytest 覆盖（迁自 engine 语义）
+- [x] ADR 0008
+
+#### M3.2 → `v0.3.2`
+
+验收：
+
+- [ ] `run_pit_long_only`：T 信号 / T+1 open 成交
+- [ ] 防未来函数列护栏测试
+
+#### M3.3 → `v0.3.3`
+
+验收：
+
+- [ ] `score_cross_section_csv` + CLI `stock-platform-score`
+
+验收（大）：
+
+- [ ] M3.1–M3.3 done；CHANGELOG 含 `0.4.0`
 
 ---
 
