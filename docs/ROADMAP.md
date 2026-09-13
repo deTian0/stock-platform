@@ -17,7 +17,7 @@
 | M0.2 | 契约草案评审定稿 | 小 | `v0.0.2` | done |
 | M0.3 | CI 绿 + 文档交叉链接检查 | 小 | `v0.0.3` | done |
 | M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | planned |
-| M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | planned |
+| M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | done |
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | planned |
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | planned |
 | M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
@@ -90,7 +90,31 @@
 
 **目标**：可 `pip install` 的 `packages/providers`；东财限流单点；与旧仓抓取去重启动。
 
-验收（大）：
+### 小里程碑
+
+#### M1.1 → `v0.1.1`
+
+验收：
+
+- [x] `packages/providers` 可 `pip install -e ".[dev]"`
+- [x] `normalize_symbol` / `exchange_prefix` / `is_bse_symbol`
+- [x] 拒绝港美与中文名；`920xxx` → `bj`
+- [x] pytest 覆盖上述行为；CI `providers` job
+- [x] ADR 0003
+
+#### M1.2 → `v0.1.2`
+
+验收：
+
+- [ ] daily + realtime 适配器（录制回放测）
+
+#### M1.3 → `v0.1.3`
+
+验收：
+
+- [ ] 东财限流单点 + 能力矩阵注册
+
+验收（大 M1 → `v0.2.0`）：
 
 - [ ] daily + realtime 契约测试（录制回放）通过
 - [ ] ticker 归一化 + 非 A 股拒绝

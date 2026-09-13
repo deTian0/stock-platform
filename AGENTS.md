@@ -10,7 +10,8 @@
 
 ## 硬性规则
 
-- 当前处于 **v0.1.x（M0 已完成）**：可开始 M1 providers；不虚构尚未实现的行情 API。
+- 当前处于 **v0.1.x（M1 进行中）**：providers 可安装；不虚构尚未实现的行情 HTTP API。
+- 改 `packages/providers` 版本时同步：根 `VERSION`、`pyproject.toml`、`__init__.__version__`。
 - 上游仓（tick-stock-panel、a-stock-data 等）仅作参考；迁入须走里程碑验收，禁止整目录复制。
 - 版本号单一事实源：根目录 `VERSION`。打 tag 用 `scripts/release_tag.ps1`。
 - 不提交密钥、行情缓存、SQLite 大数据。

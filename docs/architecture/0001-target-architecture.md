@@ -28,5 +28,6 @@
 ## 后续 ADR
 
 - 0002：数据集字段与单位（**已 Accepted，M0.2**）
-- 0003：东财限流与 Session 单例（待 M1）
+- 0003：providers 包与 normalize_symbol（**已 Accepted，M1.1**）
 - 0004：工作台迁入策略（子树合并 vs 逐步重写）（待 M2）
+- 0005：东财限流与 Session 单例（待 M1.3）

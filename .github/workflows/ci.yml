@@ -25,3 +25,31 @@ jobs:
         run: |
           $ver = (Get-Content VERSION -Raw).Trim()
           ./scripts/release_tag.ps1 -Version $ver -Kind patch -Message "ci dry-run" -DryRun
+
+  providers:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/providers
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install providers (editable + dev)
+        run: python -m pip install -e ".[dev]"
+
+      - name: Pytest
+        run: python -m pytest -q
+
+      - name: Package version matches VERSION
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          root_ver=$(tr -d '[:space:]' < VERSION)
+          pkg_ver=$(python -c "import tomllib; print(tomllib.load(open('packages/providers/pyproject.toml','rb'))['project']['version'])")
+          test "$root_ver" = "$pkg_ver"
+          import_ver=$(python -c "import sys; sys.path.insert(0,'packages/providers/src'); from stock_platform_providers import __version__; print(__version__)")
+          test "$root_ver" = "$import_ver"

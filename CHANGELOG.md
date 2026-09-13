@@ -8,6 +8,14 @@
 
 - （无）
 
+## [0.1.1] - 2026-09-13
+
+### Added
+
+- `packages/providers`：可安装包 `stock-platform-providers`
+- `normalize_symbol` / `exchange_prefix` / `is_bse_symbol` + pytest
+- ADR 0003；CI `providers` job（含与根 `VERSION` 对齐校验）
+
 ## [0.1.0] - 2026-09-13
 
 ### Added
@@ -50,7 +58,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/local/stock-platform/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/local/stock-platform/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/local/stock-platform/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/local/stock-platform/compare/v0.0.1...v0.0.2
