@@ -8,6 +8,13 @@
 
 - （无）
 
+## [0.4.2] - 2026-09-13
+
+### Added
+
+- M4.2 验收：workbench 个股研报 / 复盘槽位经能力矩阵 `resolve("daily")`
+- 路由测试覆盖 historical asof 告警与港股拒绝
+
 ## [0.4.1] - 2026-09-13
 
 ### Added
@@ -166,7 +173,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/local/stock-platform/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/local/stock-platform/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/local/stock-platform/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/local/stock-platform/compare/v0.3.2...v0.3.3
