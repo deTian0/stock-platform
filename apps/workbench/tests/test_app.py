@@ -112,3 +112,28 @@ def test_api_matches_direct_replay_same_symbol_day(client: TestClient) -> None:
         assert a["volume"] == b["volume"]
         assert a["amount"] == b["amount"]
         assert a["change_pct"] == b["change_pct"]
+
+
+def test_research_and_review_slots(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/report",
+        params={"symbol": "SH600519", "asof": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "research"
+    assert body["provider"] == "replay"
+    assert body["symbol"] == "600519"
+    assert any("跳过 realtime" in w or "早于今天" in w for w in body["warnings"])
+
+    rev = client.get(
+        "/api/review/report",
+        params={"symbol": "600519", "asof": "2026-09-02"},
+    )
+    assert rev.status_code == 200
+    assert rev.json()["kind"] == "review"
+
+
+def test_research_rejects_hk(client: TestClient) -> None:
+    r = client.get("/api/research/report", params={"symbol": "00700"})
+    assert r.status_code == 400

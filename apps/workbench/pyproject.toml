@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-workbench"
-version = "0.4.0"
+version = "0.4.1"
 description = "Minimal research workbench shell for stock-platform."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,7 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "stock-platform-providers",
+  "stock-platform-agents",
 ]
 
 [project.optional-dependencies]

@@ -28,8 +28,8 @@
 | M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | done |
 | M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | done |
 | M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | done |
-| M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | planned |
-| M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | planned |
+| M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | in_progress |
+| M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | done |
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | planned |
 | M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | planned |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
@@ -204,6 +204,28 @@
 ## M4 — Agent 插件 → `v0.5.0`
 
 **目标**：研报图不自带 HTTP 抓取；历史日未来函数护栏保留。
+
+### 小里程碑
+
+#### M4.1 → `v0.4.1`
+
+验收：
+
+- [x] `packages/agents` 可安装（`stock-platform-agents`）
+- [x] `ResearchAgentPlugin` / `ReviewAgentPlugin` 仅经注入的 `MarketDataProvider`
+- [x] 历史 `asof` 跳过 realtime 并告警；`normalize_symbol` 拒港美
+- [x] pytest + CI `agents` job；ADR 0009
+
+#### M4.2 → `v0.4.2`
+
+验收：
+
+- [ ] workbench `GET /api/research/report`、`GET /api/review/report`
+- [ ] 路由经 `resolve("daily")`；无内嵌东财 URL
+
+验收（大）：
+
+- [ ] M4.1–M4.2 done；CHANGELOG 含 `0.5.0`
 
 ---
 
