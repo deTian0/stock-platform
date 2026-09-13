@@ -34,7 +34,7 @@
 | M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | in_progress |
 | M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
 | M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | done |
-| M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | planned |
+| M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | done |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
 
@@ -257,8 +257,8 @@
 
 验收：
 
-- [ ] `GlobalReplayProvider` + fixtures（AAPL / 00700）
-- [ ] 能力矩阵注册 `global_replay` / `global_http`(pending)
+- [x] `GlobalReplayProvider` + fixtures（AAPL / 00700）
+- [x] 能力矩阵注册 `global_replay` / `global_http`(pending)
 
 验收（大）：
 

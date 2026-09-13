@@ -8,6 +8,13 @@
 
 - （无）
 
+## [0.5.3] - 2026-09-13
+
+### Added
+
+- M5.3 验收：`GlobalReplayProvider`（AAPL / 00700 fixtures）
+- 能力矩阵：`global_replay` usable、`global_http` pending
+
 ## [0.5.2] - 2026-09-13
 
 ### Added
@@ -202,7 +209,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/local/stock-platform/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/local/stock-platform/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/local/stock-platform/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/local/stock-platform/compare/v0.4.2...v0.5.0
