@@ -1,4 +1,4 @@
-"""stock-platform providers ? unified Vendor surface (A-share first)."""
+"""stock-platform providers ? unified Vendor surface (A-share first, US/HK via market)."""
 
 from .capabilities import (
     CAPABILITY_IDS,
@@ -11,6 +11,16 @@ from .capabilities import (
 )
 from .eastmoney import EastmoneyClient, em_get, is_eastmoney_url, reset_default_client
 from .errors import SymbolError
+from .global_replay import GlobalReplayProvider, GlobalReplayTransport
+from .market import (
+    LimitRule,
+    MarketStrategy,
+    SettleRule,
+    SessionSegment,
+    SymbolRef,
+    get_market_strategy,
+    list_market_ids,
+)
 from .replay import ReplayProvider, ReplayTransport
 from .symbol import (
     exchange_prefix,
@@ -22,20 +32,29 @@ __all__ = [
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
     "EastmoneyClient",
+    "GlobalReplayProvider",
+    "GlobalReplayTransport",
+    "LimitRule",
+    "MarketStrategy",
     "ProviderDeclaration",
     "ReplayProvider",
     "ReplayTransport",
+    "SettleRule",
+    "SessionSegment",
     "SymbolError",
+    "SymbolRef",
     "build_capability_matrix",
     "em_get",
     "exchange_prefix",
+    "get_market_strategy",
     "get_provider_registry",
     "is_bse_symbol",
     "is_eastmoney_url",
+    "list_market_ids",
     "normalize_symbol",
     "register_builtin_providers",
     "reset_default_client",
     "reset_provider_registry",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"

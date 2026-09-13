@@ -51,9 +51,8 @@ def test_normalize_rejects_non_cn(raw: str) -> None:
         normalize_symbol(raw)
 
 
-def test_normalize_rejects_non_cn_market() -> None:
-    with pytest.raises(SymbolError, match="M5"):
-        normalize_symbol("AAPL", market="US")
+def test_normalize_accepts_us_market() -> None:
+    assert normalize_symbol("AAPL", market="US") == "AAPL"
 
 
 @pytest.mark.parametrize(

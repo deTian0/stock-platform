@@ -1,0 +1,30 @@
+{
+  "bars": [
+    {
+      "symbol": "00700",
+      "date": "2026-09-01",
+      "open": 380.0,
+      "high": 390.0,
+      "low": 378.0,
+      "close": 388.0,
+      "volume": 20000000,
+      "amount": 7760000000,
+      "prev_close": 375.0,
+      "change_pct": 3.4667,
+      "pct_unit": "percent"
+    },
+    {
+      "symbol": "00700",
+      "date": "2026-09-02",
+      "open": 388.0,
+      "high": 395.0,
+      "low": 385.0,
+      "close": 392.0,
+      "volume": 18000000,
+      "amount": 7056000000,
+      "prev_close": 388.0,
+      "change_pct": 1.0309,
+      "pct_unit": "percent"
+    }
+  ]
+}

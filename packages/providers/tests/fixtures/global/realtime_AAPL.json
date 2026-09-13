@@ -1,0 +1,14 @@
+{
+  "quote": {
+    "symbol": "AAPL",
+    "name": "Apple",
+    "price": 227.0,
+    "prev_close": 224.0,
+    "change": 3.0,
+    "pct": 1.3393,
+    "pct_unit": "percent",
+    "volume": 48000000,
+    "amount": 10800000000,
+    "asof_ts": 1725260400000
+  }
+}

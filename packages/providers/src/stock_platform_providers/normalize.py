@@ -60,12 +60,13 @@ def normalize_daily_row(
     source: str,
     asset_type: str = "stock",
     default_symbol: str | None = None,
+    market: str = "CN",
 ) -> dict[str, Any]:
     """Map a vendor daily bar into contract fields (volume=手, amount=元)."""
     sym = raw.get("symbol") or raw.get("code") or default_symbol
     if not sym:
         raise ValueError("daily row missing symbol")
-    symbol = normalize_symbol(str(sym))
+    symbol = normalize_symbol(str(sym), market=market)
 
     open_ = _as_float(raw.get("open"))
     high = _as_float(raw.get("high"))
@@ -107,12 +108,13 @@ def normalize_realtime_row(
     source: str,
     asset_type: str = "stock",
     default_symbol: str | None = None,
+    market: str = "CN",
 ) -> dict[str, Any]:
     """Map a vendor snapshot into contract fields (ratios in decimal form)."""
     sym = raw.get("symbol") or raw.get("code") or default_symbol
     if not sym:
         raise ValueError("realtime row missing symbol")
-    symbol = normalize_symbol(str(sym))
+    symbol = normalize_symbol(str(sym), market=market)
 
     change_pct = _as_float(raw.get("change_pct") or raw.get("pct"))
     amplitude = _as_float(raw.get("amplitude"))
