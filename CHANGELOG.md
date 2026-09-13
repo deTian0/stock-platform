@@ -8,6 +8,13 @@
 
 - （无）
 
+## [0.2.1] - 2026-09-13
+
+### Added
+
+- `apps/workbench`：FastAPI 最小壳（health / capability-matrix / daily / realtime）
+- minute 缺能力时 409 fail-closed；ADR 0006；CI `workbench` job
+
 ## [0.2.0] - 2026-09-13
 
 ### Added
@@ -88,7 +95,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/local/stock-platform/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/local/stock-platform/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/local/stock-platform/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/local/stock-platform/compare/v0.1.1...v0.1.2
