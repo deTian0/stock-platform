@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.2.3] - 2026-09-13
+
+### Added
+
+- M2.3 验收：同标的同日 API daily 与 `ReplayProvider` 批处理字段对齐测试
+
 ## [0.2.2] - 2026-09-13
 
 ### Added
@@ -102,7 +108,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/local/stock-platform/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/local/stock-platform/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/local/stock-platform/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/local/stock-platform/compare/v0.1.3...v0.2.0
