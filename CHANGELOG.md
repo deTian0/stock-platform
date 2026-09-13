@@ -8,6 +8,20 @@
 
 - （无）
 
+## [0.2.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M1 完成**：可安装 `stock-platform-providers`
+  - ticker 归一化与港美拒绝
+  - daily/realtime 录制回放契约测试
+  - 东财 `em_get` 限流单点 + 能力矩阵注册
+  - 文档禁止裸东财 URL
+
+### Notes
+
+- Live HTTP 行情适配仍为 pending（`astock_http`）；下一阶段 M2 接入工作台壳
+
 ## [0.1.3] - 2026-09-13
 
 ### Added
@@ -74,7 +88,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/local/stock-platform/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/local/stock-platform/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/local/stock-platform/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/local/stock-platform/compare/v0.1.0...v0.1.1

@@ -16,7 +16,7 @@
 | M0.1 | 空仓脚手架与 Git | 小 | `v0.0.1` | done |
 | M0.2 | 契约草案评审定稿 | 小 | `v0.0.2` | done |
 | M0.3 | CI 绿 + 文档交叉链接检查 | 小 | `v0.0.3` | done |
-| M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | planned |
+| M1 | 统一 A 股 Provider 包（可安装） | 大 | `v0.2.0` | done |
 | M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | done |
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | done |
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | done |
@@ -125,6 +125,7 @@
 - [x] daily + realtime 契约测试（录制回放）通过
 - [x] ticker 归一化 + 非 A 股拒绝
 - [x] 文档声明：新代码禁止直连东财 URL
+- [x] M1.1 / M1.2 / M1.3 全部 done；CHANGELOG 含 `0.2.0` 节
 
 ---
 
