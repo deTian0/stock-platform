@@ -7,7 +7,7 @@
 | 版本 | 能力 |
 |------|------|
 | **M4.1 / v0.4.1** | `ResearchAgentPlugin` / `ReviewAgentPlugin`；数据仅经 providers |
-| **M4.2** | 挂 workbench `/api/research`、`/api/review` |
+| **M4.2 / v0.4.2** | workbench `/api/research/report`、`/api/review/report` |
 
 ## 硬规则
 

@@ -30,7 +30,7 @@
 | M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | done |
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | in_progress |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | done |
-| M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | planned |
+| M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | done |
 | M5 | 美港 Vendor + 市场策略表 | 大 | `v0.6.0` | planned |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
@@ -220,8 +220,8 @@
 
 验收：
 
-- [ ] workbench `GET /api/research/report`、`GET /api/review/report`
-- [ ] 路由经 `resolve("daily")`；无内嵌东财 URL
+- [x] workbench `GET /api/research/report`、`GET /api/review/report`
+- [x] 路由经 `resolve("daily")`；无内嵌东财 URL
 
 验收（大）：
 
