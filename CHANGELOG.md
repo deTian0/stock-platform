@@ -8,6 +8,13 @@
 
 - （无）
 
+## [0.2.2] - 2026-09-13
+
+### Added
+
+- `PUT /api/settings/preferences`；minute/缺能力 **409** fail-closed 护栏
+- 路由源码禁止品牌字面量扫描；ADR 0007
+
 ## [0.2.1] - 2026-09-13
 
 ### Added
@@ -95,7 +102,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/local/stock-platform/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/local/stock-platform/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/local/stock-platform/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/local/stock-platform/compare/v0.1.2...v0.1.3

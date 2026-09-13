@@ -6,7 +6,9 @@
 
 | 版本 | 能力 |
 |------|------|
-| **M2.1 / v0.2.1** | 最小 FastAPI 壳：`/health`、能力矩阵、daily/realtime；minute fail-closed |
+| M2.1 / v0.2.1 | 最小 FastAPI 壳：health / 矩阵 / daily / realtime |
+| **M2.2 / v0.2.2** | preferences、缺能力 409、禁品牌硬编码 |
+| **M2.3 / v0.2.3** | API 与 ReplayProvider 同标的同日口径对齐 |
 
 ## 安装与运行
 
@@ -29,6 +31,7 @@ python -m stock_platform_workbench
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
 | GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
+| PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
 
 ## 约束
 
