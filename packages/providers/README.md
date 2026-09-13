@@ -9,6 +9,7 @@
 | M1.1 / v0.1.1 | `normalize_symbol` / `exchange_prefix` |
 | M1.2 / v0.1.2 | `ReplayProvider` daily + realtime 录制回放 |
 | **M1.3 / v0.1.3** | `em_get` 东财限流单点 + `build_capability_matrix` |
+| **M1 / v0.2.0** | 大里程碑收口（上列能力齐备） |
 
 ## 安装
 
