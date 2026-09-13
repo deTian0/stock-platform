@@ -6,6 +6,7 @@
 2. [`docs/ROADMAP.md`](docs/ROADMAP.md)
 3. [`docs/versioning.md`](docs/versioning.md)
 4. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
+5. [`docs/contracts/`](docs/contracts/)（M0.2 已 Accepted；改口径先写 ADR）
 
 ## 硬性规则
 

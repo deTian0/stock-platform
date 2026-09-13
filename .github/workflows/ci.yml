@@ -21,6 +21,7 @@ jobs:
           test -f docs/ROADMAP.md
           test -f docs/versioning.md
           test -f docs/architecture/0001-target-architecture.md
+          test -f docs/architecture/0002-m0-2-contracts.md
           test -f docs/contracts/datasets.md
           test -f docs/contracts/capability-matrix.md
           test -f docs/contracts/market-strategy.md

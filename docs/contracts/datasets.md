@@ -1,43 +1,108 @@
-# 契约：标准数据集（草稿）
+# 契约：标准数据集
 
-> 状态：Draft（M0.2 定稿）  
-> 权威目标：与 tick-stock-panel Provider 语义对齐；本文件为合并期单一文字源。
+> 状态：**Accepted（M0.2）** · 对齐 tick-stock-panel Provider / `docs/plugin-development.md`  
+> 破坏性变更须新增 ADR，并升 MINOR（0.x）或 MAJOR（≥1.0）。
 
 ## 原则
 
-- Provider 只做「供应商字段 → 内部标准字段」转换。
-- 禁止页面/脚本绕过标准化直接解析源 JSON。
-- 单位写死在契约里，禁止「&lt;1 就 ×100」启发式。
+1. Provider 只做「供应商字段 → 内部标准字段」转换；禁止业务层直接解析源 JSON。
+2. 单位写死在本契约；**禁止**「数值 &lt; 1 就 ×100」启发式。
+3. 股票 / ETF / 指数用 `asset_type` 区分，**禁止**靠代码猜类型。
+4. 缺字段：置 `null` 并记录原因；**禁止伪造**成交额等可推导依赖项。
 
-## 数据集（能力矩阵对应）
+## 资产类型
 
-| 数据集 ID | 说明 | M0.2 最低字段 |
-|-----------|------|----------------|
-| `daily` | 日 K | `symbol`, `trade_date`, `open`, `high`, `low`, `close`, `volume`, `amount` |
-| `adj_factor` | 复权因子 | `symbol`, `trade_date`, `adj_factor` |
-| `realtime` | 实时快照 | `symbol`, `price`, `change_pct`, `volume`, `asof_ts` |
-| `minute` | 分钟 K | （M1+ 展开） |
-| `depth5` | 五档 | （M1+ 展开） |
-| `financial` | 财务 | （M1+ 展开） |
-| `full_minute` | 全历史分钟 | （M2+） |
+```text
+asset_type ∈ { "stock", "etf", "index" }
+```
 
-## 单位（不可混用）
+标的主数据（instruments）建议列：`symbol`, `name`, `code`, `exchange`, `asset_type`, `source`, `list_date?`, `status?`。
 
-| 字段 | 单位 | 备注 |
-|------|------|------|
-| `change_pct`（realtime 入口） | **小数制** | `0.0366` = 3.66% |
-| `volume` | 手（A 股惯例） | 与金额换算在消费方显式 ×100 |
-| OHLC（enriched） | 前复权价 | 涨跌停判断必须用原始价字段（待命名 `raw_*`） |
-| `trade_date` | 交易日 `YYYY-MM-DD` | 非自然日；时区：Asia/Shanghai |
+## Ticker（A 股路径）
 
-## Ticker
+| 规则 | 说明 |
+|------|------|
+| 内部 `symbol` | 6 位数字字符串，如 `600519`、`000001` |
+| 归一化 | 未来 `packages/providers.normalize_symbol()` 唯一入口 |
+| 拒绝 | 港股（4–5 位 / `.HK`）、美股代码进入 A 股路径 |
+| 北交所 | v1 默认**纳入归一化但可选宇宙过滤**；号段 43/83/87/88/92 等在策略层配置 |
 
-- A 股内部规范：6 位数字字符串，如 `600519`
-- 归一化入口：未来 `packages/providers` 的 `normalize_symbol()`
-- 港股/美股：拒绝进入 A 股 Agent 路径；美港走独立市场策略（M5）
+## 核心数据集字段
 
-## TBD（M0.2 必须关掉）
+### `daily`（日 K）
 
-- [ ] `amount` 单位（元 vs 千元）与上游对齐表
-- [ ] `asof_ts` 时区存储（aware vs naive 墙钟）
-- [ ] 指数 / ETF / 股票分表还是 `asset_type` 字段
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | 6 位 |
+| `asset_type` | str | 建议 | stock/etf/index |
+| `source` | str | 建议 | Provider 名 |
+| `date` | date | ✅ | **交易日**；内部列名对齐 TSP：`date`（不是 `trade_date`） |
+| `open/high/low/close` | float | ✅ | 元；入库可为不复权，enriched 层见下 |
+| `volume` | float | ✅ | **手**（1 手 = 100 股） |
+| `amount` | float | ✅ | **元**（成交额） |
+| `pre_close` | float | 建议 | 元 |
+| `change_pct` | float | 建议 | **小数制**；可缺，由下游用涨跌额/昨收推导 |
+| `quote_ts` | int64? | 可选 | 毫秒行情时间戳；缺失为 null |
+
+自验：`amount ÷ volume ÷ 100 ≈ 当日均价`（量能异常日除外）。
+
+### `adj_factor`（除权因子）
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | |
+| `asset_type` | str | 建议 | |
+| `source` | str | 建议 | |
+| `trade_date` | date | ✅ | 除权事件对应交易日（Asia/Shanghai 墙钟日期） |
+| `ex_factor` | float | ✅ | 复权因子；**列名固定 `ex_factor`**（源字段 `adj_factor` 须在 Provider 内 rename） |
+
+毫秒零点戳转日期时须按 **Asia/Shanghai**，禁止直接用 UTC `from_epoch().date()`（会整体早一天）。
+
+### `realtime`（实时快照）
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | |
+| `name` | str | 建议 | |
+| `price` | float | ✅ | 最新价（元） |
+| `prev_close` | float | 建议 | 昨收（元） |
+| `change_amount` | float | 建议 | 涨跌额（元） |
+| `change_pct` | float | 建议 | **小数制**入口：`0.0366` = 3.66% |
+| `amplitude` | float | 建议 | **小数制**入口 |
+| `turnover_rate` | float | 建议 | **小数制**入口：`0.05` = 5% |
+| `volume` | float | ✅ | **手** |
+| `amount` | float | 建议 | **元** |
+| `asof_ts` | int64 或 datetime | ✅ | 快照时刻；存储为 **Unix 毫秒 UTC**，展示转 Asia/Shanghai。禁止把「上海墙钟 naive」当 UTC 入库 |
+
+百分制源必须在 Provider/`pct_unit` 配置中**显式**声明并 `/100`；未声明时 `change_pct` 仅允许有文档的截面判定，`amplitude`/`turnover_rate` 应置 null 交下游重算。
+
+### 其余能力（字段摘要，M1+ 实现）
+
+| 数据集 | 关键列 |
+|--------|--------|
+| `minute` | `symbol`, `datetime`（**北京墙钟 naive**，禁止 UTC 入库）, `open/high/low/close`, `volume`（手）, `amount`（元，可 null）, `freq` |
+| `depth5` | 按 symbol 的五档；`bid_volumes`/`ask_volumes` 单位为**手** |
+| `financial` | 报表期 + 标准财务字段（M1 另表） |
+| `full_minute` | 同 minute 语义的全市场当日落盘批次 |
+
+## Enriched 层（消费侧，非 Provider 原始出口）
+
+| 主题 | 规则 |
+|------|------|
+| 前复权 OHLC | enriched 展示/指标默认前复权 |
+| 原始价 | `raw_open/raw_high/raw_low/raw_close` 不复权；**涨跌停 / 一字板必须用 raw_*** |
+| `turnover_rate`（enriched） | 可为**百分数值**（`5` = 5%）；与 realtime 入口小数制不同，跨边界必须显式转换 |
+| 指数涨跌幅缓存 | 可能存在百分数口径；**不得**直接喂给股票监控阈值 |
+
+## 已关闭的原 TBD
+
+| 原问题 | 决定 |
+|--------|------|
+| `amount` 单位 | **元**（与 TSP plugin-development 一致） |
+| `asof_ts` | Unix **毫秒 UTC**；展示转上海 |
+| 指数/ETF/股票 | **`asset_type` 字段**，分路由；不靠代码猜测 |
+| 复权因子列名 | 统一 **`ex_factor`**，不用并行的 `adj_factor` 列 |
+
+## 参考
+
+- tick-stock-panel：`backend/app/data_providers/schemas.py`、`normalizer.py`、`docs/plugin-development.md`、`CONTRIBUTING.md` §3
