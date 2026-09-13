@@ -18,4 +18,4 @@ __all__ = [
     "score_lvrev",
 ]
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
