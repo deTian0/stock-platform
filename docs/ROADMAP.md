@@ -26,7 +26,7 @@
 | M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | done |
 | M3 | 选股 / PIT 回测内核迁入 | 大 | `v0.4.0` | planned |
 | M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | done |
-| M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | planned |
+| M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | done |
 | M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | planned |
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | planned |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | planned |
@@ -186,8 +186,8 @@
 
 验收：
 
-- [ ] `run_pit_long_only`：T 信号 / T+1 open 成交
-- [ ] 防未来函数列护栏测试
+- [x] `run_pit_long_only`：T 信号 / T+1 open 成交
+- [x] 防未来函数列护栏测试
 
 #### M3.3 → `v0.3.3`
 

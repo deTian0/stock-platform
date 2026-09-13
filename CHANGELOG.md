@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.3.2] - 2026-09-13
+
+### Added
+
+- `run_pit_long_only` + `assert_no_lookahead_columns`（信号日/成交日分离）
+
 ## [0.3.1] - 2026-09-13
 
 ### Added
@@ -128,7 +134,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/local/stock-platform/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/local/stock-platform/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/local/stock-platform/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/local/stock-platform/compare/v0.2.2...v0.2.3
