@@ -8,6 +8,19 @@
 
 - （无）
 
+## [0.3.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M2 完成**：工作台最小壳经能力矩阵消费 Provider
+  - FastAPI health / matrix / daily / realtime
+  - 缺能力 409 fail-closed；禁品牌硬编码
+  - API 与 replay 同标的同日口径对齐
+
+### Notes
+
+- 下一步 M3：迁入选股 / PIT 回测内核（lvrev）
+
 ## [0.2.3] - 2026-09-13
 
 ### Added
@@ -108,7 +121,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/local/stock-platform/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/local/stock-platform/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/local/stock-platform/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/local/stock-platform/compare/v0.2.0...v0.2.1

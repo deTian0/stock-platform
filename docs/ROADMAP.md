@@ -20,7 +20,7 @@
 | M1.1 | providers 包骨架 + ticker 归一化 | 小 | `v0.1.1` | done |
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | done |
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | done |
-| M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
+| M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | done |
 | M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | done |
 | M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | done |
 | M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | done |
@@ -163,6 +163,7 @@
 
 - [x] 通用路径无硬编码单一数据源品牌
 - [x] 缺 minute 等能力时 UI/API fail-closed
+- [x] M2.1 / M2.2 / M2.3 全部 done；CHANGELOG 含 `0.3.0` 节
 
 ---
 
