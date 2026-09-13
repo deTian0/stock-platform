@@ -6,8 +6,9 @@
 
 | 版本 | 能力 |
 |------|------|
-| **M3.1 / v0.3.1** | `score_lvrev` / `apply_entry_gates` / `apply_risk_gates`（迁自 a-stock-engine） |
-| **M3.2** | `run_pit_long_only` + 防未来函数列护栏 |
+| **M3.1 / v0.3.1** | `score_lvrev` / gates |
+| **M3.2 / v0.3.2** | `run_pit_long_only` + 防未来函数 |
+| **M3.3 / v0.3.3** | `stock-platform-score` 批处理 CSV |
 
 ## 安装
 

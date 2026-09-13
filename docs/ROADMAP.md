@@ -27,7 +27,7 @@
 | M3 | 选股 / PIT 回测内核迁入 | 大 | `v0.4.0` | planned |
 | M3.1 | lvrev / 分层闸门库化 | 小 | `v0.3.1` | done |
 | M3.2 | PIT 回测权威路径 + 防未来函数测 | 小 | `v0.3.2` | done |
-| M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | planned |
+| M3.3 | 盘前简报批处理模式对接 | 小 | `v0.3.3` | done |
 | M4 | 投研 Agent 插件化（无内嵌抓取） | 大 | `v0.5.0` | planned |
 | M4.1 | Agent 改调 packages/providers | 小 | `v0.4.1` | planned |
 | M4.2 | 工作台个股/复盘槽位挂载 | 小 | `v0.4.2` | planned |
@@ -193,7 +193,7 @@
 
 验收：
 
-- [ ] `score_cross_section_csv` + CLI `stock-platform-score`
+- [x] `score_cross_section_csv` + CLI `stock-platform-score`
 
 验收（大）：
 
