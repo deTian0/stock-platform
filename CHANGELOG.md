@@ -8,6 +8,20 @@
 
 - （无）
 
+## [0.6.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M5 完成**：美港 Vendor + 市场策略表
+  - `MarketStrategy` 分市场 settle / limit / 时区
+  - `normalize_symbol(market=US|HK)` 与 CN 隔离
+  - `GlobalReplayProvider` + 能力矩阵注册
+
+### Notes
+
+- 节假日日历仍为工作日 stub；live `global_http` 未接线
+- 下一步 M6：纸面执行安全模型（吸 V2）
+
 ## [0.5.3] - 2026-09-13
 
 ### Added
@@ -209,7 +223,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/local/stock-platform/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/local/stock-platform/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/local/stock-platform/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/local/stock-platform/compare/v0.5.0...v0.5.1
