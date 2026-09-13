@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-platform-workbench"
+version = "0.2.1"
+description = "Minimal research workbench shell for stock-platform."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "LicenseRef-Pending" }
+authors = [{ name = "stock-platform" }]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "stock-platform-providers",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+stock-platform-workbench = "stock_platform_workbench.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

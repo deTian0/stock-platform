@@ -14,16 +14,16 @@
 **明确不做（v0.1.x → M1 前）**：行情抓取实现、选股、回测、UI、券商对接。  
 **已完成（M0 / v0.1.0）**：仓库工程化、契约定稿、里程碑与 tag 流程、CI 冒烟。  
 **已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
-**下一步（M2）**：工作台壳接入 Provider 能力路由。
+**进行中（M2）**：工作台壳 — v0.2.1 起 FastAPI 最小可跑。
 
 ## 仓库布局
 
 ```text
 stock-platform/
 ├── apps/
-│   └── workbench/          # 未来工作台（吸收 tick-stock-panel）
+│   └── workbench/          # FastAPI 最小壳（M2.1+）
 ├── packages/
-│   └── providers/          # 未来统一 Vendor（吸收 a-stock-data / global）
+│   └── providers/          # 统一 Vendor（M1+）
 ├── docs/
 │   ├── ROADMAP.md          # 大/小里程碑与验收
 │   ├── versioning.md       # tag 与发版规则

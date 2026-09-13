@@ -10,8 +10,8 @@
 
 ## 硬性规则
 
-- 当前处于 **v0.2.x（M1 已完成）**：providers 可安装；不虚构尚未实现的 live 行情抓取与工作台 UI。
-- 改 `packages/providers` 版本时同步：根 `VERSION`、`pyproject.toml`、`__init__.__version__`。
+- 当前处于 **v0.2.x（M2 进行中）**：workbench 最小壳已可跑；不虚构完整 TSP UI / live 行情。
+- 改版本号时同步：根 `VERSION`、各包 `pyproject.toml`、对应 `__init__.__version__`。
 - 上游仓（tick-stock-panel、a-stock-data 等）仅作参考；迁入须走里程碑验收，禁止整目录复制。
 - 版本号单一事实源：根目录 `VERSION`。打 tag 用 `scripts/release_tag.ps1`。
 - 不提交密钥、行情缓存、SQLite 大数据。

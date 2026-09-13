@@ -25,6 +25,7 @@ $required = @(
   'docs/architecture/0003-providers-normalize-symbol.md',
   'docs/architecture/0004-replay-daily-realtime.md',
   'docs/architecture/0005-em-get-capability-matrix.md',
+  'docs/architecture/0006-workbench-shell.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
@@ -34,7 +35,9 @@ $required = @(
   'packages/providers/README.md',
   'packages/providers/pyproject.toml',
   'packages/providers/src/stock_platform_providers/__init__.py',
-  'apps/workbench/README.md'
+  'apps/workbench/README.md',
+  'apps/workbench/pyproject.toml',
+  'apps/workbench/src/stock_platform_workbench/__init__.py'
 )
 
 $failed = $false

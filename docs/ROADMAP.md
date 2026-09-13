@@ -21,7 +21,7 @@
 | M1.2 | daily + realtime 适配器（录制回放测） | 小 | `v0.1.2` | done |
 | M1.3 | 东财限流单点 + 能力矩阵注册 | 小 | `v0.1.3` | done |
 | M2 | 工作台壳接入 Provider | 大 | `v0.3.0` | planned |
-| M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | planned |
+| M2.1 | workbench 目录迁入最小可跑壳 | 小 | `v0.2.1` | done |
 | M2.2 | 能力矩阵驱动路由（缺能力 fail-closed） | 小 | `v0.2.2` | planned |
 | M2.3 | 同标的/同日与批处理口径对齐验收 | 小 | `v0.2.3` | planned |
 | M3 | 选股 / PIT 回测内核迁入 | 大 | `v0.4.0` | planned |
@@ -132,6 +132,30 @@
 ## M2 — 工作台壳 → `v0.3.0`
 
 **目标**：最小可运行 workbench 只通过能力矩阵消费 Provider。
+
+### 小里程碑
+
+#### M2.1 → `v0.2.1`
+
+验收：
+
+- [x] `apps/workbench` 可 `pip install -e` + FastAPI 壳
+- [x] `/health`、`/api/settings/capability-matrix`
+- [x] `/api/market/daily` / `realtime` 经 `resolve(capability)`
+- [x] pytest + ADR 0006
+
+#### M2.2 → `v0.2.2`
+
+验收：
+
+- [ ] 缺 minute 等能力时 API **409** fail-closed（矩阵细节）
+- [ ] 通用路径无硬编码单一数据源品牌（测试护栏）
+
+#### M2.3 → `v0.2.3`
+
+验收：
+
+- [ ] 同标的/同日与批处理（replay）口径对齐验收
 
 验收（大）：
 

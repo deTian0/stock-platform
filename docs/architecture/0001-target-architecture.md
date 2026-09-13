@@ -31,4 +31,4 @@
 - 0003：providers 包与 normalize_symbol（**已 Accepted，M1.1**）
 - 0004：daily/realtime 录制回放（**已 Accepted，M1.2**）
 - 0005：东财限流 + 能力矩阵（**已 Accepted，M1.3**）
-- 0006：工作台迁入策略（待 M2）
+- 0006：工作台最小壳（**已 Accepted，M2.1**）

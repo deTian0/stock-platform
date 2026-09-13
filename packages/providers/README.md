@@ -10,6 +10,7 @@
 | M1.2 / v0.1.2 | `ReplayProvider` daily + realtime 录制回放 |
 | **M1.3 / v0.1.3** | `em_get` 东财限流单点 + `build_capability_matrix` |
 | **M1 / v0.2.0** | 大里程碑收口（上列能力齐备） |
+| 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
 
