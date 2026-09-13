@@ -8,6 +8,18 @@
 
 - （无）
 
+## [0.4.1] - 2026-09-13
+
+### Added
+
+- `packages/agents`：`ResearchAgentPlugin` / `ReviewAgentPlugin`（仅经 providers）
+- 历史 `asof` 跳过 realtime 护栏；ADR 0009；CI `agents` job
+- workbench 预挂 `/api/research/report`、`/api/review/report`（M4.2 验收于 `0.4.2`）
+
+### Notes
+
+- TradingAgents 完整辩论图仍作参考；平台槽位以本插件为准
+
 ## [0.4.0] - 2026-09-13
 
 ### Added
@@ -154,7 +166,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/local/stock-platform/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/local/stock-platform/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/local/stock-platform/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/local/stock-platform/compare/v0.3.1...v0.3.2

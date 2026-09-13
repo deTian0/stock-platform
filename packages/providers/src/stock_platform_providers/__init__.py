@@ -1,4 +1,4 @@
-"""stock-platform providers — unified Vendor surface (A-share first)."""
+"""stock-platform providers ? unified Vendor surface (A-share first)."""
 
 from .capabilities import (
     CAPABILITY_IDS,
@@ -38,4 +38,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"

@@ -16,7 +16,7 @@
 **已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
 **已完成（M2 / v0.3.0）**：FastAPI 工作台壳 + 能力矩阵路由 + fail-closed。  
 **已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
-**下一步（M4）**：投研 Agent 插件化（去内嵌抓取）。
+**进行中（M4 / → v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。
 
 ## 仓库布局
 
@@ -25,8 +25,9 @@ stock-platform/
 ├── apps/
 │   └── workbench/          # FastAPI 最小壳（M2.1+）
 ├── packages/
-│   └── providers/          # 统一 Vendor（M1+）
-│   └── research/           # lvrev / PIT（M3+）
+│   ├── providers/          # 统一 Vendor（M1+）
+│   ├── research/           # lvrev / PIT（M3+）
+│   └── agents/             # 研报/复盘插件（M4+）
 ├── docs/
 │   ├── ROADMAP.md          # 大/小里程碑与验收
 │   ├── versioning.md       # tag 与发版规则
