@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-platform-providers"
+version = "0.1.1"
+description = "Unified market-data providers for stock-platform (A-share first)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "LicenseRef-Pending" }
+authors = [{ name = "stock-platform" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stock_platform_providers = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

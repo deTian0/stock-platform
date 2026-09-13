@@ -22,12 +22,15 @@ $required = @(
   'docs/versioning.md',
   'docs/architecture/0001-target-architecture.md',
   'docs/architecture/0002-m0-2-contracts.md',
+  'docs/architecture/0003-providers-normalize-symbol.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
   'scripts/release_tag.ps1',
   'scripts/check_docs.ps1',
   'packages/providers/README.md',
+  'packages/providers/pyproject.toml',
+  'packages/providers/src/stock_platform_providers/__init__.py',
   'apps/workbench/README.md'
 )
 
