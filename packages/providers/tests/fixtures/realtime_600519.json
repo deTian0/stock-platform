@@ -1,0 +1,16 @@
+{
+  "quote": {
+    "symbol": "600519",
+    "name": "贵州茅台",
+    "price": 1425.0,
+    "prev_close": 1410.0,
+    "change": 15.0,
+    "pct": 1.0638,
+    "amplitude": 1.56,
+    "turnover_rate": 0.12,
+    "pct_unit": "percent",
+    "volume": 28000,
+    "amount": 3980000000,
+    "asof_ts": 1725260400000
+  }
+}

@@ -8,6 +8,14 @@
 
 - （无）
 
+## [0.1.2] - 2026-09-13
+
+### Added
+
+- `ReplayTransport` / `ReplayProvider`：daily + realtime 录制回放
+- `normalize_daily_row` / `normalize_realtime_row` 契约归一化
+- ADR 0004；fixtures 与 pytest 覆盖
+
 ## [0.1.1] - 2026-09-13
 
 ### Added
@@ -58,7 +66,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/local/stock-platform/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/local/stock-platform/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/local/stock-platform/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/local/stock-platform/compare/v0.0.2...v0.0.3

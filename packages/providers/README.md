@@ -4,8 +4,12 @@
 
 ## 状态
 
-**M1.1（v0.1.1）**：可 `pip install -e`；已提供 A 股 `normalize_symbol` / `exchange_prefix`。  
-尚无 HTTP 取数（M1.2+）。
+| 版本 | 能力 |
+|------|------|
+| M1.1 / v0.1.1 | `normalize_symbol` / `exchange_prefix` |
+| **M1.2 / v0.1.2** | `ReplayProvider`：daily + realtime **录制回放**（无网络） |
+
+尚无 live HTTP（M1.3 起接东财限流单点）。
 
 ## 安装
 
@@ -20,19 +24,22 @@ python -m pytest -q
 | 符号 | 作用 |
 |------|------|
 | `normalize_symbol(raw, market="CN")` | 归一为 6 位 A 股代码；拒港美/中文名 |
-| `exchange_prefix(code)` | `sh` / `sz` / `bj`（腾讯等前缀） |
+| `exchange_prefix(code)` | `sh` / `sz` / `bj` |
 | `is_bse_symbol(code)` | 北交所号段（4/8/92） |
+| `ReplayTransport` / `ReplayProvider` | 从 fixtures 读 daily/realtime |
 | `SymbolError` | 非法代码 |
 
-## 计划吸收
+### 回放约定
 
-- `a-stock-data`（A 股配方）→ M1.2+
-- `TradingAgents-astock` 的 `a_stock.py` 去重合并 → M1
-- `global-stock-data` → M5
+```text
+fixtures/daily_{symbol}.json      # list 或 {"bars":[...]}
+fixtures/realtime_{symbol}.json   # quote dict 或 {"quote":{...}}
+```
+
+字段经 `normalize_*_row` 转为 `docs/contracts/datasets.md` 口径（`volume`=手，`amount`=元，比例小数制；`pct_unit=percent` 时自动 /100）。
 
 ## 约束
 
-- 东财请求必须走单一限流入口（M1.3 `_em_get`）
-- 对外只暴露契约字段（见 `docs/contracts/`）
-- 新代码禁止直连东财 URL（绕过限流）
+- **新代码禁止直连东财 URL**；必须走未来 `_em_get`（M1.3）
+- 对外只暴露契约字段
 - 测试优先录制回放，少依赖 live
