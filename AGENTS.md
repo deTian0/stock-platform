@@ -10,7 +10,7 @@
 
 ## 硬性规则
 
-- 当前处于 **v0.3.x（M2 已完成）**：workbench 壳可跑；下一步 M3 选股回测，勿虚构完整 UI。
+- 当前处于 **v0.4.x（M3 已完成）**：research 内核可装；下一步 M4 Agent，勿整仓复制 TradingAgents。
 - 改版本号时同步：根 `VERSION`、各包 `pyproject.toml`、对应 `__init__.__version__`。
 - 上游仓（tick-stock-panel、a-stock-data 等）仅作参考；迁入须走里程碑验收，禁止整目录复制。
 - 版本号单一事实源：根目录 `VERSION`。打 tag 用 `scripts/release_tag.ps1`。
