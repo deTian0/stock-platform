@@ -8,6 +8,20 @@
 
 - （无）
 
+## [0.5.0] - 2026-09-13
+
+### Added
+
+- **大里程碑 M4 完成**：投研 Agent 插件化（无内嵌抓取）
+  - `packages/agents` 仅经 `MarketDataProvider`
+  - workbench 研报 / 复盘槽位 + 历史 asof 护栏
+  - ADR 0009
+
+### Notes
+
+- TradingAgents-astock 完整 LangGraph 辩论仍可后续接入；不得把东财 URL 写回 agents
+- 下一步 M5：美港 Vendor + 市场策略表
+
 ## [0.4.2] - 2026-09-13
 
 ### Added
@@ -173,7 +187,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/local/stock-platform/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/local/stock-platform/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/local/stock-platform/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/local/stock-platform/compare/v0.3.3...v0.4.0

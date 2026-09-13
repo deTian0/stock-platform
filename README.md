@@ -16,7 +16,8 @@
 **已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
 **已完成（M2 / v0.3.0）**：FastAPI 工作台壳 + 能力矩阵路由 + fail-closed。  
 **已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
-**进行中（M4 / → v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。
+**已完成（M4 / v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。  
+**下一步（M5）**：美港 Vendor + 市场策略表。
 
 ## 仓库布局
 
