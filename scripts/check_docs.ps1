@@ -54,6 +54,7 @@ $required = @(
   'docs/architecture/0032-ops-health.md',
   'docs/architecture/0033-recommend-performance.md',
   'docs/architecture/0034-optional-llm-debate.md',
+  'docs/architecture/0035-strategy-config-compare.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',

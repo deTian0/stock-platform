@@ -8,6 +8,16 @@
 
 - （无）
 
+## [2.6.0] - 2026-09-14
+
+### Added
+
+- **Phase C 投研稳定收口（M32–M34）**
+  - M32：推荐绩效 JSONL + `direction_accuracy` 口径（ADR 0033）
+  - M33：可选 LLM 辩论（默认确定性；`[llm]` fail-closed；ADR 0034）
+  - M34：策略配置版本化 + `run_pit_long_only` 对比入口（ADR 0035）
+  - 默认仍 replay；SIMULATE；无同花顺 / 实盘 / SPA
+
 ## [2.5.0] - 2026-09-14
 
 ### Added

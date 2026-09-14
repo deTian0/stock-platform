@@ -13,6 +13,7 @@
 | **M25 / v1.18.0** | `build_premarket_brief` + `stock-platform-brief` |
 | **M29 / v2.1.0** | `run_refresh` + `stock-platform-refresh` |
 | **M32 / v2.4.0** | `performance` JSONL + `stock-platform-performance` |
+| **M34 / v2.6.0** | 策略配置版本化 + `compare_strategy_configs` |
 
 ## 安装
 

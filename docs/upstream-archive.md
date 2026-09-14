@@ -55,3 +55,8 @@
 ## Phase B 运维稳定（`v2.3.0`）
 
 日刷新落盘 + live 预设/熔断 + `/api/ops/health`。默认仍 replay；不启用实盘。
+
+## Phase C 投研稳定（`v2.6.0`）
+
+推荐绩效 JSONL、可选 LLM 辩论（默认确定性）、策略配置版本化 + 轻量 PIT 对比。  
+仍纸面 SIMULATE；默认 replay；无同花顺 / 实盘 / SPA。

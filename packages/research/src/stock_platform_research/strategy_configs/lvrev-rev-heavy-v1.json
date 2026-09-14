@@ -1,0 +1,10 @@
+{
+  "id": "lvrev-rev-heavy-v1",
+  "version": "1",
+  "top_n": 1,
+  "reversal_q": 0.50,
+  "value_factor": false,
+  "weights": {"vol": 0.3, "rev": 0.7, "value": 0.0, "q": 0.0, "g": 0.0},
+  "universe_ref": "fixtures/universe_cn_sample.json",
+  "description": "Reversal-heavy weights for light PIT compare."
+}

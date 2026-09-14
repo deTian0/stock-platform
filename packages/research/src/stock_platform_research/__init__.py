@@ -14,6 +14,13 @@ from .performance import (
 )
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
+from .strategy_config import (
+    StrategyConfig,
+    compare_strategy_configs,
+    list_strategy_configs,
+    load_strategy_config,
+    run_strategy_pit,
+)
 from .universe import (
     UniverseEmptyError,
     default_universe_fixture_path,
@@ -24,6 +31,7 @@ from .universe import (
 __all__ = [
     "W_DEFAULT",
     "W_VALUE",
+    "StrategyConfig",
     "UniverseEmptyError",
     "apply_entry_gates",
     "apply_risk_gates",
@@ -31,10 +39,13 @@ __all__ = [
     "brief_to_orders",
     "build_cross_section_panel",
     "build_premarket_brief",
+    "compare_strategy_configs",
     "compute_performance",
     "default_performance_log_path",
     "default_universe_fixture_path",
     "factor_scores",
+    "list_strategy_configs",
+    "load_strategy_config",
     "load_universe",
     "log_brief_decisions",
     "normalize_universe",
@@ -44,6 +55,7 @@ __all__ = [
     "RefreshReport",
     "run_refresh",
     "run_pit_long_only",
+    "run_strategy_pit",
     "score_cross_section",
     "score_cross_section_csv",
     "score_lvrev",
@@ -51,4 +63,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"

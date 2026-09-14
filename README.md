@@ -15,7 +15,7 @@
 | Workbench | `apps/workbench` | FastAPI + 最小 UI：行情 / 今日推荐 / 研报 / 纸面 |
 
 **默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v2.5 Phase C 进行中仍成立）**：实盘券商、同花顺适配、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live。
+**明确不做（v2.6 Phase C 仍成立）**：实盘券商、同花顺适配、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live。
 
 ## 快速开始
 

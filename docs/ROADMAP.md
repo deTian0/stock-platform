@@ -102,7 +102,7 @@
 | M31 | 运维健康检查 + Phase B 收口 | 大 | `v2.3.0` | done |
 | M32 | 推荐绩效统计 | 大 | `v2.4.0` | done |
 | M33 | 可选 LLM 辩论挂在 TopN 之后 | 大 | `v2.5.0` | done |
-| M34 | 策略配置版本化 + 回测对比 + Phase C 收口 | 大 | `v2.6.0` | planned |
+| M34 | 策略配置版本化 + 回测对比 + Phase C 收口 | 大 | `v2.6.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -926,7 +926,7 @@
 
 **产品目标**：推荐质量可迭代与复盘——绩效统计、TopN 后可选 LLM 辩论（默认仍确定性）、策略配置版本化 + 轻量 PIT 回测对比。仍纸面 SIMULATE；默认 replay；无同花顺；无 SPA。
 
-**状态**：in_progress
+**状态**：done（`v2.6.0`）
 
 计划见：`C:\Users\63516\.cursor\plans\phase_c_research_stable_20260914.plan.md`
 
@@ -961,8 +961,8 @@
 
 验收：
 
-- [ ] 策略配置加载 + compare；fixture panel 单测；ADR 0035
-- [ ] 全量 pytest；tag `v2.6.0`；Phase C done
+- [x] 策略配置加载 + compare；fixture panel 单测；ADR 0035
+- [x] 全量 pytest；tag `v2.6.0`；Phase C done
 
 ---
 
