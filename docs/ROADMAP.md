@@ -57,7 +57,7 @@
 | M11.2 | 三区交互（矩阵/日K/纸面） | 小 | `v1.3.2` | done |
 | M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | in_progress |
 | M12.1 | 确定性 Bull/Bear/Risk 内核 | 小 | `v1.4.1` | done |
-| M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | planned |
+| M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -468,8 +468,8 @@
 
 验收：
 
-- [ ] `DebateAgentPlugin` + `GET /api/debate/report`
-- [ ] UI `#debate` 区
+- [x] `DebateAgentPlugin` + `GET /api/debate/report`
+- [x] UI `#debate` 区
 
 验收（大）：
 

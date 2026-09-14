@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.4.2] - 2026-09-14
+
+### Added
+
+- M12.2：`GET /api/debate/report` + UI `#debate` 区
+
 ## [1.4.1] - 2026-09-14
 
 ### Added
