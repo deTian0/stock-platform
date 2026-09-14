@@ -95,6 +95,28 @@ jobs:
           pkg_ver=$(python -c "import tomllib; print(tomllib.load(open('packages/agents/pyproject.toml','rb'))['project']['version'])")
           test "$root_ver" = "$pkg_ver"
 
+  execution:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/execution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install execution (editable + dev)
+        run: python -m pip install -e ".[dev]"
+      - name: Pytest
+        run: python -m pytest -q
+      - name: Package version matches VERSION
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          root_ver=$(tr -d '[:space:]' < VERSION)
+          pkg_ver=$(python -c "import tomllib; print(tomllib.load(open('packages/execution/pyproject.toml','rb'))['project']['version'])")
+          test "$root_ver" = "$pkg_ver"
+
   workbench:
     runs-on: ubuntu-latest
     steps:
@@ -102,10 +124,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install providers, agents, then workbench
+      - name: Install providers, agents, execution, then workbench
         run: |
           python -m pip install -e "./packages/providers[dev]"
           python -m pip install -e "./packages/agents[dev]"
+          python -m pip install -e "./packages/execution[dev]"
           python -m pip install -e "./apps/workbench[dev]"
       - name: Pytest workbench
         working-directory: apps/workbench
