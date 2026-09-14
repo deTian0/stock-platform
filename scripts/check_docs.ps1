@@ -52,6 +52,7 @@ $required = @(
   'docs/architecture/0030-cn-daily-refresh.md',
   'docs/architecture/0031-live-presets-em-circuit.md',
   'docs/architecture/0032-ops-health.md',
+  'docs/architecture/0033-recommend-performance.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',

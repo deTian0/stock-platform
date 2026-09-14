@@ -23,6 +23,7 @@
 | **M27 / v1.20.0** | `POST /api/research/brief/to-paper` → PaperLedger |
 | **M30 / v2.2.0** | live 预设 `GET/POST /api/settings/presets*` |
 | **M31 / v2.3.0** | `GET /api/ops/health` |
+| **M32 / v2.4.0** | `GET /api/research/performance` + `#performance` |
 
 ## 安装与运行
 

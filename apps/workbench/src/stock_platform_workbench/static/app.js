@@ -675,6 +675,27 @@
     }
   }
 
+  async function loadPerformance() {
+    const errEl = $("performance-error");
+    clearError(errEl);
+    $("performance-meta").textContent = "";
+    try {
+      const data = await fetchJson("/api/research/performance");
+      const m = data.metrics || {};
+      $("performance-meta").textContent =
+        "settled=" +
+        data.settledCount +
+        " · direction_accuracy=" +
+        m.direction_accuracy +
+        " · avg_return=" +
+        m.avg_return;
+      $("performance-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+      $("performance-json").textContent = "";
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -876,6 +897,7 @@
     $("debate-form").addEventListener("submit", loadDebate);
     $("recommend-form").addEventListener("submit", loadRecommend);
     $("btn-recommend-paper").addEventListener("click", recommendToPaper);
+    $("btn-performance").addEventListener("click", loadPerformance);
     loadMatrix();
     loadPaper();
   }

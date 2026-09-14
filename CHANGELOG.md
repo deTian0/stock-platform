@@ -8,6 +8,15 @@
 
 - （无）
 
+## [2.4.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M32 完成**：推荐决策绩效统计
+  - JSONL 决策日志 + `compute_performance`（`direction_accuracy` / `avg_return` / `up_rate` 口径）
+  - CLI `stock-platform-performance`；`GET /api/research/performance`；工作台 `#performance`
+  - ADR 0033；确定性 fixtures
+
 ## [2.3.0] - 2026-09-14
 
 ### Added

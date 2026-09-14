@@ -15,7 +15,7 @@
 | Workbench | `apps/workbench` | FastAPI + 最小 UI：行情 / 今日推荐 / 研报 / 纸面 |
 
 **默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v2.3 Phase B 仍成立）**：实盘券商、同花顺适配、LLM 辩论图、React SPA、第二套行情主链、默认开启 live。
+**明确不做（v2.4 Phase C 进行中仍成立）**：实盘券商、同花顺适配、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live。
 
 ## 快速开始
 
@@ -78,6 +78,7 @@ stock-platform/
 | v1.1.0–v1.16.0 | M8–M23（live HTTP、日历、UI、辩论、CN 扩展数据集、复权套价） |
 | **v2.0.0** | Phase A（M24–M28）日更推荐 + 纸面闭环 |
 | **v2.1.0–v2.3.0** | Phase B（M29–M31）日刷新 + live 运维稳定 |
+| **v2.4.0–v2.6.0** | Phase C（M32–M34）投研稳定（绩效 / 可选 LLM / 策略对比） |
 
 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
