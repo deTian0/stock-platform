@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.7.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M45 完成**：Workbench IA + 一键向导
+  - 顶栏分区：日用向导 / 推荐 / 纸面 / 运维；`#wizard` + `#ops`
+  - `POST /api/research/wizard/daily`（refresh→brief→to-paper；分步可见失败）
+  - ADR 0046；无 SPA；无实盘默认文案
+
 ## [3.6.0] - 2026-09-14
 
 ### Added

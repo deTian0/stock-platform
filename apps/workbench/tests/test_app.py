@@ -64,6 +64,10 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="broker"' in body
     assert 'id="debate"' in body
     assert 'id="recommend"' in body
+    assert 'id="wizard"' in body
+    assert 'id="ops"' in body
+    assert "日用向导" in body
+    assert "无实盘" in body or "SIMULATE" in body
     assert 'id="performance"' in body
     assert 'id="strategy-compare"' in body
     assert 'id="pref-preset"' in body
@@ -808,3 +812,33 @@ def test_ops_health_last_refresh_manifest(tmp_path: Path, monkeypatch: pytest.Mo
     assert body["lastRefresh"]["ok"] is False
     assert body["lastRefresh"]["asof"] == "2026-09-02"
     assert body["liveTradingEnabled"] is False
+
+
+def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
+    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "wiz", "universe": ["600519"]})
+    h = draft.json()["strategyHash"]
+    client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
+    client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
+    r = client.post(
+        "/api/research/wizard/daily",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "skipRefresh": True,
+            "toPaper": True,
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    steps = {s["step"]: s for s in body["steps"]}
+    assert steps["refresh"]["skipped"] is True
+    assert steps["brief"]["ok"] is True
+    assert steps["to_paper"]["ok"] is True
+    assert "/api/research/wizard/daily" in client.get("/static/app.js").text
