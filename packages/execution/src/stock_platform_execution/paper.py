@@ -8,10 +8,12 @@ from typing import Any
 
 from .errors import DraftBlocked, IdempotentReplay
 from .profile import validate_simulation_profile
+from stock_platform_providers import get_market_strategy
+
 from .timing import (
     assert_signal_before_execution,
-    china_now,
     execution_window_status,
+    market_now,
     planned_execution_date,
     signal_bar_is_completed,
 )
@@ -34,15 +36,19 @@ class PaperLedger:
         decision_only: bool = False,
         now: datetime | None = None,
         observed_raw_dates: list[str] | None = None,
+        market: str = "CN",
     ) -> dict[str, Any]:
+        mid = get_market_strategy(market).market_id
         execution = validate_simulation_profile(profile)
-        local = china_now(now)
-        if not signal_bar_is_completed(signal_trade_date, local):
+        local = market_now(mid, now)
+        if not signal_bar_is_completed(signal_trade_date, local, market=mid):
             raise DraftBlocked(f"signal bar for {signal_trade_date} is not completed")
 
-        planned = planned_execution_date(signal_trade_date, observed_raw_dates)
+        planned = planned_execution_date(signal_trade_date, observed_raw_dates, market=mid)
         assert_signal_before_execution(signal_trade_date, planned)
-        window = execution_window_status(planned, execution.get("tradeWindow"), local)
+        window = execution_window_status(
+            planned, execution.get("tradeWindow"), local, market=mid
+        )
 
         blocked: list[str] = []
         eligible = window == "open" and not decision_only
@@ -58,6 +64,7 @@ class PaperLedger:
         draft = {
             "draftId": draft_id,
             "strategyHash": strategy_hash,
+            "marketId": mid,
             "signalTradeDate": signal_trade_date,
             "plannedExecutionDate": planned,
             "executionWindowStatus": window,
@@ -79,6 +86,7 @@ class PaperLedger:
         profile: dict[str, Any] | None = None,
         now: datetime | None = None,
         max_draft_age_seconds: int = 600,
+        market: str = "CN",
     ) -> dict[str, Any]:
         validate_simulation_profile(profile)
         if draft_id in self._accepted:
@@ -96,12 +104,12 @@ class PaperLedger:
         if not draft.get("orders"):
             raise DraftBlocked("refusing to submit empty order list")
 
-        local = china_now(now)
+        mid = str(draft.get("marketId") or market)
+        mid = get_market_strategy(mid).market_id
+        local = market_now(mid, now)
         generated = datetime.fromisoformat(str(draft["generatedAt"]))
         if generated.tzinfo is None:
-            from .timing import CHINA_TZ
-
-            generated = generated.replace(tzinfo=CHINA_TZ)
+            generated = generated.replace(tzinfo=local.tzinfo)
         age = (local - generated.astimezone(local.tzinfo)).total_seconds()
         if age > max_draft_age_seconds:
             raise DraftBlocked(f"draft older than {max_draft_age_seconds}s ({int(age)}s)")
@@ -110,6 +118,7 @@ class PaperLedger:
             str(draft["plannedExecutionDate"]),
             (profile or {}).get("tradeWindow") or "09:35-10:00",
             local,
+            market=mid,
         )
         if window != "open":
             raise DraftBlocked(f"execution window is {window}; late fill forbidden")
@@ -118,6 +127,7 @@ class PaperLedger:
         result = {
             "executionId": execution_id,
             "draftId": draft_id,
+            "marketId": mid,
             "accepted": True,
             "orders": list(draft["orders"]),
             "acceptedAt": local.isoformat(timespec="seconds"),

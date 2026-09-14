@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.6.2] - 2026-09-14
+
+### Added
+
+- M14.2：PaperLedger / workbench /api/paper/* 可选 market（默认 CN）；草稿 marketId
+
 ## [1.6.1] - 2026-09-14
 
 ### Added
