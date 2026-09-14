@@ -34,6 +34,17 @@ REALTIME_COLUMNS = [
     "asset_type",
 ]
 
+# CN adjustment / ex-rights factors (复权因子). Column name is ex_factor (not adj_factor).
+ADJ_FACTOR_COLUMNS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "trade_date",
+    "ex_factor",
+]
+
+ADJ_FACTOR_KINDS = frozenset({"qfq", "hfq"})
+
 # CN minute bars — datetime is Beijing wall-clock naive (no tz / no UTC storage).
 MINUTE_COLUMNS = [
     "symbol",

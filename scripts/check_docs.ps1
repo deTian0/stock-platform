@@ -45,6 +45,7 @@ $required = @(
   'docs/architecture/0023-cn-minute.md',
   'docs/architecture/0024-cn-depth5.md',
   'docs/architecture/0025-cn-financial.md',
+  'docs/architecture/0026-cn-adj-factor.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',
