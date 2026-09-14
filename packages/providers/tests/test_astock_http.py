@@ -103,6 +103,76 @@ def test_fund_flow_rejects_hk() -> None:
         provider.get_fund_flow(["00700"])
 
 
+def test_sector_fund_flow_from_daykline() -> None:
+    def get_json(url, params=None):
+        assert "fflow/daykline" in url
+        assert params["secid"] == "90.BK0477"
+        return {
+            "data": {
+                "name": "白酒",
+                "klines": [
+                    "2026-09-01,350000000,-1,-1,-1,-1,1.25",
+                    "2026-09-02,-120000000,-1,-1,-1,-1,-0.68",
+                ],
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_sector_fund_flow(
+        ["BK0477"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 2
+    assert rows[0]["sector_code"] == "BK0477"
+    assert rows[0]["sector_name"] == "白酒"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["main_net"] == 350000000.0
+    assert rows[0]["change_pct"] == 1.25
+    assert rows[1]["main_net"] == -120000000.0
+
+
+def test_sector_fund_flow_rejects_bad_code() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
+    with pytest.raises(SymbolError):
+        provider.get_sector_fund_flow(["600519"])
+
+
+def test_news_from_np_weblist() -> None:
+    def get_json(url, params=None):
+        assert "np-weblist" in url
+        assert "getFastNewsList" in url
+        return {
+            "data": {
+                "fastNewsList": [
+                    {
+                        "title": "贵州茅台相关快讯",
+                        "summary": "摘要一行",
+                        "showTime": "2026-09-01 10:00:00",
+                    },
+                    {
+                        "title": "市场早报",
+                        "summary": "",
+                        "showTime": "2026-09-02 09:30:00",
+                    },
+                ]
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_news(
+        ["SH600519"], start=date(2026, 9, 1), end=date(2026, 9, 2), limit=20
+    )
+    assert len(rows) == 2
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["title"] == "贵州茅台相关快讯"
+    assert rows[0]["summary"] == "摘要一行"
+    assert rows[0]["sentiment"] is None
+
+
+def test_news_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
+    with pytest.raises(SymbolError):
+        provider.get_news(["00700"])
+
+
 def test_minute_from_klines() -> None:
     def get_json(url, params=None):
         assert "push2his" in url

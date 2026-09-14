@@ -71,6 +71,18 @@
       if (fundFlow && fundFlow.effective) {
         $("pref-fund-flow").value = fundFlow.effective;
       }
+      const sectorFundFlow = rows.find(function (r) {
+        return r.id === "sector_fund_flow";
+      });
+      if (sectorFundFlow && sectorFundFlow.effective) {
+        $("pref-sector-fund-flow").value = sectorFundFlow.effective;
+      }
+      const newsCap = rows.find(function (r) {
+        return r.id === "news";
+      });
+      if (newsCap && newsCap.effective) {
+        $("pref-news").value = newsCap.effective;
+      }
       const lhb = rows.find(function (r) {
         return r.id === "lhb";
       });
@@ -118,6 +130,10 @@
         (daily && daily.effective ? daily.effective : "") +
         " · fund_flow=" +
         (fundFlow && fundFlow.effective ? fundFlow.effective : "") +
+        " · sector_fund_flow=" +
+        (sectorFundFlow && sectorFundFlow.effective ? sectorFundFlow.effective : "") +
+        " · news=" +
+        (newsCap && newsCap.effective ? newsCap.effective : "") +
         " · lhb=" +
         (lhb && lhb.effective ? lhb.effective : "") +
         " · unlock=" +
@@ -162,6 +178,8 @@
     clearError(errEl);
     const daily = $("pref-daily").value;
     const fundFlow = $("pref-fund-flow").value;
+    const sectorFundFlow = $("pref-sector-fund-flow").value;
+    const newsPref = $("pref-news").value;
     const lhb = $("pref-lhb").value;
     const unlock = $("pref-unlock").value;
     const minute = $("pref-minute").value;
@@ -178,6 +196,8 @@
             daily: daily,
             realtime: daily,
             fund_flow: fundFlow,
+            sector_fund_flow: sectorFundFlow,
+            news: newsPref,
             lhb: lhb,
             unlock: unlock,
             minute: minute,
@@ -193,6 +213,10 @@
         daily +
         " fund_flow=" +
         fundFlow +
+        " sector_fund_flow=" +
+        sectorFundFlow +
+        " news=" +
+        newsPref +
         " lhb=" +
         lhb +
         " unlock=" +
@@ -838,6 +862,90 @@
     }
   }
 
+  async function loadSectorFundFlow(event) {
+    if (event) event.preventDefault();
+    const errEl = $("sector-fund-flow-error");
+    clearError(errEl);
+    $("sector-fund-flow-meta").textContent = "";
+    const sectors = $("sector-fund-flow-sectors").value.trim();
+    const start = $("sector-fund-flow-start").value;
+    const end = $("sector-fund-flow-end").value;
+    const params = new URLSearchParams({ sectors: sectors });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    try {
+      const data = await fetchJson("/api/market/sector-fund-flow?" + params.toString());
+      $("sector-fund-flow-meta").textContent =
+        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
+      const tbody = $("sector-fund-flow-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.sector_code +
+          "</td><td>" +
+          row.date +
+          "</td><td>" +
+          row.main_net +
+          "</td><td>" +
+          (row.change_pct == null ? "" : row.change_pct) +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("sector-fund-flow-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
+  async function loadNews(event) {
+    if (event) event.preventDefault();
+    const errEl = $("news-error");
+    clearError(errEl);
+    $("news-meta").textContent = "";
+    const symbols = $("news-symbols").value.trim();
+    const start = $("news-start").value;
+    const end = $("news-end").value;
+    const params = new URLSearchParams({ symbols: symbols });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    try {
+      const data = await fetchJson("/api/market/news?" + params.toString());
+      $("news-meta").textContent =
+        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
+      const tbody = $("news-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          (row.symbol || "") +
+          "</td><td>" +
+          row.date +
+          "</td><td>" +
+          row.title +
+          "</td><td>" +
+          (row.sentiment == null ? "" : row.sentiment) +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("news-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   async function loadLhb(event) {
     if (event) event.preventDefault();
     const errEl = $("lhb-error");
@@ -991,6 +1099,8 @@
     $("daily-adjusted-form").addEventListener("submit", loadDailyAdjusted);
     $("full-minute-form").addEventListener("submit", loadFullMinute);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
+    $("sector-fund-flow-form").addEventListener("submit", loadSectorFundFlow);
+    $("news-form").addEventListener("submit", loadNews);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);
     $("debate-form").addEventListener("submit", loadDebate);

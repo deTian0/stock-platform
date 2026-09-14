@@ -16,6 +16,8 @@ _CN_LIVE_CAPABILITIES: tuple[str, ...] = (
     "fund_flow",
     "lhb",
     "unlock",
+    "sector_fund_flow",
+    "news",
 )
 
 _REPLAY_PREFS: dict[str, str] = {cap: "replay" for cap in _CN_LIVE_CAPABILITIES}

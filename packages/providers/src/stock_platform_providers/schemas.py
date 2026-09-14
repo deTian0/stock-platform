@@ -79,6 +79,28 @@ FUND_FLOW_COLUMNS = [
     "super_net",
 ]
 
+# CN board / sector day-level fund flow (元). M41 / Phase E.
+SECTOR_FUND_FLOW_COLUMNS = [
+    "sector_code",
+    "sector_name",
+    "asset_type",
+    "source",
+    "date",
+    "main_net",
+    "change_pct",
+]
+
+# Lightweight news features (not LLM summaries). M41 / Phase E.
+NEWS_COLUMNS = [
+    "symbol",
+    "sector_code",
+    "date",
+    "title",
+    "summary",
+    "source",
+    "sentiment",
+]
+
 # CN dragon-tiger board (龙虎榜) aggregate payload keys (amounts in 元).
 LHB_TOP_KEYS = [
     "symbol",

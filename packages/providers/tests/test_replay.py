@@ -15,7 +15,9 @@ from stock_platform_providers.normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
+    normalize_news_row,
     normalize_realtime_row,
+    normalize_sector_fund_flow_row,
     normalize_unlock_payload,
 )
 from stock_platform_providers.replay import ReplayProvider, ReplayTransport
@@ -25,7 +27,9 @@ from stock_platform_providers.schemas import (
     FUND_FLOW_COLUMNS,
     LHB_TOP_KEYS,
     MINUTE_COLUMNS,
+    NEWS_COLUMNS,
     REALTIME_COLUMNS,
+    SECTOR_FUND_FLOW_COLUMNS,
     UNLOCK_TOP_KEYS,
 )
 
@@ -283,6 +287,63 @@ def test_normalize_fund_flow_requires_date() -> None:
     with pytest.raises(ValueError, match="missing date"):
         normalize_fund_flow_row(
             {"symbol": "600519", "main_net": 1.0},
+            source="test",
+        )
+
+
+def test_replay_sector_fund_flow() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_sector_fund_flow(
+        ["90.BK0477"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 2
+    assert rows[0]["sector_code"] == "BK0477"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["asset_type"] == "sector"
+    assert rows[0]["main_net"] == 350000000.0
+    assert rows[0]["change_pct"] == 1.25
+    assert rows[1]["main_net"] == -120000000.0
+    assert set(SECTOR_FUND_FLOW_COLUMNS) <= set(rows[0].keys())
+
+
+def test_replay_sector_fund_flow_missing_fixture() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    with pytest.raises(SymbolError, match="no sector_fund_flow fixture"):
+        provider.get_sector_fund_flow(["BK9999"])
+
+
+def test_normalize_sector_fund_flow_requires_date() -> None:
+    with pytest.raises(ValueError, match="missing date"):
+        normalize_sector_fund_flow_row(
+            {"sector_code": "BK0477", "main_net": 1.0},
+            source="test",
+        )
+
+
+def test_replay_news() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_news(
+        ["SH600519"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 2
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["title"].startswith("贵州茅台")
+    assert rows[0]["sentiment"] == 0.35
+    assert rows[1]["sentiment"] is None
+    assert set(NEWS_COLUMNS) <= set(rows[0].keys())
+
+
+def test_replay_news_missing_fixture() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    with pytest.raises(SymbolError, match="no news fixture"):
+        provider.get_news(["000001"])
+
+
+def test_normalize_news_requires_title() -> None:
+    with pytest.raises(ValueError, match="missing title"):
+        normalize_news_row(
+            {"symbol": "600519", "date": "2026-09-01"},
             source="test",
         )
 

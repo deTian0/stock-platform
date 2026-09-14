@@ -149,3 +149,25 @@ def normalize_symbol(symbol: str, *, market: str = "CN") -> str:
     if m == "US":
         return _normalize_us(symbol)
     raise SymbolError(f"market={market!r} is not supported; expected CN, US, or HK.")
+
+
+_SECTOR_CODE = re.compile(r"^BK\d{4,6}$")
+
+
+def normalize_sector_code(code: str) -> str:
+    """Normalize an East Money board / sector code (e.g. ``BK0477``).
+
+    Accepts ``BK0477``, ``bk0477``, or ``90.BK0477`` (EM secid form).
+    """
+    if not isinstance(code, str) or not code.strip():
+        raise SymbolError(f"sector code must be a non-empty string, got {code!r}")
+    original = code.strip()
+    s = original.upper().replace(" ", "")
+    if s.startswith("90."):
+        s = s[3:]
+    if not _SECTOR_CODE.fullmatch(s):
+        raise SymbolError(
+            f"{original!r} is not a valid EM board/sector code "
+            "(expect BK####, e.g. BK0477)."
+        )
+    return s

@@ -1,7 +1,7 @@
 """stock-platform providers — unified Vendor surface (A-share first, US/HK via market)."""
 
 from .adjust import apply_adjust
-from .astock_http import AStockHttpProvider, em_secid
+from .astock_http import AStockHttpProvider, em_board_secid, em_secid
 from .calendar import TradingCalendar, get_trading_calendar
 from .capabilities import (
     CAPABILITY_IDS,
@@ -40,6 +40,7 @@ from .replay import ReplayProvider, ReplayTransport
 from .symbol import (
     exchange_prefix,
     is_bse_symbol,
+    normalize_sector_code,
     normalize_symbol,
 )
 
@@ -65,6 +66,7 @@ __all__ = [
     "SymbolRef",
     "TradingCalendar",
     "build_capability_matrix",
+    "em_board_secid",
     "em_get",
     "em_secid",
     "get_preference_preset",
@@ -78,10 +80,11 @@ __all__ = [
     "is_bse_symbol",
     "is_eastmoney_url",
     "list_market_ids",
+    "normalize_sector_code",
     "normalize_symbol",
     "register_builtin_providers",
     "reset_default_client",
     "reset_provider_registry",
 ]
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"

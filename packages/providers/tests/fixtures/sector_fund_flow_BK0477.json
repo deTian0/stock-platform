@@ -1,0 +1,18 @@
+{
+  "bars": [
+    {
+      "sector_code": "BK0477",
+      "sector_name": "白酒",
+      "date": "2026-09-01",
+      "main_net": 350000000.0,
+      "change_pct": 1.25
+    },
+    {
+      "code": "90.BK0477",
+      "name": "白酒",
+      "trade_date": "20260902",
+      "main_net": -120000000.0,
+      "change_pct": -0.68
+    }
+  ]
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from .base import AssetType
@@ -17,18 +18,21 @@ from .normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
+    normalize_news_row,
     normalize_realtime_row,
+    normalize_sector_fund_flow_row,
     normalize_unlock_payload,
     validate_adj_factor_kind,
 )
 from .schemas import FULL_MINUTE_DEFAULT_COUNT, FULL_MINUTE_FREQ
-from .symbol import exchange_prefix, normalize_symbol
+from .symbol import exchange_prefix, normalize_sector_code, normalize_symbol
 
 _CN_TZ = ZoneInfo("Asia/Shanghai")
 
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+NEWS_URL = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 SINA_FINANCE_URL = (
     "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
@@ -84,6 +88,11 @@ def em_secid(code: str) -> str:
     prefix = exchange_prefix(code)
     market = 1 if prefix == "sh" else 0
     return f"{market}.{code}"
+
+
+def em_board_secid(sector_code: str) -> str:
+    """East Money board/sector secid: ``90.BK####``."""
+    return f"90.{normalize_sector_code(sector_code)}"
 
 
 def _response_json(resp: Any) -> dict[str, Any]:
@@ -381,6 +390,120 @@ class AStockHttpProvider:
                 if end and d > end:
                     continue
                 rows.append(row)
+        return rows
+
+    def get_sector_fund_flow(
+        self,
+        sectors: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        limit: int = 60,
+        asset_type: str = "sector",
+    ) -> list[dict[str, Any]]:
+        """Board/sector day-level fund flow via push2his fflow/daykline (元).
+
+        Uses EM board secid ``90.BK####`` (same daykline recipe as individual
+        ``fund_flow``). ``change_pct`` is optional and often null on this endpoint.
+        """
+        rows: list[dict[str, Any]] = []
+        lmt = max(1, min(int(limit), 1000))
+        for raw_code in sectors:
+            sector_code = normalize_sector_code(raw_code)
+            payload = self._fetch(
+                FUND_FLOW_URL,
+                {
+                    "secid": em_board_secid(sector_code),
+                    "fields1": "f1,f2,f3,f7",
+                    "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+                    "lmt": str(lmt),
+                },
+            )
+            data = payload.get("data") or {}
+            name = data.get("name") or data.get("secu_name")
+            klines = data.get("klines") or []
+            for line in klines:
+                parsed = _parse_fund_flow_csv(str(line))
+                parsed["sector_code"] = sector_code
+                if name:
+                    parsed["sector_name"] = name
+                # Optional change_pct if vendor includes a trailing percent field.
+                parts = str(line).split(",")
+                if len(parts) > 6 and parts[6] not in {"", "-"}:
+                    parsed.setdefault("change_pct", parts[6])
+                row = normalize_sector_fund_flow_row(
+                    parsed,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_sector_code=sector_code,
+                )
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                rows.append(row)
+        return rows
+
+    def get_news(
+        self,
+        symbols: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Lightweight news features via np-weblist ``getFastNewsList`` (em_get).
+
+        Thin scaffold: recent EM fast-news list stamped with the requested
+        symbol. Not an LLM summary path; ``sentiment`` is usually null.
+        """
+        rows: list[dict[str, Any]] = []
+        page_size = max(1, min(int(limit), 50))
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            payload = self._fetch(
+                NEWS_URL,
+                {
+                    "client": "web",
+                    "biz": "web_724",
+                    "fastColumn": "102",
+                    "sortEnd": "",
+                    "pageSize": str(page_size),
+                    "req_trace": str(uuid4()),
+                },
+            )
+            data = payload.get("data") or {}
+            items = data.get("fastNewsList") or data.get("items") or []
+            sym_rows: list[dict[str, Any]] = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                raw = {
+                    "symbol": code,
+                    "date": item.get("showTime") or item.get("date") or item.get("time"),
+                    "title": item.get("title"),
+                    "summary": item.get("summary") or item.get("content"),
+                    "sentiment": item.get("sentiment"),
+                }
+                try:
+                    row = normalize_news_row(
+                        raw,
+                        source=self.name,
+                        default_symbol=code,
+                        market="CN",
+                    )
+                except ValueError:
+                    continue
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                sym_rows.append(row)
+                if limit > 0 and len(sym_rows) >= limit:
+                    break
+            rows.extend(sym_rows)
         return rows
 
     def _datacenter(

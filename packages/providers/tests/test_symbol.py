@@ -8,6 +8,7 @@ from stock_platform_providers import (
     SymbolError,
     exchange_prefix,
     is_bse_symbol,
+    normalize_sector_code,
     normalize_symbol,
 )
 
@@ -78,3 +79,20 @@ def test_bse_920_not_shanghai() -> None:
     assert is_bse_symbol("920982")
     assert is_bse_symbol("830001")
     assert not is_bse_symbol("600519")
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("BK0477", "BK0477"),
+        ("bk0477", "BK0477"),
+        ("90.BK0477", "BK0477"),
+    ],
+)
+def test_normalize_sector_code(raw: str, expected: str) -> None:
+    assert normalize_sector_code(raw) == expected
+
+
+def test_normalize_sector_code_rejects_stock() -> None:
+    with pytest.raises(SymbolError):
+        normalize_sector_code("600519")

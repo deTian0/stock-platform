@@ -53,6 +53,8 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="daily"' in body
     assert 'id="minute"' in body
     assert 'id="fund-flow"' in body
+    assert 'id="sector-fund-flow"' in body
+    assert 'id="news"' in body
     assert 'id="lhb"' in body
     assert 'id="unlock"' in body
     assert 'id="adj-factor"' in body
@@ -78,6 +80,8 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
     assert "/api/market/fund-flow" in text
+    assert "/api/market/sector-fund-flow" in text
+    assert "/api/market/news" in text
     assert "/api/market/lhb" in text
     assert "/api/market/unlock" in text
     assert "/api/market/adj-factor" in text
@@ -128,12 +132,16 @@ def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 10
+    assert len(rows) == 12
     by_id = {row["id"]: row for row in rows}
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
     assert by_id["fund_flow"]["usable"] is True
     assert by_id["fund_flow"]["effective"] == "replay"
+    assert by_id["sector_fund_flow"]["usable"] is True
+    assert by_id["sector_fund_flow"]["effective"] == "replay"
+    assert by_id["news"]["usable"] is True
+    assert by_id["news"]["effective"] == "replay"
     assert by_id["lhb"]["usable"] is True
     assert by_id["lhb"]["effective"] == "replay"
     assert by_id["unlock"]["usable"] is True
@@ -186,6 +194,53 @@ def test_can_prefer_fund_flow_astock_http(client: TestClient) -> None:
     by_id = {row["id"]: row for row in matrix}
     assert by_id["fund_flow"]["effective"] == "astock_http"
     assert by_id["fund_flow"]["usable"] is True
+
+
+def test_sector_fund_flow_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/sector-fund-flow",
+        params={"sectors": "BK0477", "start": "2026-09-01", "end": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "sector_fund_flow"
+    assert body["provider"] == "replay"
+    assert len(body["rows"]) == 2
+    assert body["rows"][0]["sector_code"] == "BK0477"
+    assert body["rows"][0]["main_net"] == 350000000.0
+
+
+def test_news_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/news",
+        params={"symbols": "SH600519", "start": "2026-09-01", "end": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "news"
+    assert body["provider"] == "replay"
+    assert len(body["rows"]) == 2
+    assert body["rows"][0]["symbol"] == "600519"
+    assert body["rows"][0]["title"].startswith("贵州茅台")
+
+
+def test_can_prefer_sector_fund_flow_and_news_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={
+            "preferences": {
+                "sector_fund_flow": "astock_http",
+                "news": "astock_http",
+            }
+        },
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["sector_fund_flow"]["effective"] == "astock_http"
+    assert by_id["news"]["effective"] == "astock_http"
+    assert by_id["sector_fund_flow"]["usable"] is True
+    assert by_id["news"]["usable"] is True
 
 
 def test_lhb_replay(client: TestClient) -> None:
