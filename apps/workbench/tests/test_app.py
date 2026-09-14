@@ -48,6 +48,13 @@ def test_static_assets(client: TestClient) -> None:
     assert css.status_code == 200
     js = client.get("/static/app.js")
     assert js.status_code == 200
+    # M11.2: UI must call existing APIs (fail-closed path included).
+    text = js.text
+    assert "/api/settings/capability-matrix" in text
+    assert "/api/market/daily" in text
+    assert "/api/paper/status" in text
+    assert "fail_closed" in text
+    assert "/api/settings/preferences" in text
 
 
 def test_capability_matrix(client: TestClient) -> None:
