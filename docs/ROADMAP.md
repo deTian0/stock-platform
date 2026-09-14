@@ -35,7 +35,7 @@
 | M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
 | M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | done |
 | M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | done |
-| M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | in_progress |
+| M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | done |
 | M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
 | M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | done |
 | M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | done |
@@ -297,7 +297,7 @@
 
 验收（大）：
 
-- [ ] M6.1–M6.3 done；CHANGELOG 含 `0.7.0`
+- [x] M6.1–M6.3 done；CHANGELOG 含 `0.7.0`
 
 ---
 
