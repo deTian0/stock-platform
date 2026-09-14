@@ -82,7 +82,7 @@
 | M20 | CN 财务报表 | 大 | `v1.13.0` | done |
 | M20.1 | financial provider + matrix + ADR 0025 | 小 | `v1.12.1` | done |
 | M20.2 | workbench financial API + UI | 小 | `v1.12.2` | done |
-| M21 | CN 复权因子 | 大 | `v1.14.0` | in_progress |
+| M21 | CN 复权因子 | 大 | `v1.14.0` | done |
 | M21.1 | adj_factor provider + matrix + ADR 0026 | 小 | `v1.13.1` | done |
 | M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | done |
 
@@ -730,7 +730,7 @@
 
 验收（大）：
 
-- [ ] M21.1–M21.2 done；CHANGELOG 含 `1.14.0`
+- [x] M21.1–M21.2 done；CHANGELOG 含 `1.14.0`
 
 ---
 
