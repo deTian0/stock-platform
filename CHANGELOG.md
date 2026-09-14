@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.5.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M43 完成**：组合回测加深 + 绩效对齐纸面成交
+  - `portfolio_metrics` / `run_portfolio_pit`（回撤、换手、成交数）
+  - `align_fills_to_performance` 从纸面 fills 回填 JSONL；`direction_accuracy` 口径不变
+  - ADR 0043；默认 SIMULATE；CI fixtures
+
 ## [3.4.0] - 2026-09-14
 
 ### Added

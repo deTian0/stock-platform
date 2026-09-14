@@ -111,7 +111,7 @@
 | M40 | 定时 refresh→brief 日流水线 | 大 | `v3.2.0` | done |
 | M41 | 板块资金流 / 新闻特征 | 大 | `v3.3.0` | done |
 | M42 | 日历 2028+ + Task Scheduler/cron 运维包 | 大 | `v3.4.0` | done |
-| M43 | （可选）组合回测加深 + 绩效对齐纸面成交 | 大 | `v3.5.0` | planned |
+| M43 | （可选）组合回测加深 + 绩效对齐纸面成交 | 大 | `v3.5.0` | done |
 | M44 | （可选）LLM 成本/质量控制 | 大 | `v3.6.0` | planned |
 | M45 | Workbench IA + 一键向导（刷新→推荐→纸面） | 大 | `v3.7.0` | planned |
 | M46 | Phase E 日用稳定收口 | 大 | `v3.8.0` | planned |
@@ -1037,7 +1037,7 @@
 
 **产品目标**：把「今日推荐」从 demo 做成可坚持的真日用——更大宇宙、定时 refresh→brief、可读理由；加固板块/新闻数据与日历/调度运维；可选加深投研与工作台向导。默认仍 paper + replay；SIMULATE；无 SPA；无真实券商；东财经 `em_get`；矩阵 fail-closed。
 
-**状态**：in_progress（已完成 M39–M42 → `v3.4.0`）
+**状态**：in_progress（已完成 M39–M43 → `v3.5.0`）
 
 **详细设计**：`C:\Users\63516\.cursor\plans\phase_e_daily_use_roadmap_20260914.plan.md`
 
@@ -1100,8 +1100,8 @@
 
 验收：
 
-- [ ] 组合级回测指标范围经 ADR 冻结；CLI/API 之一 + 单测
-- [ ] 纸面成交 → 绩效回填路径；CHANGELOG `3.5.0`
+- [x] 组合级回测指标范围经 ADR 冻结；CLI/API 之一 + 单测
+- [x] 纸面成交 → 绩效回填路径；CHANGELOG `3.5.0`
 
 ---
 

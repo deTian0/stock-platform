@@ -13,12 +13,14 @@ from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, panel_to_csv
 from .performance import (
+    align_fills_to_performance,
     compute_performance,
     default_performance_log_path,
     log_brief_decisions,
     performance_summary,
     settled_records,
 )
+from .portfolio import portfolio_metrics, run_portfolio_pit
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
@@ -44,6 +46,7 @@ __all__ = [
     "DailyPipelineReport",
     "StrategyConfig",
     "UniverseEmptyError",
+    "align_fills_to_performance",
     "apply_entry_gates",
     "apply_risk_gates",
     "assert_no_lookahead_columns",
@@ -65,10 +68,12 @@ __all__ = [
     "normalize_universe",
     "panel_to_csv",
     "performance_summary",
+    "portfolio_metrics",
     "reason_summary",
     "REFRESH_DATASETS",
     "RefreshReport",
     "run_daily_pipeline",
+    "run_portfolio_pit",
     "run_refresh",
     "run_pit_long_only",
     "run_strategy_pit",
@@ -80,4 +85,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.4.0"
+__version__ = "3.5.0"

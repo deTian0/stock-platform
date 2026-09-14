@@ -15,6 +15,7 @@
 | **M32 / v2.4.0** | `performance` JSONL + `stock-platform-performance` |
 | **M34 / v2.6.0** | 策略配置版本化 + `compare_strategy_configs` |
 | **M39 / v3.1.0** | 分层宇宙 core/watch/full + 可读 `reasons[]`（ADR 0040） |
+| **M43** | `run_portfolio_pit` / `portfolio_metrics` + `align_fills_to_performance`（ADR 0043） |
 
 ## 安装
 
@@ -36,9 +37,17 @@ python -m pytest -q
 - 跨除权日比价前先经 `stock_platform_providers.apply_adjust`（M23）；本包不内嵌抓取
 - 宇宙空列表 / 空文件 **fail-closed**（`UniverseEmptyError`）；截面经注入 provider，CI 零公网
 - 日刷新 CLI 默认 `--provider replay`；live HTTP 不在本包内嵌
+- 组合指标薄范围：回撤 / 近似换手 / 成交笔数；非全量化平台（ADR 0043）
+- 纸面 fills → 绩效 JSONL：`align_fills_to_performance`；`direction_accuracy` 口径不变
 
 刷新：
 
 ```powershell
 stock-platform-refresh --asof 2026-09-02 --universe fixtures\universe_cn_sample.json --out $env:TEMP\sp-refresh --provider replay --fixtures path\to\fixtures
+```
+
+纸面成交对齐绩效：
+
+```powershell
+stock-platform-performance --log $env:TEMP\decisions.jsonl --align-fills path\to\fills.json
 ```
