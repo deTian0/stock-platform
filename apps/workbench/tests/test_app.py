@@ -20,7 +20,9 @@ FORBIDDEN_BRAND_TOKENS = ("tickflow", "tushare", "akshare", "eastmoney.com")
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    # CI / unit tests stay offline — force replay regardless of production default.
+    monkeypatch.setenv("STOCK_PLATFORM_PROVIDER_PRESET", "replay")
     state = build_default_state(FIXTURES)
     app = create_app(state=state)
     return TestClient(app)
@@ -643,14 +645,15 @@ def test_can_prefer_astock_http_without_calling_network(client: TestClient) -> N
 def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
     listed = client.get("/api/settings/presets")
     assert listed.status_code == 200
-    assert listed.json()["default"] == "replay"
+    assert listed.json()["default"] == "cn_astock_http"
     r = client.post("/api/settings/presets/cn_astock_http/apply")
     assert r.status_code == 200
     body = r.json()
     assert body["applied"] == "cn_astock_http"
-    assert body["isDefault"] is False
+    assert body["isDefault"] is True
     assert body["preferences"]["daily"] == "astock_http"
     assert body["preferences"]["full_minute"] == "astock_http"
+    assert body["liveTradingEnabled"] is False
     health = client.get("/api/ops/health").json()
     assert health["liveTradingEnabled"] is False
     assert health["defaultReplay"] is False
@@ -666,6 +669,15 @@ def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
     by_id = {row["id"]: row for row in matrix}
     assert by_id["daily"]["effective"] == "astock_http"
     assert by_id["daily"]["usable"] is True
+
+
+def test_production_default_state_is_cn_live(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("STOCK_PLATFORM_PROVIDER_PRESET", raising=False)
+    state = build_default_state(tmp_path)
+    assert state.preferences["daily"] == "astock_http"
+    assert state.preferences["fund_flow"] == "astock_http"
+    assert state.preferences["news"] == "astock_http"
+    assert all(v == "astock_http" for v in state.preferences.values())
 
 
 def test_can_prefer_global_http_without_calling_network(client: TestClient) -> None:

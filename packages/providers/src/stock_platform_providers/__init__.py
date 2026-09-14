@@ -16,13 +16,18 @@ from .eastmoney import (
     CircuitOpenError,
     EastmoneyClient,
     em_get,
+    http_trust_env,
     is_eastmoney_url,
     reset_default_client,
 )
 from .presets import (
+    DEFAULT_STARTUP_PRESET,
+    ENV_PROVIDER_PRESET,
     PREFERENCE_PRESETS,
     get_preference_preset,
     list_preference_presets,
+    resolve_startup_preset_id,
+    startup_preferences,
 )
 from .errors import SymbolError
 from .global_http import GlobalHttpProvider, GlobalHttpRouter, infer_global_market
@@ -69,9 +74,14 @@ __all__ = [
     "em_board_secid",
     "em_get",
     "em_secid",
+    "http_trust_env",
+    "DEFAULT_STARTUP_PRESET",
+    "ENV_PROVIDER_PRESET",
     "get_preference_preset",
     "list_preference_presets",
     "PREFERENCE_PRESETS",
+    "resolve_startup_preset_id",
+    "startup_preferences",
     "exchange_prefix",
     "get_market_strategy",
     "get_provider_registry",
@@ -87,4 +97,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "3.8.1"
+__version__ = "3.9.0"

@@ -6,7 +6,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from stock_platform_providers import get_preference_preset, list_preference_presets
+from stock_platform_providers import (
+    DEFAULT_STARTUP_PRESET,
+    get_preference_preset,
+    list_preference_presets,
+    resolve_startup_preset_id,
+)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -39,8 +44,16 @@ def put_preferences(request: Request, body: PreferencesUpdate) -> dict[str, Any]
 
 @router.get("/presets")
 def get_presets() -> dict[str, Any]:
-    """Documented live preference templates. None of these change process defaults."""
-    return {"default": "replay", "presets": list_preference_presets()}
+    """Documented preference templates. Startup default is CN live (env can force replay)."""
+    try:
+        startup = resolve_startup_preset_id()
+    except KeyError:
+        startup = DEFAULT_STARTUP_PRESET
+    return {
+        "default": DEFAULT_STARTUP_PRESET,
+        "startup": startup,
+        "presets": list_preference_presets(),
+    }
 
 
 @router.post("/presets/{preset_id}/apply")
@@ -56,5 +69,9 @@ def apply_preset(request: Request, preset_id: str) -> dict[str, Any]:
         "isDefault": bool(preset.get("is_default")),
         "preferences": state.preferences,
         "matrix": state.matrix(),
-        "note": "Startup default remains replay; this only mutates the current process.",
+        "note": (
+            f"Process preferences updated. Production startup default is "
+            f"{DEFAULT_STARTUP_PRESET}; set STOCK_PLATFORM_PROVIDER_PRESET=replay for CI."
+        ),
+        "liveTradingEnabled": False,
     }

@@ -150,12 +150,16 @@ def parse_yahoo_chart(payload: dict[str, Any]) -> list[dict[str, Any]]:
 def _default_get_json(url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     import requests
 
-    resp = requests.get(
-        url,
-        params=params or {},
-        headers={"User-Agent": DEFAULT_UA},
-        timeout=15,
-    )
+    from .eastmoney import http_trust_env
+
+    with requests.Session() as session:
+        session.trust_env = http_trust_env()
+        resp = session.get(
+            url,
+            params=params or {},
+            headers={"User-Agent": DEFAULT_UA},
+            timeout=15,
+        )
     resp.raise_for_status()
     return resp.json()
 
@@ -163,11 +167,15 @@ def _default_get_json(url: str, params: dict[str, Any] | None = None) -> dict[st
 def _default_get_text(url: str, *, encoding: str = "gbk") -> str:
     import requests
 
-    resp = requests.get(
-        url,
-        headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
-        timeout=10,
-    )
+    from .eastmoney import http_trust_env
+
+    with requests.Session() as session:
+        session.trust_env = http_trust_env()
+        resp = session.get(
+            url,
+            headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
+            timeout=10,
+        )
     resp.raise_for_status()
     resp.encoding = encoding
     return resp.text

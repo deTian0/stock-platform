@@ -26,23 +26,29 @@
 | **M32 / v2.4.0** | `GET /api/research/performance` + `#performance` |
 | **M33 / v2.5.0** | `engine=llm` 可选辩论 + `POST /api/research/brief/debate` |
 | **M34 / v2.6.0** | `GET/POST /api/research/strategy/*` + `#strategy-compare` |
+| **M47 / v3.9.0** | **生产默认 CN live**（`astock_http`）；CI 用 `STOCK_PLATFORM_PROVIDER_PRESET=replay` |
 
 ## 安装与运行
 
 ```powershell
 cd D:\workspace\git\stock-platform
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\research[dev]"
 python -m pip install -e ".\packages\agents[dev]"
 python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
 cd apps\workbench
+$env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 python -m pytest -q
+Remove-Item Env:STOCK_PLATFORM_PROVIDER_PRESET
 python -m stock_platform_workbench
-# → http://127.0.0.1:3018/  （UI）
+# → http://127.0.0.1:3018/  （UI；行情默认 live）
 # → http://127.0.0.1:3018/health
 # → http://127.0.0.1:3018/api/ops/health
 ```
+
+生产 live 说明：[`docs/ops/live-startup.md`](../../docs/ops/live-startup.md)。
 
 ## API（当前）
 
@@ -62,7 +68,7 @@ python -m stock_platform_workbench
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
-| GET | `/api/research/brief?asof=&symbols=&topN=` | 盘前 TopN 简报（矩阵 daily；默认 replay） |
+| GET | `/api/research/brief?asof=&symbols=&topN=` | 盘前 TopN 简报（矩阵 daily；生产默认 live） |
 | POST | `/api/research/brief/to-paper` | TopN → 纸面草稿（SIMULATE；需 active strategy） |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
@@ -72,11 +78,12 @@ python -m stock_platform_workbench
 | POST | `/api/paper/drafts` | 建纸面订单草稿 |
 | POST | `/api/paper/drafts/{id}/execute` | 提交（幂等） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
-| GET | `/api/settings/presets` | 列出 replay / cn_astock_http / us_hk_global_http（启动默认仍 replay） |
-| POST | `/api/settings/presets/{id}/apply` | 应用到当前进程（不改下次启动默认） |
+| GET | `/api/settings/presets` | 列出 replay / cn_astock_http / us_hk_global_http（启动默认 cn live） |
+| POST | `/api/settings/presets/{id}/apply` | 应用到当前进程 |
 
 ## 约束
 
 - 路由**禁止**写死数据源品牌；只调用 `WorkbenchState.resolve(capability)`
 - 遵循 `docs/contracts/`
-- 默认 Provider 为 `replay`（fixtures），非 TickFlow
+- 生产默认 Provider 为 `astock_http`（CN）；CI 设 `STOCK_PLATFORM_PROVIDER_PRESET=replay`
+- 交易永远 SIMULATE；「真实」仅指行情

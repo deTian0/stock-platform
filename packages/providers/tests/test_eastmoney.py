@@ -64,6 +64,18 @@ def test_em_get_uses_default_client() -> None:
         em_get("https://example.com/")
 
 
+def test_http_trust_env_default_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stock_platform_providers.eastmoney import http_trust_env
+
+    monkeypatch.delenv("STOCK_PLATFORM_HTTP_TRUST_ENV", raising=False)
+    assert http_trust_env() is False
+    monkeypatch.setenv("STOCK_PLATFORM_HTTP_TRUST_ENV", "1")
+    assert http_trust_env() is True
+    client = reset_default_client(min_interval=0.0, sleeper=lambda _s: None)
+    session = client._ensure_session()
+    assert session.trust_env is True
+
+
 def test_circuit_opens_after_consecutive_failures() -> None:
     from stock_platform_providers.eastmoney import CircuitOpenError
 

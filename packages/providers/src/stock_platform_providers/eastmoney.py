@@ -55,6 +55,16 @@ def _default_cooldown_sec() -> float:
     return float(os.environ.get("EM_CIRCUIT_COOLDOWN", "60"))
 
 
+def http_trust_env() -> bool:
+    """Whether requests should honor HTTP(S)_PROXY env / system proxy.
+
+    Default **False** so a broken local proxy does not silently break live EM calls.
+    Set ``STOCK_PLATFORM_HTTP_TRUST_ENV=1`` when an explicit proxy is required.
+    """
+    raw = str(os.environ.get("STOCK_PLATFORM_HTTP_TRUST_ENV", "0") or "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 class EastmoneyClient:
     """Serial throttle + Keep-Alive session for eastmoney.com.
 
@@ -110,6 +120,7 @@ class EastmoneyClient:
                 'Install with: pip install "stock-platform-providers[http]"'
             ) from exc
         session = requests.Session()
+        session.trust_env = http_trust_env()
         session.headers.update({"User-Agent": DEFAULT_UA})
         self._session = session
         return session

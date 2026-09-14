@@ -14,9 +14,11 @@
 | Execution | `packages/execution` | 纸面 SIMULATE、`BrokerPort` / `PaperBroker`、可选 `ths_sim`（mock） |
 | Workbench | `apps/workbench` | FastAPI + 最小 UI：日用向导 / 推荐 / 纸面 / 运维 |
 
-**默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v3.8 Phase E 仍成立）**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live、同花顺真实 HTTP（backlog）。  
+**默认运行时（v3.9+）**：行情偏好默认 **CN live**（`astock_http` / `em_get`）；美港可切 `global_http`。  
+CI / 本地测试设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 保持零公网。详见 [`docs/ops/live-startup.md`](docs/ops/live-startup.md)。  
+**明确不做**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、同花顺真实 HTTP（backlog）。  
 **同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。
+**交易**：始终 paper / SIMULATE（`liveTradingEnabled=false`）——「真实」仅指行情 API。
 
 ## 日用路径（Phase E）
 
@@ -34,24 +36,28 @@ python -m stock_platform_workbench
 # → http://127.0.0.1:3018/#wizard  （刷新→推荐→纸面；默认 skip refresh）
 ```
 
-默认仍 **paper + replay + SIMULATE**。日用宇宙样例见 `docs/ops/daily-universe.md`。
+默认 **paper + SIMULATE**；行情默认 live（可用 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 强制 fixtures）。日用宇宙样例见 `docs/ops/daily-universe.md`。
 
 ## 快速开始
 
 ```powershell
 cd D:\workspace\git\stock-platform
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\research[dev]"
 python -m pip install -e ".\packages\agents[dev]"
 python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
+$env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"   # 全量 pytest 零公网
 python -m pytest packages apps -q
+Remove-Item Env:STOCK_PLATFORM_PROVIDER_PRESET   # 生产启动用 live 默认
 python -m stock_platform_workbench
 # → http://127.0.0.1:3018/  （打开「今日推荐」）
 # → http://127.0.0.1:3018/health
 # → http://127.0.0.1:3018/api/ops/health
 ```
 
+Live 运维说明：[`docs/ops/live-startup.md`](docs/ops/live-startup.md)。
 日数据刷新（离线 replay fixtures）：
 
 ```powershell
@@ -98,6 +104,9 @@ stock-platform/
 | **v2.0.0** | Phase A（M24–M28）日更推荐 + 纸面闭环 |
 | **v2.1.0–v2.3.0** | Phase B（M29–M31）日刷新 + live 运维稳定 |
 | **v2.4.0–v2.6.0** | Phase C（M32–M34）投研稳定（绩效 / 可选 LLM / 策略对比） |
+| **v3.0.0** | Phase D（M35–M38）执行端口 + ths_sim |
+| **v3.1.0–v3.8.0** | Phase E 日用稳定 |
+| **v3.9.0** | M47 生产 live 行情默认（交易仍 SIMULATE） |
 
 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
