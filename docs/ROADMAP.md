@@ -70,7 +70,7 @@
 | M16 | CN 龙虎榜 | 大 | `v1.9.0` | done |
 | M16.1 | lhb provider + matrix + ADR 0021 | 小 | `v1.8.1` | done |
 | M16.2 | workbench lhb API + UI | 小 | `v1.8.2` | done |
-| M17 | CN 限售解禁 | 大 | `v1.10.0` | in_progress |
+| M17 | CN 限售解禁 | 大 | `v1.10.0` | done |
 | M17.1 | unlock provider + matrix + ADR 0022 | 小 | `v1.9.1` | done |
 | M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | done |
 
@@ -614,7 +614,7 @@
 
 验收（大）：
 
-- [ ] M17.1–M17.2 done；CHANGELOG 含 `1.10.0`
+- [x] M17.1–M17.2 done；CHANGELOG 含 `1.10.0`
 
 ---
 
