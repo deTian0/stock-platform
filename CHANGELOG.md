@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.3.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M10 完成**：CN 静态交易日历（休市日表 + timing / MarketStrategy 共用）
+  - ADR 0015；US/HK 仍 weekday stub
+
 ## [1.2.2] - 2026-09-14
 
 ### Added

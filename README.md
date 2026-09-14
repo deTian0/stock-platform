@@ -8,7 +8,7 @@
 
 | 组件 | 路径 | 能力 |
 |------|------|------|
-| Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、`astock_http` / `global_http`（可选 live）、能力矩阵、`MarketStrategy` |
+| Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
 | Research | `packages/research` | lvrev / 闸门 / PIT / `stock-platform-score` |
 | Agents | `packages/agents` | 研报/复盘插件（仅经 providers） |
 | Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |

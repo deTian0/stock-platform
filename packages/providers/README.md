@@ -13,6 +13,7 @@
 | **M5.1+ / v0.5.1** | `MarketStrategy` CN/US/HK；`normalize_symbol(market=)`；`GlobalReplayProvider` |
 | **M8.1 / v1.0.1** | `AStockHttpProvider` live daily/realtime（经 `em_get`） |
 | **M9.1 / v1.1.1** | `GlobalHttpProvider` / `GlobalHttpRouter`（Yahoo + 新浪） |
+| **M10.1 / v1.2.1** | `TradingCalendar` + 静态 CN 休市日 |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
@@ -35,6 +36,7 @@ python -m pip install -e ".[http]"
 |------|------|
 | `normalize_symbol` / `exchange_prefix` / `is_bse_symbol` | CN / US / HK 代码（`market=`） |
 | `get_market_strategy` / `MarketStrategy` | 市场策略表（settle / limit / 时区） |
+| `get_trading_calendar` / `TradingCalendar` | CN 静态休市日；US/HK weekday stub |
 | `ReplayTransport` / `ReplayProvider` | CN fixtures 回放 |
 | `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
 | `AStockHttpProvider` | A 股 live（经 `em_get`） |
