@@ -91,7 +91,7 @@
 | M23 | CN 复权套价 | 大 | `v1.16.0` | done |
 | M23.1 | apply_adjust 内核 + ADR 0028 | 小 | `v1.15.1` | done |
 | M23.2 | workbench daily-adjusted API + UI | 小 | `v1.15.2` | done |
-| M24 | Universe + PIT 截面面板 | 大 | `v1.17.0` | in_progress |
+| M24 | Universe + PIT 截面面板 | 大 | `v1.17.0` | done |
 | M24.1 | universe + panel 内核 + ADR 0029 | 小 | `v1.16.1` | done |
 | M25 | 盘前简报批处理 | 大 | `v1.18.0` | planned |
 | M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | planned |
@@ -820,7 +820,7 @@
 
 验收（大）：
 
-- [ ] CSV 兼容导出；CHANGELOG 含 `1.17.0`
+- [x] CSV 兼容导出；CHANGELOG 含 `1.17.0`
 
 ---
 

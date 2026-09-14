@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.17.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M24 完成**：CN 宇宙 + PIT 日截面面板（ADR 0029；`load_universe` / `build_cross_section_panel` / CSV）
+  - 空宇宙 fail-closed；注入 providers；默认仍无公网抓取
+
 ## [1.16.1] - 2026-09-14
 
 ### Added
