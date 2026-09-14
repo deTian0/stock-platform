@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.7.3] - 2026-09-14
+
+### Added
+
+- M7.3 验收：`release-checklist.md`、`check_versions.ps1`、CI version job
+
 ## [0.7.2] - 2026-09-14
 
 ### Changed
@@ -271,7 +277,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/local/stock-platform/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/local/stock-platform/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/local/stock-platform/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/local/stock-platform/compare/v0.6.3...v0.7.0
