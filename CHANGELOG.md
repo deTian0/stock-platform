@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.13.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M20 完成**：CN 个股财务报表（能力矩阵 `financial`；replay + 新浪三表 HTTP）
+  - ADR 0025；workbench API/UI；默认仍 replay；mootdx / 东财财报备胎不做
+
 ## [1.12.2] - 2026-09-14
 
 ### Added
