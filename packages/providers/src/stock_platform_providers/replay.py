@@ -38,6 +38,7 @@ class ReplayTransport:
         depth5_{symbol}.json      # dict or {"quote": {...}} five-level book
         financial_{symbol}.json   # dict aggregate {income, balance, cashflow}
         adj_factor_{symbol}.json  # list[dict] or {"bars": [...]} / {"factors": [...]}
+        full_minute_{symbol}.json # list[dict] or {"bars": [...]} — same-day 1m only
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -129,6 +130,16 @@ class ReplayTransport:
         if isinstance(data, list):
             return data
         raise ValueError(f"unexpected adj_factor fixture shape in {path}")
+
+    def load_full_minute(self, symbol: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"full_minute_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            bars = data.get("bars") or data.get("data") or []
+            return list(bars)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected full_minute fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -407,5 +418,49 @@ class ReplayProvider:
             sym_rows.sort(key=lambda r: r["trade_date"], reverse=True)
             if limit > 0:
                 sym_rows = sym_rows[:limit]
+            rows.extend(sym_rows)
+        return rows
+
+    def get_full_minute(
+        self,
+        symbols: list[str],
+        *,
+        trade_date: date | None = None,
+        count: int = 300,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Same-day 1m bars for a symbol batch (universe repair). Missing fixture → skip.
+
+        Distinct from ``get_minute``: always ``freq=1m``; scoped to one ``trade_date``;
+        does **not** fall back to ``minute_{symbol}.json``.
+        """
+        from .schemas import FULL_MINUTE_FREQ
+
+        if count < 0:
+            raise ValueError(f"full_minute count must be >= 0, got {count}")
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                bars = self._transport.load_full_minute(symbol)
+            except FileNotFoundError:
+                continue
+            sym_rows: list[dict[str, Any]] = []
+            for bar in bars:
+                row = normalize_minute_row(
+                    bar,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                    default_freq=FULL_MINUTE_FREQ,
+                )
+                if row["freq"] != FULL_MINUTE_FREQ:
+                    continue
+                bar_day = date.fromisoformat(row["datetime"][:10])
+                if trade_date is not None and bar_day != trade_date:
+                    continue
+                sym_rows.append(row)
+            if count > 0:
+                sym_rows = sym_rows[-count:]
             rows.extend(sym_rows)
         return rows

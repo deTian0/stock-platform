@@ -92,7 +92,7 @@ asset_type ∈ { "stock", "etf", "index" }
 | `minute` | `symbol`, `datetime`（**北京墙钟 naive** `YYYY-MM-DD HH:MM:SS`，禁止 tz/UTC 入库）, `open/high/low/close`, `volume`（手）, `amount`（元，可 null）, `freq`（`1m`/`5m`/`15m`/`30m`/`60m`）, `source`, `asset_type` |
 | `depth5` | 见下表（M19） |
 | `financial` | 见下表（M20） |
-| `full_minute` | 同 minute 语义的全市场当日落盘批次 |
+| `full_minute` | 同 minute 列；**仅 `freq=1m`**；语义为**单交易日**标的批量当日 1m（宇宙修复轮）；见 ADR 0027；与多频历史 `minute` 独立 |
 | `fund_flow` | 见下表（M15） |
 | `lhb` | 见下表（M16） |
 | `unlock` | 见下表（M17） |

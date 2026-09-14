@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 from .base import AssetType
 from .eastmoney import EastmoneyClient, get_default_client
@@ -20,7 +21,10 @@ from .normalize import (
     normalize_unlock_payload,
     validate_adj_factor_kind,
 )
+from .schemas import FULL_MINUTE_DEFAULT_COUNT, FULL_MINUTE_FREQ
 from .symbol import exchange_prefix, normalize_symbol
+
+_CN_TZ = ZoneInfo("Asia/Shanghai")
 
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
@@ -744,6 +748,31 @@ class AStockHttpProvider:
                 sym_rows = sym_rows[:limit]
             rows.extend(sym_rows)
         return rows
+
+    def get_full_minute(
+        self,
+        symbols: list[str],
+        *,
+        trade_date: date | None = None,
+        count: int = FULL_MINUTE_DEFAULT_COUNT,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Same-day 1m batch via push2his kline (klt=1) — distinct from multi-freq ``get_minute``.
+
+        ``trade_date=None`` → Asia/Shanghai today. Empty klines skip the symbol.
+        """
+        if count < 0:
+            raise ValueError(f"full_minute count must be >= 0, got {count}")
+        day = trade_date or datetime.now(_CN_TZ).date()
+        # Reuse get_minute path (em_get) with fixed 1m + single-day window.
+        return self.get_minute(
+            symbols,
+            freq=FULL_MINUTE_FREQ,
+            start=day,
+            end=day,
+            asset_type=asset_type,
+            limit=count if count > 0 else 0,
+        )
 
 
 def _parse_sina_adj_factor_js(text: str) -> list[dict[str, Any]]:

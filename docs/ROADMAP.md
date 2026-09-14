@@ -85,6 +85,9 @@
 | M21 | CN 复权因子 | 大 | `v1.14.0` | done |
 | M21.1 | adj_factor provider + matrix + ADR 0026 | 小 | `v1.13.1` | done |
 | M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | done |
+| M22 | CN 全量分钟 | 大 | `v1.15.0` | in_progress |
+| M22.1 | full_minute provider + matrix + ADR 0027 | 小 | `v1.14.1` | done |
+| M22.2 | workbench full-minute API + UI | 小 | `v1.14.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -731,6 +734,32 @@
 验收（大）：
 
 - [x] M21.1–M21.2 done；CHANGELOG 含 `1.14.0`
+
+---
+
+## M22 — CN 全量分钟 → `v1.15.0`
+
+**目标**：个股当日 1m 批量（宇宙修复语义）；经 `em_get` push2his kline `klt=1`；默认 replay；CI 零公网；激活矩阵既有 `full_minute`；与多频 `minute` 严格区分。
+
+### 小里程碑
+
+#### M22.1 → `v1.14.1`
+
+验收：
+
+- [x] 契约字段 + ADR 0027；`ReplayProvider` / `AStockHttpProvider.get_full_minute` + fixtures / 注入测
+- [x] `replay` / `astock_http` 声明 `full_minute`；空 klines / 缺 fixture 不崩；不回退 `minute_*`
+
+#### M22.2 → `v1.14.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/full-minute` 真正取数；默认偏好 replay；可选 UI
+- [ ] 有候选时不再 409
+
+验收（大）：
+
+- [ ] M22.1–M22.2 done；CHANGELOG 含 `1.15.0`
 
 ---
 
