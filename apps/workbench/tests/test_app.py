@@ -39,6 +39,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     body = r.text
     assert 'id="capability"' in body
     assert 'id="daily"' in body
+    assert 'id="minute"' in body
     assert 'id="fund-flow"' in body
     assert 'id="lhb"' in body
     assert 'id="unlock"' in body
@@ -79,7 +80,9 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["lhb"]["effective"] == "replay"
     assert by_id["unlock"]["usable"] is True
     assert by_id["unlock"]["effective"] == "replay"
-    assert by_id["minute"]["usable"] is False
+    assert by_id["minute"]["usable"] is True
+    assert by_id["minute"]["effective"] == "replay"
+    assert by_id["depth5"]["usable"] is False
 
 
 def test_daily_and_realtime(client: TestClient) -> None:
@@ -197,13 +200,59 @@ def test_can_prefer_unlock_astock_http(client: TestClient) -> None:
     assert by_id["unlock"]["usable"] is True
 
 
-def test_minute_fail_closed(client: TestClient) -> None:
+def test_minute_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/minute",
+        params={
+            "symbols": "SH600519",
+            "freq": "1m",
+            "start": "2026-09-01",
+            "end": "2026-09-02",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "minute"
+    assert body["provider"] == "replay"
+    assert body["freq"] == "1m"
+    assert len(body["rows"]) == 3
+    assert body["rows"][0]["datetime"] == "2026-09-01 09:31:00"
+    assert body["rows"][0]["freq"] == "1m"
+
+
+def test_can_prefer_minute_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"minute": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["minute"]["effective"] == "astock_http"
+    assert by_id["minute"]["usable"] is True
+
+
+def test_depth5_fail_closed(client: TestClient) -> None:
     r = client.get("/api/market/minute", params={"symbols": "600519"})
-    assert r.status_code == 409
-    detail = r.json()
-    assert detail["capability"] == "minute"
-    assert detail["usable"] is False
-    assert detail["reason"] == "capability_not_usable"
+    # minute is usable; depth5 remains the fail-closed sentinel via matrix
+    assert r.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["depth5"]["usable"] is False
+    assert by_id["adj_factor"]["usable"] is False
+
+
+def test_prefer_unavailable_capability_still_fail_closed(client: TestClient) -> None:
+    r = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"depth5": "astock_http", "daily": "replay"}},
+    )
+    assert r.status_code == 200
+    assert r.json()["preferences"]["depth5"] == "astock_http"
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["depth5"]["usable"] is False
+    assert by_id["depth5"]["candidates"] == []
 
 
 def test_routes_do_not_hardcode_tickflow(client: TestClient) -> None:
@@ -220,18 +269,6 @@ def test_route_modules_forbid_brand_literals() -> None:
         text = path.read_text(encoding="utf-8").lower()
         for token in FORBIDDEN_BRAND_TOKENS:
             assert token not in text, f"{path.name} contains forbidden token {token!r}"
-
-
-def test_prefer_unavailable_minute_still_fail_closed(client: TestClient) -> None:
-    r = client.put(
-        "/api/settings/preferences",
-        json={"preferences": {"minute": "astock_http", "daily": "replay"}},
-    )
-    assert r.status_code == 200
-    assert r.json()["preferences"]["minute"] == "astock_http"
-    minute = client.get("/api/market/minute", params={"symbols": "600519"})
-    assert minute.status_code == 409
-    assert minute.json()["usable"] is False
 
 
 def test_api_matches_direct_replay_same_symbol_day(client: TestClient) -> None:

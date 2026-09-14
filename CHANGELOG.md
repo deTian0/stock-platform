@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.10.2] - 2026-09-14
+
+### Added
+
+- M18.2：workbench `GET /api/market/minute` + UI `#minute`；默认偏好 replay
+
 ## [1.10.1] - 2026-09-14
 
 ### Added

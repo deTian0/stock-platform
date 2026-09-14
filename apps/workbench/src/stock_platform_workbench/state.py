@@ -91,6 +91,7 @@ def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None =
     prefs = {
         "daily": "replay",
         "realtime": "replay",
+        "minute": "replay",
         "fund_flow": "replay",
         "lhb": "replay",
         "unlock": "replay",

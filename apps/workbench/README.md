@@ -12,6 +12,7 @@
 | **M4.2 / v0.4.2** | `/api/research/report`、`/api/review/report`（经 agents 插件） |
 | **M6.3 / v0.6.3** | `/api/paper/*` 纸面执行（SIMULATE only） |
 | **M11 / v1.3.1+** | `GET /` 最小 UI（矩阵 / 日 K / 纸面） |
+| **M18.2 / v1.10.2** | `GET /api/market/minute` + UI；默认 replay |
 
 ## 安装与运行
 
@@ -34,13 +35,13 @@ python -m stock_platform_workbench
 |------|------|------|
 | GET | `/` | 最小操作台 UI |
 | GET | `/health` | 健康检查 |
-| GET | `/api/settings/capability-matrix` | 能力矩阵（含 fund_flow / lhb / unlock） |
+| GET | `/api/settings/capability-matrix` | 能力矩阵（含 minute / fund_flow / lhb / unlock） |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
+| GET | `/api/market/minute?symbols=&freq=` | 经矩阵 resolve(`minute`)；无候选仍 **409** |
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
-| GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
 | GET | `/api/debate/report?symbol=&asof=` | 确定性 Bull/Bear/Risk 辩论 |
