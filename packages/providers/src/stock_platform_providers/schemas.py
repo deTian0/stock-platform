@@ -62,6 +62,10 @@ MINUTE_COLUMNS = [
 
 MINUTE_FREQS = frozenset({"1m", "5m", "15m", "30m", "60m"})
 
+# full_minute reuses MINUTE_COLUMNS with freq fixed to 1m (same-day batch / repair).
+FULL_MINUTE_FREQ = "1m"
+FULL_MINUTE_DEFAULT_COUNT = 300
+
 # CN day-level fund flow (元). Platform extension beyond TSP original seven.
 FUND_FLOW_COLUMNS = [
     "symbol",

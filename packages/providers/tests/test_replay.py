@@ -195,6 +195,33 @@ def test_replay_adj_factor_missing_fixture_empty() -> None:
     assert provider.get_adj_factor(["000001"]) == []
 
 
+def test_replay_full_minute() -> None:
+    from stock_platform_providers.schemas import MINUTE_COLUMNS
+
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_full_minute(
+        ["SH600519", "000001"], trade_date=date(2026, 9, 1), count=300
+    )
+    assert len(rows) == 5  # 3 for 600519 on 09-01 + 2 for 000001
+    assert all(r["freq"] == "1m" for r in rows)
+    assert all(r["datetime"].startswith("2026-09-01") for r in rows)
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[3]["symbol"] == "000001"
+    assert set(MINUTE_COLUMNS) <= set(rows[0].keys())
+    # count truncates per symbol
+    short = provider.get_full_minute(["600519"], trade_date=date(2026, 9, 1), count=2)
+    assert len(short) == 2
+    assert short[-1]["datetime"] == "2026-09-01 14:59:00"
+    # does not fall back to minute_* fixtures
+    assert provider.get_full_minute(["600000"], trade_date=date(2026, 9, 1)) == []
+
+
+def test_replay_full_minute_missing_fixture_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    assert provider.get_full_minute(["000002"], trade_date=date(2026, 9, 1)) == []
+
+
 def test_replay_adj_factor_date_filter() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
     rows = provider.get_adj_factor(

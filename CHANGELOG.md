@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.14.1] - 2026-09-14
+
+### Added
+
+- M22.1：CN 全量分钟 `full_minute`（激活矩阵第七项；ADR 0027）
+  - `ReplayProvider` / `AStockHttpProvider.get_full_minute`；东财 push2his `klt=1`（em_get）；fixtures；与多频 `minute` 区分；CI 零公网
+
 ## [1.14.0] - 2026-09-14
 
 ### Added

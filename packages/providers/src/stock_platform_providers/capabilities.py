@@ -84,6 +84,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "minute",
                     "depth5",
                     "financial",
+                    "full_minute",
                     "fund_flow",
                     "lhb",
                     "unlock",
@@ -107,6 +108,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "minute",
                     "depth5",
                     "financial",
+                    "full_minute",
                     "fund_flow",
                     "lhb",
                     "unlock",
@@ -115,8 +117,8 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             available=True,
             status="ok",
             note=(
-                "Live: East Money via em_get; financial/adj_factor via Sina HTTP "
-                "(not em_get); prefer replay for offline CI"
+                "Live: East Money via em_get (incl. full_minute 1m batch); "
+                "financial/adj_factor via Sina HTTP (not em_get); prefer replay for offline CI"
             ),
         )
     )

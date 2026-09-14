@@ -297,6 +297,44 @@ def test_adj_factor_invalid_kind() -> None:
         provider.get_adj_factor(["600519"], kind="bad")
 
 
+def test_full_minute_from_kline() -> None:
+    def get_json(url, params=None):
+        assert "push2his.eastmoney.com" in url
+        assert params["klt"] == "1"
+        assert params["beg"] == "20260901"
+        assert params["end"] == "20260901"
+        assert params["secid"] == "1.600519"
+        return {
+            "data": {
+                "klines": [
+                    "2026-09-01 09:31,1400.0,1401.0,1402.0,1399.5,1200,168120000",
+                    "2026-09-01 09:32,1401.0,1402.5,1403.5,1400.5,980,137445000",
+                ]
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_full_minute(
+        ["SH600519"], trade_date=date(2026, 9, 1), count=300
+    )
+    assert len(rows) == 2
+    assert rows[0]["freq"] == "1m"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["datetime"] == "2026-09-01 09:31:00"
+
+
+def test_full_minute_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
+    with pytest.raises(SymbolError):
+        provider.get_full_minute(["00700"], trade_date=date(2026, 9, 1))
+
+
+def test_full_minute_empty_klines() -> None:
+    rows = AStockHttpProvider(get_json=lambda *a, **k: {"data": {"klines": []}}).get_full_minute(
+        ["600519"], trade_date=date(2026, 9, 1)
+    )
+    assert rows == []
+
+
 def test_lhb_from_datacenter() -> None:
     calls: list[str] = []
 
