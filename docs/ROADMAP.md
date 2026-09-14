@@ -42,7 +42,7 @@
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | in_progress |
 | M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
 | M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | done |
-| M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | planned |
+| M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -327,7 +327,7 @@
 
 验收：
 
-- [ ] `docs/release-checklist.md` + `scripts/check_versions.ps1` + CI 接入
+- [x] `docs/release-checklist.md` + `scripts/check_versions.ps1` + CI 接入
 
 验收（大）：
 
