@@ -3,7 +3,7 @@
 > 状态：**Accepted（M0.2）** · 语义对齐 tick-stock-panel `CAPABILITY_REGISTRY`  
 > 运行时：能力矩阵是路由 **唯一权威**；UI 不硬编码能力清单。
 
-## 七项能力（顺序即设置页/文档展示序）
+## 能力清单（顺序即设置页/文档展示序）
 
 | id | 中文 | 数据集 | 说明 | TSP 默认源（参考） | TickFlow 档位门槛（参考） |
 |----|------|--------|------|-------------------|---------------------------|
@@ -14,6 +14,9 @@
 | `depth5` | 五档盘口 | depth5 | 封单/深度 | tickflow | pro |
 | `financial` | 财务数据 | financial | 指标与三表 | tickflow | expert |
 | `full_minute` | 全量分钟 | full_minute | 盘中全市场当日落盘 | tickflow | expert |
+| `fund_flow` | 日级资金流 | fund_flow | 个股主力/大小单日级净流入（**元**） | —（平台扩展，ADR 0020） | — |
+
+前七项对齐 TSP `CAPABILITY_REGISTRY`；`fund_flow` 为本仓 M15 扩展，不绑定 TickFlow 套餐文案。
 
 本仓 **不绑定** TickFlow 套餐文案；上表档位仅作迁入 TSP 时的对照。新 Provider（如 `astock_http`）用自身 `usable` 探测，不继承套餐词。
 
@@ -48,8 +51,8 @@ CapabilityStatus {
 
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
-| `replay` | fixtures | **M1.2 已实现** | daily, realtime（CN） |
-| `astock_http` | a-stock-data 配方 | **M8.1 已实现**（em_get） | daily, realtime |
+| `replay` | fixtures | **M1.2 已实现**；**M15 fund_flow** | daily, realtime, fund_flow（CN） |
+| `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15 fund_flow**（em_get） | daily, realtime, fund_flow |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
 | `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现** | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |

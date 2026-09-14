@@ -12,17 +12,23 @@ from stock_platform_providers.capabilities import (
 )
 
 
-def test_registry_has_seven_capabilities() -> None:
-    assert len(CAPABILITY_IDS) == 7
+def test_registry_has_eight_capabilities() -> None:
+    assert len(CAPABILITY_IDS) == 8
     assert CAPABILITY_IDS[0] == "daily"
-    assert CAPABILITY_IDS[-1] == "full_minute"
+    assert CAPABILITY_IDS[6] == "full_minute"
+    assert CAPABILITY_IDS[7] == "fund_flow"
 
 
 def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     reg = reset_provider_registry()
     register_builtin_providers(reg)
     matrix = build_capability_matrix(
-        preferences={"daily": "replay", "realtime": "replay", "minute": "replay"},
+        preferences={
+            "daily": "replay",
+            "realtime": "replay",
+            "minute": "replay",
+            "fund_flow": "replay",
+        },
         providers=reg.list(),
     )
     by_id = {row["id"]: row for row in matrix}
@@ -33,6 +39,10 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert by_id["minute"]["effective"] is None
     # preferred minute=replay but replay does not offer minute → fail-closed
     assert by_id["minute"]["candidates"] == []
+    assert by_id["fund_flow"]["usable"] is True
+    assert by_id["fund_flow"]["effective"] == "replay"
+    assert any(c["name"] == "astock_http" for c in by_id["fund_flow"]["candidates"])
+    assert not any(c["name"] == "global_http" for c in by_id["fund_flow"]["candidates"])
     assert any(c["name"] == "astock_http" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "replay" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "global_http" for c in by_id["daily"]["candidates"])

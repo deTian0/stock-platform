@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.7.1] - 2026-09-14
+
+### Added
+
+- M15.1：CN 日级资金流 `fund_flow`（能力矩阵第八项；ADR 0020）
+  - `ReplayProvider` / `AStockHttpProvider.get_fund_flow`；fixtures；CI 零公网
+
 ## [1.7.0] - 2026-09-14
 
 ### Added
