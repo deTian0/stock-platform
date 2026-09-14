@@ -20,10 +20,10 @@ a-stock-data §1.4 新浪复权因子（qfq/hfq JS）已文档化；
 4. `ReplayProvider.get_adj_factor` 读 `adj_factor_{symbol}.json`；缺文件返回空贡献。
 5. `AStockHttpProvider.get_adj_factor` 走 `_fetch_sina_text`（非东财路径）。
 6. `global_*` 不声明 `adj_factor`；workbench 默认 `adj_factor=replay`。
-7. **不做** mootdx、东财复权备胎、`apply_adjust` 套价 API、默认 live。
+7. **不做** mootdx、东财复权备胎、默认 live。套价出口见 **ADR 0028**（M23）。
 
 ## 后果
 
 - 有候选时 `/api/market/adj-factor` 不再 409；`full_minute` 仍 fail-closed。
 - 单票 live 路径 1 次新浪请求；不占用东财限流配额。
-- qfq 因子为除数语义（前复权价 = 不复权价 ÷ factor）；本仓只交付因子序列，不套价。
+- qfq 因子为除数语义（前复权价 = 不复权价 ÷ factor）；M21 只交付因子序列；套价见 ADR 0028。

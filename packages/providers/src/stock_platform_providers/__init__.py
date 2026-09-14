@@ -1,5 +1,6 @@
 """stock-platform providers — unified Vendor surface (A-share first, US/HK via market)."""
 
+from .adjust import apply_adjust
 from .astock_http import AStockHttpProvider, em_secid
 from .calendar import TradingCalendar, get_trading_calendar
 from .capabilities import (
@@ -33,6 +34,7 @@ from .symbol import (
 
 __all__ = [
     "AStockHttpProvider",
+    "apply_adjust",
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
     "EastmoneyClient",
@@ -67,4 +69,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "1.15.0"
+__version__ = "1.15.1"
