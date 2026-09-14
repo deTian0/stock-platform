@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.15.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M22 完成**：CN 全量分钟（能力矩阵 `full_minute`；replay + `em_get` 当日 1m 批量）
+  - ADR 0027；workbench API/UI；默认仍 replay；与多频 `minute` 区分；无后台落盘 / get_intraday_latest
+
 ## [1.14.2] - 2026-09-14
 
 ### Added
