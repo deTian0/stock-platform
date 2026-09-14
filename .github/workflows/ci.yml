@@ -139,6 +139,8 @@ jobs:
           python -m pip install -e "./apps/workbench[dev]"
       - name: Pytest workbench
         working-directory: apps/workbench
+        env:
+          STOCK_PLATFORM_PROVIDER_PRESET: replay
         run: python -m pytest -q
       - name: Workbench version matches VERSION
         shell: bash

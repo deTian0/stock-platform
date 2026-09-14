@@ -12,6 +12,22 @@ from stock_platform_providers import apply_adjust
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 
+def _require_getter(provider: Any, method: str, capability: str) -> Any:
+    """Fail-closed when the effective provider lacks the dataset method (no fake empty)."""
+    getter = getattr(provider, method, None)
+    if getter is None:
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "reason": f"provider_missing_{method}",
+                "capability": capability,
+                "provider": getattr(provider, "name", type(provider).__name__),
+                "liveTradingEnabled": False,
+            },
+        )
+    return getter
+
+
 @router.get("/daily")
 def get_daily(
     request: Request,
@@ -58,14 +74,7 @@ def get_minute(
     state = request.app.state.workbench
     provider = state.resolve("minute")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_minute", None)
-    if getter is None:
-        return {
-            "capability": "minute",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_minute",
-        }
+    getter = _require_getter(provider, "get_minute", "minute")
     rows = getter(syms, freq=freq, start=start, end=end, limit=limit)
     return {
         "capability": "minute",
@@ -86,14 +95,7 @@ def get_fund_flow(
     state = request.app.state.workbench
     provider = state.resolve("fund_flow")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_fund_flow", None)
-    if getter is None:
-        return {
-            "capability": "fund_flow",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_fund_flow",
-        }
+    getter = _require_getter(provider, "get_fund_flow", "fund_flow")
     rows = getter(syms, start=start, end=end, limit=limit)
     return {
         "capability": "fund_flow",
@@ -113,14 +115,7 @@ def get_sector_fund_flow(
     state = request.app.state.workbench
     provider = state.resolve("sector_fund_flow")
     codes = [s.strip() for s in sectors.split(",") if s.strip()]
-    getter = getattr(provider, "get_sector_fund_flow", None)
-    if getter is None:
-        return {
-            "capability": "sector_fund_flow",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_sector_fund_flow",
-        }
+    getter = _require_getter(provider, "get_sector_fund_flow", "sector_fund_flow")
     rows = getter(codes, start=start, end=end, limit=limit)
     return {
         "capability": "sector_fund_flow",
@@ -140,14 +135,7 @@ def get_news(
     state = request.app.state.workbench
     provider = state.resolve("news")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_news", None)
-    if getter is None:
-        return {
-            "capability": "news",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_news",
-        }
+    getter = _require_getter(provider, "get_news", "news")
     rows = getter(syms, start=start, end=end, limit=limit)
     return {
         "capability": "news",
@@ -166,14 +154,7 @@ def get_lhb(
     state = request.app.state.workbench
     provider = state.resolve("lhb")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_lhb", None)
-    if getter is None:
-        return {
-            "capability": "lhb",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "items": [],
-            "reason": "provider_missing_get_lhb",
-        }
+    getter = _require_getter(provider, "get_lhb", "lhb")
     items = getter(syms, asof_date=asof_date, look_back_days=look_back_days)
     return {
         "capability": "lhb",
@@ -192,14 +173,7 @@ def get_unlock(
     state = request.app.state.workbench
     provider = state.resolve("unlock")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_unlock", None)
-    if getter is None:
-        return {
-            "capability": "unlock",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "items": [],
-            "reason": "provider_missing_get_unlock",
-        }
+    getter = _require_getter(provider, "get_unlock", "unlock")
     items = getter(syms, asof_date=asof_date, forward_days=forward_days)
     return {
         "capability": "unlock",
@@ -216,14 +190,7 @@ def get_depth5(
     state = request.app.state.workbench
     provider = state.resolve("depth5")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_depth5", None)
-    if getter is None:
-        return {
-            "capability": "depth5",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_depth5",
-        }
+    getter = _require_getter(provider, "get_depth5", "depth5")
     rows = getter(syms)
     return {
         "capability": "depth5",
@@ -241,14 +208,7 @@ def get_financial(
     state = request.app.state.workbench
     provider = state.resolve("financial")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_financial", None)
-    if getter is None:
-        return {
-            "capability": "financial",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "items": [],
-            "reason": "provider_missing_get_financial",
-        }
+    getter = _require_getter(provider, "get_financial", "financial")
     items = getter(syms, periods=periods)
     return {
         "capability": "financial",
@@ -269,14 +229,7 @@ def get_adj_factor(
     state = request.app.state.workbench
     provider = state.resolve("adj_factor")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_adj_factor", None)
-    if getter is None:
-        return {
-            "capability": "adj_factor",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_adj_factor",
-        }
+    getter = _require_getter(provider, "get_adj_factor", "adj_factor")
     rows = getter(syms, kind=kind, start=start, end=end, limit=limit)
     return {
         "capability": "adj_factor",
@@ -299,14 +252,7 @@ def get_full_minute(
     state = request.app.state.workbench
     provider = state.resolve("full_minute")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
-    getter = getattr(provider, "get_full_minute", None)
-    if getter is None:
-        return {
-            "capability": "full_minute",
-            "provider": getattr(provider, "name", type(provider).__name__),
-            "rows": [],
-            "reason": "provider_missing_get_full_minute",
-        }
+    getter = _require_getter(provider, "get_full_minute", "full_minute")
     rows = getter(syms, trade_date=trade_date, count=count)
     return {
         "capability": "full_minute",
@@ -331,17 +277,7 @@ def get_daily_adjusted(
     factor_provider = state.resolve("adj_factor")
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
     daily_rows = daily_provider.get_daily(syms, start=start, end=end)
-    getter = getattr(factor_provider, "get_adj_factor", None)
-    if getter is None:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "provider_missing_get_adj_factor",
-                "provider": getattr(
-                    factor_provider, "name", type(factor_provider).__name__
-                ),
-            },
-        )
+    getter = _require_getter(factor_provider, "get_adj_factor", "adj_factor")
     # Do not clip factor dates to the daily window (keep 1900 sentinel / earlier steps).
     factor_rows = getter(syms, kind=kind)
     try:

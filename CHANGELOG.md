@@ -8,6 +8,17 @@
 
 - （无）
 
+## [3.9.0] - 2026-09-14
+
+### Changed
+
+- **M47 生产 live 行情默认**：Workbench 启动偏好默认 `cn_astock_http`（全 CN 能力 → `astock_http` / `em_get`）
+  - CI / pytest：`STOCK_PLATFORM_PROVIDER_PRESET=replay`（fixture + GitHub Actions）保持零公网
+  - 美港：`us_hk_global_http` 预设（daily/realtime → `global_http`）
+  - 上游失败 fail-closed（熔断 503 / HTTP 502 / 缺方法 501）；不静默回退 fixtures
+  - 默认 `STOCK_PLATFORM_HTTP_TRUST_ENV=0`（忽略坏系统代理）
+  - 文档：`docs/ops/live-startup.md`；交易仍 paper / SIMULATE（`liveTradingEnabled=false`）
+
 ## [3.8.1] - 2026-09-14
 
 ### Fixed

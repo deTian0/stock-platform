@@ -169,12 +169,16 @@ class AStockHttpProvider:
             return self._get_json(url, params=params)
         import requests
 
-        resp = requests.get(
-            url,
-            params=params,
-            headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
-            timeout=15,
-        )
+        from .eastmoney import http_trust_env
+
+        with requests.Session() as session:
+            session.trust_env = http_trust_env()
+            resp = session.get(
+                url,
+                params=params,
+                headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
+                timeout=15,
+            )
         resp.raise_for_status()
         return resp.json()
 
@@ -184,11 +188,15 @@ class AStockHttpProvider:
             return self._get_text(url)
         import requests
 
-        resp = requests.get(
-            url,
-            headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
-            timeout=15,
-        )
+        from .eastmoney import http_trust_env
+
+        with requests.Session() as session:
+            session.trust_env = http_trust_env()
+            resp = session.get(
+                url,
+                headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
+                timeout=15,
+            )
         resp.raise_for_status()
         return resp.text
 

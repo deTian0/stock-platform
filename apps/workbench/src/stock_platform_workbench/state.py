@@ -15,6 +15,7 @@ from stock_platform_providers import (
     build_capability_matrix,
     register_builtin_providers,
     reset_provider_registry,
+    startup_preferences,
 )
 from stock_platform_providers.base import MarketDataProvider
 from stock_platform_execution import (
@@ -107,24 +108,14 @@ class WorkbenchState:
 
 
 def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None = None) -> WorkbenchState:
-    """Wire replay provider + builtin declarations (no brand hardcoding in routes)."""
+    """Wire providers + capability preferences (production default: CN live).
+
+    Pass ``preferences`` explicitly (or set ``STOCK_PLATFORM_PROVIDER_PRESET=replay``)
+    for offline CI. Trading remains SIMULATE regardless of market-data prefs.
+    """
     reg = reset_provider_registry()
     register_builtin_providers(reg)
-    prefs = {
-        "daily": "replay",
-        "realtime": "replay",
-        "adj_factor": "replay",
-        "minute": "replay",
-        "depth5": "replay",
-        "financial": "replay",
-        "fund_flow": "replay",
-        "lhb": "replay",
-        "unlock": "replay",
-        "full_minute": "replay",
-        "sector_fund_flow": "replay",
-        "news": "replay",
-        **(preferences or {}),
-    }
+    prefs = startup_preferences(preferences)
     transport = ReplayTransport(fixtures_dir)
     replay = ReplayProvider(transport)
     providers: dict[str, MarketDataProvider] = {"replay": replay}

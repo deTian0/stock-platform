@@ -115,6 +115,7 @@
 | M44 | （可选）LLM 成本/质量控制 | 大 | `v3.6.0` | done |
 | M45 | Workbench IA + 一键向导（刷新→推荐→纸面） | 大 | `v3.7.0` | done |
 | M46 | Phase E 日用稳定收口 | 大 | `v3.8.0` | done |
+| M47 | 生产 live 行情默认 | 大 | `v3.9.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -1134,6 +1135,20 @@
 
 - [x] M39–M42 done；M43–M45 已做（未 deferred）
 - [x] CHANGELOG `3.8.0`；`release_tag -Kind minor`；全量 pytest 绿
+
+---
+
+## M47 — 生产 live 行情默认 → `v3.9.0`
+
+**目标**：Workbench 启动默认 CN `astock_http`（经 `em_get`）；美港用 `us_hk_global_http` 预设；CI/pytest 经 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 零公网；上游失败 fail-closed；**交易仍 SIMULATE**。
+
+验收：
+
+- [x] `build_default_state` / presets：`cn_astock_http` 为生产默认
+- [x] env `STOCK_PLATFORM_PROVIDER_PRESET=replay` + CI workbench job + test fixture
+- [x] 市场路由缺方法 501；熔断 503；上游 HTTP 502；无静默假数据
+- [x] `docs/ops/live-startup.md` + README / workbench README
+- [x] CHANGELOG `3.9.0`；`release_tag -Kind minor`
 
 ---
 

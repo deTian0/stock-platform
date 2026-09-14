@@ -125,7 +125,8 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             note=(
                 "Live: East Money via em_get (incl. full_minute 1m batch, "
                 "sector_fund_flow, news); "
-                "financial/adj_factor via Sina HTTP (not em_get); prefer replay for offline CI"
+                "financial/adj_factor via Sina HTTP (not em_get); "
+                "production workbench default; set STOCK_PLATFORM_PROVIDER_PRESET=replay for CI"
             ),
         )
     )
@@ -148,7 +149,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             datasets=frozenset({"daily", "realtime"}),
             available=True,
             status="ok",
-            note="Live US/HK via Yahoo chart + Sina quotes; prefer global_replay for offline CI",
+            note="Live US/HK via Yahoo chart + Sina quotes; apply us_hk_global_http preset",
         )
     )
 

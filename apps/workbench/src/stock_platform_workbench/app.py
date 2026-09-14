@@ -9,12 +9,23 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from stock_platform_providers import CircuitOpenError, SymbolError
+
 from . import __version__
 from .routes import agents, broker, market, meta, ops, paper, research, settings
 from .state import CapabilityUnavailable, WorkbenchState, build_default_state
 
 _PKG_DIR = Path(__file__).resolve().parent
 _TEMPLATES = Jinja2Templates(directory=str(_PKG_DIR / "templates"))
+
+
+def _try_request_exception() -> type[BaseException] | None:
+    try:
+        from requests.exceptions import RequestException
+
+        return RequestException
+    except ImportError:  # pragma: no cover
+        return None
 
 
 def create_app(
@@ -38,6 +49,54 @@ def create_app(
     @app.exception_handler(CapabilityUnavailable)
     async def _capability_unavailable(_request: Request, exc: CapabilityUnavailable) -> JSONResponse:
         return JSONResponse(status_code=409, content=exc.detail)
+
+    @app.exception_handler(CircuitOpenError)
+    async def _circuit_open(_request: Request, exc: CircuitOpenError) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "reason": "eastmoney_circuit_open",
+                "detail": str(exc),
+                "liveTradingEnabled": False,
+            },
+        )
+
+    @app.exception_handler(SymbolError)
+    async def _symbol_error(_request: Request, exc: SymbolError) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "reason": "symbol_error",
+                "detail": str(exc),
+                "liveTradingEnabled": False,
+            },
+        )
+
+    _ReqExc = _try_request_exception()
+    if _ReqExc is not None:
+
+        @app.exception_handler(_ReqExc)
+        async def _upstream_http(_request: Request, exc: BaseException) -> JSONResponse:
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "reason": "upstream_http_error",
+                    "error": type(exc).__name__,
+                    "detail": str(exc),
+                    "liveTradingEnabled": False,
+                },
+            )
+
+    @app.exception_handler(TimeoutError)
+    async def _timeout(_request: Request, exc: TimeoutError) -> JSONResponse:
+        return JSONResponse(
+            status_code=504,
+            content={
+                "reason": "upstream_timeout",
+                "detail": str(exc),
+                "liveTradingEnabled": False,
+            },
+        )
 
     app.mount(
         "/static",
