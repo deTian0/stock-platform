@@ -49,7 +49,7 @@
 | M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | done |
 | M9.1 | `GlobalHttpProvider`（Yahoo + 新浪） | 小 | `v1.1.1` | done |
 | M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | done |
-| M10 | CN 交易日历（静态休市日） | 大 | `v1.3.0` | in_progress |
+| M10 | CN 交易日历（静态休市日） | 大 | `v1.3.0` | done |
 | M10.1 | `TradingCalendar` + `cn_closed_days` | 小 | `v1.2.1` | done |
 | M10.2 | MarketStrategy + timing 接线 | 小 | `v1.2.2` | done |
 
@@ -416,7 +416,7 @@
 
 验收（大）：
 
-- [ ] M10.1–M10.2 done；CHANGELOG 含 `1.3.0`
+- [x] M10.1–M10.2 done；CHANGELOG 含 `1.3.0`
 
 ---
 
