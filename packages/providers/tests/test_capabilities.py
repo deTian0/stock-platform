@@ -39,10 +39,11 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
     assert by_id["realtime"]["usable"] is True
-    assert by_id["minute"]["usable"] is False
-    assert by_id["minute"]["effective"] is None
-    # preferred minute=replay but replay does not offer minute → fail-closed
-    assert by_id["minute"]["candidates"] == []
+    assert by_id["minute"]["usable"] is True
+    assert by_id["minute"]["effective"] == "replay"
+    assert any(c["name"] == "replay" for c in by_id["minute"]["candidates"])
+    assert any(c["name"] == "astock_http" for c in by_id["minute"]["candidates"])
+    assert not any(c["name"] == "global_http" for c in by_id["minute"]["candidates"])
     assert by_id["fund_flow"]["usable"] is True
     assert by_id["fund_flow"]["effective"] == "replay"
     assert any(c["name"] == "astock_http" for c in by_id["fund_flow"]["candidates"])

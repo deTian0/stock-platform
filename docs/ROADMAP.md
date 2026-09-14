@@ -73,6 +73,9 @@
 | M17 | CN 限售解禁 | 大 | `v1.10.0` | done |
 | M17.1 | unlock provider + matrix + ADR 0022 | 小 | `v1.9.1` | done |
 | M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | done |
+| M18 | CN 分钟 K | 大 | `v1.11.0` | in_progress |
+| M18.1 | minute provider + matrix + ADR 0023 | 小 | `v1.10.1` | done |
+| M18.2 | workbench minute API + UI | 小 | `v1.10.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -615,6 +618,32 @@
 验收（大）：
 
 - [x] M17.1–M17.2 done；CHANGELOG 含 `1.10.0`
+
+---
+
+## M18 — CN 分钟 K → `v1.11.0`
+
+**目标**：个股分钟 K（1m/5m/15m/30m/60m；北京墙钟 naive）；经 `em_get` push2his kline；默认 replay；CI 零公网；激活矩阵既有 `minute`。
+
+### 小里程碑
+
+#### M18.1 → `v1.10.1`
+
+验收：
+
+- [x] 契约字段 + ADR 0023；`ReplayProvider` / `AStockHttpProvider.get_minute` + fixtures / 注入测
+- [x] `replay` / `astock_http` 声明 `minute`；拒 tz；空 klines 不崩
+
+#### M18.2 → `v1.10.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/minute` 真正取数；默认偏好 replay；可选 UI
+- [ ] 有候选时不再 409；`depth5` 等仍 fail-closed
+
+验收（大）：
+
+- [ ] M18.1–M18.2 done；CHANGELOG 含 `1.11.0`
 
 ---
 
