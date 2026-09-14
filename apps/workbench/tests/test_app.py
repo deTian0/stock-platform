@@ -41,6 +41,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="daily"' in body
     assert 'id="fund-flow"' in body
     assert 'id="lhb"' in body
+    assert 'id="unlock"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert "/static/app.js" in body
@@ -57,6 +58,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/daily" in text
     assert "/api/market/fund-flow" in text
     assert "/api/market/lhb" in text
+    assert "/api/market/unlock" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
     assert "fail_closed" in text
@@ -67,7 +69,7 @@ def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 9
+    assert len(rows) == 10
     by_id = {row["id"]: row for row in rows}
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
@@ -75,6 +77,8 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["fund_flow"]["effective"] == "replay"
     assert by_id["lhb"]["usable"] is True
     assert by_id["lhb"]["effective"] == "replay"
+    assert by_id["unlock"]["usable"] is True
+    assert by_id["unlock"]["effective"] == "replay"
     assert by_id["minute"]["usable"] is False
 
 
@@ -152,6 +156,45 @@ def test_can_prefer_lhb_astock_http(client: TestClient) -> None:
     by_id = {row["id"]: row for row in matrix}
     assert by_id["lhb"]["effective"] == "astock_http"
     assert by_id["lhb"]["usable"] is True
+
+
+def test_unlock_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/unlock",
+        params={"symbols": "SZ002475", "asof_date": "2026-05-17", "forward_days": 90},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "unlock"
+    assert body["provider"] == "replay"
+    assert len(body["items"]) == 1
+    assert body["items"][0]["symbol"] == "002475"
+    assert len(body["items"][0]["history"]) == 2
+    assert len(body["items"][0]["upcoming"]) == 1
+    assert body["items"][0]["upcoming"][0]["shares"] == 32000.0
+
+
+def test_unlock_empty_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/unlock",
+        params={"symbols": "600519", "asof_date": "2026-05-17"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"][0]["history"] == []
+    assert body["items"][0]["upcoming"] == []
+
+
+def test_can_prefer_unlock_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"unlock": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["unlock"]["effective"] == "astock_http"
+    assert by_id["unlock"]["usable"] is True
 
 
 def test_minute_fail_closed(client: TestClient) -> None:

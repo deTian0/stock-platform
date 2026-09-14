@@ -34,11 +34,12 @@ python -m stock_platform_workbench
 |------|------|------|
 | GET | `/` | 最小操作台 UI |
 | GET | `/health` | 健康检查 |
-| GET | `/api/settings/capability-matrix` | 能力矩阵（含 fund_flow / lhb） |
+| GET | `/api/settings/capability-matrix` | 能力矩阵（含 fund_flow / lhb / unlock） |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
+| GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
 | GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |

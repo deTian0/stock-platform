@@ -36,6 +36,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>unlock provider
+          <select id="pref-unlock">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -154,6 +160,41 @@
         </table>
       </div>
       <pre id="lhb-json" class="code"></pre>
+    </section>
+
+    <section id="unlock" class="panel">
+      <h2>限售解禁</h2>
+      <p class="hint">历史解禁 + 未来待解禁（万股）；默认 replay；可选 astock_http。</p>
+      <form id="unlock-form" class="row">
+        <label>symbols
+          <input id="unlock-symbols" name="symbols" value="002475" autocomplete="off" />
+        </label>
+        <label>asof_date
+          <input id="unlock-asof" name="asof_date" type="date" value="2026-05-17" />
+        </label>
+        <label>forward_days
+          <input id="unlock-forward" name="forward_days" type="number" min="1" max="365" value="90" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="unlock-meta" class="status" aria-live="polite"></p>
+      <pre id="unlock-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="unlock-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>bucket</th>
+              <th>date</th>
+              <th>type</th>
+              <th>shares</th>
+              <th>ratio</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="unlock-json" class="code"></pre>
     </section>
 
     <section id="debate" class="panel">

@@ -112,3 +112,29 @@ def get_lhb(
         "provider": getattr(provider, "name", type(provider).__name__),
         "items": items,
     }
+
+
+@router.get("/unlock")
+def get_unlock(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    asof_date: date = Query(..., description="Forward window start date YYYY-MM-DD"),
+    forward_days: int = Query(90, ge=1, le=365),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("unlock")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_unlock", None)
+    if getter is None:
+        return {
+            "capability": "unlock",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "items": [],
+            "reason": "provider_missing_get_unlock",
+        }
+    items = getter(syms, asof_date=asof_date, forward_days=forward_days)
+    return {
+        "capability": "unlock",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "items": items,
+    }

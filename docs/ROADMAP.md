@@ -72,7 +72,7 @@
 | M16.2 | workbench lhb API + UI | 小 | `v1.8.2` | done |
 | M17 | CN 限售解禁 | 大 | `v1.10.0` | in_progress |
 | M17.1 | unlock provider + matrix + ADR 0022 | 小 | `v1.9.1` | done |
-| M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | planned |
+| M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -610,7 +610,7 @@
 
 验收：
 
-- [ ] workbench `GET /api/market/unlock`；默认偏好 replay；可选 UI
+- [x] workbench `GET /api/market/unlock`；默认偏好 replay；可选 UI
 
 验收（大）：
 

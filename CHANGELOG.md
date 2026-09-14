@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.9.2] - 2026-09-14
+
+### Added
+
+- M17.2：workbench `GET /api/market/unlock` + UI `#unlock`；默认偏好 replay
+
 ## [1.9.1] - 2026-09-14
 
 ### Added
