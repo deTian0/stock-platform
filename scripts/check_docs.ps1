@@ -41,6 +41,7 @@ $required = @(
   'docs/architecture/0019-multi-market-paper-timing.md',
   'docs/architecture/0020-cn-fund-flow.md',
   'docs/architecture/0021-cn-lhb.md',
+  'docs/architecture/0022-cn-unlock.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',

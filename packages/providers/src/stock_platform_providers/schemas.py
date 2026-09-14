@@ -78,3 +78,22 @@ LHB_INSTITUTION_COLUMNS = [
     "sell_amt",
     "net_amt",
 ]
+
+# CN lockup / unlock calendar (限售解禁) aggregate payload (shares in 万股).
+UNLOCK_TOP_KEYS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "asof_date",
+    "forward_days",
+    "history",
+    "upcoming",
+]
+
+UNLOCK_EVENT_COLUMNS = [
+    "date",
+    "type",
+    "shares",
+    "able_shares",
+    "ratio",
+]

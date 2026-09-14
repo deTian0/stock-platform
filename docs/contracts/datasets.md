@@ -95,6 +95,7 @@ asset_type ∈ { "stock", "etf", "index" }
 | `full_minute` | 同 minute 语义的全市场当日落盘批次 |
 | `fund_flow` | 见下表（M15） |
 | `lhb` | 见下表（M16） |
+| `unlock` | 见下表（M17） |
 
 ### `fund_flow`（日级资金流，M15）
 
@@ -134,6 +135,27 @@ asset_type ∈ { "stock", "etf", "index" }
 | `institution.buy_amt` / `sell_amt` / `net_amt` | float | ✅ | 机构专用席位汇总，**元**；无机构为 0 |
 
 配方：东财 datacenter-web `RPT_DAILYBILLBOARD_DETAILSNEW` + `RPT_BILLBOARD_DAILYDETAILSBUY/SELL`（经 `em_get`）。全市场日榜与交易所备胎不在本契约。
+
+### `unlock`（限售解禁，M17）
+
+聚合 payload（非日 K 行集）。股数一律 **万股**（东财原始；不做「股」换算）。`ratio` 为**小数制**。
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | CN=6 位 |
+| `asset_type` | str | 建议 | stock/etf/index |
+| `source` | str | 建议 | Provider 名 |
+| `asof_date` | date | ✅ | 查询基准日（未来窗口起点） |
+| `forward_days` | int | ✅ | 向前自然日数（默认 90） |
+| `history` | list | ✅ | 历史解禁；无记录为 `[]` |
+| `upcoming` | list | ✅ | `[asof, asof+forward]` 待解禁；无则为 `[]` |
+| `*.date` | date | ✅ | 解禁日 |
+| `*.type` | str | 建议 | 限售类型（`FREE_SHARES_TYPE`） |
+| `*.shares` | float | 建议 | 本次解禁股数，**万股** |
+| `*.able_shares` | float | 建议 | 实际可流通股数，**万股** |
+| `*.ratio` | float | 建议 | 占总股本比，**小数制** |
+
+配方：东财 datacenter-web `RPT_LIFT_STAGE`（经 `em_get`；历史 + 未来各一次）。全市场解禁日历不在本契约。
 
 ## Enriched 层（消费侧，非 Provider 原始出口）
 

@@ -70,6 +70,9 @@
 | M16 | CN 龙虎榜 | 大 | `v1.9.0` | done |
 | M16.1 | lhb provider + matrix + ADR 0021 | 小 | `v1.8.1` | done |
 | M16.2 | workbench lhb API + UI | 小 | `v1.8.2` | done |
+| M17 | CN 限售解禁 | 大 | `v1.10.0` | in_progress |
+| M17.1 | unlock provider + matrix + ADR 0022 | 小 | `v1.9.1` | done |
+| M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -587,6 +590,31 @@
 验收（大）：
 
 - [x] M16.1–M16.2 done；CHANGELOG 含 `1.9.0`
+
+---
+
+## M17 — CN 限售解禁 → `v1.10.0`
+
+**目标**：个股限售解禁日历（历史解禁 + 未来 N 天待解禁，万股）；经 `em_get` datacenter-web；默认 replay；CI 零公网。
+
+### 小里程碑
+
+#### M17.1 → `v1.9.1`
+
+验收：
+
+- [x] 能力矩阵第十项 `unlock`；契约字段；ADR 0022
+- [x] `ReplayProvider` / `AStockHttpProvider.get_unlock` + fixtures / 注入测；空窗口不崩
+
+#### M17.2 → `v1.9.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/unlock`；默认偏好 replay；可选 UI
+
+验收（大）：
+
+- [ ] M17.1–M17.2 done；CHANGELOG 含 `1.10.0`
 
 ---
 

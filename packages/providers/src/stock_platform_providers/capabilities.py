@@ -16,6 +16,7 @@ CAPABILITY_REGISTRY: list[dict[str, str]] = [
     {"id": "full_minute", "label": "全量分钟", "desc": "盘中全市场当日分钟落盘"},
     {"id": "fund_flow", "label": "日级资金流", "desc": "个股主力/大小单日级净流入（元）"},
     {"id": "lhb", "label": "龙虎榜", "desc": "个股上榜记录 + 买卖席位 TOP5 + 机构动向（元）"},
+    {"id": "unlock", "label": "限售解禁", "desc": "个股历史解禁 + 未来待解禁（万股）"},
 ]
 
 CAPABILITY_IDS: tuple[str, ...] = tuple(item["id"] for item in CAPABILITY_REGISTRY)
@@ -75,7 +76,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             name="replay",
             display="Replay fixtures",
             kind="builtin",
-            datasets=frozenset({"daily", "realtime", "fund_flow", "lhb"}),
+            datasets=frozenset({"daily", "realtime", "fund_flow", "lhb", "unlock"}),
             available=True,
             status="ok",
             note="Offline recorded fixtures only",
@@ -86,7 +87,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             name="astock_http",
             display="A-stock HTTP (EM throttled)",
             kind="builtin",
-            datasets=frozenset({"daily", "realtime", "fund_flow", "lhb"}),
+            datasets=frozenset({"daily", "realtime", "fund_flow", "lhb", "unlock"}),
             available=True,
             status="ok",
             note="Live East Money via em_get; prefer replay for offline CI",
