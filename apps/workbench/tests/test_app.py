@@ -152,6 +152,20 @@ def test_can_prefer_astock_http_without_calling_network(client: TestClient) -> N
     assert by_id["daily"]["usable"] is True
 
 
+def test_can_prefer_global_http_without_calling_network(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"daily": "global_http", "realtime": "global_http"}},
+    )
+    assert put.status_code == 200
+    assert put.json()["preferences"]["daily"] == "global_http"
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["daily"]["effective"] == "global_http"
+    assert by_id["daily"]["usable"] is True
+    assert by_id["realtime"]["effective"] == "global_http"
+
+
 def test_paper_status_and_activate_flow(client: TestClient) -> None:
     st = client.get("/api/paper/status")
     assert st.status_code == 200

@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.1.2] - 2026-09-14
+
+### Added
+
+- M9.2：workbench 注册 `GlobalHttpRouter`，preferences 可切 `global_http`（默认仍 replay）
+
 ## [1.1.1] - 2026-09-14
 
 ### Added
