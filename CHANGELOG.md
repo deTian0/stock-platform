@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.6.1] - 2026-09-14
+
+### Added
+
+- M14.1：纸面 timing 支持 `market=`（CN/US/HK）；`market_now` / `daily_bar_final_at`（ADR 0019）
+  - 默认仍 CN；`china_now` / `CHINA_TZ` 保留为别名
+
 ## [1.6.0] - 2026-09-14
 
 ### Added

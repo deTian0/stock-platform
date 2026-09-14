@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -12,7 +13,11 @@ from stock_platform_execution import (
     planned_execution_date,
     signal_bar_is_completed,
 )
-from stock_platform_execution.timing import CHINA_TZ, assert_signal_before_execution
+from stock_platform_execution.timing import (
+    CHINA_TZ,
+    assert_signal_before_execution,
+    daily_bar_final_at,
+)
 
 
 def test_completed_bar_cutoff_before_1505() -> None:
@@ -69,3 +74,22 @@ def test_signal_bar_completed() -> None:
     now = datetime(2026, 9, 4, 16, 0, tzinfo=CHINA_TZ)
     assert signal_bar_is_completed("2026-09-04", now)
     assert not signal_bar_is_completed("2026-09-05", now)
+
+
+def test_us_planned_execution_skips_independence_day() -> None:
+    # 2025-07-03 Thu signal → skip Fri Jul4 holiday → Mon 2025-07-07
+    assert planned_execution_date("2025-07-03", market="US") == "2025-07-07"
+
+
+def test_hk_planned_execution_skips_lunar_new_year() -> None:
+    # 2025-01-28 Tue signal → skip LNY 29–31 + weekend → 2025-02-03
+    assert planned_execution_date("2025-01-28", market="HK") == "2025-02-03"
+
+
+def test_us_completed_bar_cutoff_uses_new_york() -> None:
+    et = ZoneInfo("America/New_York")
+    assert daily_bar_final_at("US").isoformat() == "16:05:00"
+    before = datetime(2025, 7, 3, 16, 0, tzinfo=et)
+    assert completed_bar_cutoff(before, market="US").isoformat() == "2025-07-02"
+    after = datetime(2025, 7, 3, 16, 5, tzinfo=et)
+    assert completed_bar_cutoff(after, market="US").isoformat() == "2025-07-03"
