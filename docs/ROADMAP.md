@@ -64,6 +64,9 @@
 | M14 | 多市场纸面 timing | 大 | `v1.7.0` | done |
 | M14.1 | timing market= + ADR 0019 | 小 | `v1.6.1` | done |
 | M14.2 | PaperLedger + workbench market | 小 | `v1.6.2` | done |
+| M15 | CN 日级资金流 | 大 | `v1.8.0` | in_progress |
+| M15.1 | fund_flow provider + matrix + ADR 0020 | 小 | `v1.7.1` | done |
+| M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -531,6 +534,31 @@
 验收（大）：
 
 - [x] M14.1–M14.2 done；CHANGELOG 含 `1.7.0`
+
+---
+
+## M15 — CN 日级资金流 → `v1.8.0`
+
+**目标**：个股日级资金流（主力/大小单净流入，元）；经 `em_get`；默认 replay；CI 零公网。
+
+### 小里程碑
+
+#### M15.1 → `v1.7.1`
+
+验收：
+
+- [x] 能力矩阵第八项 `fund_flow`；契约字段；ADR 0020
+- [x] `ReplayProvider` / `AStockHttpProvider.get_fund_flow` + fixtures / 注入测
+
+#### M15.2 → `v1.7.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/fund-flow`；默认偏好 replay；可选 UI
+
+验收（大）：
+
+- [ ] M15.1–M15.2 done；CHANGELOG 含 `1.8.0`
 
 ---
 

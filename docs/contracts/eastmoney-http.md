@@ -26,3 +26,11 @@ pip install "stock-platform-providers[http]"
 ```
 
 单测使用注入 `transport`，不访问公网。
+
+## 已知东财端点（本仓）
+
+| 用途 | URL（须经 `em_get`） |
+|------|----------------------|
+| 日 K | `push2his.../api/qt/stock/kline/get` |
+| 实时 | `push2.../api/qt/stock/get` |
+| 日级资金流（M15） | `push2his.../api/qt/stock/fflow/daykline/get` |

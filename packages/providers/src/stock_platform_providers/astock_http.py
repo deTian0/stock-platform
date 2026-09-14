@@ -7,11 +7,12 @@ from typing import Any, Callable
 
 from .base import AssetType
 from .eastmoney import EastmoneyClient, get_default_client
-from .normalize import normalize_daily_row, normalize_realtime_row
+from .normalize import normalize_daily_row, normalize_fund_flow_row, normalize_realtime_row
 from .symbol import exchange_prefix, normalize_symbol
 
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
+FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 
 
 def em_secid(code: str) -> str:
@@ -162,3 +163,67 @@ class AStockHttpProvider:
                 )
             )
         return rows
+
+    def get_fund_flow(
+        self,
+        symbols: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 120,
+    ) -> list[dict[str, Any]]:
+        """Day-level fund flow via push2his fflow/daykline (amounts in 元)."""
+        rows: list[dict[str, Any]] = []
+        lmt = max(1, min(int(limit), 1000))
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            payload = self._fetch(
+                FUND_FLOW_URL,
+                {
+                    "secid": em_secid(code),
+                    "fields1": "f1,f2,f3,f7",
+                    "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+                    "lmt": str(lmt),
+                },
+            )
+            data = payload.get("data") or {}
+            klines = data.get("klines") or []
+            for line in klines:
+                raw = _parse_fund_flow_csv(str(line))
+                raw["symbol"] = code
+                row = normalize_fund_flow_row(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    market="CN",
+                )
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                rows.append(row)
+        return rows
+
+
+def _parse_fund_flow_csv(line: str) -> dict[str, Any]:
+    """EM fflow daykline CSV: date,main,small,mid,large,super,..."""
+    parts = line.split(",")
+    if len(parts) < 6:
+        raise ValueError(f"short fund_flow row: {line!r}")
+
+    def _net(idx: int) -> float | None:
+        if idx >= len(parts) or parts[idx] in {"", "-"}:
+            return None
+        return float(parts[idx])
+
+    return {
+        "date": parts[0],
+        "main_net": _net(1),
+        "small_net": _net(2),
+        "mid_net": _net(3),
+        "large_net": _net(4),
+        "super_net": _net(5),
+    }

@@ -33,3 +33,16 @@ REALTIME_COLUMNS = [
     "source",
     "asset_type",
 ]
+
+# CN day-level fund flow (元). Platform extension beyond TSP original seven.
+FUND_FLOW_COLUMNS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "date",
+    "main_net",
+    "small_net",
+    "mid_net",
+    "large_net",
+    "super_net",
+]

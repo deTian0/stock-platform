@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-# Order matches docs/contracts/capability-matrix.md and TSP CAPABILITY_REGISTRY.
+# Order: TSP original seven first, then platform extensions (M15+).
 CAPABILITY_REGISTRY: list[dict[str, str]] = [
     {"id": "daily", "label": "日K", "desc": "历史K线与实时覆写"},
     {"id": "adj_factor", "label": "除权因子", "desc": "前复权计算基准"},
@@ -14,6 +14,7 @@ CAPABILITY_REGISTRY: list[dict[str, str]] = [
     {"id": "depth5", "label": "五档盘口", "desc": "连板梯队封单与盘口深度"},
     {"id": "financial", "label": "财务数据", "desc": "财务指标与三大报表"},
     {"id": "full_minute", "label": "全量分钟", "desc": "盘中全市场当日分钟落盘"},
+    {"id": "fund_flow", "label": "日级资金流", "desc": "个股主力/大小单日级净流入（元）"},
 ]
 
 CAPABILITY_IDS: tuple[str, ...] = tuple(item["id"] for item in CAPABILITY_REGISTRY)
@@ -73,7 +74,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             name="replay",
             display="Replay fixtures",
             kind="builtin",
-            datasets=frozenset({"daily", "realtime"}),
+            datasets=frozenset({"daily", "realtime", "fund_flow"}),
             available=True,
             status="ok",
             note="Offline recorded fixtures only",
@@ -84,7 +85,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             name="astock_http",
             display="A-stock HTTP (EM throttled)",
             kind="builtin",
-            datasets=frozenset({"daily", "realtime"}),
+            datasets=frozenset({"daily", "realtime", "fund_flow"}),
             available=True,
             status="ok",
             note="Live East Money via em_get; prefer replay for offline CI",

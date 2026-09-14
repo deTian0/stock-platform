@@ -9,7 +9,7 @@ from typing import Any
 
 from .base import AssetType
 from .errors import SymbolError
-from .normalize import normalize_daily_row, normalize_realtime_row
+from .normalize import normalize_daily_row, normalize_fund_flow_row, normalize_realtime_row
 from .symbol import normalize_symbol
 
 
@@ -20,6 +20,7 @@ class ReplayTransport:
 
         daily_{symbol}.json       # list[dict] or {"bars": [...]}
         realtime_{symbol}.json    # dict or {"quote": {...}}
+        fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -47,6 +48,16 @@ class ReplayTransport:
             if isinstance(quote, dict):
                 return quote
         raise ValueError(f"unexpected realtime fixture shape in {path}")
+
+    def load_fund_flow(self, symbol: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"fund_flow_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            bars = data.get("bars") or data.get("flows") or data.get("data") or []
+            return list(bars)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected fund_flow fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -104,4 +115,39 @@ class ReplayProvider:
                     default_symbol=symbol,
                 )
             )
+        return rows
+
+    def get_fund_flow(
+        self,
+        symbols: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 120,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                bars = self._transport.load_fund_flow(symbol)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no fund_flow fixture for {symbol}") from exc
+            sym_rows: list[dict[str, Any]] = []
+            for bar in bars:
+                row = normalize_fund_flow_row(
+                    bar,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                )
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                sym_rows.append(row)
+            if limit > 0:
+                sym_rows = sym_rows[-limit:]
+            rows.extend(sym_rows)
         return rows

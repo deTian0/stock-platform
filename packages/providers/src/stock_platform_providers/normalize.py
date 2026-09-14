@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from .schemas import DAILY_COLUMNS, REALTIME_COLUMNS
+from .schemas import DAILY_COLUMNS, FUND_FLOW_COLUMNS, REALTIME_COLUMNS
 from .symbol import normalize_symbol
 
 
@@ -147,3 +147,35 @@ def normalize_realtime_row(
         "asset_type": asset_type,
     }
     return {k: row.get(k) for k in REALTIME_COLUMNS}
+
+
+def normalize_fund_flow_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map a day-level fund-flow bar into contract fields (nets in 元)."""
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("fund_flow row missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    trade_date = _as_date(raw.get("date") or raw.get("trade_date") or raw.get("day"))
+    if trade_date is None:
+        raise ValueError(f"fund_flow row for {symbol} missing date")
+
+    row = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "date": trade_date.isoformat(),
+        "main_net": _as_float(raw.get("main_net")),
+        "small_net": _as_float(raw.get("small_net")),
+        "mid_net": _as_float(raw.get("mid_net")),
+        "large_net": _as_float(raw.get("large_net")),
+        "super_net": _as_float(raw.get("super_net")),
+    }
+    return {k: row.get(k) for k in FUND_FLOW_COLUMNS}

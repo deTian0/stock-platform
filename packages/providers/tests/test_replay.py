@@ -8,9 +8,13 @@ from pathlib import Path
 import pytest
 
 from stock_platform_providers import SymbolError, normalize_symbol
-from stock_platform_providers.normalize import normalize_daily_row, normalize_realtime_row
+from stock_platform_providers.normalize import (
+    normalize_daily_row,
+    normalize_fund_flow_row,
+    normalize_realtime_row,
+)
 from stock_platform_providers.replay import ReplayProvider, ReplayTransport
-from stock_platform_providers.schemas import DAILY_COLUMNS, REALTIME_COLUMNS
+from stock_platform_providers.schemas import DAILY_COLUMNS, FUND_FLOW_COLUMNS, REALTIME_COLUMNS
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -69,6 +73,27 @@ def test_replay_rejects_hk_before_io() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
     with pytest.raises(SymbolError):
         provider.get_daily(["00700"])
+
+
+def test_replay_fund_flow() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_fund_flow(
+        ["SH600519"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 2
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["main_net"] == 125000000.0
+    assert rows[1]["main_net"] == -82000000.0
+    assert set(FUND_FLOW_COLUMNS) <= set(rows[0].keys())
+
+
+def test_normalize_fund_flow_requires_date() -> None:
+    with pytest.raises(ValueError, match="missing date"):
+        normalize_fund_flow_row(
+            {"symbol": "600519", "main_net": 1.0},
+            source="test",
+        )
 
 
 def test_normalize_symbol_still_public() -> None:

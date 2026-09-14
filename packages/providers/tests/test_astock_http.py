@@ -71,3 +71,33 @@ def test_rejects_hk() -> None:
     provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
     with pytest.raises(SymbolError):
         provider.get_daily(["00700"])
+
+
+def test_fund_flow_from_daykline() -> None:
+    def get_json(url, params=None):
+        assert "fflow/daykline" in url
+        assert params["secid"] == "1.600519"
+        return {
+            "data": {
+                "klines": [
+                    "2026-09-01,125000000,-45000000,-30000000,80000000,45000000",
+                    "2026-09-02,-82000000,22000000,15000000,-50000000,-32000000",
+                ]
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_fund_flow(
+        ["SH600519"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 2
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["main_net"] == 125000000.0
+    assert rows[0]["super_net"] == 45000000.0
+    assert rows[1]["main_net"] == -82000000.0
+
+
+def test_fund_flow_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
+    with pytest.raises(SymbolError):
+        provider.get_fund_flow(["00700"])

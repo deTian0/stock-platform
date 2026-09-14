@@ -93,6 +93,23 @@ asset_type ∈ { "stock", "etf", "index" }
 | `depth5` | 按 symbol 的五档；`bid_volumes`/`ask_volumes` 单位为**手** |
 | `financial` | 报表期 + 标准财务字段（M1 另表） |
 | `full_minute` | 同 minute 语义的全市场当日落盘批次 |
+| `fund_flow` | 见下表（M15） |
+
+### `fund_flow`（日级资金流，M15）
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | CN=6 位 |
+| `asset_type` | str | 建议 | stock/etf/index |
+| `source` | str | 建议 | Provider 名 |
+| `date` | date | ✅ | 交易日 |
+| `main_net` | float | ✅ | 主力净流入，**元** |
+| `small_net` | float | 建议 | 小单净流入，**元** |
+| `mid_net` | float | 建议 | 中单净流入，**元** |
+| `large_net` | float | 建议 | 大单净流入，**元** |
+| `super_net` | float | 建议 | 超大单净流入，**元** |
+
+配方：东财 push2his `fflow/daykline`（经 `em_get`）；分钟/板块资金流不在本契约。
 
 ## Enriched 层（消费侧，非 Provider 原始出口）
 
