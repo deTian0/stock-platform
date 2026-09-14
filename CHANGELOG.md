@@ -8,6 +8,20 @@
 
 - （无）
 
+## [3.8.0] - 2026-09-14
+
+### Added
+
+- **Phase E 日用稳定收口（M39–M46）**
+  - M39：分层宇宙 + 可读推荐理由（ADR 0040）
+  - M40：`stock-platform-daily` refresh→brief 流水线（ADR 0041）
+  - M41：`sector_fund_flow` / `news`（ADR 0042）
+  - M42：日历 2028+ + Task Scheduler/cron（ADR 0044）
+  - M43：组合回测指标 + 纸面 fills 对齐绩效（ADR 0043）
+  - M44：LLM 预算/截断/降级（ADR 0045）
+  - M45：Workbench IA + 一键向导（ADR 0046）
+  - 默认仍 paper + replay + SIMULATE；无 SPA；无真实券商；同花顺真实 transport 仍 backlog
+
 ## [3.7.0] - 2026-09-14
 
 ### Added

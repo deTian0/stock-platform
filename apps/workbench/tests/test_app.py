@@ -564,10 +564,19 @@ def test_debate_slot(client: TestClient) -> None:
     assert "非投资建议" in body["disclaimer"]
 
 
-def test_debate_llm_fail_closed_without_env(client: TestClient) -> None:
+def test_debate_llm_fail_closed_without_env(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     st = client.get("/api/debate/status")
     assert st.status_code == 200
     assert st.json()["defaultEngine"] == "deterministic"
+    # Default M44 fallback is deterministic (soft degrade).
+    soft = client.get(
+        "/api/debate/report",
+        params={"symbol": "600519", "asof": "2026-09-02", "engine": "llm"},
+    )
+    assert soft.status_code == 200
+    assert soft.json()["kind"] == "debate"
+    # Explicit fail-closed still returns 400.
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_FALLBACK", "fail-closed")
     r = client.get(
         "/api/debate/report",
         params={"symbol": "600519", "asof": "2026-09-02", "engine": "llm"},
@@ -607,8 +616,9 @@ def test_brief_debate_deterministic(client: TestClient) -> None:
             "engine": "llm",
         },
     )
-    assert llm.status_code == 400
-    assert "fail-closed" in llm.json()["detail"]
+    # M44: default STOCK_PLATFORM_LLM_FALLBACK=deterministic → soft degrade (200).
+    assert llm.status_code == 200
+    assert llm.json()["liveTradingEnabled"] is False
 
 
 def test_research_rejects_hk(client: TestClient) -> None:

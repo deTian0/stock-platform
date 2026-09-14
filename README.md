@@ -9,14 +9,31 @@
 | 组件 | 路径 | 能力 |
 |------|------|------|
 | Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
-| Research | `packages/research` | lvrev / 闸门 / PIT / 宇宙截面 / 盘前简报 / `stock-platform-score` / `stock-platform-brief` / `stock-platform-refresh` |
-| Agents | `packages/agents` | 研报/复盘/确定性辩论插件（仅经 providers） |
+| Research | `packages/research` | lvrev / 闸门 / PIT / 分层宇宙 / 盘前简报 / `stock-platform-daily` / refresh / performance / portfolio |
+| Agents | `packages/agents` | 研报/复盘/确定性辩论；可选 LLM（预算/降级） |
 | Execution | `packages/execution` | 纸面 SIMULATE、`BrokerPort` / `PaperBroker`、可选 `ths_sim`（mock） |
-| Workbench | `apps/workbench` | FastAPI + 最小 UI：行情 / 今日推荐 / 研报 / 纸面 / broker 状态 |
+| Workbench | `apps/workbench` | FastAPI + 最小 UI：日用向导 / 推荐 / 纸面 / 运维 |
 
 **默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v3.0 Phase D 仍成立）**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live。  
+**明确不做（v3.8 Phase E 仍成立）**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、默认开启 live、同花顺真实 HTTP（backlog）。  
 **同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。
+
+## 日用路径（Phase E）
+
+```powershell
+# 1) CLI 日流水线（replay / CI）
+stock-platform-daily --asof 2026-09-02 --provider replay --fixtures .\packages\providers\tests\fixtures --out $env:TEMP\sp-daily
+
+# 2) Windows 调度（交易日跳过休市）
+powershell -NoProfile -File .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02
+# 安装步骤：docs/ops/scheduler.md
+
+# 3) Workbench 一键向导
+python -m stock_platform_workbench
+# → http://127.0.0.1:3018/#wizard  （刷新→推荐→纸面；默认 skip refresh）
+```
+
+默认仍 **paper + replay + SIMULATE**。日用宇宙样例见 `docs/ops/daily-universe.md`。
 
 ## 快速开始
 
