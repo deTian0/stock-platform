@@ -86,3 +86,29 @@ def get_fund_flow(
         "provider": getattr(provider, "name", type(provider).__name__),
         "rows": rows,
     }
+
+
+@router.get("/lhb")
+def get_lhb(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    asof_date: date = Query(..., description="Look-back end date YYYY-MM-DD"),
+    look_back_days: int = Query(30, ge=1, le=365),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("lhb")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_lhb", None)
+    if getter is None:
+        return {
+            "capability": "lhb",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "items": [],
+            "reason": "provider_missing_get_lhb",
+        }
+    items = getter(syms, asof_date=asof_date, look_back_days=look_back_days)
+    return {
+        "capability": "lhb",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "items": items,
+    }
