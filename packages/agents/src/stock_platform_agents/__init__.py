@@ -30,4 +30,4 @@ __all__ = [
     "run_debate",
     "warn_if_truncated",
 ]
-__version__ = "3.9.3"
+__version__ = "3.9.4"

@@ -13,7 +13,13 @@ from .errors import (
     ProfileBlocked,
 )
 from .gated import GatedBroker, assert_sim_gates
-from .lifecycle import StrategyLifecycle, build_strategy_spec, strategy_hash
+from .lifecycle import (
+    AUTO_ACTIVATED_STATUS_ZH,
+    DEFAULT_SIMULATE_UNIVERSE,
+    StrategyLifecycle,
+    build_strategy_spec,
+    strategy_hash,
+)
 from .paper import PaperLedger
 from .profile import default_execution_profile, validate_simulation_profile
 from .ths_sim import ExperimentalThsHttpTransport, MockThsTransport, ThsSimBroker
@@ -34,11 +40,13 @@ from .transactional import (
 )
 
 __all__ = [
+    "AUTO_ACTIVATED_STATUS_ZH",
     "AccountSnapshot",
     "ActivationBlocked",
     "BrokerConfigError",
     "BrokerPort",
     "BrokerTransportError",
+    "DEFAULT_SIMULATE_UNIVERSE",
     "DraftBlocked",
     "EXECUTION_FIELDS",
     "ExecutionError",
@@ -74,4 +82,4 @@ __all__ = [
     "validate_simulation_profile",
 ]
 
-__version__ = "3.9.3"
+__version__ = "3.9.4"
