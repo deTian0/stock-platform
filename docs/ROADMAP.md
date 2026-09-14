@@ -76,6 +76,9 @@
 | M18 | CN 分钟 K | 大 | `v1.11.0` | done |
 | M18.1 | minute provider + matrix + ADR 0023 | 小 | `v1.10.1` | done |
 | M18.2 | workbench minute API + UI | 小 | `v1.10.2` | done |
+| M19 | CN 五档盘口 | 大 | `v1.12.0` | in_progress |
+| M19.1 | depth5 provider + matrix + ADR 0024 | 小 | `v1.11.1` | done |
+| M19.2 | workbench depth5 API + UI | 小 | `v1.11.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -644,6 +647,32 @@
 验收（大）：
 
 - [x] M18.1–M18.2 done；CHANGELOG 含 `1.11.0`
+
+---
+
+## M19 — CN 五档盘口 → `v1.12.0`
+
+**目标**：个股五档盘口（买/卖各五档价量，量=手）；经 `em_get` push2 stock/get；默认 replay；CI 零公网；激活矩阵既有 `depth5`。
+
+### 小里程碑
+
+#### M19.1 → `v1.11.1`
+
+验收：
+
+- [x] 契约字段 + ADR 0024；`ReplayProvider` / `AStockHttpProvider.get_depth5` + fixtures / 注入测
+- [x] `replay` / `astock_http` 声明 `depth5`；空 data / 缺 fixture 不崩
+
+#### M19.2 → `v1.11.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/depth5` 真正取数；默认偏好 replay；可选 UI
+- [ ] 有候选时不再 409；`financial` 等仍 fail-closed
+
+验收（大）：
+
+- [ ] M19.1–M19.2 done；CHANGELOG 含 `1.12.0`
 
 ---
 

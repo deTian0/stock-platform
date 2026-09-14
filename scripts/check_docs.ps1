@@ -43,6 +43,7 @@ $required = @(
   'docs/architecture/0021-cn-lhb.md',
   'docs/architecture/0022-cn-unlock.md',
   'docs/architecture/0023-cn-minute.md',
+  'docs/architecture/0024-cn-depth5.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',

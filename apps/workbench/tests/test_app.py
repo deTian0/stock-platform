@@ -82,7 +82,10 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["unlock"]["effective"] == "replay"
     assert by_id["minute"]["usable"] is True
     assert by_id["minute"]["effective"] == "replay"
-    assert by_id["depth5"]["usable"] is False
+    assert by_id["depth5"]["usable"] is True
+    assert by_id["depth5"]["effective"] == "replay"
+    assert by_id["adj_factor"]["usable"] is False
+    assert by_id["financial"]["usable"] is False
 
 
 def test_daily_and_realtime(client: TestClient) -> None:
@@ -232,27 +235,28 @@ def test_can_prefer_minute_astock_http(client: TestClient) -> None:
     assert by_id["minute"]["usable"] is True
 
 
-def test_depth5_fail_closed(client: TestClient) -> None:
+def test_financial_fail_closed(client: TestClient) -> None:
     r = client.get("/api/market/minute", params={"symbols": "600519"})
-    # minute is usable; depth5 remains the fail-closed sentinel via matrix
+    # minute/depth5 usable; financial remains the fail-closed sentinel via matrix
     assert r.status_code == 200
     matrix = client.get("/api/settings/capability-matrix").json()
     by_id = {row["id"]: row for row in matrix}
-    assert by_id["depth5"]["usable"] is False
+    assert by_id["depth5"]["usable"] is True
+    assert by_id["financial"]["usable"] is False
     assert by_id["adj_factor"]["usable"] is False
 
 
 def test_prefer_unavailable_capability_still_fail_closed(client: TestClient) -> None:
     r = client.put(
         "/api/settings/preferences",
-        json={"preferences": {"depth5": "astock_http", "daily": "replay"}},
+        json={"preferences": {"financial": "astock_http", "daily": "replay"}},
     )
     assert r.status_code == 200
-    assert r.json()["preferences"]["depth5"] == "astock_http"
+    assert r.json()["preferences"]["financial"] == "astock_http"
     matrix = client.get("/api/settings/capability-matrix").json()
     by_id = {row["id"]: row for row in matrix}
-    assert by_id["depth5"]["usable"] is False
-    assert by_id["depth5"]["candidates"] == []
+    assert by_id["financial"]["usable"] is False
+    assert by_id["financial"]["candidates"] == []
 
 
 def test_routes_do_not_hardcode_tickflow(client: TestClient) -> None:

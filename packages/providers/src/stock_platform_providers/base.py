@@ -14,6 +14,7 @@ class MarketDataProvider(Protocol):
     Optional extensions when declared on the capability matrix:
 
     - M18+ ``get_minute`` → ``minute`` (CN intraday bars; Beijing naive datetime)
+    - M19+ ``get_depth5`` → ``depth5`` (CN five-level order book; volumes in 手)
     - M15+ ``get_fund_flow`` → ``fund_flow``
     - M16+ ``get_lhb`` → ``lhb`` (dragon-tiger board)
     - M17+ ``get_unlock`` → ``unlock`` (lockup expiry / 限售解禁)

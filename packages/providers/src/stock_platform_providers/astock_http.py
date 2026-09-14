@@ -9,6 +9,7 @@ from .base import AssetType
 from .eastmoney import EastmoneyClient, get_default_client
 from .normalize import (
     normalize_daily_row,
+    normalize_depth5_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -30,6 +31,26 @@ _MINUTE_KLT: dict[str, str] = {
     "30m": "30",
     "60m": "60",
 }
+
+# push2 stock/get five-level book (fltt=2): (price_field, volume_field) bid1→5 / ask1→5.
+_DEPTH5_BID_FIELDS: tuple[tuple[str, str], ...] = (
+    ("f19", "f20"),
+    ("f17", "f18"),
+    ("f15", "f16"),
+    ("f13", "f14"),
+    ("f11", "f12"),
+)
+_DEPTH5_ASK_FIELDS: tuple[tuple[str, str], ...] = (
+    ("f39", "f40"),
+    ("f37", "f38"),
+    ("f35", "f36"),
+    ("f33", "f34"),
+    ("f31", "f32"),
+)
+_DEPTH5_FIELDS = (
+    "f86,"
+    + ",".join(f"{p},{v}" for p, v in _DEPTH5_BID_FIELDS + _DEPTH5_ASK_FIELDS)
+)
 
 
 def em_secid(code: str) -> str:
@@ -518,6 +539,60 @@ class AStockHttpProvider:
                 )
             )
         return items
+
+    def get_depth5(
+        self,
+        symbols: list[str],
+        *,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Five-level order book via push2 stock/get (volumes in 手).
+
+        Same URL as realtime; empty ``data`` skips the symbol (no crash).
+        """
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            payload = self._fetch(
+                QUOTE_URL,
+                {
+                    "fltt": "2",
+                    "invt": "2",
+                    "secid": em_secid(code),
+                    "fields": _DEPTH5_FIELDS,
+                },
+            )
+            d = payload.get("data") or {}
+            if not d:
+                continue
+            bid_prices: list[Any] = []
+            bid_volumes: list[Any] = []
+            ask_prices: list[Any] = []
+            ask_volumes: list[Any] = []
+            for price_f, vol_f in _DEPTH5_BID_FIELDS:
+                bid_prices.append(d.get(price_f))
+                bid_volumes.append(d.get(vol_f))
+            for price_f, vol_f in _DEPTH5_ASK_FIELDS:
+                ask_prices.append(d.get(price_f))
+                ask_volumes.append(d.get(vol_f))
+            raw = {
+                "symbol": code,
+                "bid_prices": bid_prices,
+                "bid_volumes": bid_volumes,
+                "ask_prices": ask_prices,
+                "ask_volumes": ask_volumes,
+                "asof_ts": d.get("f86") or int(__import__("time").time() * 1000),
+            }
+            rows.append(
+                normalize_depth5_row(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    market="CN",
+                )
+            )
+        return rows
 
 
 def _parse_fund_flow_csv(line: str) -> dict[str, Any]:

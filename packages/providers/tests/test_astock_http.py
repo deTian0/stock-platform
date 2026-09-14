@@ -144,6 +144,59 @@ def test_minute_empty_klines() -> None:
     assert rows == []
 
 
+def test_depth5_from_quote() -> None:
+    def get_json(url, params=None):
+        assert "push2.eastmoney.com" in url
+        assert "stock/get" in url
+        assert params["secid"] == "1.600519"
+        assert "f19" in params["fields"]
+        assert "f39" in params["fields"]
+        return {
+            "data": {
+                "f19": 1425.0,
+                "f20": 10,
+                "f17": 1424.9,
+                "f18": 20,
+                "f15": 1424.8,
+                "f16": 30,
+                "f13": 1424.7,
+                "f14": 40,
+                "f11": 1424.6,
+                "f12": 50,
+                "f39": 1425.1,
+                "f40": 12,
+                "f37": 1425.2,
+                "f38": 22,
+                "f35": 1425.3,
+                "f36": 32,
+                "f33": 1425.4,
+                "f34": 42,
+                "f31": 1425.5,
+                "f32": 52,
+                "f86": 1725260400000,
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_depth5(["SH600519"])
+    assert len(rows) == 1
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["bid_prices"] == [1425.0, 1424.9, 1424.8, 1424.7, 1424.6]
+    assert rows[0]["ask_volumes"] == [12.0, 22.0, 32.0, 42.0, 52.0]
+    assert rows[0]["asof_ts"] == 1725260400000
+
+
+def test_depth5_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
+    with pytest.raises(SymbolError):
+        provider.get_depth5(["00700"])
+
+
+def test_depth5_empty_data() -> None:
+    rows = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}}).get_depth5(["600519"])
+    assert rows == []
+
+
 def test_lhb_from_datacenter() -> None:
     calls: list[str] = []
 
