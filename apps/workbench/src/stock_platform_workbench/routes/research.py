@@ -23,6 +23,7 @@ from stock_platform_research import (
     list_strategy_configs,
     log_brief_decisions,
     performance_summary,
+    run_refresh,
 )
 from stock_platform_research.strategy_config import default_strategy_config_dir
 import pandas as pd
@@ -185,6 +186,157 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
 def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
     """Alias of to-paper routed through resolve_broker (paper or ths_sim)."""
     return brief_to_paper(request, body)
+
+
+class WizardDailyRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asof: date
+    symbols: str | None = None
+    top_n: int = Field(5, ge=1, le=100, alias="topN")
+    adjust_kind: str | None = "none"
+    qty: int = Field(100, ge=1, le=1_000_000)
+    decision_only: bool = True
+    now: str | None = "2026-09-07T09:40:00+08:00"
+    market: str = "CN"
+    skip_refresh: bool = Field(True, alias="skipRefresh")
+    to_paper: bool = Field(True, alias="toPaper")
+
+
+@router.post("/wizard/daily")
+def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
+    """One-click daily path: optional refresh → brief → paper draft (SIMULATE).
+
+    Each step records ok/error; failures are visible and stop subsequent steps.
+    Never enables live trading.
+    """
+    state = request.app.state.workbench
+    steps: list[dict[str, Any]] = []
+    symbols = _parse_symbols(body.symbols)
+
+    # Step 1: refresh (local provider path; default skipped for thin UI demos)
+    if body.skip_refresh:
+        steps.append({"step": "refresh", "ok": True, "skipped": True})
+    else:
+        try:
+            daily = state.resolve("daily")
+            report = run_refresh(
+                asof=body.asof,
+                provider=daily,
+                symbols=symbols or ["600519"],
+                datasets=["daily"],
+                max_attempts=1,
+            )
+            steps.append(
+                {
+                    "step": "refresh",
+                    "ok": report.ok,
+                    "skipped": False,
+                    "failCount": report.to_dict().get("failCount"),
+                }
+            )
+            if not report.ok:
+                return {
+                    "ok": False,
+                    "steps": steps,
+                    "environment": "SIMULATE",
+                    "liveTradingEnabled": False,
+                    "error": "refresh failed",
+                }
+        except CapabilityUnavailable as exc:
+            steps.append({"step": "refresh", "ok": False, "error": str(exc)})
+            return {
+                "ok": False,
+                "steps": steps,
+                "environment": "SIMULATE",
+                "liveTradingEnabled": False,
+                "error": "refresh unavailable",
+            }
+        except Exception as exc:  # noqa: BLE001
+            steps.append({"step": "refresh", "ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            return {
+                "ok": False,
+                "steps": steps,
+                "environment": "SIMULATE",
+                "liveTradingEnabled": False,
+                "error": "refresh error",
+            }
+
+    # Step 2: brief / recommend
+    try:
+        kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+        brief = _build_brief_for_request(
+            request,
+            asof=body.asof,
+            symbols=symbols,
+            top_n=body.top_n,
+            value_factor=False,
+            reversal_q=0.30,
+            adjust_kind=kind,
+        )
+        steps.append(
+            {
+                "step": "brief",
+                "ok": True,
+                "pickCount": len(brief.get("picks") or []),
+            }
+        )
+    except (HTTPException, CapabilityUnavailable) as exc:
+        detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+        status = exc.status_code if isinstance(exc, HTTPException) else 409
+        steps.append({"step": "brief", "ok": False, "error": detail})
+        raise HTTPException(
+            status_code=status,
+            detail={"ok": False, "steps": steps, "error": detail, "liveTradingEnabled": False},
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        steps.append({"step": "brief", "ok": False, "error": f"{type(exc).__name__}: {exc}"})
+        return {
+            "ok": False,
+            "steps": steps,
+            "environment": "SIMULATE",
+            "liveTradingEnabled": False,
+            "error": "brief failed",
+        }
+
+    draft = None
+    if body.to_paper:
+        paper_body = BriefToPaperRequest(
+            asof=body.asof,
+            symbols=body.symbols,
+            topN=body.top_n,
+            adjust_kind=body.adjust_kind,
+            qty=body.qty,
+            decision_only=body.decision_only,
+            now=body.now,
+            market=body.market,
+        )
+        try:
+            paper_out = brief_to_paper(request, paper_body)
+            draft = paper_out.get("draft")
+            steps.append({"step": "to_paper", "ok": True, "draftId": (draft or {}).get("draftId")})
+        except HTTPException as exc:
+            steps.append({"step": "to_paper", "ok": False, "error": exc.detail})
+            return {
+                "ok": False,
+                "steps": steps,
+                "brief": brief,
+                "environment": "SIMULATE",
+                "liveTradingEnabled": False,
+                "error": "to-paper failed",
+            }
+    else:
+        steps.append({"step": "to_paper", "ok": True, "skipped": True})
+
+    return {
+        "ok": True,
+        "steps": steps,
+        "brief": brief,
+        "draft": draft,
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+        "disclaimer": "Wizard is paper SIMULATE only; not investment advice.",
+    }
 
 
 @router.get("/performance")

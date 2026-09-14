@@ -780,6 +780,55 @@
     }
   }
 
+  async function runWizard(event) {
+    if (event) event.preventDefault();
+    const errEl = $("wizard-error");
+    clearError(errEl);
+    $("wizard-meta").textContent = "";
+    const body = {
+      asof: $("wizard-asof").value,
+      symbols: $("wizard-symbols").value.trim(),
+      topN: Number($("wizard-topn").value || "5"),
+      adjust_kind: "none",
+      decision_only: true,
+      now: "2026-09-07T09:40:00+08:00",
+      market: "CN",
+      skipRefresh: $("wizard-skip-refresh").checked,
+      toPaper: true,
+    };
+    try {
+      const data = await fetchJson("/api/research/wizard/daily", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const stepSummary = (data.steps || [])
+        .map(function (s) {
+          return s.step + ":" + (s.ok ? "ok" : "fail");
+        })
+        .join(" · ");
+      $("wizard-meta").textContent =
+        (data.ok ? "ok" : "failed") +
+        " · " +
+        stepSummary +
+        " · liveTradingEnabled=" +
+        data.liveTradingEnabled;
+      $("wizard-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+      $("wizard-json").textContent = "";
+    }
+  }
+
+  async function loadOpsHealth() {
+    try {
+      const data = await fetchJson("/api/ops/health");
+      $("ops-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      $("ops-json").textContent = String(e);
+    }
+  }
+
   async function listStrategies() {
     const errEl = $("strategy-error");
     clearError(errEl);
@@ -1110,6 +1159,8 @@
     $("btn-performance").addEventListener("click", loadPerformance);
     $("strategy-form").addEventListener("submit", compareStrategies);
     $("btn-strategy-list").addEventListener("click", listStrategies);
+    $("wizard-form").addEventListener("submit", runWizard);
+    $("btn-ops-health").addEventListener("click", loadOpsHealth);
     loadMatrix();
     loadPaper();
     loadBroker();

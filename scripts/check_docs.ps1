@@ -65,6 +65,7 @@ $required = @(
   'docs/architecture/0043-portfolio-paper-performance.md',
   'docs/architecture/0044-calendar-2028-scheduler.md',
   'docs/architecture/0045-llm-cost-quality.md',
+  'docs/architecture/0046-workbench-ia-wizard.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

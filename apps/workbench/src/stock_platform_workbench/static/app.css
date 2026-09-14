@@ -39,6 +39,28 @@ body {
   letter-spacing: -0.02em;
 }
 
+.ia-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.ia-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.ia-nav a:hover {
+  border-bottom-color: var(--accent);
+}
+
+.panel.primary {
+  border-color: var(--accent);
+}
+
 .tagline {
   margin: 0.25rem 0 0;
   color: var(--muted);
