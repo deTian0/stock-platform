@@ -32,6 +32,24 @@ def test_health(client: TestClient) -> None:
     assert r.json()["status"] == "ok"
 
 
+def test_ui_index_shell(client: TestClient) -> None:
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+    body = r.text
+    assert 'id="capability"' in body
+    assert 'id="daily"' in body
+    assert 'id="paper"' in body
+    assert "/static/app.js" in body
+
+
+def test_static_assets(client: TestClient) -> None:
+    css = client.get("/static/app.css")
+    assert css.status_code == 200
+    js = client.get("/static/app.js")
+    assert js.status_code == 200
+
+
 def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
