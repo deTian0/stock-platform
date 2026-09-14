@@ -5,7 +5,15 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from .schemas import DAILY_COLUMNS, FUND_FLOW_COLUMNS, REALTIME_COLUMNS
+from .schemas import (
+    DAILY_COLUMNS,
+    FUND_FLOW_COLUMNS,
+    LHB_INSTITUTION_COLUMNS,
+    LHB_RECORD_COLUMNS,
+    LHB_SEAT_COLUMNS,
+    LHB_TOP_KEYS,
+    REALTIME_COLUMNS,
+)
 from .symbol import normalize_symbol
 
 
@@ -179,3 +187,111 @@ def normalize_fund_flow_row(
         "super_net": _as_float(raw.get("super_net")),
     }
     return {k: row.get(k) for k in FUND_FLOW_COLUMNS}
+
+
+def _pct_to_decimal(value: Any, *, pct_unit: str | None) -> float | None:
+    n = _as_float(value)
+    if n is None:
+        return None
+    if pct_unit == "percent":
+        return n / 100.0
+    return n
+
+
+def _normalize_lhb_seat(raw: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": str(raw.get("name") or raw.get("OPERATEDEPT_NAME") or ""),
+        "buy_amt": _as_float(raw.get("buy_amt") if "buy_amt" in raw else raw.get("BUY")),
+        "sell_amt": _as_float(raw.get("sell_amt") if "sell_amt" in raw else raw.get("SELL")),
+        "net": _as_float(raw.get("net") if "net" in raw else raw.get("NET")),
+    }
+
+
+def normalize_lhb_payload(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    asof_date: date | None = None,
+    look_back_days: int | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Normalize a dragon-tiger aggregate payload (amounts in 元).
+
+    Empty ``records`` is valid (no appearance in look-back window).
+    """
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("lhb payload missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    asof = _as_date(raw.get("asof_date") or raw.get("trade_date") or asof_date)
+    if asof is None:
+        raise ValueError(f"lhb payload for {symbol} missing asof_date")
+
+    look_back = raw.get("look_back_days", look_back_days)
+    if look_back is None:
+        look_back = 30
+    look_back_i = int(look_back)
+
+    records_out: list[dict[str, Any]] = []
+    for item in raw.get("records") or []:
+        if not isinstance(item, dict):
+            continue
+        d = _as_date(item.get("date") or item.get("TRADE_DATE") or item.get("trade_date"))
+        if d is None:
+            continue
+        pct_unit = item.get("pct_unit")
+        # EM TURNOVERRATE is percent; fixtures may already be decimal.
+        if "TURNOVERRATE" in item and pct_unit is None:
+            pct_unit = "percent"
+        elif "turnover" in item and "turnover_rate" not in item and pct_unit is None:
+            pct_unit = "percent"
+        turnover_raw = item.get("turnover_rate")
+        if turnover_raw is None:
+            turnover_raw = item.get("TURNOVERRATE", item.get("turnover"))
+        rec = {
+            "date": d.isoformat(),
+            "reason": str(item.get("reason") or item.get("EXPLANATION") or ""),
+            "net_buy": _as_float(
+                item.get("net_buy") if "net_buy" in item else item.get("BILLBOARD_NET_AMT")
+            ),
+            "turnover_rate": _pct_to_decimal(turnover_raw, pct_unit=pct_unit),
+        }
+        records_out.append({k: rec.get(k) for k in LHB_RECORD_COLUMNS})
+
+    seats_raw = raw.get("seats") or {}
+    buy_seats = [_normalize_lhb_seat(s) for s in (seats_raw.get("buy") or []) if isinstance(s, dict)]
+    sell_seats = [
+        _normalize_lhb_seat(s) for s in (seats_raw.get("sell") or []) if isinstance(s, dict)
+    ]
+    seats = {
+        "buy": [{k: s.get(k) for k in LHB_SEAT_COLUMNS} for s in buy_seats],
+        "sell": [{k: s.get(k) for k in LHB_SEAT_COLUMNS} for s in sell_seats],
+    }
+
+    inst_raw = raw.get("institution") or {}
+    buy_amt = _as_float(inst_raw.get("buy_amt")) or 0.0
+    sell_amt = _as_float(inst_raw.get("sell_amt")) or 0.0
+    net_amt = _as_float(inst_raw.get("net_amt"))
+    if net_amt is None:
+        net_amt = buy_amt - sell_amt
+    institution = {
+        "buy_amt": buy_amt,
+        "sell_amt": sell_amt,
+        "net_amt": net_amt,
+    }
+    institution = {k: institution.get(k) for k in LHB_INSTITUTION_COLUMNS}
+
+    payload = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "asof_date": asof.isoformat(),
+        "look_back_days": look_back_i,
+        "records": records_out,
+        "seats": seats,
+        "institution": institution,
+    }
+    return {k: payload.get(k) for k in LHB_TOP_KEYS}

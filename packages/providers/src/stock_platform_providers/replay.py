@@ -9,7 +9,12 @@ from typing import Any
 
 from .base import AssetType
 from .errors import SymbolError
-from .normalize import normalize_daily_row, normalize_fund_flow_row, normalize_realtime_row
+from .normalize import (
+    normalize_daily_row,
+    normalize_fund_flow_row,
+    normalize_lhb_payload,
+    normalize_realtime_row,
+)
 from .symbol import normalize_symbol
 
 
@@ -21,6 +26,7 @@ class ReplayTransport:
         daily_{symbol}.json       # list[dict] or {"bars": [...]}
         realtime_{symbol}.json    # dict or {"quote": {...}}
         fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
+        lhb_{symbol}.json         # dict aggregate {records, seats, institution}
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -58,6 +64,13 @@ class ReplayTransport:
         if isinstance(data, list):
             return data
         raise ValueError(f"unexpected fund_flow fixture shape in {path}")
+
+    def load_lhb(self, symbol: str) -> dict[str, Any]:
+        path = self.fixtures_dir / f"lhb_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        raise ValueError(f"unexpected lhb fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -151,3 +164,30 @@ class ReplayProvider:
                 sym_rows = sym_rows[-limit:]
             rows.extend(sym_rows)
         return rows
+
+    def get_lhb(
+        self,
+        symbols: list[str],
+        *,
+        asof_date: date,
+        look_back_days: int = 30,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                raw = self._transport.load_lhb(symbol)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no lhb fixture for {symbol}") from exc
+            items.append(
+                normalize_lhb_payload(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                    asof_date=asof_date,
+                    look_back_days=look_back_days,
+                )
+            )
+        return items

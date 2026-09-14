@@ -94,6 +94,7 @@ asset_type ∈ { "stock", "etf", "index" }
 | `financial` | 报表期 + 标准财务字段（M1 另表） |
 | `full_minute` | 同 minute 语义的全市场当日落盘批次 |
 | `fund_flow` | 见下表（M15） |
+| `lhb` | 见下表（M16） |
 
 ### `fund_flow`（日级资金流，M15）
 
@@ -110,6 +111,29 @@ asset_type ∈ { "stock", "etf", "index" }
 | `super_net` | float | 建议 | 超大单净流入，**元** |
 
 配方：东财 push2his `fflow/daykline`（经 `em_get`）；分钟/板块资金流不在本契约。
+
+### `lhb`（龙虎榜，M16）
+
+聚合 payload（非日 K 行集）。金额一律 **元**（东财原始金额；不做「万」换算）。
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | CN=6 位 |
+| `asset_type` | str | 建议 | stock/etf/index |
+| `source` | str | 建议 | Provider 名 |
+| `asof_date` | date | ✅ | 查询截止交易日 |
+| `look_back_days` | int | ✅ | 回看自然日数（默认 30） |
+| `records` | list | ✅ | 上榜记录；空窗口为 `[]` |
+| `records[].date` | date | ✅ | 上榜日 |
+| `records[].reason` | str | 建议 | 上榜原因 |
+| `records[].net_buy` | float | 建议 | 龙虎榜净买入，**元** |
+| `records[].turnover_rate` | float | 建议 | **小数制**（`0.1234` = 12.34%） |
+| `seats.buy` / `seats.sell` | list | ✅ | 最近上榜日买卖席位 TOP5；空为 `[]` |
+| `seats.*.name` | str | 建议 | 营业部名称 |
+| `seats.*.buy_amt` / `sell_amt` / `net` | float | 建议 | **元** |
+| `institution.buy_amt` / `sell_amt` / `net_amt` | float | ✅ | 机构专用席位汇总，**元**；无机构为 0 |
+
+配方：东财 datacenter-web `RPT_DAILYBILLBOARD_DETAILSNEW` + `RPT_BILLBOARD_DAILYDETAILSBUY/SELL`（经 `em_get`）。全市场日榜与交易所备胎不在本契约。
 
 ## Enriched 层（消费侧，非 Provider 原始出口）
 

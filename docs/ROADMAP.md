@@ -67,6 +67,9 @@
 | M15 | CN 日级资金流 | 大 | `v1.8.0` | done |
 | M15.1 | fund_flow provider + matrix + ADR 0020 | 小 | `v1.7.1` | done |
 | M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | done |
+| M16 | CN 龙虎榜 | 大 | `v1.9.0` | in_progress |
+| M16.1 | lhb provider + matrix + ADR 0021 | 小 | `v1.8.1` | done |
+| M16.2 | workbench lhb API + UI | 小 | `v1.8.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -559,6 +562,31 @@
 验收（大）：
 
 - [x] M15.1–M15.2 done；CHANGELOG 含 `1.8.0`
+
+---
+
+## M16 — CN 龙虎榜 → `v1.9.0`
+
+**目标**：个股龙虎榜（上榜记录 + 买卖席位 TOP5 + 机构动向，元）；经 `em_get` datacenter-web；默认 replay；CI 零公网。
+
+### 小里程碑
+
+#### M16.1 → `v1.8.1`
+
+验收：
+
+- [x] 能力矩阵第九项 `lhb`；契约字段；ADR 0021
+- [x] `ReplayProvider` / `AStockHttpProvider.get_lhb` + fixtures / 注入测；空窗口不崩
+
+#### M16.2 → `v1.8.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/lhb`；默认偏好 replay；可选 UI
+
+验收（大）：
+
+- [ ] M16.1–M16.2 done；CHANGELOG 含 `1.9.0`
 
 ---
 
