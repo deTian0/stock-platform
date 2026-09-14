@@ -433,6 +433,60 @@
     }
   }
 
+  async function loadDailyAdjusted(event) {
+    if (event) event.preventDefault();
+    const errEl = $("daily-adjusted-error");
+    clearError(errEl);
+    $("daily-adjusted-meta").textContent = "";
+    const symbols = $("daily-adjusted-symbols").value.trim();
+    const kind = $("daily-adjusted-kind").value || "qfq";
+    const start = $("daily-adjusted-start").value;
+    const end = $("daily-adjusted-end").value;
+    const params = new URLSearchParams({ symbols: symbols, kind: kind });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    try {
+      const data = await fetchJson("/api/market/daily-adjusted?" + params.toString());
+      const rows = data.rows || [];
+      const providers = data.providers || {};
+      $("daily-adjusted-meta").textContent =
+        "daily=" +
+        (providers.daily || "") +
+        " · adj_factor=" +
+        (providers.adj_factor || "") +
+        " · kind=" +
+        data.kind +
+        " · rows=" +
+        rows.length;
+      const tbody = $("daily-adjusted-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.symbol +
+          "</td><td>" +
+          row.date +
+          "</td><td>" +
+          row.close +
+          "</td><td>" +
+          row.ex_factor +
+          "</td><td>" +
+          (row.adjust_kind || data.kind) +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("daily-adjusted-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   async function loadFullMinute(event) {
     if (event) event.preventDefault();
     const errEl = $("full-minute-error");
@@ -710,6 +764,7 @@
     $("depth5-form").addEventListener("submit", loadDepth5);
     $("financial-form").addEventListener("submit", loadFinancial);
     $("adj-factor-form").addEventListener("submit", loadAdjFactor);
+    $("daily-adjusted-form").addEventListener("submit", loadDailyAdjusted);
     $("full-minute-form").addEventListener("submit", loadFullMinute);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
