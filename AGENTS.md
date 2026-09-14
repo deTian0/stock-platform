@@ -5,18 +5,20 @@
 1. [`CONTRIBUTING.md`](CONTRIBUTING.md)
 2. [`docs/ROADMAP.md`](docs/ROADMAP.md)
 3. [`docs/versioning.md`](docs/versioning.md)
-4. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
-5. [`docs/contracts/`](docs/contracts/)（M0.2 已 Accepted；改口径先写 ADR）
+4. [`docs/upstream-archive.md`](docs/upstream-archive.md)
+5. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
+6. [`docs/architecture/0012-v1-product-boundary.md`](docs/architecture/0012-v1-product-boundary.md)
+7. [`docs/contracts/`](docs/contracts/)（改口径先写 ADR）
 
 ## 硬性规则
 
-- 当前处于 **v0.4.x（M3 已完成）**：research 内核可装；下一步 M4 Agent，勿整仓复制 TradingAgents。
-- 改版本号时同步：根 `VERSION`、各包 `pyproject.toml`、对应 `__init__.__version__`。
-- 上游仓（tick-stock-panel、a-stock-data 等）仅作参考；迁入须走里程碑验收，禁止整目录复制。
-- 版本号单一事实源：根目录 `VERSION`。打 tag 用 `scripts/release_tag.ps1`。
+- **产品仓**：`stock-platform` 是唯一运行时主链；上游仓只读参考。
+- 改版本号时同步：根 `VERSION`、各包 `pyproject.toml`、对应 `__init__.__version__`（可用 `scripts/check_versions.ps1`）。
+- 东财请求必须经 `em_get`；美港不得套用 A 股 T+1/涨跌停。
+- 执行层默认 SIMULATE；禁止引入 live 券商开关。
 - 不提交密钥、行情缓存、SQLite 大数据。
 - 保持改动最小；不处理无关问题。
 
 ## 完成标准
 
-以 ROADMAP 中对应里程碑的验收清单为准；打 tag 前 `CHANGELOG.md` 必须有对应条目。
+以 ROADMAP 验收清单为准。打 tag 前：`check_docs` + `check_versions` + pytest 全绿，且 `CHANGELOG` 有对应节。发版步骤见 [`docs/release-checklist.md`](docs/release-checklist.md)。

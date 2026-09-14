@@ -8,7 +8,8 @@
 | `CHANGELOG.md` | 人类可读变更 |
 | Git annotated tag | `v` + `VERSION`，如 `v0.0.1` |
 
-发版前三者必须一致。禁止只打 tag 不改 `VERSION`。
+发版前三者必须一致。禁止只打 tag 不改 `VERSION`。  
+包版本对齐另用 [`scripts/check_versions.ps1`](../scripts/check_versions.ps1)；完整清单见 [`release-checklist.md`](release-checklist.md)。
 
 ## SemVer 映射里程碑
 
