@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.11.2] - 2026-09-14
+
+### Added
+
+- M19.2：workbench `GET /api/market/depth5` + UI `#depth5`；默认偏好 replay
+
 ## [1.11.1] - 2026-09-14
 
 ### Added

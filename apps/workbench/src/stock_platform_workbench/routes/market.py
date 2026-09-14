@@ -150,3 +150,27 @@ def get_unlock(
         "provider": getattr(provider, "name", type(provider).__name__),
         "items": items,
     }
+
+
+@router.get("/depth5")
+def get_depth5(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("depth5")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_depth5", None)
+    if getter is None:
+        return {
+            "capability": "depth5",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_depth5",
+        }
+    rows = getter(syms)
+    return {
+        "capability": "depth5",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "rows": rows,
+    }

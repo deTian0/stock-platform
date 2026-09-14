@@ -235,6 +235,30 @@ def test_can_prefer_minute_astock_http(client: TestClient) -> None:
     assert by_id["minute"]["usable"] is True
 
 
+def test_depth5_replay(client: TestClient) -> None:
+    r = client.get("/api/market/depth5", params={"symbols": "SH600519"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "depth5"
+    assert body["provider"] == "replay"
+    assert len(body["rows"]) == 1
+    assert body["rows"][0]["symbol"] == "600519"
+    assert body["rows"][0]["bid_prices"][0] == 1425.0
+    assert body["rows"][0]["ask_volumes"][-1] == 52
+
+
+def test_can_prefer_depth5_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"depth5": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["depth5"]["effective"] == "astock_http"
+    assert by_id["depth5"]["usable"] is True
+
+
 def test_financial_fail_closed(client: TestClient) -> None:
     r = client.get("/api/market/minute", params={"symbols": "600519"})
     # minute/depth5 usable; financial remains the fail-closed sentinel via matrix
