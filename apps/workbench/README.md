@@ -15,6 +15,7 @@
 | **M18.2 / v1.10.2** | `GET /api/market/minute` + UI；默认 replay |
 | **M19.2 / v1.11.2** | `GET /api/market/depth5` + UI；默认 replay |
 | **M20.2 / v1.12.2** | `GET /api/market/financial` + UI；默认 replay |
+| **M21.2 / v1.13.2** | `GET /api/market/adj-factor` + UI；默认 replay |
 
 ## 安装与运行
 
@@ -37,9 +38,10 @@ python -m stock_platform_workbench
 |------|------|------|
 | GET | `/` | 最小操作台 UI |
 | GET | `/health` | 健康检查 |
-| GET | `/api/settings/capability-matrix` | 能力矩阵（含 minute / depth5 / financial / fund_flow / lhb / unlock） |
+| GET | `/api/settings/capability-matrix` | 能力矩阵（含 adj_factor / minute / depth5 / financial / fund_flow / lhb / unlock） |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
+| GET | `/api/market/adj-factor?symbols=&kind=` | 经矩阵 resolve(`adj_factor`)；无候选仍 **409** |
 | GET | `/api/market/minute?symbols=&freq=` | 经矩阵 resolve(`minute`)；无候选仍 **409** |
 | GET | `/api/market/depth5?symbols=` | 经矩阵 resolve(`depth5`)；无候选仍 **409** |
 | GET | `/api/market/financial?symbols=&periods=` | 经矩阵 resolve(`financial`)；无候选仍 **409** |
