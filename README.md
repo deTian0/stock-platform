@@ -9,13 +9,13 @@
 | 组件 | 路径 | 能力 |
 |------|------|------|
 | Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
-| Research | `packages/research` | lvrev / 闸门 / PIT / `stock-platform-score` |
+| Research | `packages/research` | lvrev / 闸门 / PIT / 宇宙截面 / 盘前简报 / `stock-platform-score` / `stock-platform-brief` |
 | Agents | `packages/agents` | 研报/复盘/确定性辩论插件（仅经 providers） |
 | Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |
-| Workbench | `apps/workbench` | FastAPI + 最小 UI（`GET /`）：行情 / 研报 / 纸面 |
+| Workbench | `apps/workbench` | FastAPI + 最小 UI：行情 / 今日推荐 / 研报 / 纸面 |
 
 **默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v1.x）**：实盘券商、第二套行情主链、把 Skill 仓当 pip 依赖。
+**明确不做（v2.0 Phase A）**：实盘券商、同花顺适配、LLM 辩论图、React SPA、第二套行情主链。
 
 ## 快速开始
 
@@ -28,7 +28,14 @@ python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
 python -m pytest packages apps -q
 python -m stock_platform_workbench
+# → http://127.0.0.1:3018/  （打开「今日推荐」）
 # → http://127.0.0.1:3018/health
+```
+
+盘前简报 CLI：
+
+```powershell
+stock-platform-brief path\to\panel.csv --asof 2026-09-02 --top 10 -o picks.csv
 ```
 
 自检：
@@ -49,7 +56,7 @@ stock-platform/
 │   ├── upstream-archive.md
 │   ├── release-checklist.md
 │   ├── versioning.md
-│   ├── architecture/          # ADR 0001–0012
+│   ├── architecture/          # ADR 0001–0029
 │   └── contracts/
 └── scripts/{check_docs,check_versions,release_tag}.ps1
 ```
@@ -60,7 +67,8 @@ stock-platform/
 |-----|--------|
 | v0.1.0–v0.7.0 | M0–M6（架子→数据→工作台→研究→Agent→美港→纸面执行） |
 | **v1.0.0** | M7 产品收敛 / 上游归档 |
-| **v1.16.0** | M23 复权套价 `apply_adjust`（当前） |
+| v1.1.0–v1.16.0 | M8–M23（live HTTP、日历、UI、辩论、CN 扩展数据集、复权套价） |
+| **v2.0.0** | Phase A（M24–M28）日更推荐 + 纸面闭环 |
 
 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 

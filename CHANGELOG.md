@@ -8,6 +8,17 @@
 
 - （无）
 
+## [2.0.0] - 2026-09-14
+
+### Added
+
+- **Phase A 产品稳定（M24–M28）**：日更选股推荐 + 纸面交易闭环
+  - M24 宇宙 + PIT 截面面板（ADR 0029）
+  - M25 盘前简报（`build_premarket_brief` / CLI / `GET /api/research/brief`）
+  - M26 工作台「今日推荐」UI
+  - M27 TopN → PaperLedger 草稿（SIMULATE；默认 CN）
+  - 默认仍 replay；无同花顺/实盘；无 LLM；无 SPA
+
 ## [1.20.0] - 2026-09-14
 
 ### Added
