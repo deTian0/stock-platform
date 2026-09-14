@@ -34,4 +34,5 @@ pip install "stock-platform-providers[http]"
 | 日 K | `push2his.../api/qt/stock/kline/get`（`klt=101`） |
 | 分钟 K（M18） | 同上 URL，`klt=1/5/15/30/60`；`datetime` 北京墙钟 naive |
 | 实时 | `push2.../api/qt/stock/get` |
+| 五档盘口（M19） | 同上 URL；买/卖五档 `f19`…`f12` / `f39`…`f32`；量=手 |
 | 日级资金流（M15） | `push2his.../api/qt/stock/fflow/daykline/get` |

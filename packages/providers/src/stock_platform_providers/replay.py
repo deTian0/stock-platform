@@ -11,6 +11,7 @@ from .base import AssetType
 from .errors import SymbolError
 from .normalize import (
     normalize_daily_row,
+    normalize_depth5_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -31,6 +32,7 @@ class ReplayTransport:
         fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
         lhb_{symbol}.json         # dict aggregate {records, seats, institution}
         unlock_{symbol}.json      # dict aggregate {history, upcoming}
+        depth5_{symbol}.json      # dict or {"quote": {...}} five-level book
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -92,6 +94,19 @@ class ReplayTransport:
         if isinstance(data, dict):
             return data
         raise ValueError(f"unexpected unlock fixture shape in {path}")
+
+    def load_depth5(self, symbol: str) -> dict[str, Any]:
+        path = self.fixtures_dir / f"depth5_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and (
+            "bid_prices" in data or "bid1" in data or "ask_prices" in data
+        ):
+            return data
+        if isinstance(data, dict):
+            quote = data.get("quote") or data.get("data")
+            if isinstance(quote, dict):
+                return quote
+        raise ValueError(f"unexpected depth5 fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -282,3 +297,27 @@ class ReplayProvider:
                 )
             )
         return items
+
+    def get_depth5(
+        self,
+        symbols: list[str],
+        *,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Five-level order book. Missing fixture → skip (empty contribution)."""
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                quote = self._transport.load_depth5(symbol)
+            except FileNotFoundError:
+                continue
+            rows.append(
+                normalize_depth5_row(
+                    quote,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                )
+            )
+        return rows

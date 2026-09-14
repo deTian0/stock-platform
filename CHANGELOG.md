@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.11.1] - 2026-09-14
+
+### Added
+
+- M19.1：CN 五档盘口 `depth5`（激活矩阵第五项；ADR 0024）
+  - `ReplayProvider` / `AStockHttpProvider.get_depth5`；fixtures；量=手；CI 零公网
+
 ## [1.11.0] - 2026-09-14
 
 ### Added

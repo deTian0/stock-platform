@@ -114,3 +114,17 @@ UNLOCK_EVENT_COLUMNS = [
     "able_shares",
     "ratio",
 ]
+
+# CN five-level order book (五档盘口). Volumes in 手; prices in 元.
+DEPTH5_COLUMNS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "bid_prices",
+    "bid_volumes",
+    "ask_prices",
+    "ask_volumes",
+    "asof_ts",
+]
+
+DEPTH5_LEVELS = 5

@@ -7,6 +7,8 @@ from typing import Any
 
 from .schemas import (
     DAILY_COLUMNS,
+    DEPTH5_COLUMNS,
+    DEPTH5_LEVELS,
     FUND_FLOW_COLUMNS,
     LHB_INSTITUTION_COLUMNS,
     LHB_RECORD_COLUMNS,
@@ -456,3 +458,73 @@ def normalize_unlock_payload(
         "upcoming": upcoming,
     }
     return {k: payload.get(k) for k in UNLOCK_TOP_KEYS}
+
+
+def _as_level_list(value: Any, *, n: int = DEPTH5_LEVELS) -> list[float | None]:
+    """Pad/truncate a price or volume ladder to exactly ``n`` floats (or None)."""
+    if value is None:
+        return [None] * n
+    if isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
+        items = [value]
+    out: list[float | None] = []
+    for item in items[:n]:
+        out.append(_as_float(item))
+    while len(out) < n:
+        out.append(None)
+    return out
+
+
+def normalize_depth5_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map a five-level order book snapshot (prices 元, volumes 手)."""
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("depth5 row missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    bid_prices = _as_level_list(raw.get("bid_prices") or raw.get("bids"))
+    bid_volumes = _as_level_list(raw.get("bid_volumes") or raw.get("bid_vols"))
+    ask_prices = _as_level_list(raw.get("ask_prices") or raw.get("asks"))
+    ask_volumes = _as_level_list(raw.get("ask_volumes") or raw.get("ask_vols"))
+
+    # Accept parallel bid1..bid5 / ask1..ask5 style keys when arrays absent.
+    if all(v is None for v in bid_prices) and any(f"bid{i}" in raw for i in range(1, 6)):
+        bid_prices = [_as_float(raw.get(f"bid{i}")) for i in range(1, 6)]
+    if all(v is None for v in bid_volumes) and any(
+        f"bid_vol{i}" in raw or f"bid_volume{i}" in raw for i in range(1, 6)
+    ):
+        bid_volumes = [
+            _as_float(raw.get(f"bid_vol{i}", raw.get(f"bid_volume{i}"))) for i in range(1, 6)
+        ]
+    if all(v is None for v in ask_prices) and any(f"ask{i}" in raw for i in range(1, 6)):
+        ask_prices = [_as_float(raw.get(f"ask{i}")) for i in range(1, 6)]
+    if all(v is None for v in ask_volumes) and any(
+        f"ask_vol{i}" in raw or f"ask_volume{i}" in raw for i in range(1, 6)
+    ):
+        ask_volumes = [
+            _as_float(raw.get(f"ask_vol{i}", raw.get(f"ask_volume{i}"))) for i in range(1, 6)
+        ]
+
+    asof = _as_ms(raw.get("asof_ts") or raw.get("timestamp") or raw.get("f86"))
+    if asof is None:
+        raise ValueError(f"depth5 row for {symbol} missing asof_ts")
+
+    row = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "bid_prices": bid_prices,
+        "bid_volumes": bid_volumes,
+        "ask_prices": ask_prices,
+        "ask_volumes": ask_volumes,
+        "asof_ts": asof,
+    }
+    return {k: row.get(k) for k in DEPTH5_COLUMNS}

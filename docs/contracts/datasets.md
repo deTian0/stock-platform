@@ -90,12 +90,29 @@ asset_type ∈ { "stock", "etf", "index" }
 | 数据集 | 关键列 |
 |--------|--------|
 | `minute` | `symbol`, `datetime`（**北京墙钟 naive** `YYYY-MM-DD HH:MM:SS`，禁止 tz/UTC 入库）, `open/high/low/close`, `volume`（手）, `amount`（元，可 null）, `freq`（`1m`/`5m`/`15m`/`30m`/`60m`）, `source`, `asset_type` |
-| `depth5` | 按 symbol 的五档；`bid_volumes`/`ask_volumes` 单位为**手** |
+| `depth5` | 见下表（M19） |
 | `financial` | 报表期 + 标准财务字段（M1 另表） |
 | `full_minute` | 同 minute 语义的全市场当日落盘批次 |
 | `fund_flow` | 见下表（M15） |
 | `lhb` | 见下表（M16） |
 | `unlock` | 见下表（M17） |
+
+### `depth5`（五档盘口，M19）
+
+快照 payload（非日 K 行集）。价=元；量=**手**。数组按一档→五档排列，长度固定 5。
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | ✅ | CN=6 位 |
+| `asset_type` | str | 建议 | stock/etf/index |
+| `source` | str | 建议 | Provider 名 |
+| `bid_prices` | list[float] | ✅ | 买一～买五价格，**元**；长度 5 |
+| `bid_volumes` | list[float] | ✅ | 买一～买五量，**手**；长度 5 |
+| `ask_prices` | list[float] | ✅ | 卖一～卖五价格，**元**；长度 5 |
+| `ask_volumes` | list[float] | ✅ | 卖一～卖五量，**手**；长度 5 |
+| `asof_ts` | int64 | ✅ | 快照时刻；**Unix 毫秒 UTC** |
+
+配方：东财 push2 `stock/get` 五档字段（经 `em_get`；与 realtime 同 URL）。mootdx / 交易所官方备胎不在本契约。
 
 ### `fund_flow`（日级资金流，M15）
 

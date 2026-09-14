@@ -10,6 +10,7 @@ import pytest
 from stock_platform_providers import SymbolError, normalize_symbol
 from stock_platform_providers.normalize import (
     normalize_daily_row,
+    normalize_depth5_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -19,6 +20,7 @@ from stock_platform_providers.normalize import (
 from stock_platform_providers.replay import ReplayProvider, ReplayTransport
 from stock_platform_providers.schemas import (
     DAILY_COLUMNS,
+    DEPTH5_COLUMNS,
     FUND_FLOW_COLUMNS,
     LHB_TOP_KEYS,
     MINUTE_COLUMNS,
@@ -108,6 +110,42 @@ def test_replay_minute() -> None:
 def test_replay_minute_missing_fixture_empty() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
     assert provider.get_minute(["000001"], freq="1m") == []
+
+
+def test_replay_depth5() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_depth5(["SH600519"])
+    assert len(rows) == 1
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["bid_prices"][0] == 1425.0
+    assert rows[0]["bid_volumes"][0] == 10
+    assert rows[0]["ask_prices"][0] == 1425.1
+    assert rows[0]["ask_volumes"][-1] == 52
+    assert len(rows[0]["bid_prices"]) == 5
+    assert rows[0]["asof_ts"] == 1725260400000
+    assert set(DEPTH5_COLUMNS) <= set(rows[0].keys())
+
+
+def test_replay_depth5_missing_fixture_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    assert provider.get_depth5(["000001"]) == []
+
+
+def test_normalize_depth5_pads_levels() -> None:
+    row = normalize_depth5_row(
+        {
+            "symbol": "600519",
+            "bid_prices": [1.0, 2.0],
+            "bid_volumes": [10],
+            "ask_prices": [3.0],
+            "ask_volumes": [4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            "asof_ts": 1725260400000,
+        },
+        source="test",
+    )
+    assert row["bid_prices"] == [1.0, 2.0, None, None, None]
+    assert row["ask_volumes"] == [4.0, 5.0, 6.0, 7.0, 8.0]
 
 
 def test_normalize_minute_rejects_tz() -> None:
