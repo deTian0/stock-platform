@@ -8,22 +8,31 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">stock-platform</div>
-    <p class="tagline">研究与纸面工作台 · v{{ version }} · 默认 paper + replay + SIMULATE</p>
+    <div class="brand-row">
+      <div class="brand">stock-platform</div>
+      <span class="badge" title="无实盘开关">paper · SIMULATE</span>
+    </div>
+    <p class="tagline">研究与纸面工作台 · v{{ version }} · 默认 paper + 生产 live 行情（CI 用 replay）</p>
     <nav class="ia-nav" aria-label="主要分区">
       <a href="#wizard">日用向导</a>
-      <a href="#recommend">推荐</a>
+      <a href="#recommend">今日推荐</a>
       <a href="#paper">纸面</a>
+      <a href="#market-tools">行情工具</a>
       <a href="#ops">运维</a>
       <a href="#capability">能力矩阵</a>
-      <a href="#debate">实验·辩论</a>
+      <a href="#lab">实验</a>
     </nav>
   </header>
 
   <main>
+    <p class="flow-banner" role="note">日用路径：向导一键跑通 → 读推荐卡片 → 纸面草稿。原始 JSON 默认折叠。</p>
+
     <section id="wizard" class="panel primary">
-      <h2>日用向导</h2>
-      <p class="hint">一键：刷新（可选）→ 推荐 brief → 纸面草稿。默认 replay；无实盘开关；非投资建议。</p>
+      <div class="panel-head">
+        <h2>日用向导</h2>
+        <span class="pill">主流程</span>
+      </div>
+      <p class="hint">一键：刷新（可选）→ 推荐 brief → 纸面草稿。默认可跳过 refresh；无实盘开关；非投资建议。</p>
       <form id="wizard-form" class="row">
         <label>asof
           <input id="wizard-asof" type="date" value="2026-09-02" />
@@ -41,114 +50,88 @@
       </form>
       <p id="wizard-meta" class="status" aria-live="polite"></p>
       <pre id="wizard-error" class="error" hidden></pre>
-      <pre id="wizard-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="wizard-json" class="code"></pre>
+      </details>
     </section>
 
-    <section id="ops" class="panel">
-      <h2>运维健康</h2>
-      <p class="hint">只读；观察 last_refresh / EM 限流；调度见 docs/ops/scheduler.md。</p>
-      <button type="button" id="btn-ops-health">刷新健康</button>
-      <pre id="ops-json" class="code"></pre>
-    </section>
-
-    <section id="capability" class="panel">
-      <h2>能力矩阵</h2>
-      <p class="hint">路由权威；缺能力 fail-closed（409）。实验区能力请按需展开下方面板。</p>
-      <div class="row">
-        <label>daily provider
-          <select id="pref-daily">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-            <option value="global_http">global_http</option>
-          </select>
-        </label>
-        <label>fund_flow provider
-          <select id="pref-fund-flow">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>sector_fund_flow provider
-          <select id="pref-sector-fund-flow">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>news provider
-          <select id="pref-news">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>lhb provider
-          <select id="pref-lhb">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>unlock provider
-          <select id="pref-unlock">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>minute provider
-          <select id="pref-minute">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>depth5 provider
-          <select id="pref-depth5">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>financial provider
-          <select id="pref-financial">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>adj_factor provider
-          <select id="pref-adj-factor">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>full_minute provider
-          <select id="pref-full-minute">
-            <option value="replay">replay</option>
-            <option value="astock_http">astock_http</option>
-          </select>
-        </label>
-        <label>偏好预设
-          <select id="pref-preset">
-            <option value="cn_astock_http">cn_astock_http（生产默认）</option>
-            <option value="us_hk_global_http">us_hk_global_http</option>
-            <option value="replay">replay（CI/离线）</option>
-          </select>
-        </label>
-        <button type="button" id="btn-preset" class="secondary">应用预设</button>
-        <button type="button" id="btn-pref" class="secondary">应用偏好</button>
-        <button type="button" id="btn-matrix">刷新矩阵</button>
+    <section id="recommend" class="panel primary">
+      <div class="panel-head">
+        <h2>今日推荐</h2>
+        <span class="pill">主流程</span>
       </div>
-      <p id="pref-status" class="status" aria-live="polite"></p>
-      <div class="table-wrap">
-        <table id="matrix-table">
+      <p class="hint">盘前简报 TopN（lvrev + 闸门）；卡片展示代码 / 分数 / 理由。可跳转 <a href="#daily">日 K</a> / <a href="#paper">纸面</a>。非投资建议。</p>
+      <form id="recommend-form" class="row">
+        <label>asof
+          <input id="recommend-asof" name="asof" type="date" value="2026-09-02" />
+        </label>
+        <label>symbols
+          <input id="recommend-symbols" name="symbols" value="600519,000001" autocomplete="off" />
+        </label>
+        <label>topN
+          <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="5" />
+        </label>
+        <button type="submit">刷新推荐</button>
+        <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
+        <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
+      </form>
+      <p id="recommend-meta" class="status" aria-live="polite"></p>
+      <pre id="recommend-error" class="error" hidden></pre>
+      <div id="recommend-cards" class="card-grid" aria-live="polite"></div>
+      <div class="table-wrap table-compact">
+        <table id="recommend-table">
           <thead>
             <tr>
-              <th>id</th>
-              <th>usable</th>
-              <th>effective</th>
-              <th>label</th>
+              <th>rank</th>
+              <th>symbol</th>
+              <th>score</th>
+              <th>close</th>
+              <th>理由</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <pre id="matrix-error" class="error" hidden></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="recommend-json" class="code"></pre>
+      </details>
     </section>
+
+    <section id="paper" class="panel">
+      <div class="panel-head">
+        <h2>纸面状态</h2>
+        <span class="pill muted">只读</span>
+      </div>
+      <p class="hint">只读；无实盘开关。</p>
+      <button type="button" id="btn-paper">刷新纸面</button>
+      <pre id="paper-banner" class="banner" aria-live="polite"></pre>
+      <pre id="paper-error" class="error" hidden></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="paper-json" class="code"></pre>
+      </details>
+    </section>
+
+    <section id="broker" class="panel">
+      <div class="panel-head">
+        <h2>Broker 状态（SIMULATE）</h2>
+        <span class="pill muted">只读</span>
+      </div>
+      <p class="hint">只读；默认 paper。ths_sim 仅环境变量 opt-in，非实盘开关。</p>
+      <button type="button" id="btn-broker">刷新 broker</button>
+      <pre id="broker-banner" class="banner" aria-live="polite"></pre>
+      <pre id="broker-error" class="error" hidden></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="broker-json" class="code"></pre>
+      </details>
+    </section>
+
+    <details id="market-tools" class="group">
+      <summary class="group-summary">行情与基本面工具 <span class="count">12</span></summary>
+      <div class="group-body">
 
     <section id="daily" class="panel">
       <h2>日 K</h2>
@@ -251,7 +234,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <pre id="depth5-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="depth5-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="financial" class="panel">
@@ -283,7 +269,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <pre id="financial-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="financial-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="adj-factor" class="panel">
@@ -315,7 +304,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <pre id="adj-factor-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="adj-factor-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="daily-adjusted" class="panel">
@@ -518,7 +510,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <pre id="lhb-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="lhb-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="unlock" class="panel">
@@ -553,8 +548,134 @@
           <tbody></tbody>
         </table>
       </div>
-      <pre id="unlock-json" class="code"></pre>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="unlock-json" class="code"></pre>
+      </details>
     </section>
+
+      </div>
+    </details>
+
+    <details id="ops-group" class="group">
+      <summary class="group-summary">运维与能力配置</summary>
+      <div class="group-body">
+
+    <section id="ops" class="panel">
+      <h2>运维健康</h2>
+      <p class="hint">只读；观察 last_refresh / EM 限流；调度见 docs/ops/scheduler.md。</p>
+      <button type="button" id="btn-ops-health">刷新健康</button>
+      <details class="raw-json" open>
+        <summary>健康 JSON</summary>
+        <pre id="ops-json" class="code"></pre>
+      </details>
+    </section>
+
+    <section id="capability" class="panel">
+      <h2>能力矩阵</h2>
+      <p class="hint">路由权威；缺能力 fail-closed（409）。实验区能力请按需展开下方面板。</p>
+      <div class="row">
+        <label>daily provider
+          <select id="pref-daily">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+            <option value="global_http">global_http</option>
+          </select>
+        </label>
+        <label>fund_flow provider
+          <select id="pref-fund-flow">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>sector_fund_flow provider
+          <select id="pref-sector-fund-flow">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>news provider
+          <select id="pref-news">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>lhb provider
+          <select id="pref-lhb">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>unlock provider
+          <select id="pref-unlock">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>minute provider
+          <select id="pref-minute">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>depth5 provider
+          <select id="pref-depth5">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>financial provider
+          <select id="pref-financial">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>adj_factor provider
+          <select id="pref-adj-factor">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>full_minute provider
+          <select id="pref-full-minute">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>偏好预设
+          <select id="pref-preset">
+            <option value="cn_astock_http">cn_astock_http（生产默认）</option>
+            <option value="us_hk_global_http">us_hk_global_http</option>
+            <option value="replay">replay（CI/离线）</option>
+          </select>
+        </label>
+        <button type="button" id="btn-preset" class="secondary">应用预设</button>
+        <button type="button" id="btn-pref" class="secondary">应用偏好</button>
+        <button type="button" id="btn-matrix">刷新矩阵</button>
+      </div>
+      <p id="pref-status" class="status" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table id="matrix-table">
+          <thead>
+            <tr>
+              <th>id</th>
+              <th>usable</th>
+              <th>effective</th>
+              <th>label</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="matrix-error" class="error" hidden></pre>
+    </section>
+
+      </div>
+    </details>
+
+    <details id="lab" class="group">
+      <summary class="group-summary">实验区 · 辩论 / 绩效 / 策略</summary>
+      <div class="group-body">
 
     <section id="debate" class="panel">
       <h2>轻量辩论</h2>
@@ -576,43 +697,10 @@
       </form>
       <p id="debate-meta" class="status" aria-live="polite"></p>
       <pre id="debate-error" class="error" hidden></pre>
-      <pre id="debate-json" class="code"></pre>
-    </section>
-
-    <section id="recommend" class="panel">
-      <h2>今日推荐</h2>
-      <p class="hint">盘前简报 TopN（lvrev + 闸门）；可读理由（reasons / reasonSummary）；默认 replay；非投资建议。可跳转 <a href="#daily">日 K</a> / <a href="#paper">纸面</a>。日用宇宙见 <code>universe_cn_daily.json</code>（core/watch/full）。</p>
-      <form id="recommend-form" class="row">
-        <label>asof
-          <input id="recommend-asof" name="asof" type="date" value="2026-09-02" />
-        </label>
-        <label>symbols
-          <input id="recommend-symbols" name="symbols" value="600519,000001" autocomplete="off" />
-        </label>
-        <label>topN
-          <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="5" />
-        </label>
-        <button type="submit">刷新推荐</button>
-        <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
-        <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
-      </form>
-      <p id="recommend-meta" class="status" aria-live="polite"></p>
-      <pre id="recommend-error" class="error" hidden></pre>
-      <div class="table-wrap">
-        <table id="recommend-table">
-          <thead>
-            <tr>
-              <th>rank</th>
-              <th>symbol</th>
-              <th>score</th>
-              <th>close</th>
-              <th>理由</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <pre id="recommend-json" class="code"></pre>
+      <details class="raw-json" open>
+        <summary>辩论 JSON</summary>
+        <pre id="debate-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="performance" class="panel">
@@ -621,7 +709,10 @@
       <button type="button" id="btn-performance">刷新绩效</button>
       <p id="performance-meta" class="status" aria-live="polite"></p>
       <pre id="performance-error" class="error" hidden></pre>
-      <pre id="performance-json" class="code"></pre>
+      <details class="raw-json" open>
+        <summary>绩效 JSON</summary>
+        <pre id="performance-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="strategy-compare" class="panel">
@@ -639,32 +730,22 @@
       </form>
       <p id="strategy-meta" class="status" aria-live="polite"></p>
       <pre id="strategy-error" class="error" hidden></pre>
-      <pre id="strategy-json" class="code"></pre>
+      <details class="raw-json" open>
+        <summary>对比 JSON</summary>
+        <pre id="strategy-json" class="code"></pre>
+      </details>
     </section>
 
-    <section id="paper" class="panel">
-      <h2>纸面状态</h2>
-      <p class="hint">只读；无实盘开关。</p>
-      <button type="button" id="btn-paper">刷新纸面</button>
-      <pre id="paper-banner" class="banner" aria-live="polite"></pre>
-      <pre id="paper-error" class="error" hidden></pre>
-      <pre id="paper-json" class="code"></pre>
-    </section>
-
-    <section id="broker" class="panel">
-      <h2>Broker 状态（SIMULATE）</h2>
-      <p class="hint">只读；默认 paper。ths_sim 仅环境变量 opt-in，非实盘开关。</p>
-      <button type="button" id="btn-broker">刷新 broker</button>
-      <pre id="broker-banner" class="banner" aria-live="polite"></pre>
-      <pre id="broker-error" class="error" hidden></pre>
-      <pre id="broker-json" class="code"></pre>
-    </section>
+      </div>
+    </details>
   </main>
 
   <footer>
     <a href="/health">/health</a>
     ·
     <a href="/docs">OpenAPI</a>
+    ·
+    <a href="/api/ops/health">ops health</a>
   </footer>
   <script src="/static/app.js" defer></script>
 </body>
