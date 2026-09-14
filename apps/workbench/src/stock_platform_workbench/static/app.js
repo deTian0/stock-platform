@@ -572,6 +572,89 @@
     }
   }
 
+  async function loadRecommend(event) {
+    if (event) event.preventDefault();
+    const errEl = $("recommend-error");
+    clearError(errEl);
+    $("recommend-meta").textContent = "";
+    const asof = $("recommend-asof").value;
+    const symbols = $("recommend-symbols").value.trim();
+    const topN = $("recommend-topn").value || "5";
+    const params = new URLSearchParams({ asof: asof, topN: topN, adjust_kind: "none" });
+    if (symbols) params.set("symbols", symbols);
+    try {
+      const data = await fetchJson("/api/research/brief?" + params.toString());
+      $("recommend-meta").textContent =
+        "provider=" +
+        (data.provider || "") +
+        " · picks=" +
+        (data.picks ? data.picks.length : 0) +
+        " · panel=" +
+        data.panelSize;
+      const tbody = $("recommend-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.picks || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.rank +
+          "</td><td><a href=\"#daily\">" +
+          row.symbol +
+          "</a></td><td>" +
+          row.composite_score +
+          "</td><td>" +
+          row.close +
+          "</td><td>" +
+          (row.reason || "") +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+      $("recommend-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("recommend-table").querySelector("tbody").innerHTML = "";
+      $("recommend-json").textContent = "";
+    }
+  }
+
+  async function recommendToPaper() {
+    const errEl = $("recommend-error");
+    clearError(errEl);
+    const asof = $("recommend-asof").value;
+    const symbols = $("recommend-symbols").value.trim();
+    const topN = Number($("recommend-topn").value || "5");
+    const body = {
+      asof: asof,
+      topN: topN,
+      adjust_kind: "none",
+      decision_only: true,
+      now: "2026-09-07T09:40:00+08:00",
+      market: "CN",
+    };
+    if (symbols) body.symbols = symbols;
+    try {
+      const data = await fetchJson("/api/research/brief/to-paper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      $("recommend-meta").textContent =
+        "to-paper draftId=" +
+        (data.draft && data.draft.draftId) +
+        " · liveTradingEnabled=" +
+        String(data.liveTradingEnabled);
+      $("recommend-json").textContent = JSON.stringify(data, null, 2);
+      loadPaper();
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -770,6 +853,8 @@
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);
     $("debate-form").addEventListener("submit", loadDebate);
+    $("recommend-form").addEventListener("submit", loadRecommend);
+    $("btn-recommend-paper").addEventListener("click", recommendToPaper);
     loadMatrix();
     loadPaper();
   }

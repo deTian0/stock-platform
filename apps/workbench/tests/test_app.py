@@ -48,6 +48,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="full-minute"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
+    assert 'id="recommend"' in body
     assert "/static/app.js" in body
 
 
@@ -68,6 +69,8 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/full-minute" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
+    assert "/api/research/brief" in text
+    assert "/api/research/brief/to-paper" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
 
@@ -522,3 +525,62 @@ def test_paper_status_and_activate_flow(client: TestClient) -> None:
     again = client.post(f"/api/paper/drafts/{draft_id}/execute", params={"now": "2026-09-07T09:40:00+08:00"})
     assert again.status_code == 200
     assert again.json().get("idempotentReplay") is True
+
+
+def test_research_brief_api(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 5,
+            "adjust_kind": "none",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asof"] == "2026-09-02"
+    assert body["market"] == "CN"
+    assert body["environment"] == "SIMULATE"
+    assert body["provider"] == "replay"
+    assert "picks" in body
+    assert isinstance(body["picks"], list)
+
+
+def test_research_brief_to_paper(client: TestClient) -> None:
+    blocked = client.post(
+        "/api/research/brief/to-paper",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+        },
+    )
+    assert blocked.status_code == 400
+
+    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "x", "universe": ["600519"]})
+    h = draft.json()["strategyHash"]
+    client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
+    client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
+
+    ok = client.post(
+        "/api/research/brief/to-paper",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+            "market": "CN",
+        },
+    )
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    assert body["draft"]["signalTradeDate"] == "2026-09-02"
+    assert body["draft"]["decisionOnly"] is True

@@ -10,6 +10,7 @@
 | **M3.2 / v0.3.2** | `run_pit_long_only` + 防未来函数 |
 | **M3.3 / v0.3.3** | `stock-platform-score` 批处理 CSV |
 | **M24.1 / v1.16.1** | `load_universe` + `build_cross_section_panel`（ADR 0029） |
+| **M25 / v1.18.0** | `build_premarket_brief` + `stock-platform-brief` |
 
 ## 安装
 

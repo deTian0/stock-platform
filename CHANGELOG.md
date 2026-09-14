@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.18.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M25 完成**：盘前简报批处理
+  - `build_premarket_brief` / `stock-platform-brief`；`GET /api/research/brief`
+  - lvrev + entry gates → TopN + reasons；默认 replay；CI 零公网
+
 ## [1.17.0] - 2026-09-14
 
 ### Added
