@@ -84,7 +84,7 @@
 | M20.2 | workbench financial API + UI | 小 | `v1.12.2` | done |
 | M21 | CN 复权因子 | 大 | `v1.14.0` | in_progress |
 | M21.1 | adj_factor provider + matrix + ADR 0026 | 小 | `v1.13.1` | done |
-| M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | planned |
+| M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -725,8 +725,8 @@
 
 验收：
 
-- [ ] workbench `GET /api/market/adj-factor` 真正取数；默认偏好 replay；可选 UI
-- [ ] 有候选时不再 409；`full_minute` 等仍 fail-closed
+- [x] workbench `GET /api/market/adj-factor` 真正取数；默认偏好 replay；可选 UI
+- [x] 有候选时不再 409；`full_minute` 等仍 fail-closed
 
 验收（大）：
 

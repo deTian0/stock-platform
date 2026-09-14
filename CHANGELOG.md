@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.13.2] - 2026-09-14
+
+### Added
+
+- M21.2：workbench `GET /api/market/adj-factor` + UI `#adj-factor`；默认偏好 replay
+
 ## [1.13.1] - 2026-09-14
 
 ### Added

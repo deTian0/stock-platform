@@ -199,3 +199,32 @@ def get_financial(
         "provider": getattr(provider, "name", type(provider).__name__),
         "items": items,
     }
+
+
+@router.get("/adj-factor")
+def get_adj_factor(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    kind: str = Query("qfq", description="qfq (forward) or hfq (backward)"),
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = Query(0, ge=0, le=10000),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("adj_factor")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_adj_factor", None)
+    if getter is None:
+        return {
+            "capability": "adj_factor",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_adj_factor",
+        }
+    rows = getter(syms, kind=kind, start=start, end=end, limit=limit)
+    return {
+        "capability": "adj_factor",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "kind": kind,
+        "rows": rows,
+    }

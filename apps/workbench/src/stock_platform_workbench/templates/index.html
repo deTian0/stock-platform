@@ -60,6 +60,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>adj_factor provider
+          <select id="pref-adj-factor">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -214,6 +220,38 @@
         </table>
       </div>
       <pre id="financial-json" class="code"></pre>
+    </section>
+
+    <section id="adj-factor" class="panel">
+      <h2>复权因子</h2>
+      <p class="hint">除权因子（列名 ex_factor）；默认 qfq；默认 replay；可选新浪 live。</p>
+      <form id="adj-factor-form" class="row">
+        <label>symbols
+          <input id="adj-factor-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>kind
+          <select id="adj-factor-kind" name="kind">
+            <option value="qfq" selected>qfq</option>
+            <option value="hfq">hfq</option>
+          </select>
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="adj-factor-meta" class="status" aria-live="polite"></p>
+      <pre id="adj-factor-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="adj-factor-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>trade_date</th>
+              <th>ex_factor</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="adj-factor-json" class="code"></pre>
     </section>
 
     <section id="fund-flow" class="panel">
