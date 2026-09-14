@@ -9,6 +9,7 @@
 | **M3.1 / v0.3.1** | `score_lvrev` / gates |
 | **M3.2 / v0.3.2** | `run_pit_long_only` + 防未来函数 |
 | **M3.3 / v0.3.3** | `stock-platform-score` 批处理 CSV |
+| **M24.1 / v1.16.1** | `load_universe` + `build_cross_section_panel`（ADR 0029） |
 
 ## 安装
 
@@ -28,3 +29,4 @@ python -m pytest -q
 - 评分不得使用 `fwd_*` / `next_*` 等未来列（`assert_no_lookahead_columns`）
 - 信号日与成交日分离：信号用 T 收盘特征，成交用 T+1 open
 - 跨除权日比价前先经 `stock_platform_providers.apply_adjust`（M23）；本包不内嵌抓取
+- 宇宙空列表 / 空文件 **fail-closed**（`UniverseEmptyError`）；截面经注入 provider，CI 零公网
