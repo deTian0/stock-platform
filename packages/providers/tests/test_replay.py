@@ -169,6 +169,44 @@ def test_normalize_financial_aliases() -> None:
     assert payload["periods"] == 1
 
 
+def test_replay_adj_factor() -> None:
+    from stock_platform_providers.normalize import normalize_adj_factor_row
+    from stock_platform_providers.schemas import ADJ_FACTOR_COLUMNS
+
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_adj_factor(["SH600519"])
+    assert len(rows) >= 3
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["trade_date"] == "2026-06-26"
+    assert rows[0]["ex_factor"] == 1.0
+    assert rows[0]["trade_date"] >= rows[-1]["trade_date"]
+    assert set(ADJ_FACTOR_COLUMNS) <= set(rows[0].keys())
+    aliased = normalize_adj_factor_row(
+        {"code": "600519", "d": "2024-01-02", "f": "1.25"},
+        source="test",
+    )
+    assert aliased["trade_date"] == "2024-01-02"
+    assert aliased["ex_factor"] == 1.25
+
+
+def test_replay_adj_factor_missing_fixture_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    assert provider.get_adj_factor(["000001"]) == []
+
+
+def test_replay_adj_factor_date_filter() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_adj_factor(
+        ["600519"],
+        start=date(2025, 1, 1),
+        end=date(2026, 12, 31),
+        limit=1,
+    )
+    assert len(rows) == 1
+    assert rows[0]["trade_date"] == "2026-06-26"
+
+
 def test_normalize_depth5_pads_levels() -> None:
     row = normalize_depth5_row(
         {

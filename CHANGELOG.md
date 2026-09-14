@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.13.1] - 2026-09-14
+
+### Added
+
+- M21.1：CN 复权因子 `adj_factor`（激活矩阵第二项；ADR 0026）
+  - `ReplayProvider` / `AStockHttpProvider.get_adj_factor`；新浪 qfq/hfq（非 em_get）；fixtures；CI 零公网
+
 ## [1.13.0] - 2026-09-14
 
 ### Added

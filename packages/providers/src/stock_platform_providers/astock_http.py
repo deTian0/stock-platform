@@ -1,13 +1,15 @@
-"""A-share live HTTP provider — East Money via em_get; financial via Sina."""
+"""A-share live HTTP provider — East Money via em_get; financial/adj_factor via Sina."""
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 from typing import Any, Callable
 
 from .base import AssetType
 from .eastmoney import EastmoneyClient, get_default_client
 from .normalize import (
+    normalize_adj_factor_row,
     normalize_daily_row,
     normalize_depth5_row,
     normalize_financial_payload,
@@ -16,6 +18,7 @@ from .normalize import (
     normalize_minute_row,
     normalize_realtime_row,
     normalize_unlock_payload,
+    validate_adj_factor_kind,
 )
 from .symbol import exchange_prefix, normalize_symbol
 
@@ -26,6 +29,7 @@ DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 SINA_FINANCE_URL = (
     "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
 )
+SINA_ADJ_FACTOR_TMPL = "https://finance.sina.com.cn/realstock/company/{paper}/{kind}.js"
 
 DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -125,7 +129,7 @@ def _parse_minute_kline_csv(line: str) -> dict[str, Any]:
 
 
 class AStockHttpProvider:
-    """MarketDataProvider: East Money via ``em_get``; financial via Sina HTTP."""
+    """MarketDataProvider: East Money via ``em_get``; Sina for financial/adj_factor."""
 
     name = "astock_http"
 
@@ -134,9 +138,11 @@ class AStockHttpProvider:
         client: EastmoneyClient | None = None,
         *,
         get_json: Callable[..., dict[str, Any]] | None = None,
+        get_text: Callable[..., str] | None = None,
     ) -> None:
         self._client = client or get_default_client()
         self._get_json = get_json
+        self._get_text = get_text
 
     def _fetch(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         if self._get_json is not None:
@@ -145,7 +151,7 @@ class AStockHttpProvider:
         return _response_json(resp)
 
     def _fetch_sina(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Non-EM HTTP (Sina). Must not go through ``em_get``."""
+        """Non-EM HTTP (Sina JSON). Must not go through ``em_get``."""
         if self._get_json is not None:
             return self._get_json(url, params=params)
         import requests
@@ -158,6 +164,20 @@ class AStockHttpProvider:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def _fetch_sina_text(self, url: str) -> str:
+        """Non-EM HTTP text (Sina JS payloads). Must not go through ``em_get``."""
+        if self._get_text is not None:
+            return self._get_text(url)
+        import requests
+
+        resp = requests.get(
+            url,
+            headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.text
 
     def get_daily(
         self,
@@ -678,6 +698,75 @@ class AStockHttpProvider:
                 )
             )
         return items
+
+    def get_adj_factor(
+        self,
+        symbols: list[str],
+        *,
+        kind: str = "qfq",
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 0,
+    ) -> list[dict[str, Any]]:
+        """CN adjustment factors via Sina JS (not East Money / em_get).
+
+        Default ``kind=qfq`` (forward). Empty ``data`` skips the symbol.
+        """
+        kind_n = validate_adj_factor_kind(kind)
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            paper = f"{exchange_prefix(code)}{code}"
+            url = SINA_ADJ_FACTOR_TMPL.format(paper=paper, kind=kind_n)
+            text = self._fetch_sina_text(url)
+            factors = _parse_sina_adj_factor_js(text)
+            if not factors:
+                continue
+            sym_rows: list[dict[str, Any]] = []
+            for item in factors:
+                row = normalize_adj_factor_row(
+                    item,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    market="CN",
+                )
+                d = date.fromisoformat(row["trade_date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                sym_rows.append(row)
+            # Sina returns newest-first; keep that after filters
+            sym_rows.sort(key=lambda r: r["trade_date"], reverse=True)
+            if limit > 0:
+                sym_rows = sym_rows[:limit]
+            rows.extend(sym_rows)
+        return rows
+
+
+def _parse_sina_adj_factor_js(text: str) -> list[dict[str, Any]]:
+    """Parse Sina ``var xxqfq={...}/* base64 */`` into date/factor rows.
+
+    Must use ``JSONDecoder.raw_decode`` from the first ``{`` — trailing comment
+    blocks break ``$``-anchored regexes (a-stock-data §1.4).
+    """
+    brace = text.find("{")
+    if brace < 0:
+        return []
+    try:
+        data, _ = json.JSONDecoder().raw_decode(text[brace:])
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    out: list[dict[str, Any]] = []
+    for it in data.get("data") or []:
+        if not isinstance(it, dict):
+            continue
+        out.append({"date": it.get("d"), "factor": it.get("f")})
+    return out
 
 
 def _parse_sina_finance_report(payload: dict[str, Any], *, num: int) -> list[dict[str, Any]]:

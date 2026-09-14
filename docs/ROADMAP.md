@@ -82,6 +82,9 @@
 | M20 | CN 财务报表 | 大 | `v1.13.0` | done |
 | M20.1 | financial provider + matrix + ADR 0025 | 小 | `v1.12.1` | done |
 | M20.2 | workbench financial API + UI | 小 | `v1.12.2` | done |
+| M21 | CN 复权因子 | 大 | `v1.14.0` | in_progress |
+| M21.1 | adj_factor provider + matrix + ADR 0026 | 小 | `v1.13.1` | done |
+| M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -702,6 +705,32 @@
 验收（大）：
 
 - [x] M20.1–M20.2 done；CHANGELOG 含 `1.13.0`
+
+---
+
+## M21 — CN 复权因子 → `v1.14.0`
+
+**目标**：个股复权因子（qfq 默认 / hfq 可选）；经新浪 HTTP（非 `em_get`）；默认 replay；CI 零公网；激活矩阵既有 `adj_factor`。
+
+### 小里程碑
+
+#### M21.1 → `v1.13.1`
+
+验收：
+
+- [x] 契约字段 + ADR 0026；`ReplayProvider` / `AStockHttpProvider.get_adj_factor` + fixtures / 注入测
+- [x] `replay` / `astock_http` 声明 `adj_factor`；空 data / 缺 fixture 不崩
+
+#### M21.2 → `v1.13.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/adj-factor` 真正取数；默认偏好 replay；可选 UI
+- [ ] 有候选时不再 409；`full_minute` 等仍 fail-closed
+
+验收（大）：
+
+- [ ] M21.1–M21.2 done；CHANGELOG 含 `1.14.0`
 
 ---
 

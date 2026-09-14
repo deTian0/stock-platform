@@ -10,6 +10,7 @@ from typing import Any
 from .base import AssetType
 from .errors import SymbolError
 from .normalize import (
+    normalize_adj_factor_row,
     normalize_daily_row,
     normalize_depth5_row,
     normalize_financial_payload,
@@ -18,6 +19,7 @@ from .normalize import (
     normalize_minute_row,
     normalize_realtime_row,
     normalize_unlock_payload,
+    validate_adj_factor_kind,
 )
 from .symbol import normalize_symbol
 
@@ -35,6 +37,7 @@ class ReplayTransport:
         unlock_{symbol}.json      # dict aggregate {history, upcoming}
         depth5_{symbol}.json      # dict or {"quote": {...}} five-level book
         financial_{symbol}.json   # dict aggregate {income, balance, cashflow}
+        adj_factor_{symbol}.json  # list[dict] or {"bars": [...]} / {"factors": [...]}
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -116,6 +119,16 @@ class ReplayTransport:
         if isinstance(data, dict):
             return data
         raise ValueError(f"unexpected financial fixture shape in {path}")
+
+    def load_adj_factor(self, symbol: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"adj_factor_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            bars = data.get("bars") or data.get("factors") or data.get("data") or []
+            return list(bars)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected adj_factor fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -356,3 +369,43 @@ class ReplayProvider:
                 )
             )
         return items
+
+    def get_adj_factor(
+        self,
+        symbols: list[str],
+        *,
+        kind: str = "qfq",
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Adjustment factor series. Missing fixture → skip (empty contribution)."""
+        validate_adj_factor_kind(kind)
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                bars = self._transport.load_adj_factor(symbol)
+            except FileNotFoundError:
+                continue
+            sym_rows: list[dict[str, Any]] = []
+            for bar in bars:
+                row = normalize_adj_factor_row(
+                    bar,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                )
+                d = date.fromisoformat(row["trade_date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                sym_rows.append(row)
+            # Contract / Sina order: newest first (trade_date desc)
+            sym_rows.sort(key=lambda r: r["trade_date"], reverse=True)
+            if limit > 0:
+                sym_rows = sym_rows[:limit]
+            rows.extend(sym_rows)
+        return rows

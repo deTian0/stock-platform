@@ -28,6 +28,7 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
         preferences={
             "daily": "replay",
             "realtime": "replay",
+            "adj_factor": "replay",
             "minute": "replay",
             "depth5": "replay",
             "financial": "replay",
@@ -41,6 +42,11 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
     assert by_id["realtime"]["usable"] is True
+    assert by_id["adj_factor"]["usable"] is True
+    assert by_id["adj_factor"]["effective"] == "replay"
+    assert any(c["name"] == "replay" for c in by_id["adj_factor"]["candidates"])
+    assert any(c["name"] == "astock_http" for c in by_id["adj_factor"]["candidates"])
+    assert not any(c["name"] == "global_http" for c in by_id["adj_factor"]["candidates"])
     assert by_id["minute"]["usable"] is True
     assert by_id["minute"]["effective"] == "replay"
     assert any(c["name"] == "replay" for c in by_id["minute"]["candidates"])
@@ -68,6 +74,8 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert any(c["name"] == "replay" for c in by_id["financial"]["candidates"])
     assert any(c["name"] == "astock_http" for c in by_id["financial"]["candidates"])
     assert not any(c["name"] == "global_http" for c in by_id["financial"]["candidates"])
+    assert by_id["full_minute"]["usable"] is False
+    assert by_id["full_minute"]["candidates"] == []
     assert any(c["name"] == "astock_http" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "replay" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "global_http" for c in by_id["daily"]["candidates"])

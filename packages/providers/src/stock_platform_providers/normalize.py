@@ -6,6 +6,8 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from .schemas import (
+    ADJ_FACTOR_COLUMNS,
+    ADJ_FACTOR_KINDS,
     DAILY_COLUMNS,
     DEPTH5_COLUMNS,
     DEPTH5_LEVELS,
@@ -266,6 +268,57 @@ def normalize_fund_flow_row(
         "super_net": _as_float(raw.get("super_net")),
     }
     return {k: row.get(k) for k in FUND_FLOW_COLUMNS}
+
+
+def normalize_adj_factor_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map an adjustment-factor event into contract fields (``ex_factor``).
+
+    Accepts vendor aliases: ``d``/``date`` → ``trade_date``;
+    ``f``/``factor``/``adj_factor`` → ``ex_factor``.
+    """
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("adj_factor row missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    trade_date = _as_date(
+        raw.get("trade_date") or raw.get("date") or raw.get("d") or raw.get("day")
+    )
+    if trade_date is None:
+        raise ValueError(f"adj_factor row for {symbol} missing trade_date")
+
+    factor_raw = None
+    for key in ("ex_factor", "factor", "adj_factor", "f"):
+        if raw.get(key) is not None and raw.get(key) != "":
+            factor_raw = raw.get(key)
+            break
+    ex_factor = _as_float(factor_raw)
+    if ex_factor is None:
+        raise ValueError(f"adj_factor row for {symbol} missing ex_factor")
+
+    row = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "trade_date": trade_date.isoformat(),
+        "ex_factor": ex_factor,
+    }
+    return {k: row.get(k) for k in ADJ_FACTOR_COLUMNS}
+
+
+def validate_adj_factor_kind(kind: str) -> str:
+    """Return normalized kind or raise ValueError."""
+    k = str(kind).strip().lower()
+    if k not in ADJ_FACTOR_KINDS:
+        raise ValueError(f"adj_factor kind must be qfq or hfq, got {kind!r}")
+    return k
 
 
 def _pct_to_decimal(value: Any, *, pct_unit: str | None) -> float | None:

@@ -259,6 +259,44 @@ def test_financial_empty_reports() -> None:
     assert items == []
 
 
+def test_adj_factor_from_sina_js() -> None:
+    def get_text(url: str) -> str:
+        assert "finance.sina.com.cn/realstock/company/sh600519/qfq.js" in url
+        # Trailing base64 comment must not break raw_decode
+        return (
+            'var sh600519qfq={"data":[{"d":"2026-06-26","f":"1.0000"},'
+            '{"d":"2015-01-05","f":"1.4118"}]};/* base64 junk */'
+        )
+
+    rows = AStockHttpProvider(get_text=get_text).get_adj_factor(["SH600519"])
+    assert len(rows) == 2
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "astock_http"
+    assert rows[0]["trade_date"] == "2026-06-26"
+    assert rows[0]["ex_factor"] == 1.0
+    assert rows[1]["trade_date"] == "2015-01-05"
+    assert rows[1]["ex_factor"] == 1.4118
+
+
+def test_adj_factor_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_text=lambda *a, **k: "")
+    with pytest.raises(SymbolError):
+        provider.get_adj_factor(["00700"])
+
+
+def test_adj_factor_empty_data() -> None:
+    rows = AStockHttpProvider(
+        get_text=lambda *a, **k: 'var x={"data":[]};'
+    ).get_adj_factor(["600519"])
+    assert rows == []
+
+
+def test_adj_factor_invalid_kind() -> None:
+    provider = AStockHttpProvider(get_text=lambda *a, **k: "")
+    with pytest.raises(ValueError, match="qfq"):
+        provider.get_adj_factor(["600519"], kind="bad")
+
+
 def test_lhb_from_datacenter() -> None:
     calls: list[str] = []
 

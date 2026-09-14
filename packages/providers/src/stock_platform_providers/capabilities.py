@@ -80,6 +80,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                 {
                     "daily",
                     "realtime",
+                    "adj_factor",
                     "minute",
                     "depth5",
                     "financial",
@@ -102,6 +103,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                 {
                     "daily",
                     "realtime",
+                    "adj_factor",
                     "minute",
                     "depth5",
                     "financial",
@@ -113,7 +115,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             available=True,
             status="ok",
             note=(
-                "Live: East Money via em_get; financial via Sina HTTP "
+                "Live: East Money via em_get; financial/adj_factor via Sina HTTP "
                 "(not em_get); prefer replay for offline CI"
             ),
         )
