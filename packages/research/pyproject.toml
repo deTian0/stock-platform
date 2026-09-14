@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-research"
-version = "1.4.0"
+version = "1.4.1"
 description = "Selection / backtest research kernels for stock-platform (lvrev, PIT)."
 readme = "README.md"
 requires-python = ">=3.10"

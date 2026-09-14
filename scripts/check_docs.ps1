@@ -36,6 +36,7 @@ $required = @(
   'docs/architecture/0014-global-http-live.md',
   'docs/architecture/0015-cn-trading-calendar.md',
   'docs/architecture/0016-workbench-minimal-ui.md',
+  'docs/architecture/0017-light-debate.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',
