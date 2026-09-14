@@ -35,6 +35,8 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert by_id["minute"]["candidates"] == []
     assert any(c["name"] == "astock_http" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "replay" for c in by_id["daily"]["candidates"])
+    assert any(c["name"] == "global_http" for c in by_id["daily"]["candidates"])
+    assert not any(p["name"] == "global_http" for p in by_id["daily"]["pending"])
 
 
 def test_unknown_dataset_rejected() -> None:

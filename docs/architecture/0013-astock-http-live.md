@@ -18,4 +18,4 @@ v1.0 默认 replay。产品下一步需可选 live 日 K / 实时，且不得绕
 ## 后果
 
 - 公网可用性依赖东财；封禁时应用降级回 replay，不得静默换裸 URL。
-- `global_http` 仍 pending（1.x 后续）。
+- 美港 live 见 ADR 0014（`global_http`）。

@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.1.1] - 2026-09-14
+
+### Added
+
+- M9.1：`GlobalHttpProvider` / `GlobalHttpRouter`（Yahoo 日 K + 新浪实时）
+- ADR 0014；能力矩阵 `global_http` usable
+- `a-stock-engine` README 归档横幅（指向 stock-platform）
+
 ## [1.1.0] - 2026-09-14
 
 ### Added

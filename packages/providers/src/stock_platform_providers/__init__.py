@@ -12,6 +12,7 @@ from .capabilities import (
 )
 from .eastmoney import EastmoneyClient, em_get, is_eastmoney_url, reset_default_client
 from .errors import SymbolError
+from .global_http import GlobalHttpProvider, GlobalHttpRouter, infer_global_market
 from .global_replay import GlobalReplayProvider, GlobalReplayTransport
 from .market import (
     LimitRule,
@@ -34,6 +35,8 @@ __all__ = [
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
     "EastmoneyClient",
+    "GlobalHttpProvider",
+    "GlobalHttpRouter",
     "GlobalReplayProvider",
     "GlobalReplayTransport",
     "LimitRule",
@@ -51,6 +54,7 @@ __all__ = [
     "exchange_prefix",
     "get_market_strategy",
     "get_provider_registry",
+    "infer_global_market",
     "is_bse_symbol",
     "is_eastmoney_url",
     "list_market_ids",
@@ -60,4 +64,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
