@@ -8,6 +8,7 @@ from .brief import (
     reason_summary,
     write_brief_csv,
 )
+from .daily_pipeline import DailyPipelineReport, run_daily_pipeline
 from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, panel_to_csv
@@ -40,6 +41,7 @@ from .universe import (
 __all__ = [
     "W_DEFAULT",
     "W_VALUE",
+    "DailyPipelineReport",
     "StrategyConfig",
     "UniverseEmptyError",
     "apply_entry_gates",
@@ -66,6 +68,7 @@ __all__ = [
     "reason_summary",
     "REFRESH_DATASETS",
     "RefreshReport",
+    "run_daily_pipeline",
     "run_refresh",
     "run_pit_long_only",
     "run_strategy_pit",
@@ -77,4 +80,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"

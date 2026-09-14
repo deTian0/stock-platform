@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.2.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M40 完成**：定时 refresh→brief 日流水线
+  - `run_daily_pipeline` + CLI `stock-platform-daily`；产物 `briefs/{asof}` + `latest.json`
+  - 同 asof 幂等覆盖；失败 fail-closed 写 `failure.json`
+  - `docs/ops/daily-pipeline.md`；ADR 0041；默认 replay
+
 ## [3.1.0] - 2026-09-14
 
 ### Added
