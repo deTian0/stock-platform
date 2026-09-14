@@ -1,87 +1,71 @@
 # stock-platform
 
-单一产品仓：把既有 A 股/全球数据、选股回测、工作台、投研 Agent、执行安全模型，逐步收敛成一个可发布的量化研究与决策平台。
+可发布的量化**研究与纸面决策**平台：统一 Vendor、选股/PIT、工作台 API、投研 Agent 槽位、纸面执行安全模型，收敛在单一产品仓。
 
-> 当前版本见根目录 [`VERSION`](VERSION)。里程碑与 tag 路线见 [`docs/ROADMAP.md`](docs/ROADMAP.md)、[`docs/versioning.md`](docs/versioning.md)。
+> 当前版本见 [`VERSION`](VERSION)。路线图 [`docs/ROADMAP.md`](docs/ROADMAP.md)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
 
-## 第一版范围（架子）
+## v1.0 交付面
 
-- 工程目录与 Git 管理
-- 目标架构与数据契约（M0.2 Accepted）
-- 里程碑 / SemVer tag 升级路线（文档 + 脚本 + CI）
-- `packages/providers` 与 `apps/workbench` 占位（尚无可运行业务）
+| 组件 | 路径 | 能力 |
+|------|------|------|
+| Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、能力矩阵、`MarketStrategy` |
+| Research | `packages/research` | lvrev / 闸门 / PIT / `stock-platform-score` |
+| Agents | `packages/agents` | 研报/复盘插件（仅经 providers） |
+| Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |
+| Workbench | `apps/workbench` | FastAPI：行情 / 研报 / 纸面 API |
 
-**明确不做（v0.1.x → M1 前）**：行情抓取实现、选股、回测、UI、券商对接。  
-**已完成（M0 / v0.1.0）**：仓库工程化、契约定稿、里程碑与 tag 流程、CI 冒烟。  
-**已完成（M1 / v0.2.0）**：可安装 providers、ticker、replay daily/realtime、`em_get`、能力矩阵。  
-**已完成（M2 / v0.3.0）**：FastAPI 工作台壳 + 能力矩阵路由 + fail-closed。  
-**已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
-**已完成（M4 / v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。  
-**已完成（M5 / v0.6.0）**：美港策略表 + `GlobalReplayProvider`。  
-**已完成（M6 / v0.7.0）**：纸面执行安全（`packages/execution`，SIMULATE only）。  
-**下一步（M7）**：产品收敛 / 上游仓归档 → `v1.0.0`。
+**默认运行时**：fixtures replay（离线可测）。`astock_http` / `global_http` live 仍为 pending。  
+**明确不做（v1.0）**：实盘券商、第二套行情主链、把 Skill 仓当 pip 依赖。
+
+## 快速开始
+
+```powershell
+cd D:\workspace\git\stock-platform
+python -m pip install -e ".\packages\providers[dev]"
+python -m pip install -e ".\packages\research[dev]"
+python -m pip install -e ".\packages\agents[dev]"
+python -m pip install -e ".\packages\execution[dev]"
+python -m pip install -e ".\apps\workbench[dev]"
+python -m pytest packages apps -q
+python -m stock_platform_workbench
+# → http://127.0.0.1:3018/health
+```
+
+自检：
+
+```powershell
+.\scripts\check_docs.ps1
+.\scripts\check_versions.ps1
+```
 
 ## 仓库布局
 
 ```text
 stock-platform/
-├── apps/
-│   └── workbench/          # FastAPI 最小壳（M2.1+）
-├── packages/
-│   ├── providers/          # 统一 Vendor（M1+）
-│   ├── research/           # lvrev / PIT（M3+）
-│   ├── agents/             # 研报/复盘插件（M4+）
-│   └── execution/          # 纸面执行安全（M6+）
+├── apps/workbench/
+├── packages/{providers,research,agents,execution}/
 ├── docs/
-│   ├── ROADMAP.md          # 大/小里程碑与验收
-│   ├── versioning.md       # tag 与发版规则
-│   ├── architecture/       # ADR
-│   └── contracts/          # 数据集 / 能力矩阵 / 市场策略
-├── scripts/
-│   ├── check_docs.ps1      # 文档/链接/VERSION 自检
-│   └── release_tag.ps1     # 打 tag 辅助脚本
-├── VERSION                 # 单一版本事实源
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-└── AGENTS.md
+│   ├── ROADMAP.md
+│   ├── upstream-archive.md
+│   ├── release-checklist.md
+│   ├── versioning.md
+│   ├── architecture/          # ADR 0001–0012
+│   └── contracts/
+└── scripts/{check_docs,check_versions,release_tag}.ps1
 ```
 
-## 吸收来源（只读参考，勿整仓拷贝）
+## 里程碑摘要
 
-| 来源仓 | 目标角色 |
-|--------|----------|
-| tick-stock-panel | 工作台壳 + Provider 契约 |
-| a-stock-data / global-stock-data | 统一 Vendor 配方 |
-| a-stock-engine | 选股 / PIT 回测内核 |
-| TradingAgents-astock | 研报 Agent 插件（去数据层） |
-| V2-code-review | 执行安全模型（设计吸收） |
-| finance-quant-skills | Agent 技能文档（不进运行时） |
+| Tag | 里程碑 |
+|-----|--------|
+| v0.1.0–v0.7.0 | M0–M6（架子→数据→工作台→研究→Agent→美港→纸面执行） |
+| **v1.0.0** | **M7 产品收敛 / 上游归档** |
 
-## 快速开始（当前）
+细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
-```powershell
-cd D:\workspace\git\stock-platform
-Get-Content VERSION
-.\scripts\check_docs.ps1
-Get-Content docs\ROADMAP.md
-```
+## 上游参考（只读）
 
-文档自检与发版 DryRun（不创建 tag）：
-
-```powershell
-.\scripts\check_docs.ps1
-.\scripts\release_tag.ps1 -Version (Get-Content VERSION -Raw).Trim() -Kind patch -Message "dry-run" -DryRun
-```
-
-正式打 tag（小里程碑用 `patch`，大里程碑用 `minor`）：
-
-```powershell
-# 1) 更新 VERSION + CHANGELOG + ROADMAP 验收勾选并 commit
-# 2) 再执行：
-.\scripts\release_tag.ps1 -Version 0.0.3 -Kind patch -Message "M0.3: CI and docs checks"
-```
-
-详见 [`docs/versioning.md`](docs/versioning.md)。
+见 [`docs/upstream-archive.md`](docs/upstream-archive.md)。新功能只进本仓。
 
 ## 许可
 

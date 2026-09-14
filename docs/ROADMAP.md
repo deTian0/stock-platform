@@ -39,7 +39,10 @@
 | M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
 | M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | done |
 | M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | done |
-| M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
+| M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | in_progress |
+| M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
+| M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | planned |
+| M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -304,6 +307,31 @@
 ## M7 — v1.0.0
 
 **目标**：单一产品可发布；上游参考仓归档说明齐全；版本/文档/CI 一致。
+
+### 小里程碑
+
+#### M7.1 → `v0.7.1`
+
+验收：
+
+- [x] `docs/upstream-archive.md` 上游总表 + 红线 + 未迁入清单
+- [x] ADR 0012：v1.0 产品边界
+
+#### M7.2 → `v0.7.2`
+
+验收：
+
+- [ ] README / CONTRIBUTING / AGENTS 按 v1 交付面改写（去掉「架子」表述）
+
+#### M7.3 → `v0.7.3`
+
+验收：
+
+- [ ] `docs/release-checklist.md` + `scripts/check_versions.ps1` + CI 接入
+
+验收（大）：
+
+- [ ] M7.1–M7.3 done；CHANGELOG 含 `1.0.0`；`release_tag -Kind major`
 
 ---
 

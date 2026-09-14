@@ -8,6 +8,14 @@
 
 - （无）
 
+## [0.7.1] - 2026-09-14
+
+### Added
+
+- `docs/upstream-archive.md`：上游参考仓归档总表与红线
+- ADR 0012：v1.0 产品边界
+- （同树预置）产品化 README / 发版清单 / `check_versions.ps1`，验收见 0.7.2 / 0.7.3
+
 ## [0.7.0] - 2026-09-14
 
 ### Added
@@ -256,7 +264,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/local/stock-platform/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/local/stock-platform/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/local/stock-platform/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/local/stock-platform/compare/v0.6.1...v0.6.2

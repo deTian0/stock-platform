@@ -13,4 +13,4 @@ __all__ = [
     "build_review_report",
 ]
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
