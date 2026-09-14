@@ -30,6 +30,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>lhb provider
+          <select id="pref-lhb">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -114,6 +120,40 @@
           <tbody></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="lhb" class="panel">
+      <h2>龙虎榜</h2>
+      <p class="hint">上榜记录 + 席位 TOP5 + 机构动向（元）；默认 replay；可选 astock_http。</p>
+      <form id="lhb-form" class="row">
+        <label>symbols
+          <input id="lhb-symbols" name="symbols" value="002475" autocomplete="off" />
+        </label>
+        <label>asof_date
+          <input id="lhb-asof" name="asof_date" type="date" value="2026-05-17" />
+        </label>
+        <label>look_back_days
+          <input id="lhb-lookback" name="look_back_days" type="number" min="1" max="365" value="30" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="lhb-meta" class="status" aria-live="polite"></p>
+      <pre id="lhb-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="lhb-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>date</th>
+              <th>reason</th>
+              <th>net_buy</th>
+              <th>turnover_rate</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="lhb-json" class="code"></pre>
     </section>
 
     <section id="debate" class="panel">

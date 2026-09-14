@@ -1,0 +1,8 @@
+{
+  "symbol": "600519",
+  "asof_date": "2026-05-17",
+  "look_back_days": 30,
+  "records": [],
+  "seats": {"buy": [], "sell": []},
+  "institution": {"buy_amt": 0.0, "sell_amt": 0.0, "net_amt": 0.0}
+}

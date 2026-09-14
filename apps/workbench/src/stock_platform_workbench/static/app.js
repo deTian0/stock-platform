@@ -71,11 +71,19 @@
       if (fundFlow && fundFlow.effective) {
         $("pref-fund-flow").value = fundFlow.effective;
       }
+      const lhb = rows.find(function (r) {
+        return r.id === "lhb";
+      });
+      if (lhb && lhb.effective) {
+        $("pref-lhb").value = lhb.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
         " · fund_flow=" +
-        (fundFlow && fundFlow.effective ? fundFlow.effective : "");
+        (fundFlow && fundFlow.effective ? fundFlow.effective : "") +
+        " · lhb=" +
+        (lhb && lhb.effective ? lhb.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -86,6 +94,7 @@
     clearError(errEl);
     const daily = $("pref-daily").value;
     const fundFlow = $("pref-fund-flow").value;
+    const lhb = $("pref-lhb").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -95,11 +104,17 @@
             daily: daily,
             realtime: daily,
             fund_flow: fundFlow,
+            lhb: lhb,
           },
         }),
       });
       $("pref-status").textContent =
-        "preferences updated → daily/realtime=" + daily + " fund_flow=" + fundFlow;
+        "preferences updated → daily/realtime=" +
+        daily +
+        " fund_flow=" +
+        fundFlow +
+        " lhb=" +
+        lhb;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -231,12 +246,77 @@
     }
   }
 
+  async function loadLhb(event) {
+    if (event) event.preventDefault();
+    const errEl = $("lhb-error");
+    clearError(errEl);
+    $("lhb-meta").textContent = "";
+    $("lhb-json").textContent = "";
+    const symbols = $("lhb-symbols").value.trim();
+    const asof = $("lhb-asof").value;
+    const lookBack = $("lhb-lookback").value;
+    const params = new URLSearchParams({ symbols: symbols, asof_date: asof });
+    if (lookBack) params.set("look_back_days", lookBack);
+    try {
+      const data = await fetchJson("/api/market/lhb?" + params.toString());
+      const items = data.items || [];
+      const records = items.length ? items[0].records || [] : [];
+      $("lhb-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · items=" +
+        items.length +
+        " · records=" +
+        records.length;
+      const tbody = $("lhb-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const item of items) {
+        const recs = item.records || [];
+        if (!recs.length) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            item.symbol +
+            "</td><td colspan=\"4\">(空窗口)</td>";
+          tbody.appendChild(tr);
+          continue;
+        }
+        for (const row of recs) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            item.symbol +
+            "</td><td>" +
+            row.date +
+            "</td><td>" +
+            (row.reason || "") +
+            "</td><td>" +
+            row.net_buy +
+            "</td><td>" +
+            row.turnover_rate +
+            "</td>";
+          tbody.appendChild(tr);
+        }
+      }
+      $("lhb-json").textContent = JSON.stringify(items, null, 2);
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("lhb-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
+    $("lhb-form").addEventListener("submit", loadLhb);
     $("debate-form").addEventListener("submit", loadDebate);
     loadMatrix();
     loadPaper();

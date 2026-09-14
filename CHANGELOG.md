@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.8.2] - 2026-09-14
+
+### Added
+
+- M16.2：workbench `GET /api/market/lhb` + UI `#lhb`；默认偏好 replay
+
 ## [1.8.1] - 2026-09-14
 
 ### Added

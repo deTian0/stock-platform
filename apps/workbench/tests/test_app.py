@@ -40,6 +40,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="capability"' in body
     assert 'id="daily"' in body
     assert 'id="fund-flow"' in body
+    assert 'id="lhb"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert "/static/app.js" in body
@@ -55,6 +56,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
     assert "/api/market/fund-flow" in text
+    assert "/api/market/lhb" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
     assert "fail_closed" in text
@@ -65,12 +67,14 @@ def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 8
+    assert len(rows) == 9
     by_id = {row["id"]: row for row in rows}
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
     assert by_id["fund_flow"]["usable"] is True
     assert by_id["fund_flow"]["effective"] == "replay"
+    assert by_id["lhb"]["usable"] is True
+    assert by_id["lhb"]["effective"] == "replay"
     assert by_id["minute"]["usable"] is False
 
 
@@ -110,6 +114,44 @@ def test_can_prefer_fund_flow_astock_http(client: TestClient) -> None:
     by_id = {row["id"]: row for row in matrix}
     assert by_id["fund_flow"]["effective"] == "astock_http"
     assert by_id["fund_flow"]["usable"] is True
+
+
+def test_lhb_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/lhb",
+        params={"symbols": "SZ002475", "asof_date": "2026-05-17", "look_back_days": 30},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "lhb"
+    assert body["provider"] == "replay"
+    assert len(body["items"]) == 1
+    assert body["items"][0]["symbol"] == "002475"
+    assert len(body["items"][0]["records"]) == 2
+    assert body["items"][0]["records"][0]["net_buy"] == 85200000.0
+
+
+def test_lhb_empty_window_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/lhb",
+        params={"symbols": "600519", "asof_date": "2026-05-17"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"][0]["records"] == []
+    assert body["items"][0]["institution"]["net_amt"] == 0.0
+
+
+def test_can_prefer_lhb_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"lhb": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["lhb"]["effective"] == "astock_http"
+    assert by_id["lhb"]["usable"] is True
 
 
 def test_minute_fail_closed(client: TestClient) -> None:
