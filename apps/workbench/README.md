@@ -11,6 +11,7 @@
 | **M2.3 / v0.2.3** | API 与 ReplayProvider 同标的同日口径对齐 |
 | **M4.2 / v0.4.2** | `/api/research/report`、`/api/review/report`（经 agents 插件） |
 | **M6.3 / v0.6.3** | `/api/paper/*` 纸面执行（SIMULATE only） |
+| **M11 / v1.3.1+** | `GET /` 最小 UI（矩阵 / 日 K / 纸面） |
 
 ## 安装与运行
 
@@ -23,6 +24,7 @@ python -m pip install -e ".\apps\workbench[dev]"
 cd apps\workbench
 python -m pytest -q
 python -m stock_platform_workbench
+# → http://127.0.0.1:3018/  （UI）
 # → http://127.0.0.1:3018/health
 ```
 
@@ -30,6 +32,7 @@ python -m stock_platform_workbench
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| GET | `/` | 最小操作台 UI |
 | GET | `/health` | 健康检查 |
 | GET | `/api/settings/capability-matrix` | 七项能力矩阵 |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |

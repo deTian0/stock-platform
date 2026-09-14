@@ -52,7 +52,7 @@
 | M10 | CN 交易日历（静态休市日） | 大 | `v1.3.0` | done |
 | M10.1 | `TradingCalendar` + `cn_closed_days` | 小 | `v1.2.1` | done |
 | M10.2 | MarketStrategy + timing 接线 | 小 | `v1.2.2` | done |
-| M11 | Workbench 最小 UI | 大 | `v1.4.0` | in_progress |
+| M11 | Workbench 最小 UI | 大 | `v1.4.0` | done |
 | M11.1 | 壳与首页 `GET /` | 小 | `v1.3.1` | done |
 | M11.2 | 三区交互（矩阵/日K/纸面） | 小 | `v1.3.2` | done |
 
@@ -444,7 +444,7 @@
 
 验收（大）：
 
-- [ ] M11.1–M11.2 done；CHANGELOG 含 `1.4.0`
+- [x] M11.1–M11.2 done；CHANGELOG 含 `1.4.0`
 
 ---
 
