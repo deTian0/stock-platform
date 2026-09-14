@@ -684,7 +684,7 @@
           "</td><td>" +
           row.close +
           "</td><td>" +
-          (row.reason || "") +
+          (row.reasonSummary || row.reason || "") +
           "</td>";
         tbody.appendChild(tr);
       }
