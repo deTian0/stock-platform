@@ -96,7 +96,7 @@
 | M25 | 盘前简报批处理 | 大 | `v1.18.0` | done |
 | M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | done |
 | M27 | Recommend → PaperLedger | 大 | `v1.20.0` | done |
-| M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | in_progress |
+| M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -803,6 +803,8 @@
 
 **产品目标**：日更选股推荐 + 纸面交易闭环（SIMULATE；无同花顺/实盘；无 LLM；无 SPA）。
 
+**状态**：done（`v2.0.0`）
+
 ---
 
 ## M24 — Universe + PIT 截面面板 → `v1.17.0`
@@ -863,8 +865,8 @@
 
 验收：
 
-- [ ] Phase A 勾选完成；CHANGELOG `2.0.0`
-- [ ] 全量 pytest 绿；tag `v2.0.0` push
+- [x] Phase A 勾选完成；CHANGELOG `2.0.0`
+- [x] 全量 pytest 绿；tag `v2.0.0` push
 
 ---
 

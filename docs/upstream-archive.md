@@ -34,6 +34,8 @@
 | 半日市 / 多市场纸面默认非 CN | M14 已接 CN/US/HK timing（默认仍 CN）；半日市不建模 |
 | UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |
 | 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M22 已交付个股批量 `full_minute`；M23 已交付 `apply_adjust` 套价。分钟/板块资金流、全市场龙虎榜与全市场解禁、`get_intraday_latest` 仍延期 |
+| 同花顺 / 实盘券商适配 | Phase A（`v2.0.0`）仍纸面 SIMULATE；实盘开关与同花顺适配刻意延期 |
+| 全市场自动宇宙扩容 | M24 以 config/fixtures 宇宙为先；空宇宙 fail-closed；全市场扫描延期 |
 
 ## 维护动作（可选，人工）
 
@@ -43,4 +45,9 @@
 > **归档提示**：产品开发已收敛至 sibling 仓 `stock-platform`（本文件权威清单见该仓 `docs/upstream-archive.md`）。本仓仅作参考实现 / 配方来源。
 ```
 
-本文件是平台侧权威清单；上游是否改 README 不阻塞 `v1.0.0`。
+本文件是平台侧权威清单；上游是否改 README 不阻塞 `v1.0.0` / `v2.0.0`。
+
+## Phase A 产品稳定（`v2.0.0`）
+
+平台已具备：**宇宙 → PIT 截面 → lvrev 简报 → 工作台今日推荐 → 纸面草稿**闭环。  
+仍默认 replay；东财仅 `em_get`；无 LLM / SPA / 实盘。
