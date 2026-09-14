@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.6.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M13 完成**：US/HK 静态交易日历（对标 CN；MarketStrategy 自动生效）
+  - ADR 0018；纸面默认仍 CN timing；不拉交易所 API
+
 ## [1.5.2] - 2026-09-14
 
 ### Added
@@ -63,7 +70,7 @@
 ### Added
 
 - **大里程碑 M10 完成**：CN 静态交易日历（休市日表 + timing / MarketStrategy 共用）
-  - ADR 0015；US/HK 仍 weekday stub
+  - ADR 0015；US/HK 假日表见后续 M13 / ADR 0018
 
 ## [1.2.2] - 2026-09-14
 

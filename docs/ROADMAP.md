@@ -58,7 +58,7 @@
 | M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | done |
 | M12.1 | 确定性 Bull/Bear/Risk 内核 | 小 | `v1.4.1` | done |
 | M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | done |
-| M13 | US/HK 静态交易日历 | 大 | `v1.6.0` | in_progress |
+| M13 | US/HK 静态交易日历 | 大 | `v1.6.0` | done |
 | M13.1 | us/hk closed days + 日历加载 | 小 | `v1.5.1` | done |
 | M13.2 | MarketStrategy 验收 + 文档 | 小 | `v1.5.2` | done |
 
@@ -405,7 +405,7 @@
 
 ## M10 — CN 交易日历 → `v1.3.0`
 
-**目标**：静态上交所休市日替换「只跳周末」；纸面 timing 与 MarketStrategy 共用；US/HK 仍 weekday stub。
+**目标**：静态上交所休市日替换「只跳周末」；纸面 timing 与 MarketStrategy 共用；US/HK 假日表见 M13。
 
 ### 小里程碑
 
@@ -501,7 +501,7 @@
 
 验收（大）：
 
-- [ ] M13.1–M13.2 done；CHANGELOG 含 `1.6.0`
+- [x] M13.1–M13.2 done；CHANGELOG 含 `1.6.0`
 
 ---
 
