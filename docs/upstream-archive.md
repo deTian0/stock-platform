@@ -31,6 +31,7 @@
 | TradingAgents 完整 LLM 辩论图 | M12 已提供确定性轻量辩论；完整 LangGraph/LLM 仍可选后续 |
 | 券商实盘 / OpenD | M6 明确不吸收 |
 | US/HK 官方假日 API 运行时拉取 | M13 已固化静态表（2024–2027）；不拉 NYSE/HKEX API |
+| 半日市 / 多市场纸面默认非 CN | M14 已接 CN/US/HK timing（默认仍 CN）；半日市不建模 |
 | UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |
 
 ## 维护动作（可选，人工）

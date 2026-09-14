@@ -61,9 +61,9 @@
 | M13 | US/HK 静态交易日历 | 大 | `v1.6.0` | done |
 | M13.1 | us/hk closed days + 日历加载 | 小 | `v1.5.1` | done |
 | M13.2 | MarketStrategy 验收 + 文档 | 小 | `v1.5.2` | done |
-| M14 | 多市场纸面 timing | 大 | `v1.7.0` | in_progress |
-| M14.1 | timing market= + ADR 0019 | 小 | `v1.6.1` | in_progress |
-| M14.2 | PaperLedger + workbench market | 小 | `v1.6.2` | planned |
+| M14 | 多市场纸面 timing | 大 | `v1.7.0` | done |
+| M14.1 | timing market= + ADR 0019 | 小 | `v1.6.1` | done |
+| M14.2 | PaperLedger + workbench market | 小 | `v1.6.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -518,19 +518,19 @@
 
 验收：
 
-- [ ] `timing` helpers 接受 `market=`；`market_now` / `daily_bar_final_at`
-- [ ] US Jul4 / HK 春节跨越 + US ET cutoff 单测；ADR 0019
+- [x] `timing` helpers 接受 `market=`；`market_now` / `daily_bar_final_at`
+- [x] US Jul4 / HK 春节跨越 + US ET cutoff 单测；ADR 0019
 
 #### M14.2 → `v1.6.2`
 
 验收：
 
-- [ ] `PaperLedger` / workbench `/api/paper/*` 可选 `market`（默认 CN）
-- [ ] 草稿落盘 `marketId`；execution README 一句
+- [x] `PaperLedger` / workbench `/api/paper/*` 可选 `market`（默认 CN）
+- [x] 草稿落盘 `marketId`；execution README 一句
 
 验收（大）：
 
-- [ ] M14.1–M14.2 done；CHANGELOG 含 `1.7.0`
+- [x] M14.1–M14.2 done；CHANGELOG 含 `1.7.0`
 
 ---
 
