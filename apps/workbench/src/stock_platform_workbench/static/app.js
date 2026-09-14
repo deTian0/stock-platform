@@ -83,6 +83,12 @@
       if (unlock && unlock.effective) {
         $("pref-unlock").value = unlock.effective;
       }
+      const minute = rows.find(function (r) {
+        return r.id === "minute";
+      });
+      if (minute && minute.effective) {
+        $("pref-minute").value = minute.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
@@ -91,7 +97,9 @@
         " · lhb=" +
         (lhb && lhb.effective ? lhb.effective : "") +
         " · unlock=" +
-        (unlock && unlock.effective ? unlock.effective : "");
+        (unlock && unlock.effective ? unlock.effective : "") +
+        " · minute=" +
+        (minute && minute.effective ? minute.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -104,6 +112,7 @@
     const fundFlow = $("pref-fund-flow").value;
     const lhb = $("pref-lhb").value;
     const unlock = $("pref-unlock").value;
+    const minute = $("pref-minute").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -115,6 +124,7 @@
             fund_flow: fundFlow,
             lhb: lhb,
             unlock: unlock,
+            minute: minute,
           },
         }),
       });
@@ -126,7 +136,9 @@
         " lhb=" +
         lhb +
         " unlock=" +
-        unlock;
+        unlock +
+        " minute=" +
+        minute;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -174,6 +186,56 @@
         showError(errEl, detail);
       }
       $("daily-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
+  async function loadMinute(event) {
+    if (event) event.preventDefault();
+    const errEl = $("minute-error");
+    clearError(errEl);
+    $("minute-meta").textContent = "";
+    const symbols = $("minute-symbols").value.trim();
+    const freq = $("minute-freq").value;
+    const start = $("minute-start").value;
+    const end = $("minute-end").value;
+    const params = new URLSearchParams({ symbols: symbols, freq: freq });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    try {
+      const data = await fetchJson("/api/market/minute?" + params.toString());
+      $("minute-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · freq=" +
+        (data.freq || freq) +
+        " · rows=" +
+        (data.rows ? data.rows.length : 0);
+      const tbody = $("minute-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.symbol +
+          "</td><td>" +
+          row.datetime +
+          "</td><td>" +
+          row.close +
+          "</td><td>" +
+          row.volume +
+          "</td><td>" +
+          row.freq +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("minute-table").querySelector("tbody").innerHTML = "";
     }
   }
 
@@ -402,6 +464,7 @@
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);
+    $("minute-form").addEventListener("submit", loadMinute);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);

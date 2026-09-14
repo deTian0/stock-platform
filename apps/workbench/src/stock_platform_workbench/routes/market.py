@@ -48,16 +48,28 @@ def get_realtime(
 def get_minute(
     request: Request,
     symbols: str = Query(..., description="Comma-separated tickers"),
+    freq: str = Query("1m", description="1m/5m/15m/30m/60m"),
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = Query(0, ge=0, le=100000),
 ) -> dict[str, Any]:
-    """Intentionally fail-closed until a minute-capable provider is registered."""
     state = request.app.state.workbench
     provider = state.resolve("minute")
-    # Unreachable with default wiring; kept for future providers.
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_minute", None)
+    if getter is None:
+        return {
+            "capability": "minute",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_minute",
+        }
+    rows = getter(syms, freq=freq, start=start, end=end, limit=limit)
     return {
         "capability": "minute",
         "provider": getattr(provider, "name", type(provider).__name__),
-        "rows": [],
-        "symbols": [s.strip() for s in symbols.split(",") if s.strip()],
+        "freq": freq,
+        "rows": rows,
     }
 
 
