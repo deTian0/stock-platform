@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.0.1] - 2026-09-14
+
+### Added
+
+- `AStockHttpProvider`：东财日 K / 实时经 `em_get`（ADR 0013）
+- 能力矩阵 `astock_http` usable；单测注入 JSON，CI 不打公网
+
 ## [1.0.0] - 2026-09-14
 
 ### Added
@@ -291,7 +298,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/local/stock-platform/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/local/stock-platform/compare/v0.7.3...v1.0.0
 [0.7.3]: https://github.com/local/stock-platform/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/local/stock-platform/compare/v0.7.1...v0.7.2

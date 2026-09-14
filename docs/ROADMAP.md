@@ -43,6 +43,9 @@
 | M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
 | M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | done |
 | M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | done |
+| M8 | A 股 live HTTP（可选） | 大 | `v1.1.0` | in_progress |
+| M8.1 | `AStockHttpProvider` via `em_get` | 小 | `v1.0.1` | done |
+| M8.2 | workbench 可偏好 live daily/realtime | 小 | `v1.0.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -332,6 +335,31 @@
 验收（大）：
 
 - [x] M7.1–M7.3 done；CHANGELOG 含 `1.0.0`；`release_tag -Kind major`
+
+---
+
+## M8 — A 股 live HTTP → `v1.1.0`
+
+**目标**：可选 live 日 K / 实时；默认仍 replay；东财只走 `em_get`。
+
+### 小里程碑
+
+#### M8.1 → `v1.0.1`
+
+验收：
+
+- [x] `AStockHttpProvider`（push2his kline + push2 quote）
+- [x] 单测注入 `get_json`；ADR 0013；矩阵 `astock_http` usable
+
+#### M8.2 → `v1.0.2`
+
+验收：
+
+- [ ] workbench 可 `preferences` 切到 `astock_http`（默认仍 replay）
+
+验收（大）：
+
+- [ ] M8.1–M8.2 done；CHANGELOG 含 `1.1.0`
 
 ---
 

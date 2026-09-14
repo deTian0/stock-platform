@@ -27,7 +27,7 @@
 
 | 能力 | 原因 |
 |------|------|
-| `astock_http` / `global_http` live | 仍 pending；CI 默认 replay |
+| `astock_http` / `global_http` live | `astock_http` 已于 M8 接线；`global_http` 仍 pending；CI 默认 replay |
 | TradingAgents 完整辩论图 | Agent 槽位已够；完整图可选后续 minor |
 | 券商实盘 / OpenD | M6 明确不吸收 |
 | 节假日官方日历 | timing 现为工作日 stub |
