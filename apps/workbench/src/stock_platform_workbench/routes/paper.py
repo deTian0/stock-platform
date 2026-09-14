@@ -58,7 +58,7 @@ def paper_status(request: Request) -> dict[str, Any]:
         order_guards_ok=True,
     )
     return {
-        **paper.ledger.status(),
+        **paper.broker.status(),
         "lifecycle": snap,
         "admission": admission,
     }
@@ -111,7 +111,7 @@ def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="no active strategy; activate explicitly first")
     try:
         mid = get_market_strategy(body.market).market_id
-        return paper.ledger.build_draft(
+        return paper.broker.build_draft(
             strategy_hash=str(active["strategyHash"]),
             signal_trade_date=body.signal_trade_date,
             orders=body.orders,
@@ -133,7 +133,7 @@ def execute_draft(
     paper = request.app.state.workbench.paper
     try:
         mid = get_market_strategy(market).market_id
-        return paper.ledger.execute_draft(
+        return paper.broker.execute_draft(
             draft_id,
             market=mid,
             now=_parse_now(now, mid) or market_now(mid),

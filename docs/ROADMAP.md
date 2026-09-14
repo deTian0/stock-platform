@@ -103,13 +103,18 @@
 | M32 | 推荐绩效统计 | 大 | `v2.4.0` | done |
 | M33 | 可选 LLM 辩论挂在 TopN 之后 | 大 | `v2.5.0` | done |
 | M34 | 策略配置版本化 + 回测对比 + Phase C 收口 | 大 | `v2.6.0` | done |
+| M35 | 执行端口抽象（Paper vs ExternalSim） | 大 | `v2.7.0` | done |
+| M36 | 同花顺模拟盘适配器（mock / experimental） | 大 | `v2.8.0` | done |
+| M37 | 风控闸门接到外部模拟 | 大 | `v2.9.0` | done |
+| M38 | Phase D E2E 收口（recommend → ths_sim） | 大 | `v3.0.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
 > 上表「目标 tag」列与阶段绑定；若插入额外小里程碑，只增加 patch，不跳过已规划的大 tag。  
 > **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。  
 > **Phase B（M29–M31）**：日刷新落盘 + live 运维稳定 → `v2.1.0`–`v2.3.0`。  
-> **Phase C（M32–M34）**：投研稳定（绩效 / 可选 LLM / 策略对比）→ `v2.4.0`–`v2.6.0`。
+> **Phase C（M32–M34）**：投研稳定（绩效 / 可选 LLM / 策略对比）→ `v2.4.0`–`v2.6.0`。  
+> **Phase D（M35–M38）**：同花顺**模拟盘**外部 broker（默认仍 paper）→ `v2.7.0`–`v3.0.0`。
 
 ---
 
@@ -963,6 +968,59 @@
 
 - [x] 策略配置加载 + compare；fixture panel 单测；ADR 0035
 - [x] 全量 pytest；tag `v2.6.0`；Phase C done
+
+---
+
+## Phase D — 同花顺模拟盘（M35–M38）→ `v3.0.0`
+
+**产品目标**：推荐 → 外部 **模拟** broker（同花顺纸面/模拟，非实盘）。默认仍内部 PaperLedger；`STOCK_PLATFORM_BROKER=ths_sim` 显式 opt-in。无稳定公开 THS 交易 API 时交付端口 + mock + experimental 扩展点。
+
+**状态**：done（`v3.0.0`）
+
+计划见：`C:\Users\63516\.cursor\plans\phase_d_ths_sim_20260914.plan.md`
+
+---
+
+## M35 — 执行端口抽象 → `v2.7.0`
+
+**目标**：`BrokerPort` / `PaperBroker` / `ExternalSimBroker`；订单/成交/持仓/账户契约；默认 paper；env `STOCK_PLATFORM_BROKER`。
+
+验收：
+
+- [x] 契约 + 工厂；paper 路径行为不变
+- [x] ADR 0036；禁止 liveTradingEnabled / 实盘券商
+
+---
+
+## M36 — 同花顺模拟盘适配器 → `v2.8.0`
+
+**目标**：`ThsSimBroker` + 可注入 transport；默认 mock fixtures；缺凭据 fail-closed；experimental HTTP 不宣称生产就绪。
+
+验收：
+
+- [x] Mock CI 零公网；README / `.env.example`（`STOCK_PLATFORM_THS_*`）
+- [x] ADR 0037；不默认启用；无「实盘」UI 开关
+
+---
+
+## M37 — 风控闸门接到外部模拟 → `v2.9.0`
+
+**目标**：timing / freshness / window / idempotency / admission 复用于 `ths_sim`；失败 refuse。
+
+验收：
+
+- [x] 闸门单测；仍 SIMULATE；ADR 0038
+
+---
+
+## M38 — Phase D E2E 收口 → `v3.0.0`
+
+**目标**：brief TopN → ths_sim draft/orders → fill（mock）→ 可选绩效；workbench 只读 broker 状态；major CHANGELOG；全量 pytest。
+
+验收：
+
+- [x] E2E + `#broker` 面板；Phase D ROADMAP done
+- [x] `release_tag -Kind major`；push `--follow-tags`
 
 ---
 

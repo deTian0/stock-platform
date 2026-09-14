@@ -17,7 +17,13 @@ from stock_platform_providers import (
     reset_provider_registry,
 )
 from stock_platform_providers.base import MarketDataProvider
-from stock_platform_execution import PaperLedger, StrategyLifecycle
+from stock_platform_execution import (
+    BrokerPort,
+    GatedBroker,
+    PaperLedger,
+    StrategyLifecycle,
+    resolve_broker,
+)
 
 
 class CapabilityUnavailable(Exception):
@@ -31,8 +37,24 @@ class CapabilityUnavailable(Exception):
 
 @dataclass
 class PaperRuntime:
-    ledger: PaperLedger = field(default_factory=PaperLedger)
+    broker: BrokerPort = field(default_factory=lambda: resolve_broker())
     lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+
+    def __post_init__(self) -> None:
+        # External sim always goes through admission wrapper (still SIMULATE).
+        if getattr(self.broker, "name", "") == "ths_sim" and not isinstance(
+            self.broker, GatedBroker
+        ):
+            self.broker = GatedBroker(self.broker, require_active_hash=False)
+
+    @property
+    def ledger(self) -> PaperLedger:
+        inner = self.broker.inner if isinstance(self.broker, GatedBroker) else self.broker
+        ledger = getattr(inner, "ledger", None)
+        if isinstance(ledger, PaperLedger):
+            return ledger
+        raise TypeError("active broker does not expose a PaperLedger")
+
 
 
 @dataclass

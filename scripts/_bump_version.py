@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[1] if (Path(__file__).name == "bump_version.py") else Path(r"D:\workspace\git\stock-platform")
+root = Path(__file__).resolve().parents[1]
 ver = sys.argv[1] if len(sys.argv) > 1 else "1.7.1"
 
 (root / "VERSION").write_text(ver + "\n", encoding="utf-8")

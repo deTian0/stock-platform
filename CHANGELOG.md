@@ -8,6 +8,42 @@
 
 - （无）
 
+## [3.0.0] - 2026-09-14
+
+### Added
+
+- **Phase D 同花顺模拟盘收口（M35–M38）**
+  - M35：`BrokerPort` / `PaperBroker` / `resolve_broker`（ADR 0036）
+  - M36：`ThsSimBroker` + mock transport；experimental HTTP 扩展点（ADR 0037）
+  - M37：`GatedBroker` / admission 接到 `ths_sim`（ADR 0038）
+  - M38：brief → broker E2E；`GET /api/broker/status`；`#broker` 只读面板（ADR 0039）
+  - 默认仍 `STOCK_PLATFORM_BROKER=paper` + replay；SIMULATE；无实盘
+  - 真实 THS HTTP：**experimental/pending**（无稳定公开零售模拟盘 API）
+
+## [2.9.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M37 完成**：风控闸门接到外部模拟
+  - `assert_sim_gates` / `GatedBroker`；ths_sim 复用 timing/window/idempotency/admission
+  - ADR 0038
+
+## [2.8.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M36 完成**：同花顺模拟盘适配器
+  - `ThsSimBroker`；`MockThsTransport`（CI 零公网）；`ExperimentalThsHttpTransport` fail-closed
+  - Env：`STOCK_PLATFORM_THS_MODE` / `STOCK_PLATFORM_THS_*`；ADR 0037
+
+## [2.7.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M35 完成**：执行端口抽象
+  - `BrokerPort` / `PaperBroker` / `ExternalSimBroker`；Order/Fill/Position/Account 契约
+  - `STOCK_PLATFORM_BROKER=paper|ths_sim`（默认 paper）；ADR 0036
+
 ## [2.6.0] - 2026-09-14
 
 ### Added

@@ -161,7 +161,7 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
         now = market_now(mid)
 
     try:
-        draft = paper.ledger.build_draft(
+        draft = paper.broker.build_draft(
             strategy_hash=str(active["strategyHash"]),
             signal_trade_date=body.asof.isoformat(),
             orders=orders,
@@ -175,9 +175,16 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
     return {
         "brief": brief,
         "draft": draft,
+        "broker": getattr(paper.broker, "name", "paper"),
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
     }
+
+
+@router.post("/brief/to-broker")
+def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
+    """Alias of to-paper routed through resolve_broker (paper or ths_sim)."""
+    return brief_to_paper(request, body)
 
 
 @router.get("/performance")
