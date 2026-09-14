@@ -97,11 +97,15 @@
 | M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | done |
 | M27 | Recommend → PaperLedger | 大 | `v1.20.0` | done |
 | M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | done |
+| M29 | 日数据刷新 / full_minute 落盘 | 大 | `v2.1.0` | done |
+| M30 | live 偏好模板 + 东财熔断 | 大 | `v2.2.0` | done |
+| M31 | 运维健康检查 + Phase B 收口 | 大 | `v2.3.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
 > 上表「目标 tag」列与阶段绑定；若插入额外小里程碑，只增加 patch，不跳过已规划的大 tag。  
-> **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。
+> **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。  
+> **Phase B（M29–M31）**：日刷新落盘 + live 运维稳定 → `v2.1.0`–`v2.3.0`。
 
 ---
 
@@ -867,6 +871,50 @@
 
 - [x] Phase A 勾选完成；CHANGELOG `2.0.0`
 - [x] 全量 pytest 绿；tag `v2.0.0` push
+
+---
+
+## Phase B — 运维稳定（M29–M31）→ `v2.3.0`
+
+**产品目标**：日数据自动刷新落盘 + 可靠 live 运维（仍默认 replay；SIMULATE；无同花顺/实盘；无 LLM；无 SPA）。
+
+**状态**：done（`v2.3.0`）
+
+---
+
+## M29 — 日数据刷新 / full_minute 落盘 → `v2.1.0`
+
+**目标**：宇宙级 `daily` / `adj_factor` / `fund_flow` / `full_minute` 刷新到本地路径；重试 + 失败报告；CI 零公网。
+
+验收：
+
+- [x] `run_refresh` + `stock-platform-refresh`；ReplayTransport 文件名
+- [x] `STOCK_PLATFORM_REFRESH_DIR` / `--out`；`manifest.json` + `latest.json`
+- [x] ADR 0030；注入假 provider 单测
+
+---
+
+## M30 — live 偏好模板 + 节流/熔断 → `v2.2.0`
+
+**目标**：成套 CN/美港 live 预设（非默认）；文档化并硬化 `EM_MIN_INTERVAL` + 连续失败熔断。
+
+验收：
+
+- [x] `PREFERENCE_PRESETS`：`replay` / `cn_astock_http` / `us_hk_global_http`
+- [x] workbench `GET/POST /api/settings/presets*`；UI 选择器
+- [x] `EastmoneyClient` 熔断 + `snapshot()`；ADR 0031；`eastmoney-http.md`
+
+---
+
+## M31 — 运维健康检查 + Phase B 收口 → `v2.3.0`
+
+**目标**：`/api/ops/health` + fixture 录制文档；Phase B CHANGELOG/ROADMAP 收口。
+
+验收：
+
+- [x] `GET /api/ops/health`（保留 `/health`）；可选 last_refresh
+- [x] [`docs/ops/refresh-and-fixtures.md`](ops/refresh-and-fixtures.md)；ADR 0032
+- [x] 全量 pytest；tag `v2.3.0`
 
 ---
 

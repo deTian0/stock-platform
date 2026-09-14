@@ -21,6 +21,8 @@
 | **M25 / v1.18.0** | `GET /api/research/brief` 盘前简报 |
 | **M26 / v1.19.0** | UI「今日推荐」`#recommend` |
 | **M27 / v1.20.0** | `POST /api/research/brief/to-paper` → PaperLedger |
+| **M30 / v2.2.0** | live 预设 `GET/POST /api/settings/presets*` |
+| **M31 / v2.3.0** | `GET /api/ops/health` |
 
 ## 安装与运行
 
@@ -36,6 +38,7 @@ python -m pytest -q
 python -m stock_platform_workbench
 # → http://127.0.0.1:3018/  （UI）
 # → http://127.0.0.1:3018/health
+# → http://127.0.0.1:3018/api/ops/health
 ```
 
 ## API（当前）
@@ -43,7 +46,8 @@ python -m stock_platform_workbench
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | 最小操作台 UI |
-| GET | `/health` | 健康检查 |
+| GET | `/health` | 存活探针 |
+| GET | `/api/ops/health` | 运维快照（默认 replay / 熔断 / lastRefresh） |
 | GET | `/api/settings/capability-matrix` | 能力矩阵（含 adj_factor / minute / depth5 / financial / fund_flow / lhb / unlock） |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
@@ -65,6 +69,8 @@ python -m stock_platform_workbench
 | POST | `/api/paper/drafts` | 建纸面订单草稿 |
 | POST | `/api/paper/drafts/{id}/execute` | 提交（幂等） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
+| GET | `/api/settings/presets` | 列出 replay / cn_astock_http / us_hk_global_http（启动默认仍 replay） |
+| POST | `/api/settings/presets/{id}/apply` | 应用到当前进程（不改下次启动默认） |
 
 ## 约束
 

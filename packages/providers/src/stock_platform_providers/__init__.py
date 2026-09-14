@@ -12,7 +12,18 @@ from .capabilities import (
     register_builtin_providers,
     reset_provider_registry,
 )
-from .eastmoney import EastmoneyClient, em_get, is_eastmoney_url, reset_default_client
+from .eastmoney import (
+    CircuitOpenError,
+    EastmoneyClient,
+    em_get,
+    is_eastmoney_url,
+    reset_default_client,
+)
+from .presets import (
+    PREFERENCE_PRESETS,
+    get_preference_preset,
+    list_preference_presets,
+)
 from .errors import SymbolError
 from .global_http import GlobalHttpProvider, GlobalHttpRouter, infer_global_market
 from .global_replay import GlobalReplayProvider, GlobalReplayTransport
@@ -37,6 +48,7 @@ __all__ = [
     "apply_adjust",
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
+    "CircuitOpenError",
     "EastmoneyClient",
     "GlobalHttpProvider",
     "GlobalHttpRouter",
@@ -55,6 +67,9 @@ __all__ = [
     "build_capability_matrix",
     "em_get",
     "em_secid",
+    "get_preference_preset",
+    "list_preference_presets",
+    "PREFERENCE_PRESETS",
     "exchange_prefix",
     "get_market_strategy",
     "get_provider_registry",
@@ -69,4 +84,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

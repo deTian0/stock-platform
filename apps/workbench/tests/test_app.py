@@ -32,6 +32,18 @@ def test_health(client: TestClient) -> None:
     assert r.json()["status"] == "ok"
 
 
+def test_ops_health_default_replay(client: TestClient) -> None:
+    r = client.get("/api/ops/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["liveTradingEnabled"] is False
+    assert body["executionMode"] == "SIMULATE"
+    assert body["defaultReplay"] is True
+    assert body["eastmoney"]["minInterval"] >= 0
+    assert "circuitOpen" in body["eastmoney"]
+    assert body["lastRefresh"] is None
+
+
 def test_ui_index_shell(client: TestClient) -> None:
     r = client.get("/")
     assert r.status_code == 200
@@ -49,6 +61,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert 'id="recommend"' in body
+    assert 'id="pref-preset"' in body
     assert "/static/app.js" in body
 
 
@@ -73,6 +86,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/research/brief/to-paper" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
+    assert "/api/settings/presets/" in text
 
 
 def test_capability_matrix(client: TestClient) -> None:
@@ -474,6 +488,34 @@ def test_can_prefer_astock_http_without_calling_network(client: TestClient) -> N
     assert by_id["daily"]["usable"] is True
 
 
+def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
+    listed = client.get("/api/settings/presets")
+    assert listed.status_code == 200
+    assert listed.json()["default"] == "replay"
+    r = client.post("/api/settings/presets/cn_astock_http/apply")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["applied"] == "cn_astock_http"
+    assert body["isDefault"] is False
+    assert body["preferences"]["daily"] == "astock_http"
+    assert body["preferences"]["full_minute"] == "astock_http"
+    health = client.get("/api/ops/health").json()
+    assert health["liveTradingEnabled"] is False
+    assert health["defaultReplay"] is False
+    unknown = client.post("/api/settings/presets/tickflow/apply")
+    assert unknown.status_code == 404
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"daily": "astock_http", "realtime": "astock_http"}},
+    )
+    assert put.status_code == 200
+    assert put.json()["preferences"]["daily"] == "astock_http"
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["daily"]["effective"] == "astock_http"
+    assert by_id["daily"]["usable"] is True
+
+
 def test_can_prefer_global_http_without_calling_network(client: TestClient) -> None:
     put = client.put(
         "/api/settings/preferences",
@@ -584,3 +626,18 @@ def test_research_brief_to_paper(client: TestClient) -> None:
     assert body["environment"] == "SIMULATE"
     assert body["draft"]["signalTradeDate"] == "2026-09-02"
     assert body["draft"]["decisionOnly"] is True
+
+
+def test_ops_health_last_refresh_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STOCK_PLATFORM_REFRESH_DIR", str(tmp_path))
+    (tmp_path / "latest.json").write_text(
+        '{"ok": false, "asof": "2026-09-02", "failCount": 2, "outDir": "x"}',
+        encoding="utf-8",
+    )
+    state = build_default_state(FIXTURES)
+    client = TestClient(create_app(state=state))
+    body = client.get("/api/ops/health").json()
+    assert body["status"] == "degraded"
+    assert body["lastRefresh"]["ok"] is False
+    assert body["lastRefresh"]["asof"] == "2026-09-02"
+    assert body["liveTradingEnabled"] is False

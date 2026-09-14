@@ -50,7 +50,8 @@ python -m pip install -e ".[http]"
 | `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
 | `AStockHttpProvider` | A 股 live（经 `em_get`） |
 | `GlobalHttpProvider` / `GlobalHttpRouter` | 美港 live（Yahoo + 新浪；不经 `em_get`） |
-| `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口 |
+| `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口（节流 + 熔断） |
+| `PREFERENCE_PRESETS` / `list_preference_presets` | 文档化 live 偏好模板（非启动默认） |
 | `build_capability_matrix` / `register_builtin_providers` | 能力路由 |
 | `apply_adjust` | 用 `adj_factor` 套不复权 OHLC（qfq 除 / hfq 乘） |
 
