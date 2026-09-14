@@ -444,13 +444,19 @@
 
     <section id="debate" class="panel">
       <h2>轻量辩论</h2>
-      <p class="hint">确定性 Bull/Bear/Risk；无 LLM；非投资建议。</p>
+      <p class="hint">默认确定性 Bull/Bear/Risk；可选 LLM（需 env/密钥，失败明文 fail-closed）。非投资建议。</p>
       <form id="debate-form" class="row">
         <label>symbol
           <input id="debate-symbol" name="symbol" value="600519" autocomplete="off" />
         </label>
         <label>asof
           <input id="debate-asof" name="asof" type="date" value="2026-09-02" />
+        </label>
+        <label>engine
+          <select id="debate-engine" name="engine">
+            <option value="deterministic" selected>deterministic</option>
+            <option value="llm">llm（可选）</option>
+          </select>
         </label>
         <button type="submit">运行辩论</button>
       </form>
@@ -474,6 +480,7 @@
         </label>
         <button type="submit">刷新推荐</button>
         <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
+        <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
       </form>
       <p id="recommend-meta" class="status" aria-live="polite"></p>
       <pre id="recommend-error" class="error" hidden></pre>

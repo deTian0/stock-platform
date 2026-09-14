@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from stock_platform_execution import DraftBlocked, ProfileBlocked
 from stock_platform_execution.timing import market_now
 from stock_platform_providers import apply_adjust, get_market_strategy
+from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
 from stock_platform_research import (
     UniverseEmptyError,
     brief_to_orders,
@@ -230,3 +231,44 @@ def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
     }
+
+
+class BriefDebateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asof: date
+    symbols: str | None = None
+    top_n: int = Field(5, ge=1, le=50, alias="topN")
+    value_factor: bool = Field(False, alias="valueFactor")
+    reversal_q: float = Field(0.30, alias="reversalQ")
+    adjust_kind: str | None = "qfq"
+    engine: str = "deterministic"
+    max_picks: int | None = Field(None, ge=1, le=50, alias="maxPicks")
+
+
+@router.post("/brief/debate")
+def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
+    """Build TopN brief then run debate on picks (default deterministic; llm fail-closed)."""
+    kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+    brief = _build_brief_for_request(
+        request,
+        asof=body.asof,
+        symbols=_parse_symbols(body.symbols),
+        top_n=body.top_n,
+        value_factor=body.value_factor,
+        reversal_q=body.reversal_q,
+        adjust_kind=kind,
+    )
+    daily = request.app.state.workbench.resolve("daily")
+    brief["provider"] = getattr(daily, "name", type(daily).__name__)
+    try:
+        return debate_brief_picks(
+            daily,
+            brief,
+            engine=body.engine,
+            max_picks=body.max_picks,
+        )
+    except LlmUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (AgentError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
