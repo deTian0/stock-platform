@@ -174,3 +174,28 @@ def get_depth5(
         "provider": getattr(provider, "name", type(provider).__name__),
         "rows": rows,
     }
+
+
+@router.get("/financial")
+def get_financial(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    periods: int = Query(8, ge=1, le=40, description="Number of report periods"),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("financial")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_financial", None)
+    if getter is None:
+        return {
+            "capability": "financial",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "items": [],
+            "reason": "provider_missing_get_financial",
+        }
+    items = getter(syms, periods=periods)
+    return {
+        "capability": "financial",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "items": items,
+    }
