@@ -10,6 +10,7 @@
 | **M2.2 / v0.2.2** | preferences、缺能力 409、禁品牌硬编码 |
 | **M2.3 / v0.2.3** | API 与 ReplayProvider 同标的同日口径对齐 |
 | **M4.2 / v0.4.2** | `/api/research/report`、`/api/review/report`（经 agents 插件） |
+| **M6.3 / v0.6.3** | `/api/paper/*` 纸面执行（SIMULATE only） |
 
 ## 安装与运行
 
@@ -17,6 +18,7 @@
 cd D:\workspace\git\stock-platform
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\agents[dev]"
+python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
 cd apps\workbench
 python -m pytest -q
@@ -35,6 +37,10 @@ python -m stock_platform_workbench
 | GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
+| GET | `/api/paper/status` | 纸面状态（SIMULATE · 实盘关闭） |
+| POST | `/api/paper/strategies/draft\|validate\|activate` | 草稿 / 校验 / 显式激活 |
+| POST | `/api/paper/drafts` | 建纸面订单草稿 |
+| POST | `/api/paper/drafts/{id}/execute` | 提交（幂等） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
 
 ## 约束

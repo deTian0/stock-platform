@@ -15,6 +15,7 @@ from stock_platform_providers import (
     reset_provider_registry,
 )
 from stock_platform_providers.base import MarketDataProvider
+from stock_platform_execution import PaperLedger, StrategyLifecycle
 
 
 class CapabilityUnavailable(Exception):
@@ -27,6 +28,12 @@ class CapabilityUnavailable(Exception):
 
 
 @dataclass
+class PaperRuntime:
+    ledger: PaperLedger = field(default_factory=PaperLedger)
+    lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+
+
+@dataclass
 class WorkbenchState:
     """Runtime wiring: preferences + concrete provider instances (by name)."""
 
@@ -34,6 +41,7 @@ class WorkbenchState:
     preferences: dict[str, str] = field(default_factory=dict)
     providers: dict[str, MarketDataProvider] = field(default_factory=dict)
     declarations: list[ProviderDeclaration] = field(default_factory=list)
+    paper: PaperRuntime = field(default_factory=PaperRuntime)
 
     def matrix(self) -> list[dict[str, Any]]:
         return build_capability_matrix(self.preferences, self.declarations)

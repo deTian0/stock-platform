@@ -30,6 +30,7 @@ $required = @(
   'docs/architecture/0008-research-lvrev-pit.md',
   'docs/architecture/0009-agent-plugins.md',
   'docs/architecture/0010-market-strategy-global.md',
+  'docs/architecture/0011-paper-execution-safety.md',
   'docs/contracts/datasets.md',
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
@@ -47,7 +48,10 @@ $required = @(
   'packages/research/src/stock_platform_research/__init__.py',
   'packages/agents/README.md',
   'packages/agents/pyproject.toml',
-  'packages/agents/src/stock_platform_agents/__init__.py'
+  'packages/agents/src/stock_platform_agents/__init__.py',
+  'packages/execution/README.md',
+  'packages/execution/pyproject.toml',
+  'packages/execution/src/stock_platform_execution/__init__.py'
 )
 
 $failed = $false

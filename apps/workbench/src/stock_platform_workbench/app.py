@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from . import __version__
-from .routes import agents, market, meta, settings
+from .routes import agents, market, meta, paper, settings
 from .state import CapabilityUnavailable, WorkbenchState, build_default_state
 
 
@@ -38,4 +38,5 @@ def create_app(
     app.include_router(settings.router)
     app.include_router(market.router)
     app.include_router(agents.router)
+    app.include_router(paper.router)
     return app

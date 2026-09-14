@@ -18,7 +18,7 @@
 **已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
 **已完成（M4 / v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。  
 **已完成（M5 / v0.6.0）**：美港策略表 + `GlobalReplayProvider`。  
-**下一步（M6）**：纸面执行安全模型（吸 V2）。
+**进行中（M6 / → v0.7.0）**：纸面执行安全模型（`packages/execution`）。
 
 ## 仓库布局
 
@@ -29,7 +29,8 @@ stock-platform/
 ├── packages/
 │   ├── providers/          # 统一 Vendor（M1+）
 │   ├── research/           # lvrev / PIT（M3+）
-│   └── agents/             # 研报/复盘插件（M4+）
+│   ├── agents/             # 研报/复盘插件（M4+）
+│   └── execution/          # 纸面执行安全（M6+）
 ├── docs/
 │   ├── ROADMAP.md          # 大/小里程碑与验收
 │   ├── versioning.md       # tag 与发版规则

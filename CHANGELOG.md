@@ -4,9 +4,17 @@
 
 ## [Unreleased]
 
-### Changed
+### Added
 
-- 契约跟进探索结论：`datasets.md` US/HK 符号与 volume（股）分支；能力矩阵标明 `global_replay`；ADR 0010 吸收边界（Skill 非 pip 依赖）
+- （无）
+
+## [0.6.1] - 2026-09-14
+
+### Added
+
+- `packages/execution`：纸面执行安全内核（timing / transactional / profile / lifecycle / admission）
+- ADR 0011；paper-only 闸门（SIMULATE + live=false）
+- （同树）`PaperLedger` 与 workbench `/api/paper/*`，验收见 0.6.2 / 0.6.3
 
 ## [0.6.0] - 2026-09-13
 
@@ -223,7 +231,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/local/stock-platform/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/local/stock-platform/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/local/stock-platform/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/local/stock-platform/compare/v0.5.1...v0.5.2

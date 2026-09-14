@@ -35,7 +35,10 @@
 | M5.1 | MarketStrategy CN/US/HK 表 | 小 | `v0.5.1` | done |
 | M5.2 | US/HK `normalize_symbol` | 小 | `v0.5.2` | done |
 | M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | done |
-| M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | planned |
+| M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | in_progress |
+| M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
+| M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | planned |
+| M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
@@ -269,6 +272,32 @@
 ## M6 — 纸面执行 → `v0.7.0`
 
 **目标**：吸收 V2 审查结论（信号新鲜度、事务化意图、草稿/激活）；默认仅模拟。
+
+### 小里程碑
+
+#### M6.1 → `v0.6.1`
+
+验收：
+
+- [x] `packages/execution`：timing / transactional / profile / lifecycle / admission
+- [x] paper-only 闸门；市场态 ≠ 执行态；ADR 0011
+
+#### M6.2 → `v0.6.2`
+
+验收：
+
+- [ ] `PaperLedger`：decision_only 清订单、窗口外禁补单、draftId 幂等
+
+#### M6.3 → `v0.6.3`
+
+验收：
+
+- [ ] workbench `/api/paper/status|drafts|strategies/*`
+- [ ] 无 live 开关；显式激活
+
+验收（大）：
+
+- [ ] M6.1–M6.3 done；CHANGELOG 含 `0.7.0`
 
 ---
 

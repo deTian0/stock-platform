@@ -137,3 +137,42 @@ def test_research_and_review_slots(client: TestClient) -> None:
 def test_research_rejects_hk(client: TestClient) -> None:
     r = client.get("/api/research/report", params={"symbol": "00700"})
     assert r.status_code == 400
+
+
+def test_paper_status_and_activate_flow(client: TestClient) -> None:
+    st = client.get("/api/paper/status")
+    assert st.status_code == 200
+    assert st.json()["liveTradingEnabled"] is False
+    assert "SIMULATE" in st.json()["banner"]
+
+    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "x", "universe": ["510300"]})
+    assert draft.status_code == 200
+    h = draft.json()["strategyHash"]
+
+    val = client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
+    assert val.status_code == 200
+
+    act = client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
+    assert act.status_code == 200
+    assert act.json()["stage"] == "active"
+
+    created = client.post(
+        "/api/paper/drafts",
+        json={
+            "signal_trade_date": "2026-09-04",
+            "orders": [{"symbol": "510300", "side": "buy", "qty": 100}],
+            "now": "2026-09-07T09:40:00+08:00",
+        },
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["executionEligible"] is True
+    draft_id = body["draftId"]
+
+    exe = client.post(f"/api/paper/drafts/{draft_id}/execute", params={"now": "2026-09-07T09:40:00+08:00"})
+    assert exe.status_code == 200
+    assert exe.json()["accepted"] is True
+
+    again = client.post(f"/api/paper/drafts/{draft_id}/execute", params={"now": "2026-09-07T09:40:00+08:00"})
+    assert again.status_code == 200
+    assert again.json().get("idempotentReplay") is True

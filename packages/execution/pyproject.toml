@@ -3,16 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stock-platform-agents"
+name = "stock-platform-execution"
 version = "0.6.1"
-description = "Thin research-agent plugins for stock-platform (no embedded market HTTP)."
+description = "Paper-only execution safety kernel for stock-platform (broker-free)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "LicenseRef-Pending" }
 authors = [{ name = "stock-platform" }]
-dependencies = [
-  "stock-platform-providers",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
@@ -21,7 +19,7 @@ dev = ["pytest>=8.0"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-stock_platform_agents = ["py.typed"]
+stock_platform_execution = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
