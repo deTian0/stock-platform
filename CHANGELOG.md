@@ -8,6 +8,13 @@
 
 - （无）
 
+## [0.7.2] - 2026-09-14
+
+### Changed
+
+- README / CONTRIBUTING / AGENTS 按 v1.0 交付面改写
+- 修复 upstream-archive 示例链接（避免 docs 自检断链）
+
 ## [0.7.1] - 2026-09-14
 
 ### Added
@@ -264,7 +271,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/local/stock-platform/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/local/stock-platform/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/local/stock-platform/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/local/stock-platform/compare/v0.6.2...v0.6.3

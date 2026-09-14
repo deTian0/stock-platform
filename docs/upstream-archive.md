@@ -38,7 +38,7 @@
 在各上游 README 顶部增加指向本仓的归档横幅，例如：
 
 ```markdown
-> **归档提示**：产品开发已收敛至 [stock-platform](../stock-platform)。本仓仅作参考实现 / 配方来源。
+> **归档提示**：产品开发已收敛至 sibling 仓 `stock-platform`（本文件权威清单见该仓 `docs/upstream-archive.md`）。本仓仅作参考实现 / 配方来源。
 ```
 
 本文件是平台侧权威清单；上游是否改 README 不阻塞 `v1.0.0`。
