@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.9.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M16 完成**：CN 个股龙虎榜（能力矩阵 `lhb`；replay + `em_get` datacenter）
+  - ADR 0021；workbench API/UI；默认仍 replay；全市场日榜 / 交易所备胎不做
+
 ## [1.8.2] - 2026-09-14
 
 ### Added
