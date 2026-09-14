@@ -12,6 +12,8 @@ from .schemas import (
     LHB_RECORD_COLUMNS,
     LHB_SEAT_COLUMNS,
     LHB_TOP_KEYS,
+    MINUTE_COLUMNS,
+    MINUTE_FREQS,
     REALTIME_COLUMNS,
     UNLOCK_EVENT_COLUMNS,
     UNLOCK_TOP_KEYS,
@@ -157,6 +159,75 @@ def normalize_realtime_row(
         "asset_type": asset_type,
     }
     return {k: row.get(k) for k in REALTIME_COLUMNS}
+
+
+def _as_beijing_naive_datetime(value: Any) -> str | None:
+    """Normalize to ``YYYY-MM-DD HH:MM:SS`` Beijing wall clock (no tz suffix).
+
+    Rejects timezone-aware inputs and ``Z`` / offset suffixes — minute bars must
+    not be stored as UTC.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            raise ValueError("minute datetime must be Beijing wall-clock naive (no tz)")
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    text = str(value).strip()
+    if text.endswith("Z") or "+" in text[10:] or text.endswith("UTC"):
+        raise ValueError(f"minute datetime must not carry timezone: {text!r}")
+    # Accept "YYYY-MM-DD HH:MM" / "YYYY-MM-DDTHH:MM:SS" / with seconds
+    text = text.replace("T", " ")
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"invalid minute datetime: {text!r}") from exc
+    if dt.tzinfo is not None:
+        raise ValueError("minute datetime must be Beijing wall-clock naive (no tz)")
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def normalize_minute_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    default_freq: str = "1m",
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map a vendor minute bar into contract fields (volume=手, amount=元)."""
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("minute row missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    freq = str(raw.get("freq") or default_freq).strip().lower()
+    if freq.isdigit():
+        freq = f"{freq}m"
+    if freq not in MINUTE_FREQS:
+        raise ValueError(f"minute freq must be one of {sorted(MINUTE_FREQS)}, got {freq!r}")
+
+    dt = _as_beijing_naive_datetime(
+        raw.get("datetime") or raw.get("time") or raw.get("date") or raw.get("dt")
+    )
+    if dt is None:
+        raise ValueError(f"minute row for {symbol} missing datetime")
+
+    row = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "datetime": dt,
+        "open": _as_float(raw.get("open")),
+        "high": _as_float(raw.get("high")),
+        "low": _as_float(raw.get("low")),
+        "close": _as_float(raw.get("close")),
+        "volume": _as_float(raw.get("volume") if "volume" in raw else raw.get("vol")),
+        "amount": _as_float(raw.get("amount") if "amount" in raw else raw.get("amt")),
+        "freq": freq,
+    }
+    return {k: row.get(k) for k in MINUTE_COLUMNS}
 
 
 def normalize_fund_flow_row(

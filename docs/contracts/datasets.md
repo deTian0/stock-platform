@@ -89,7 +89,7 @@ asset_type ∈ { "stock", "etf", "index" }
 
 | 数据集 | 关键列 |
 |--------|--------|
-| `minute` | `symbol`, `datetime`（**北京墙钟 naive**，禁止 UTC 入库）, `open/high/low/close`, `volume`（手）, `amount`（元，可 null）, `freq` |
+| `minute` | `symbol`, `datetime`（**北京墙钟 naive** `YYYY-MM-DD HH:MM:SS`，禁止 tz/UTC 入库）, `open/high/low/close`, `volume`（手）, `amount`（元，可 null）, `freq`（`1m`/`5m`/`15m`/`30m`/`60m`）, `source`, `asset_type` |
 | `depth5` | 按 symbol 的五档；`bid_volumes`/`ask_volumes` 单位为**手** |
 | `financial` | 报表期 + 标准财务字段（M1 另表） |
 | `full_minute` | 同 minute 语义的全市场当日落盘批次 |

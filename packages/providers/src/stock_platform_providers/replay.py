@@ -13,6 +13,7 @@ from .normalize import (
     normalize_daily_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
+    normalize_minute_row,
     normalize_realtime_row,
     normalize_unlock_payload,
 )
@@ -26,6 +27,7 @@ class ReplayTransport:
 
         daily_{symbol}.json       # list[dict] or {"bars": [...]}
         realtime_{symbol}.json    # dict or {"quote": {...}}
+        minute_{symbol}.json      # list[dict] or {"bars": [...]}
         fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
         lhb_{symbol}.json         # dict aggregate {records, seats, institution}
         unlock_{symbol}.json      # dict aggregate {history, upcoming}
@@ -56,6 +58,16 @@ class ReplayTransport:
             if isinstance(quote, dict):
                 return quote
         raise ValueError(f"unexpected realtime fixture shape in {path}")
+
+    def load_minute(self, symbol: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"minute_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            bars = data.get("bars") or data.get("data") or []
+            return list(bars)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected minute fixture shape in {path}")
 
     def load_fund_flow(self, symbol: str) -> list[dict[str, Any]]:
         path = self.fixtures_dir / f"fund_flow_{symbol}.json"
@@ -137,6 +149,49 @@ class ReplayProvider:
                     default_symbol=symbol,
                 )
             )
+        return rows
+
+    def get_minute(
+        self,
+        symbols: list[str],
+        *,
+        freq: str = "1m",
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Return minute bars for ``freq`` (1m/5m/15m/30m/60m). Missing fixture → []."""
+        want = str(freq).strip().lower()
+        if want.isdigit():
+            want = f"{want}m"
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                bars = self._transport.load_minute(symbol)
+            except FileNotFoundError:
+                continue
+            sym_rows: list[dict[str, Any]] = []
+            for bar in bars:
+                row = normalize_minute_row(
+                    bar,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                    default_freq=want,
+                )
+                if row["freq"] != want:
+                    continue
+                bar_day = date.fromisoformat(row["datetime"][:10])
+                if start and bar_day < start:
+                    continue
+                if end and bar_day > end:
+                    continue
+                sym_rows.append(row)
+            if limit > 0:
+                sym_rows = sym_rows[-limit:]
+            rows.extend(sym_rows)
         return rows
 
     def get_fund_flow(

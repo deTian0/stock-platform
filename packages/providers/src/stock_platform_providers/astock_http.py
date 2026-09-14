@@ -11,6 +11,7 @@ from .normalize import (
     normalize_daily_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
+    normalize_minute_row,
     normalize_realtime_row,
     normalize_unlock_payload,
 )
@@ -20,6 +21,15 @@ KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+
+# East Money klt → contract freq (minute only; 101=daily used separately).
+_MINUTE_KLT: dict[str, str] = {
+    "1m": "1",
+    "5m": "5",
+    "15m": "15",
+    "30m": "30",
+    "60m": "60",
+}
 
 
 def em_secid(code: str) -> str:
@@ -56,6 +66,22 @@ def _parse_kline_csv(line: str) -> dict[str, Any]:
         "amount": parts[6],
         "change_pct": change_pct,
         "pct_unit": "percent" if change_pct is not None else None,
+    }
+
+
+def _parse_minute_kline_csv(line: str) -> dict[str, Any]:
+    """EM minute kline CSV: datetime,open,close,high,low,volume,amount,..."""
+    parts = line.split(",")
+    if len(parts) < 7:
+        raise ValueError(f"short minute kline row: {line!r}")
+    return {
+        "datetime": parts[0],
+        "open": parts[1],
+        "close": parts[2],
+        "high": parts[3],
+        "low": parts[4],
+        "volume": parts[5],
+        "amount": parts[6] if parts[6] not in {"", "-"} else None,
     }
 
 
@@ -123,6 +149,71 @@ class AStockHttpProvider:
                 if end and d > end:
                     continue
                 rows.append(row)
+        return rows
+
+    def get_minute(
+        self,
+        symbols: list[str],
+        *,
+        freq: str = "1m",
+        start: date | None = None,
+        end: date | None = None,
+        asset_type: AssetType = "stock",
+        limit: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Intraday bars via push2his kline/get (klt=1/5/15/30/60).
+
+        ``datetime`` is East Money Beijing wall clock (naive); never store as UTC.
+        """
+        want = str(freq).strip().lower()
+        if want.isdigit():
+            want = f"{want}m"
+        klt = _MINUTE_KLT.get(want)
+        if klt is None:
+            raise ValueError(f"unsupported minute freq: {freq!r}")
+
+        rows: list[dict[str, Any]] = []
+        beg = (start or date(1990, 1, 1)).strftime("%Y%m%d")
+        end_s = (end or date(2099, 12, 31)).strftime("%Y%m%d")
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            payload = self._fetch(
+                KLINE_URL,
+                {
+                    "secid": em_secid(code),
+                    "fields1": "f1,f2,f3,f4,f5,f6",
+                    "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+                    "klt": klt,
+                    "fqt": "0",
+                    "beg": beg,
+                    "end": end_s,
+                    "lmt": "1000000",
+                },
+            )
+            data = payload.get("data") or {}
+            klines = data.get("klines") or []
+            sym_rows: list[dict[str, Any]] = []
+            for line in klines:
+                raw = _parse_minute_kline_csv(str(line))
+                raw["symbol"] = code
+                raw["freq"] = want
+                row = normalize_minute_row(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    default_freq=want,
+                    market="CN",
+                )
+                bar_day = date.fromisoformat(row["datetime"][:10])
+                if start and bar_day < start:
+                    continue
+                if end and bar_day > end:
+                    continue
+                sym_rows.append(row)
+            if limit > 0:
+                sym_rows = sym_rows[-limit:]
+            rows.extend(sym_rows)
         return rows
 
     def get_realtime(

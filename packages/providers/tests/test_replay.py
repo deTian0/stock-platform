@@ -12,6 +12,7 @@ from stock_platform_providers.normalize import (
     normalize_daily_row,
     normalize_fund_flow_row,
     normalize_lhb_payload,
+    normalize_minute_row,
     normalize_realtime_row,
     normalize_unlock_payload,
 )
@@ -20,6 +21,7 @@ from stock_platform_providers.schemas import (
     DAILY_COLUMNS,
     FUND_FLOW_COLUMNS,
     LHB_TOP_KEYS,
+    MINUTE_COLUMNS,
     REALTIME_COLUMNS,
     UNLOCK_TOP_KEYS,
 )
@@ -81,6 +83,47 @@ def test_replay_rejects_hk_before_io() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
     with pytest.raises(SymbolError):
         provider.get_daily(["00700"])
+
+
+def test_replay_minute() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    rows = provider.get_minute(
+        ["SH600519"], freq="1m", start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 3
+    assert rows[0]["symbol"] == "600519"
+    assert rows[0]["source"] == "replay"
+    assert rows[0]["freq"] == "1m"
+    assert rows[0]["datetime"] == "2026-09-01 09:31:00"
+    assert rows[0]["volume"] == 1200
+    assert rows[2]["datetime"] == "2026-09-02 09:31:00"
+    assert set(MINUTE_COLUMNS) <= set(rows[0].keys())
+    # 5m bars filtered out when asking 1m
+    fives = provider.get_minute(["600519"], freq="5m")
+    assert len(fives) == 1
+    assert fives[0]["freq"] == "5m"
+    assert fives[0]["close"] == 1404.0
+
+
+def test_replay_minute_missing_fixture_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    assert provider.get_minute(["000001"], freq="1m") == []
+
+
+def test_normalize_minute_rejects_tz() -> None:
+    with pytest.raises(ValueError, match="timezone|naive"):
+        normalize_minute_row(
+            {
+                "symbol": "600519",
+                "datetime": "2026-09-01T09:31:00Z",
+                "open": 1,
+                "high": 1,
+                "low": 1,
+                "close": 1,
+                "volume": 1,
+            },
+            source="test",
+        )
 
 
 def test_replay_fund_flow() -> None:

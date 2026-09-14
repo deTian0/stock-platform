@@ -34,6 +34,23 @@ REALTIME_COLUMNS = [
     "asset_type",
 ]
 
+# CN minute bars — datetime is Beijing wall-clock naive (no tz / no UTC storage).
+MINUTE_COLUMNS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "datetime",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "freq",
+]
+
+MINUTE_FREQS = frozenset({"1m", "5m", "15m", "30m", "60m"})
+
 # CN day-level fund flow (元). Platform extension beyond TSP original seven.
 FUND_FLOW_COLUMNS = [
     "symbol",

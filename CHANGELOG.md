@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.10.1] - 2026-09-14
+
+### Added
+
+- M18.1：CN 分钟 K `minute`（激活矩阵第四项；ADR 0023）
+  - `ReplayProvider` / `AStockHttpProvider.get_minute`；fixtures；北京墙钟 naive；CI 零公网
+
 ## [1.10.0] - 2026-09-14
 
 ### Added
