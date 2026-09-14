@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from stock_platform_research.performance import (
+    align_fills_to_performance,
     brief_picks_to_pending,
     compute_performance,
     load_jsonl,
@@ -101,3 +102,60 @@ def test_pending_skipped_in_metrics() -> None:
     ]
     assert settled_records(entries) == []
     assert performance_summary(entries=entries)["settledCount"] == 0
+
+
+def test_align_fills_to_performance_pending_and_settled(tmp_path: Path) -> None:
+    log = tmp_path / "decisions.jsonl"
+    rows = align_fills_to_performance(
+        [
+            {
+                "symbol": "600519",
+                "side": "buy",
+                "qty": 100,
+                "price": 1800.0,
+                "filled_at": "2026-09-02T09:35:00",
+            },
+            {
+                "symbol": "000001",
+                "side": "sell",
+                "qty": 50,
+                "price": 12.0,
+                "ts": "2026-09-03",
+                "return": -0.02,
+            },
+        ],
+        holding="5d",
+        log_path=log,
+    )
+    assert len(rows) == 2
+    assert rows[0]["rating"] == "Buy"
+    assert rows[0]["pending"] is True
+    assert rows[0]["source"] == "paper_fill"
+    assert rows[1]["rating"] == "Sell"
+    assert rows[1]["pending"] is False
+    assert rows[1]["raw"] == "-2.00%"
+    loaded = load_jsonl(log)
+    assert len(loaded) == 2
+    # direction_accuracy 口径 unchanged: Sell + negative raw is a hit
+    settled = settle_pending_entries(
+        loaded,
+        returns={("2026-09-02", "600519"): 0.01},
+    )
+    stats = compute_performance(settled_records(settled))
+    assert stats.directional_count == 2
+    assert stats.direction_accuracy == pytest.approx(1.0)
+
+
+def test_align_fills_duck_type_object(tmp_path: Path) -> None:
+    class _Fill:
+        def __init__(self) -> None:
+            self.symbol = "600000"
+            self.side = "buy"
+            self.qty = 10.0
+            self.price = 10.5
+            self.filled_at = "2026-09-01"
+
+    log = tmp_path / "f.jsonl"
+    rows = align_fills_to_performance([_Fill()], log_path=log)
+    assert rows[0]["symbol"] == "600000"
+    assert rows[0]["pending"] is True

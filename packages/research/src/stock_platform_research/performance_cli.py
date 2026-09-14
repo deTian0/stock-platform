@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .performance import (
+    align_fills_to_performance,
     default_performance_log_path,
     load_jsonl,
     performance_summary,
@@ -30,10 +31,26 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Optional JSON map {(date|symbol): raw_return_float} to settle pending rows",
     )
+    p.add_argument(
+        "--align-fills",
+        type=Path,
+        help="Optional JSON array of fill-like dicts (symbol/side/qty/price/ts) → append pending rows",
+    )
+    p.add_argument(
+        "--holding",
+        default="5d",
+        help="Holding tag for --align-fills pending rows (default 5d)",
+    )
     p.add_argument("--json-out", type=Path, help="Write summary JSON")
     args = p.parse_args(argv)
 
     log_path = args.log or default_performance_log_path()
+    if args.align_fills and args.align_fills.is_file():
+        fills = json.loads(args.align_fills.read_text(encoding="utf-8"))
+        if not isinstance(fills, list):
+            raise SystemExit("--align-fills must be a JSON array of fill-like objects")
+        align_fills_to_performance(fills, holding=args.holding, log_path=log_path)
+
     entries = load_jsonl(log_path)
     if args.settle_fixture and args.settle_fixture.is_file():
         raw_map = json.loads(args.settle_fixture.read_text(encoding="utf-8"))

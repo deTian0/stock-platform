@@ -338,3 +338,95 @@ def default_performance_log_path() -> Path:
     if env:
         return Path(env)
     return Path.cwd() / "data" / "recommend_decisions.jsonl"
+
+
+def _fill_as_mapping(fill: Any) -> dict[str, Any]:
+    """Duck-type Fill / dict — soft, no hard import of execution package."""
+    if isinstance(fill, Mapping):
+        return dict(fill)
+    if hasattr(fill, "to_dict") and callable(fill.to_dict):
+        try:
+            data = fill.to_dict()
+            if isinstance(data, Mapping):
+                return dict(data)
+        except Exception:  # noqa: BLE001
+            pass
+    out: dict[str, Any] = {}
+    for key in (
+        "symbol",
+        "side",
+        "qty",
+        "price",
+        "filled_at",
+        "date",
+        "ts",
+        "raw",
+        "return",
+        "alpha",
+        "holding",
+        "fill_id",
+        "order_id",
+    ):
+        if hasattr(fill, key):
+            out[key] = getattr(fill, key)
+    return out
+
+
+def _rating_for_side(side: str) -> str | None:
+    s = side.strip().lower()
+    if s in {"buy", "b", "long"}:
+        return "Buy"
+    if s in {"sell", "s", "short"}:
+        return "Sell"
+    return None
+
+
+def align_fills_to_performance(
+    fills: Sequence[Any],
+    *,
+    holding: str = "5d",
+    log_path: str | Path | None = None,
+    source: str = "paper_fill",
+) -> list[dict[str, Any]]:
+    """Map paper / broker fills → performance JSONL decision rows.
+
+    - Buy → rating ``Buy``; Sell → rating ``Sell``.
+    - Pending unless ``raw`` / ``return`` is provided on the fill (then settled).
+    - Appends via ``append_jsonl`` when ``log_path`` resolves.
+
+    Does **not** change ``direction_accuracy`` 口径 (ADR 0033): still
+    directional ratings only, Hold excluded, prefer alpha when present.
+    Soft duck-typing avoids a hard dependency cycle on ``stock_platform_execution``.
+    """
+    path = Path(log_path) if log_path is not None else default_performance_log_path()
+    rows: list[dict[str, Any]] = []
+    for fill in fills:
+        m = _fill_as_mapping(fill)
+        sym = str(m.get("symbol") or "").strip()
+        if not sym:
+            continue
+        rating = _rating_for_side(str(m.get("side") or "buy"))
+        if rating is None:
+            continue
+        ts = m.get("date") or m.get("ts") or m.get("filled_at") or ""
+        date_s = str(ts)[:10]
+        raw_val: Any = m.get("raw")
+        if raw_val is None and m.get("return") is not None:
+            ret = m["return"]
+            raw_val = format_pct(float(ret)) if isinstance(ret, (int, float)) else ret
+        pending = raw_val is None
+        row: dict[str, Any] = {
+            "date": date_s,
+            "symbol": sym,
+            "rating": rating,
+            "raw": raw_val,
+            "alpha": m.get("alpha"),
+            "holding": str(m.get("holding") or holding),
+            "pending": pending,
+            "source": source,
+            "fill_price": m.get("price"),
+            "fill_qty": m.get("qty"),
+        }
+        append_jsonl(path, row)
+        rows.append(row)
+    return rows
