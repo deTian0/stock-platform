@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.11.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M18 完成**：CN 个股分钟 K（能力矩阵 `minute`；replay + `em_get` push2his kline）
+  - ADR 0023；workbench API/UI；默认仍 replay；`full_minute` / 腾讯备胎不做
+
 ## [1.10.2] - 2026-09-14
 
 ### Added

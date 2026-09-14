@@ -73,7 +73,7 @@
 | M17 | CN 限售解禁 | 大 | `v1.10.0` | done |
 | M17.1 | unlock provider + matrix + ADR 0022 | 小 | `v1.9.1` | done |
 | M17.2 | workbench unlock API + UI | 小 | `v1.9.2` | done |
-| M18 | CN 分钟 K | 大 | `v1.11.0` | in_progress |
+| M18 | CN 分钟 K | 大 | `v1.11.0` | done |
 | M18.1 | minute provider + matrix + ADR 0023 | 小 | `v1.10.1` | done |
 | M18.2 | workbench minute API + UI | 小 | `v1.10.2` | done |
 
@@ -643,7 +643,7 @@
 
 验收（大）：
 
-- [ ] M18.1–M18.2 done；CHANGELOG 含 `1.11.0`
+- [x] M18.1–M18.2 done；CHANGELOG 含 `1.11.0`
 
 ---
 
