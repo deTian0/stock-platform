@@ -53,8 +53,8 @@ CapabilityStatus {
 
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
-| `replay` | fixtures | **M1.2 已实现**；**M15–M22**（含 `full_minute`） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock（CN） |
-| `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M22**（`full_minute` 经 `em_get`；adj_factor/financial 新浪） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock |
+| `replay` | fixtures | **M1.2 已实现**；**M15–M23**（含套价 `apply_adjust`） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock（CN） |
+| `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M23**（`full_minute` 经 `em_get`；adj_factor/financial 新浪；套价纯函数） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
 | `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现** | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |

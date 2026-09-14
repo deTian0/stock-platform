@@ -88,7 +88,7 @@
 | M22 | CN 全量分钟 | 大 | `v1.15.0` | done |
 | M22.1 | full_minute provider + matrix + ADR 0027 | 小 | `v1.14.1` | done |
 | M22.2 | workbench full-minute API + UI | 小 | `v1.14.2` | done |
-| M23 | CN 复权套价 | 大 | `v1.16.0` | in_progress |
+| M23 | CN 复权套价 | 大 | `v1.16.0` | done |
 | M23.1 | apply_adjust 内核 + ADR 0028 | 小 | `v1.15.1` | done |
 | M23.2 | workbench daily-adjusted API + UI | 小 | `v1.15.2` | done |
 
@@ -788,7 +788,7 @@
 
 验收（大）：
 
-- [ ] M23.1–M23.2 done；CHANGELOG 含 `1.16.0`
+- [x] M23.1–M23.2 done；CHANGELOG 含 `1.16.0`
 
 ---
 

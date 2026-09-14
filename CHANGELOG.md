@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.16.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M23 完成**：CN 复权套价（`apply_adjust`；qfq 除 / hfq 乘；消费 daily + adj_factor）
+  - ADR 0028；workbench API/UI；默认仍 replay；不新增能力 id；空因子 fail-closed
+
 ## [1.15.2] - 2026-09-14
 
 ### Added
