@@ -33,7 +33,7 @@
 | US/HK 官方假日 API 运行时拉取 | M13 已固化静态表（2024–2027）；不拉 NYSE/HKEX API |
 | 半日市 / 多市场纸面默认非 CN | M14 已接 CN/US/HK timing（默认仍 CN）；半日市不建模 |
 | UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |
-| 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M22 已交付个股批量 `full_minute`（当日 1m 修复语义，无后台落盘）；分钟/板块资金流、全市场龙虎榜与全市场解禁、`get_intraday_latest` 仍延期 |
+| 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M22 已交付个股批量 `full_minute`；M23 已交付 `apply_adjust` 套价。分钟/板块资金流、全市场龙虎榜与全市场解禁、`get_intraday_latest` 仍延期 |
 
 ## 维护动作（可选，人工）
 
