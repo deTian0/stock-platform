@@ -1,0 +1,5 @@
+{"date": "2026-08-01", "symbol": "600519", "rating": "Buy", "raw": "+3.00%", "alpha": "+1.00%", "holding": "5d", "pending": false, "source": "brief", "rank": 1}
+{"date": "2026-08-02", "symbol": "000001", "rating": "Buy", "raw": "-2.00%", "alpha": "-0.50%", "holding": "5d", "pending": false, "source": "brief", "rank": 1}
+{"date": "2026-08-03", "symbol": "600036", "rating": "Sell", "raw": "-1.50%", "alpha": "-0.20%", "holding": "5d", "pending": false, "source": "brief", "rank": 2}
+{"date": "2026-08-04", "symbol": "601318", "rating": "Buy", "raw": "+1.00%", "alpha": null, "holding": "5d", "pending": false, "source": "paper", "rank": 1}
+{"date": "2026-08-05", "symbol": "000002", "rating": "Buy", "raw": null, "alpha": null, "holding": "5d", "pending": true, "source": "brief", "rank": 3}

@@ -16,7 +16,10 @@ from stock_platform_research import (
     UniverseEmptyError,
     brief_to_orders,
     build_premarket_brief,
+    default_performance_log_path,
     default_universe_fixture_path,
+    log_brief_decisions,
+    performance_summary,
 )
 
 from ..state import CapabilityUnavailable
@@ -167,6 +170,63 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
     return {
         "brief": brief,
         "draft": draft,
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+    }
+
+
+@router.get("/performance")
+def get_performance(
+    request: Request,
+    log: str | None = Query(None, description="Optional JSONL path override"),
+) -> dict[str, Any]:
+    """Summarize settled recommend decisions (SIMULATE research metrics)."""
+    import stock_platform_research
+
+    path = Path(log) if log else default_performance_log_path()
+    if not path.is_file():
+        pkg_root = Path(stock_platform_research.__file__).resolve().parents[2]
+        packaged = pkg_root / "tests" / "fixtures" / "recommend_decisions.jsonl"
+        alt = Path(request.app.state.workbench.fixtures_dir) / "recommend_decisions.jsonl"
+        if packaged.is_file():
+            path = packaged
+        elif alt.is_file():
+            path = alt
+    return performance_summary(path)
+
+
+class LogBriefRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asof: date
+    symbols: str | None = None
+    top_n: int = Field(10, ge=1, le=100, alias="topN")
+    value_factor: bool = Field(False, alias="valueFactor")
+    reversal_q: float = Field(0.30, alias="reversalQ")
+    adjust_kind: str | None = "qfq"
+    holding: str = "5d"
+    log: str | None = None
+
+
+@router.post("/performance/log-brief")
+def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
+    """Append pending TopN decisions from a brief into the performance JSONL."""
+    kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+    brief = _build_brief_for_request(
+        request,
+        asof=body.asof,
+        symbols=_parse_symbols(body.symbols),
+        top_n=body.top_n,
+        value_factor=body.value_factor,
+        reversal_q=body.reversal_q,
+        adjust_kind=kind,
+    )
+    path = Path(body.log) if body.log else default_performance_log_path()
+    rows = log_brief_decisions(path, brief, holding=body.holding)
+    return {
+        "logPath": str(path),
+        "appended": len(rows),
+        "entries": rows,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
     }

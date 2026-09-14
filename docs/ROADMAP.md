@@ -100,12 +100,16 @@
 | M29 | 日数据刷新 / full_minute 落盘 | 大 | `v2.1.0` | done |
 | M30 | live 偏好模板 + 东财熔断 | 大 | `v2.2.0` | done |
 | M31 | 运维健康检查 + Phase B 收口 | 大 | `v2.3.0` | done |
+| M32 | 推荐绩效统计 | 大 | `v2.4.0` | done |
+| M33 | 可选 LLM 辩论挂在 TopN 之后 | 大 | `v2.5.0` | planned |
+| M34 | 策略配置版本化 + 回测对比 + Phase C 收口 | 大 | `v2.6.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
 > 上表「目标 tag」列与阶段绑定；若插入额外小里程碑，只增加 patch，不跳过已规划的大 tag。  
 > **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。  
-> **Phase B（M29–M31）**：日刷新落盘 + live 运维稳定 → `v2.1.0`–`v2.3.0`。
+> **Phase B（M29–M31）**：日刷新落盘 + live 运维稳定 → `v2.1.0`–`v2.3.0`。  
+> **Phase C（M32–M34）**：投研稳定（绩效 / 可选 LLM / 策略对比）→ `v2.4.0`–`v2.6.0`。
 
 ---
 
@@ -915,6 +919,50 @@
 - [x] `GET /api/ops/health`（保留 `/health`）；可选 last_refresh
 - [x] [`docs/ops/refresh-and-fixtures.md`](ops/refresh-and-fixtures.md)；ADR 0032
 - [x] 全量 pytest；tag `v2.3.0`
+
+---
+
+## Phase C — 投研稳定（M32–M34）→ `v2.6.0`
+
+**产品目标**：推荐质量可迭代与复盘——绩效统计、TopN 后可选 LLM 辩论（默认仍确定性）、策略配置版本化 + 轻量 PIT 回测对比。仍纸面 SIMULATE；默认 replay；无同花顺；无 SPA。
+
+**状态**：in_progress
+
+计划见：`C:\Users\63516\.cursor\plans\phase_c_research_stable_20260914.plan.md`
+
+---
+
+## M32 — 推荐绩效统计 → `v2.4.0`
+
+**目标**：已结算推荐决策 JSONL 日志 + 持有期收益 / 方向正确率等指标；CLI 与 `GET /api/research/performance`；薄工作台面板。
+
+验收：
+
+- [x] JSONL schema + `compute_performance`（`direction_accuracy` / `avg_return` / `up_rate` 口径文档化）
+- [x] CLI `stock-platform-performance`；API + `#performance` UI
+- [x] ADR 0033；确定性 fixtures 单测
+
+---
+
+## M33 — 可选 LLM 辩论 → `v2.5.0`
+
+**目标**：M12 确定性辩论仍为默认；可选 LLM 路径挂在 TopN 之后；缺依赖/密钥 fail-closed；数据仅经 providers。
+
+验收：
+
+- [ ] Soft import / `[llm]` extra；默认 deterministic
+- [ ] TopN 后辩论 API；mocked LLM 单测；ADR 0034
+
+---
+
+## M34 — 策略配置版本化 + 回测对比 + Phase C 收口 → `v2.6.0`
+
+**目标**：版本化策略 JSON；两配置经 `run_pit_long_only` 对比；API/UI 入口；Phase C CHANGELOG/ROADMAP 收口。
+
+验收：
+
+- [ ] 策略配置加载 + compare；fixture panel 单测；ADR 0035
+- [ ] 全量 pytest；tag `v2.6.0`；Phase C done
 
 ---
 

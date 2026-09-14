@@ -61,6 +61,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert 'id="recommend"' in body
+    assert 'id="performance"' in body
     assert 'id="pref-preset"' in body
     assert "/static/app.js" in body
 
@@ -84,9 +85,21 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/debate/report" in text
     assert "/api/research/brief" in text
     assert "/api/research/brief/to-paper" in text
+    assert "/api/research/performance" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
     assert "/api/settings/presets/" in text
+
+
+def test_research_performance(client: TestClient) -> None:
+    r = client.get("/api/research/performance")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    assert body["settledCount"] >= 1
+    assert "direction_accuracy" in body["metrics"]
+    assert "direction_accuracy" in body["metricDefinitions"]
 
 
 def test_capability_matrix(client: TestClient) -> None:
