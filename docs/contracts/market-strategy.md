@@ -59,8 +59,9 @@ market_id ∈ { "CN", "US", "HK" }
 | 代码归一化 | 大写字母 ticker（`AAPL` / `BRK.B`） | 5 位补零（`00700`） |
 | 进入 CN `normalize_symbol` | 必须失败 | 必须失败 |
 | Vendor（M5 / M9） | `global_replay` fixtures；`global_http` live（Yahoo+新浪） | 同左 |
+| 交易日历（M13） | 静态 NYSE 风格休市日（`us_closed_days.txt`） | 静态港交所休市日（`hk_closed_days.txt`） |
 
-实现：`packages/providers` → `get_market_strategy` / `GlobalReplayProvider`。
+实现：`packages/providers` → `get_market_strategy` / `GlobalReplayProvider`；日历见 ADR 0018。
 
 ---
 

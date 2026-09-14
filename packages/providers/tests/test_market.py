@@ -64,6 +64,20 @@ def test_cn_is_trading_day_uses_holiday_calendar() -> None:
     assert cn.is_trading_day(date(2024, 10, 8))
 
 
+def test_us_is_trading_day_uses_holiday_calendar() -> None:
+    us = get_market_strategy("US")
+    assert not us.is_trading_day(date(2025, 7, 4))
+    assert not us.is_trading_day(date(2024, 12, 25))
+    assert us.is_trading_day(date(2025, 7, 3))
+
+
+def test_hk_is_trading_day_uses_holiday_calendar() -> None:
+    hk = get_market_strategy("HK")
+    assert not hk.is_trading_day(date(2025, 1, 29))
+    assert not hk.is_trading_day(date(2025, 1, 30))
+    assert hk.is_trading_day(date(2025, 1, 28))
+
+
 def test_unknown_market() -> None:
     with pytest.raises(SymbolError, match="unknown market"):
         get_market_strategy("JP")

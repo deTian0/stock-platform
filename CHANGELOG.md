@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.5.2] - 2026-09-14
+
+### Added
+
+- M13.2：`MarketStrategy` US/HK 假日验收；`market-strategy` / providers README / upstream-archive 同步
+
 ## [1.5.1] - 2026-09-14
 
 ### Added

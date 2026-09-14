@@ -23,4 +23,4 @@ V2 审查快照暴露信号过期补单、市场态/执行态混淆、草稿误�
 ## 后果
 
 - Admission 通过仅表示受控模拟准入，不代表收益已证明。
-- CN 交易日历见 ADR 0015；US/HK 仍为 weekday stub。
+- CN 交易日历见 ADR 0015；US/HK 见 ADR 0018。纸面默认仍用 CN timing。
