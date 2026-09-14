@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.6.2] - 2026-09-14
+
+### Added
+
+- M6.2 验收：`PaperLedger` decision_only / 窗口外零订单 / draftId 幂等回放
+
 ## [0.6.1] - 2026-09-14
 
 ### Added
@@ -231,7 +237,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/local/stock-platform/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/local/stock-platform/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/local/stock-platform/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/local/stock-platform/compare/v0.5.2...v0.5.3

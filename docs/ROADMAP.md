@@ -37,7 +37,7 @@
 | M5.3 | global_replay fixtures Vendor | 小 | `v0.5.3` | done |
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | in_progress |
 | M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
-| M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | planned |
+| M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | done |
 | M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | planned |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
 
@@ -286,7 +286,7 @@
 
 验收：
 
-- [ ] `PaperLedger`：decision_only 清订单、窗口外禁补单、draftId 幂等
+- [x] `PaperLedger`：decision_only 清订单、窗口外禁补单、draftId 幂等
 
 #### M6.3 → `v0.6.3`
 
