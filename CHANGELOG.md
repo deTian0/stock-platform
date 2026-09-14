@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.20.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M27 完成**：Recommend → PaperLedger
+  - `POST /api/research/brief/to-paper`；UI 一键纸面草稿；SIMULATE only；默认 market=CN
+  - 复用 timing/window/freshness；`liveTradingEnabled=false`
+
 ## [1.19.0] - 2026-09-14
 
 ### Added
