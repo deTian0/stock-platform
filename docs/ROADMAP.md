@@ -114,7 +114,7 @@
 | M43 | （可选）组合回测加深 + 绩效对齐纸面成交 | 大 | `v3.5.0` | done |
 | M44 | （可选）LLM 成本/质量控制 | 大 | `v3.6.0` | done |
 | M45 | Workbench IA + 一键向导（刷新→推荐→纸面） | 大 | `v3.7.0` | done |
-| M46 | Phase E 日用稳定收口 | 大 | `v3.8.0` | planned |
+| M46 | Phase E 日用稳定收口 | 大 | `v3.8.0` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -1037,7 +1037,7 @@
 
 **产品目标**：把「今日推荐」从 demo 做成可坚持的真日用——更大宇宙、定时 refresh→brief、可读理由；加固板块/新闻数据与日历/调度运维；可选加深投研与工作台向导。默认仍 paper + replay；SIMULATE；无 SPA；无真实券商；东财经 `em_get`；矩阵 fail-closed。
 
-**状态**：in_progress（已完成 M39–M45 → `v3.7.0`）
+**状态**：done（Phase E 收口 `v3.8.0`；基线曾为 `v3.0.0`）
 
 **详细设计**：`C:\Users\63516\.cursor\plans\phase_e_daily_use_roadmap_20260914.plan.md`
 
@@ -1132,8 +1132,8 @@
 
 验收：
 
-- [ ] M39–M42 done；M43–M45 已做或 ROADMAP 标 `deferred`
-- [ ] CHANGELOG `3.8.0`；`release_tag -Kind minor`；全量 pytest 绿
+- [x] M39–M42 done；M43–M45 已做（未 deferred）
+- [x] CHANGELOG `3.8.0`；`release_tag -Kind minor`；全量 pytest 绿
 
 ---
 
