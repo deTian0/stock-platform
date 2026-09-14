@@ -107,6 +107,12 @@
       if (adjFactor && adjFactor.effective) {
         $("pref-adj-factor").value = adjFactor.effective;
       }
+      const fullMinute = rows.find(function (r) {
+        return r.id === "full_minute";
+      });
+      if (fullMinute && fullMinute.effective) {
+        $("pref-full-minute").value = fullMinute.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
@@ -123,7 +129,9 @@
         " · financial=" +
         (financial && financial.effective ? financial.effective : "") +
         " · adj_factor=" +
-        (adjFactor && adjFactor.effective ? adjFactor.effective : "");
+        (adjFactor && adjFactor.effective ? adjFactor.effective : "") +
+        " · full_minute=" +
+        (fullMinute && fullMinute.effective ? fullMinute.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -140,6 +148,7 @@
     const depth5 = $("pref-depth5").value;
     const financial = $("pref-financial").value;
     const adjFactor = $("pref-adj-factor").value;
+    const fullMinute = $("pref-full-minute").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -155,6 +164,7 @@
             depth5: depth5,
             financial: financial,
             adj_factor: adjFactor,
+            full_minute: fullMinute,
           },
         }),
       });
@@ -423,6 +433,54 @@
     }
   }
 
+  async function loadFullMinute(event) {
+    if (event) event.preventDefault();
+    const errEl = $("full-minute-error");
+    clearError(errEl);
+    $("full-minute-meta").textContent = "";
+    const symbols = $("full-minute-symbols").value.trim();
+    const tradeDate = $("full-minute-date").value;
+    const count = $("full-minute-count").value || "300";
+    const params = new URLSearchParams({ symbols: symbols, count: count });
+    if (tradeDate) params.set("trade_date", tradeDate);
+    try {
+      const data = await fetchJson("/api/market/full-minute?" + params.toString());
+      $("full-minute-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · trade_date=" +
+        (data.trade_date || tradeDate || "") +
+        " · rows=" +
+        (data.rows ? data.rows.length : 0);
+      const tbody = $("full-minute-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.symbol +
+          "</td><td>" +
+          row.datetime +
+          "</td><td>" +
+          row.close +
+          "</td><td>" +
+          row.volume +
+          "</td><td>" +
+          row.freq +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("full-minute-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   async function loadPaper() {
     const errEl = $("paper-error");
     clearError(errEl);
@@ -652,6 +710,7 @@
     $("depth5-form").addEventListener("submit", loadDepth5);
     $("financial-form").addEventListener("submit", loadFinancial);
     $("adj-factor-form").addEventListener("submit", loadAdjFactor);
+    $("full-minute-form").addEventListener("submit", loadFullMinute);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);

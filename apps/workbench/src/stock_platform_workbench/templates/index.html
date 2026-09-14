@@ -66,6 +66,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>full_minute provider
+          <select id="pref-full-minute">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -252,6 +258,39 @@
         </table>
       </div>
       <pre id="adj-factor-json" class="code"></pre>
+    </section>
+
+    <section id="full-minute" class="panel">
+      <h2>全量分钟</h2>
+      <p class="hint">当日 1m 批量（宇宙修复语义）；与多频 minute 独立；默认 replay。</p>
+      <form id="full-minute-form" class="row">
+        <label>symbols
+          <input id="full-minute-symbols" name="symbols" value="600519,000001" autocomplete="off" />
+        </label>
+        <label>trade_date
+          <input id="full-minute-date" name="trade_date" type="date" value="2026-09-01" />
+        </label>
+        <label>count
+          <input id="full-minute-count" name="count" type="number" value="300" min="0" max="1000" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="full-minute-meta" class="status" aria-live="polite"></p>
+      <pre id="full-minute-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="full-minute-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>datetime</th>
+              <th>close</th>
+              <th>volume</th>
+              <th>freq</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="fund-flow" class="panel">

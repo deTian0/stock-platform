@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.14.2] - 2026-09-14
+
+### Added
+
+- M22.2：workbench `GET /api/market/full-minute` + UI `#full-minute`；默认偏好 replay
+
 ## [1.14.1] - 2026-09-14
 
 ### Added
