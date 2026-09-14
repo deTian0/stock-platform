@@ -67,7 +67,7 @@
 | M15 | CN 日级资金流 | 大 | `v1.8.0` | done |
 | M15.1 | fund_flow provider + matrix + ADR 0020 | 小 | `v1.7.1` | done |
 | M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | done |
-| M16 | CN 龙虎榜 | 大 | `v1.9.0` | in_progress |
+| M16 | CN 龙虎榜 | 大 | `v1.9.0` | done |
 | M16.1 | lhb provider + matrix + ADR 0021 | 小 | `v1.8.1` | done |
 | M16.2 | workbench lhb API + UI | 小 | `v1.8.2` | done |
 
@@ -586,7 +586,7 @@
 
 验收（大）：
 
-- [ ] M16.1–M16.2 done；CHANGELOG 含 `1.9.0`
+- [x] M16.1–M16.2 done；CHANGELOG 含 `1.9.0`
 
 ---
 
