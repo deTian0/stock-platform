@@ -52,6 +52,9 @@
 | M10 | CN 交易日历（静态休市日） | 大 | `v1.3.0` | done |
 | M10.1 | `TradingCalendar` + `cn_closed_days` | 小 | `v1.2.1` | done |
 | M10.2 | MarketStrategy + timing 接线 | 小 | `v1.2.2` | done |
+| M11 | Workbench 最小 UI | 大 | `v1.4.0` | in_progress |
+| M11.1 | 壳与首页 `GET /` | 小 | `v1.3.1` | done |
+| M11.2 | 三区交互（矩阵/日K/纸面） | 小 | `v1.3.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -417,6 +420,31 @@
 验收（大）：
 
 - [x] M10.1–M10.2 done；CHANGELOG 含 `1.3.0`
+
+---
+
+## M11 — Workbench 最小 UI → `v1.4.0`
+
+**目标**：单页操作台调用既有 API；不引入 SPA / 实盘。
+
+### 小里程碑
+
+#### M11.1 → `v1.3.1`
+
+验收：
+
+- [x] Jinja2 `GET /` + `/static`；ADR 0016
+- [x] 页面含 `#capability` / `#daily` / `#paper` 锚点
+
+#### M11.2 → `v1.3.2`
+
+验收：
+
+- [ ] JS 拉取矩阵 / 日 K / 纸面；409 可见；可选切 daily 偏好
+
+验收（大）：
+
+- [ ] M11.1–M11.2 done；CHANGELOG 含 `1.4.0`
 
 ---
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-workbench"
-version = "1.3.0"
+version = "1.3.1"
 description = "Minimal research workbench shell for stock-platform."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ authors = [{ name = "stock-platform" }]
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
+  "jinja2>=3.1",
   "stock-platform-providers",
   "stock-platform-agents",
   "stock-platform-execution",
@@ -26,6 +27,9 @@ stock-platform-workbench = "stock_platform_workbench.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+stock_platform_workbench = ["py.typed", "templates/*", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

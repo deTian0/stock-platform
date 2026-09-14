@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-platform workbench</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">stock-platform</div>
+    <p class="tagline">研究与纸面工作台 · v{{ version }}</p>
+  </header>
+
+  <main>
+    <section id="capability" class="panel">
+      <h2>能力矩阵</h2>
+      <p class="hint">路由权威；缺能力 fail-closed（409）。</p>
+      <div class="row">
+        <label>daily provider
+          <select id="pref-daily">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+            <option value="global_http">global_http</option>
+          </select>
+        </label>
+        <button type="button" id="btn-pref" class="secondary">应用偏好</button>
+        <button type="button" id="btn-matrix">刷新矩阵</button>
+      </div>
+      <p id="pref-status" class="status" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table id="matrix-table">
+          <thead>
+            <tr>
+              <th>id</th>
+              <th>usable</th>
+              <th>effective</th>
+              <th>label</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="matrix-error" class="error" hidden></pre>
+    </section>
+
+    <section id="daily" class="panel">
+      <h2>日 K</h2>
+      <p class="hint">经能力矩阵解析 provider；默认 fixtures replay。</p>
+      <form id="daily-form" class="row">
+        <label>symbols
+          <input id="daily-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>start
+          <input id="daily-start" name="start" type="date" value="2026-09-01" />
+        </label>
+        <label>end
+          <input id="daily-end" name="end" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="daily-meta" class="status" aria-live="polite"></p>
+      <pre id="daily-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="daily-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>date</th>
+              <th>close</th>
+              <th>volume</th>
+              <th>change_pct</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="paper" class="panel">
+      <h2>纸面状态</h2>
+      <p class="hint">只读；无实盘开关。</p>
+      <button type="button" id="btn-paper">刷新纸面</button>
+      <pre id="paper-banner" class="banner" aria-live="polite"></pre>
+      <pre id="paper-error" class="error" hidden></pre>
+      <pre id="paper-json" class="code"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/health">/health</a>
+    ·
+    <a href="/docs">OpenAPI</a>
+  </footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
