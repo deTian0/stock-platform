@@ -1,6 +1,7 @@
 """stock-platform providers — unified Vendor surface (A-share first, US/HK via market)."""
 
 from .astock_http import AStockHttpProvider, em_secid
+from .calendar import TradingCalendar, get_trading_calendar
 from .capabilities import (
     CAPABILITY_IDS,
     CAPABILITY_REGISTRY,
@@ -48,12 +49,14 @@ __all__ = [
     "SessionSegment",
     "SymbolError",
     "SymbolRef",
+    "TradingCalendar",
     "build_capability_matrix",
     "em_get",
     "em_secid",
     "exchange_prefix",
     "get_market_strategy",
     "get_provider_registry",
+    "get_trading_calendar",
     "infer_global_market",
     "is_bse_symbol",
     "is_eastmoney_url",
@@ -64,4 +67,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"

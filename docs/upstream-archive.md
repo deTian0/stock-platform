@@ -30,7 +30,7 @@
 | live HTTP 默认开启 | `astock_http`（M8）与 `global_http`（M9）均已接线；**CI / 默认偏好仍 replay** |
 | TradingAgents 完整辩论图 | Agent 槽位已够；完整图可选后续 minor |
 | 券商实盘 / OpenD | M6 明确不吸收 |
-| 节假日官方日历 | timing 现为工作日 stub |
+| US/HK 官方假日表 | CN 静态日历已于 M10 接线；美港仍 weekday stub |
 | UI 完整前端 | workbench 现为 FastAPI API 壳 |
 
 ## 维护动作（可选，人工）

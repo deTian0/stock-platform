@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.2.1] - 2026-09-14
+
+### Added
+
+- M10.1：`TradingCalendar` / `get_trading_calendar` + 静态 `cn_closed_days.txt`（ADR 0015）
+
 ## [1.2.0] - 2026-09-14
 
 ### Added

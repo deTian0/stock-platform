@@ -49,6 +49,9 @@
 | M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | done |
 | M9.1 | `GlobalHttpProvider`（Yahoo + 新浪） | 小 | `v1.1.1` | done |
 | M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | done |
+| M10 | CN 交易日历（静态休市日） | 大 | `v1.3.0` | in_progress |
+| M10.1 | `TradingCalendar` + `cn_closed_days` | 小 | `v1.2.1` | done |
+| M10.2 | MarketStrategy + timing 接线 | 小 | `v1.2.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -388,6 +391,32 @@
 验收（大）：
 
 - [x] M9.1–M9.2 done；CHANGELOG 含 `1.2.0`
+
+---
+
+## M10 — CN 交易日历 → `v1.3.0`
+
+**目标**：静态上交所休市日替换「只跳周末」；纸面 timing 与 MarketStrategy 共用；US/HK 仍 weekday stub。
+
+### 小里程碑
+
+#### M10.1 → `v1.2.1`
+
+验收：
+
+- [x] `TradingCalendar` + `data/cn_closed_days.txt`（2024–2027）
+- [x] ADR 0015；单测覆盖春节/国庆跨越
+
+#### M10.2 → `v1.2.2`
+
+验收：
+
+- [ ] `MarketStrategy.is_trading_day` 与 `timing` 走 CN 日历
+- [ ] `completed_bar_cutoff` 回退跳过非交易日；execution 依赖 providers
+
+验收（大）：
+
+- [ ] M10.1–M10.2 done；CHANGELOG 含 `1.3.0`
 
 ---
 
