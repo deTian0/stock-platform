@@ -17,6 +17,6 @@
 
 ## 后果
 
-- 节假日日历仍为工作日 stub，live 日历随 Vendor 后续补。
+- 节假日日历：CN 见 ADR 0015 静态表；US/HK 仍为工作日 stub。
 - 完整全球 HTTP 抓取不进本里程碑；日 K live 时港股优先 Yahoo 配方（见 Skill）。
 - `datasets.md` 按 market 分支 volume（手 vs 股）与币种。

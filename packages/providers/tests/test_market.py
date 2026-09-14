@@ -58,6 +58,12 @@ def test_cn_strategy_rejects_hk() -> None:
         get_market_strategy("CN").validate_symbol("00700")
 
 
+def test_cn_is_trading_day_uses_holiday_calendar() -> None:
+    cn = get_market_strategy("CN")
+    assert not cn.is_trading_day(date(2024, 10, 1))
+    assert cn.is_trading_day(date(2024, 10, 8))
+
+
 def test_unknown_market() -> None:
     with pytest.raises(SymbolError, match="unknown market"):
         get_market_strategy("JP")

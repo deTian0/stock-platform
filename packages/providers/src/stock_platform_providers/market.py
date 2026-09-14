@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
+from .calendar import get_trading_calendar
 from .errors import SymbolError
 from .symbol import normalize_symbol
 
@@ -53,8 +54,8 @@ class MarketStrategy:
     _stock_limit: LimitRule | None
 
     def is_trading_day(self, d: date) -> bool:
-        """Weekday-only stub (holiday calendars land with live vendors)."""
-        return d.weekday() < 5
+        """True when the market session opens (CN uses static holiday calendar)."""
+        return get_trading_calendar(self.market_id).is_trading_day(d)
 
     def session_segments(self, d: date) -> list[SessionSegment]:
         if not self.is_trading_day(d):

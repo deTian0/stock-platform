@@ -6,6 +6,8 @@ import re
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
+from stock_platform_providers import get_trading_calendar
+
 CHINA_TZ = timezone(timedelta(hours=8))
 DAILY_BAR_FINAL_AT = time(15, 5)
 DEFAULT_TRADE_WINDOW = "09:35-10:00"
@@ -21,14 +23,16 @@ def china_now(now: datetime | None = None) -> datetime:
 def completed_bar_cutoff(now: datetime | None = None) -> date:
     """Latest trade date whose official daily bar is considered completed."""
     local = china_now(now)
-    return local.date() if local.time() >= DAILY_BAR_FINAL_AT else local.date() - timedelta(days=1)
+    candidate = local.date() if local.time() >= DAILY_BAR_FINAL_AT else local.date() - timedelta(days=1)
+    cal = get_trading_calendar("CN")
+    while not cal.is_trading_day(candidate):
+        candidate -= timedelta(days=1)
+    return candidate
 
 
 def next_weekday(trade_date: date) -> date:
-    candidate = trade_date + timedelta(days=1)
-    while candidate.weekday() >= 5:
-        candidate += timedelta(days=1)
-    return candidate
+    """Next CN trading day after ``trade_date`` (alias kept for callers)."""
+    return get_trading_calendar("CN").next_trading_day(trade_date)
 
 
 def planned_execution_date(signal_date: str, observed_raw_dates: list[str] | None = None) -> str:
