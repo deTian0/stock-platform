@@ -8,6 +8,18 @@
 
 - （无）
 
+## [1.1.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M8 完成**：可选 A 股 live HTTP（`AStockHttpProvider` via `em_get`）
+  - 默认仍 replay；preferences 可切 live
+  - ADR 0013
+
+### Notes
+
+- `global_http` 仍 pending；封禁时降级 replay，禁止裸东财 URL
+
 ## [1.0.2] - 2026-09-14
 
 ### Added
@@ -304,7 +316,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/local/stock-platform/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/local/stock-platform/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/local/stock-platform/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/local/stock-platform/compare/v0.7.3...v1.0.0
