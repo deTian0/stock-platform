@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-research"
-version = "3.1.0"
+version = "3.2.0"
 description = "Selection / backtest research kernels for stock-platform (lvrev, PIT)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ dependencies = [
 stock-platform-score = "stock_platform_research.__main__:main"
 stock-platform-brief = "stock_platform_research.brief_cli:main"
 stock-platform-refresh = "stock_platform_research.refresh_cli:main"
+stock-platform-daily = "stock_platform_research.daily_cli:main"
 stock-platform-performance = "stock_platform_research.performance_cli:main"
 
 [project.optional-dependencies]
