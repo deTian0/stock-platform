@@ -8,6 +8,14 @@
 
 - （无）
 
+## [3.6.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M44 完成**：LLM 成本/质量控制
+  - 调用/token 预算；截断告警（含 Responses incomplete）；超限默认降级 deterministic
+  - ADR 0045；默认仍 deterministic；`[llm]` 仍为可选 extra
+
 ## [3.5.0] - 2026-09-14
 
 ### Added
