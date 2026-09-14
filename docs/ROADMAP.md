@@ -94,8 +94,8 @@
 | M24 | Universe + PIT 截面面板 | 大 | `v1.17.0` | done |
 | M24.1 | universe + panel 内核 + ADR 0029 | 小 | `v1.16.1` | done |
 | M25 | 盘前简报批处理 | 大 | `v1.18.0` | done |
-| M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | in_progress |
-| M27 | Recommend → PaperLedger | 大 | `v1.20.0` | planned |
+| M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | done |
+| M27 | Recommend → PaperLedger | 大 | `v1.20.0` | in_progress |
 | M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
@@ -841,8 +841,8 @@
 
 验收：
 
-- [ ] `#recommend` UI + API 接线
-- [ ] `test_app` 断言静态资源调用 brief API
+- [x] `#recommend` UI + API 接线
+- [x] `test_app` 断言静态资源调用 brief API
 
 ---
 
