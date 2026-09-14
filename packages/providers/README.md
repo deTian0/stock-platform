@@ -45,7 +45,7 @@ python -m pip install -e ".[http]"
 |------|------|
 | `normalize_symbol` / `exchange_prefix` / `is_bse_symbol` | CN / US / HK 代码（`market=`） |
 | `get_market_strategy` / `MarketStrategy` | 市场策略表（settle / limit / 时区） |
-| `get_trading_calendar` / `TradingCalendar` | CN/US/HK 静态休市日（2024–2027）；周末由代码排除 |
+| `get_trading_calendar` / `TradingCalendar` | CN/US/HK 静态休市日（2024–early 2029）；周末由代码排除 |
 | `ReplayTransport` / `ReplayProvider` | CN fixtures 回放 |
 | `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
 | `AStockHttpProvider` | A 股 live（经 `em_get`） |

@@ -36,5 +36,6 @@ stock-platform-daily --asof 2026-09-02 --provider replay --fixtures .\packages\p
 
 ## 调度入口
 
-Windows Task Scheduler / cron 包装见 M42：`docs/ops/scheduler.md`（安装步骤与样例 XML）。
-本里程碑仅约定 CLI 与产物路径；默认仍 **paper + replay + SIMULATE**。
+Windows Task Scheduler / cron 包装：[`scheduler.md`](scheduler.md)
+（`scripts/ops/Invoke-DailyPipeline.ps1` + XML / cron 样例；非交易日 exit 0）。
+默认仍 **paper + replay + SIMULATE**。

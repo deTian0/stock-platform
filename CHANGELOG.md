@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.4.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M42 完成**：日历 2028+ + Task Scheduler/cron 运维包
+  - CN/US/HK 静态休市日延伸至 2028+（provisional）
+  - `scripts/ops/Invoke-DailyPipeline.ps1` + Task Scheduler XML + cron 样例
+  - `docs/ops/scheduler.md` / `calendar-maintenance.md`；ADR 0044
+
 ## [3.3.0] - 2026-09-14
 
 ### Added

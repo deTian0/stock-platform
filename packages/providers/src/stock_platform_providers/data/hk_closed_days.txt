@@ -1,5 +1,6 @@
-# HKEX closed weekdays 2024-2027 (curated static; weekends omitted).
+# HKEX closed weekdays 2024-early 2029 (curated static; weekends omitted).
 # 2026-2027 provisional until exchange notices finalize.
+# 2028-early 2029: thin provisional; verify against HKEX notices.
 2024-01-01
 2024-02-12
 2024-02-13
@@ -56,3 +57,20 @@
 2027-10-01
 2027-10-08
 2027-12-27
+2028-01-03
+2028-01-26
+2028-01-27
+2028-01-28
+2028-04-03
+2028-04-04
+2028-04-14
+2028-04-17
+2028-05-01
+2028-05-29
+2028-05-31
+2028-07-03
+2028-10-02
+2028-10-19
+2028-12-25
+2028-12-26
+2029-01-01

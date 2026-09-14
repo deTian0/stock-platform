@@ -15,10 +15,11 @@
    `{out}/briefs/latest.json`。同 asof 重跑覆盖。
 3. **失败**：fail-closed；写 `failure.json` + `latest.ok=false`；退出码非 0。
 4. **CLI**：`stock-platform-daily`（`--provider replay` + `--fixtures` 为 CI 默认）。
-5. **调度**：本机手跑文档在 `docs/ops/daily-pipeline.md`；Task Scheduler XML 延至 M42。
+5. **调度**：本机手跑文档在 `docs/ops/daily-pipeline.md`；Task Scheduler / cron
+   运维包见 M42（`docs/ops/scheduler.md`，ADR 0044）。
 6. **不做**：默认 live、后台守护进程、SPA、真实券商。
 
 ## 后果
 
-- M42 运维包直接调度本 CLI。
+- M42 运维包直接调度本 CLI（非交易日由包装脚本 skip）。
 - 与 ADR 0030 refresh 产物目录兼容（共享 `out` 根）。
