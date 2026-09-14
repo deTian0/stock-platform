@@ -16,17 +16,18 @@ from stock_platform_execution import (
     build_strategy_spec,
     evaluate_admission,
 )
-from stock_platform_execution.timing import CHINA_TZ, china_now
+from stock_platform_execution.timing import market_now
+from stock_platform_providers import get_market_strategy
 
 router = APIRouter(tags=["paper"])
 
 
-def _parse_now(raw: str | None) -> datetime | None:
+def _parse_now(raw: str | None, market: str = "CN") -> datetime | None:
     if not raw:
         return None
     dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=CHINA_TZ)
+        return market_now(market, dt)
     return dt
 
 
@@ -35,6 +36,7 @@ class DraftRequest(BaseModel):
     orders: list[dict[str, Any]] = Field(default_factory=list)
     decision_only: bool = False
     now: str | None = None
+    market: str = "CN"
 
 
 class ActivateRequest(BaseModel):
@@ -108,22 +110,34 @@ def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
     if not active:
         raise HTTPException(status_code=400, detail="no active strategy; activate explicitly first")
     try:
+        mid = get_market_strategy(body.market).market_id
         return paper.ledger.build_draft(
             strategy_hash=str(active["strategyHash"]),
             signal_trade_date=body.signal_trade_date,
             orders=body.orders,
             decision_only=body.decision_only,
-            now=_parse_now(body.now) or china_now(),
+            market=mid,
+            now=_parse_now(body.now, mid) or market_now(mid),
         )
     except (DraftBlocked, ProfileBlocked, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/api/paper/drafts/{draft_id}/execute")
-def execute_draft(request: Request, draft_id: str, now: str | None = None) -> dict[str, Any]:
+def execute_draft(
+    request: Request,
+    draft_id: str,
+    now: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
     paper = request.app.state.workbench.paper
     try:
-        return paper.ledger.execute_draft(draft_id, now=_parse_now(now) or china_now())
+        mid = get_market_strategy(market).market_id
+        return paper.ledger.execute_draft(
+            draft_id,
+            market=mid,
+            now=_parse_now(now, mid) or market_now(mid),
+        )
     except IdempotentReplay as exc:
         return {
             "accepted": True,
@@ -133,5 +147,5 @@ def execute_draft(request: Request, draft_id: str, now: str | None = None) -> di
             "environment": "SIMULATE",
             "liveTradingEnabled": False,
         }
-    except (DraftBlocked, ProfileBlocked) as exc:
+    except (DraftBlocked, ProfileBlocked, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

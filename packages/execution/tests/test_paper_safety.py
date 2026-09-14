@@ -108,3 +108,37 @@ def test_paper_execute_and_idempotent() -> None:
 
 def test_paper_status_banner() -> None:
     assert "SIMULATE" in PaperLedger().status()["banner"]
+
+
+def test_paper_draft_stores_market_id_default_cn() -> None:
+    ledger = PaperLedger()
+    now = datetime(2026, 9, 7, 9, 40, tzinfo=CHINA_TZ)
+    draft = ledger.build_draft(
+        strategy_hash="h",
+        signal_trade_date="2026-09-04",
+        orders=[{"symbol": "510300", "side": "buy", "qty": 100}],
+        now=now,
+    )
+    assert draft["marketId"] == "CN"
+
+
+def test_paper_us_market_skips_independence_day() -> None:
+    from zoneinfo import ZoneInfo
+
+    et = ZoneInfo("America/New_York")
+    ledger = PaperLedger()
+    # 2025-07-03 Thu after ET daily bar final → plan skips Jul4 → Mon Jul7
+    now = datetime(2025, 7, 7, 9, 40, tzinfo=et)
+    draft = ledger.build_draft(
+        strategy_hash="h",
+        signal_trade_date="2025-07-03",
+        orders=[{"symbol": "AAPL", "side": "buy", "qty": 10}],
+        now=now,
+        market="US",
+    )
+    assert draft["marketId"] == "US"
+    assert draft["plannedExecutionDate"] == "2025-07-07"
+    assert draft["executionEligible"] is True
+    result = ledger.execute_draft(draft["draftId"], now=now)
+    assert result["marketId"] == "US"
+    assert result["accepted"] is True
