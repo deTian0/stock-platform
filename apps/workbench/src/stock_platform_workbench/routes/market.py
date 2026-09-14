@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from stock_platform_providers import apply_adjust
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -257,5 +259,49 @@ def get_full_minute(
         "provider": getattr(provider, "name", type(provider).__name__),
         "trade_date": trade_date.isoformat() if trade_date else None,
         "count": count,
+        "rows": rows,
+    }
+
+
+@router.get("/daily-adjusted")
+def get_daily_adjusted(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    kind: str = Query("qfq", description="qfq (forward) or hfq (backward)"),
+    start: date | None = None,
+    end: date | None = None,
+) -> dict[str, Any]:
+    """Unadjusted daily OHLC scaled by adj_factor (not a matrix capability id)."""
+    state = request.app.state.workbench
+    daily_provider = state.resolve("daily")
+    factor_provider = state.resolve("adj_factor")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    daily_rows = daily_provider.get_daily(syms, start=start, end=end)
+    getter = getattr(factor_provider, "get_adj_factor", None)
+    if getter is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "provider_missing_get_adj_factor",
+                "provider": getattr(
+                    factor_provider, "name", type(factor_provider).__name__
+                ),
+            },
+        )
+    # Do not clip factor dates to the daily window (keep 1900 sentinel / earlier steps).
+    factor_rows = getter(syms, kind=kind)
+    try:
+        rows = apply_adjust(daily_rows, factor_rows, kind=kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "capabilities": ["daily", "adj_factor"],
+        "providers": {
+            "daily": getattr(daily_provider, "name", type(daily_provider).__name__),
+            "adj_factor": getattr(
+                factor_provider, "name", type(factor_provider).__name__
+            ),
+        },
+        "kind": kind,
         "rows": rows,
     }

@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.15.2] - 2026-09-14
+
+### Added
+
+- M23.2：workbench `GET /api/market/daily-adjusted` + UI `#daily-adjusted`；默认偏好 replay
+
 ## [1.15.1] - 2026-09-14
 
 ### Added

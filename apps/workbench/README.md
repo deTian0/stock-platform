@@ -16,6 +16,8 @@
 | **M19.2 / v1.11.2** | `GET /api/market/depth5` + UI；默认 replay |
 | **M20.2 / v1.12.2** | `GET /api/market/financial` + UI；默认 replay |
 | **M21.2 / v1.13.2** | `GET /api/market/adj-factor` + UI；默认 replay |
+| **M22.2 / v1.14.2** | `GET /api/market/full-minute` + UI；默认 replay |
+| **M23.2 / v1.15.2** | `GET /api/market/daily-adjusted` + UI；默认 replay |
 
 ## 安装与运行
 
@@ -42,6 +44,7 @@ python -m stock_platform_workbench
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
 | GET | `/api/market/adj-factor?symbols=&kind=` | 经矩阵 resolve(`adj_factor`)；无候选仍 **409** |
+| GET | `/api/market/daily-adjusted?symbols=&kind=` | `resolve(daily)` + `resolve(adj_factor)` 后 `apply_adjust`；空因子 **400** |
 | GET | `/api/market/minute?symbols=&freq=` | 经矩阵 resolve(`minute`)；无候选仍 **409** |
 | GET | `/api/market/depth5?symbols=` | 经矩阵 resolve(`depth5`)；无候选仍 **409** |
 | GET | `/api/market/financial?symbols=&periods=` | 经矩阵 resolve(`financial`)；无候选仍 **409** |

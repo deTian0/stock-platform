@@ -260,6 +260,45 @@
       <pre id="adj-factor-json" class="code"></pre>
     </section>
 
+    <section id="daily-adjusted" class="panel">
+      <h2>复权日 K</h2>
+      <p class="hint">daily + adj_factor 套价（qfq 除 / hfq 乘）；非独立能力；默认 replay。</p>
+      <form id="daily-adjusted-form" class="row">
+        <label>symbols
+          <input id="daily-adjusted-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>kind
+          <select id="daily-adjusted-kind" name="kind">
+            <option value="qfq" selected>qfq</option>
+            <option value="hfq">hfq</option>
+          </select>
+        </label>
+        <label>start
+          <input id="daily-adjusted-start" name="start" type="date" value="2026-09-01" />
+        </label>
+        <label>end
+          <input id="daily-adjusted-end" name="end" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="daily-adjusted-meta" class="status" aria-live="polite"></p>
+      <pre id="daily-adjusted-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="daily-adjusted-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>date</th>
+              <th>close</th>
+              <th>ex_factor</th>
+              <th>kind</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="full-minute" class="panel">
       <h2>全量分钟</h2>
       <p class="hint">当日 1m 批量（宇宙修复语义）；与多频 minute 独立；默认 replay。</p>

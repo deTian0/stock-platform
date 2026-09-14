@@ -44,6 +44,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="lhb"' in body
     assert 'id="unlock"' in body
     assert 'id="adj-factor"' in body
+    assert 'id="daily-adjusted"' in body
     assert 'id="full-minute"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
@@ -63,6 +64,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/lhb" in text
     assert "/api/market/unlock" in text
     assert "/api/market/adj-factor" in text
+    assert "/api/market/daily-adjusted" in text
     assert "/api/market/full-minute" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
@@ -303,6 +305,29 @@ def test_adj_factor_replay(client: TestClient) -> None:
     assert body["rows"][0]["symbol"] == "600519"
     assert body["rows"][0]["trade_date"] == "2026-06-26"
     assert body["rows"][0]["ex_factor"] == 1.0
+
+
+def test_daily_adjusted_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/daily-adjusted",
+        params={"symbols": "SH600519", "kind": "qfq", "start": "2026-09-01", "end": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capabilities"] == ["daily", "adj_factor"]
+    assert body["providers"]["daily"] == "replay"
+    assert body["providers"]["adj_factor"] == "replay"
+    assert body["kind"] == "qfq"
+    assert len(body["rows"]) == 2
+    assert body["rows"][0]["symbol"] == "600519"
+    assert body["rows"][0]["ex_factor"] == 1.0
+    assert body["rows"][0]["adjust_kind"] == "qfq"
+    assert body["rows"][0]["close"] == 1410.0
+
+
+def test_daily_adjusted_missing_factors_400(client: TestClient) -> None:
+    r = client.get("/api/market/daily-adjusted", params={"symbols": "000001", "kind": "qfq"})
+    assert r.status_code == 400
 
 
 def test_can_prefer_adj_factor_astock_http(client: TestClient) -> None:
