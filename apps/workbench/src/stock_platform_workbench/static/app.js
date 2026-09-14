@@ -5,6 +5,15 @@
     return document.getElementById(id);
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function showError(el, err) {
     el.hidden = false;
     if (typeof err === "string") {
@@ -17,6 +26,73 @@
   function clearError(el) {
     el.hidden = true;
     el.textContent = "";
+  }
+
+  function formatScore(score) {
+    if (score == null || score === "") return "—";
+    var n = Number(score);
+    if (Number.isNaN(n)) return escapeHtml(score);
+    return n.toFixed(4);
+  }
+
+  function renderRecommendCards(picks) {
+    var host = $("recommend-cards");
+    if (!host) return;
+    host.innerHTML = "";
+    if (!picks || !picks.length) {
+      host.innerHTML = '<p class="hint" style="margin:0">暂无推荐结果</p>';
+      return;
+    }
+    for (var i = 0; i < picks.length; i++) {
+      var row = picks[i];
+      var card = document.createElement("article");
+      card.className = "rec-card";
+      var reasons = row.reasons || [];
+      var chips = "";
+      for (var j = 0; j < reasons.length; j++) {
+        var item = reasons[j];
+        var label = (item && (item.summary || item.key)) || "";
+        if (!label) continue;
+        chips += "<li>" + escapeHtml(label) + "</li>";
+      }
+      if (!chips && (row.reasonSummary || row.reason)) {
+        chips = "<li>" + escapeHtml(row.reasonSummary || row.reason) + "</li>";
+      }
+      card.innerHTML =
+        '<div class="rec-card-top">' +
+        '<div><span class="rec-rank">#' +
+        escapeHtml(row.rank) +
+        '</span> <a class="rec-symbol" href="#daily">' +
+        escapeHtml(row.symbol) +
+        "</a></div>" +
+        '<div class="rec-score">' +
+        formatScore(row.composite_score) +
+        "</div></div>" +
+        '<div class="rec-meta"><span>收盘 <strong>' +
+        escapeHtml(row.close == null ? "—" : row.close) +
+        "</strong></span></div>" +
+        '<p class="rec-summary">' +
+        escapeHtml(row.reasonSummary || row.reason || "") +
+        "</p>" +
+        (chips ? '<ul class="reason-list">' + chips + "</ul>" : "");
+      host.appendChild(card);
+    }
+  }
+
+  function openAncestorDetails(el) {
+    var node = el;
+    while (node && node !== document.body) {
+      if (node.tagName === "DETAILS") node.open = true;
+      node = node.parentElement;
+    }
+  }
+
+  function revealHashTarget() {
+    var id = (location.hash || "").replace(/^#/, "");
+    if (!id) return;
+    var target = document.getElementById(id);
+    if (!target) return;
+    openAncestorDetails(target);
   }
 
   async function fetchJson(url, options) {
@@ -694,21 +770,23 @@
         (data.picks ? data.picks.length : 0) +
         " · panel=" +
         data.panelSize;
+      const picks = data.picks || [];
+      renderRecommendCards(picks);
       const tbody = $("recommend-table").querySelector("tbody");
       tbody.innerHTML = "";
-      for (const row of data.picks || []) {
+      for (const row of picks) {
         const tr = document.createElement("tr");
         tr.innerHTML =
           "<td>" +
-          row.rank +
-          "</td><td><a href=\"#daily\">" +
-          row.symbol +
+          escapeHtml(row.rank) +
+          '</td><td><a href="#daily">' +
+          escapeHtml(row.symbol) +
           "</a></td><td>" +
-          row.composite_score +
+          escapeHtml(row.composite_score) +
           "</td><td>" +
-          row.close +
+          escapeHtml(row.close) +
           "</td><td>" +
-          (row.reasonSummary || row.reason || "") +
+          escapeHtml(row.reasonSummary || row.reason || "") +
           "</td>";
         tbody.appendChild(tr);
       }
@@ -721,6 +799,7 @@
         showError(errEl, detail);
       }
       $("recommend-table").querySelector("tbody").innerHTML = "";
+      $("recommend-cards").innerHTML = "";
       $("recommend-json").textContent = "";
     }
   }
@@ -814,6 +893,16 @@
         " · liveTradingEnabled=" +
         data.liveTradingEnabled;
       $("wizard-json").textContent = JSON.stringify(data, null, 2);
+      var brief = data.brief || (data.steps && data.steps.find(function (s) {
+        return s.step === "brief" && s.result;
+      }));
+      var briefResult = data.brief || (brief && brief.result) || null;
+      if (briefResult && briefResult.picks) {
+        renderRecommendCards(briefResult.picks);
+        $("recommend-meta").textContent =
+          "from wizard · picks=" + briefResult.picks.length;
+      }
+      if (data.ok) loadPaper();
     } catch (e) {
       showError(errEl, e.detail || String(e));
       $("wizard-json").textContent = "";
@@ -1161,6 +1250,8 @@
     $("btn-strategy-list").addEventListener("click", listStrategies);
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
+    window.addEventListener("hashchange", revealHashTarget);
+    revealHashTarget();
     loadMatrix();
     loadPaper();
     loadBroker();

@@ -68,21 +68,28 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="recommend"' in body
     assert 'id="wizard"' in body
     assert 'id="ops"' in body
+    assert 'id="recommend-cards"' in body
+    assert 'id="market-tools"' in body
+    assert 'id="lab"' in body
     assert "日用向导" in body
     assert "无实盘" in body or "SIMULATE" in body
     assert 'id="performance"' in body
     assert 'id="strategy-compare"' in body
     assert 'id="pref-preset"' in body
     assert "/static/app.js" in body
+    assert "/static/app.css" in body
 
 
 def test_static_assets(client: TestClient) -> None:
     css = client.get("/static/app.css")
     assert css.status_code == 200
+    assert "rec-card" in css.text
+    assert "group-summary" in css.text
     js = client.get("/static/app.js")
     assert js.status_code == 200
     # M11.2: UI must call existing APIs (fail-closed path included).
     text = js.text
+    assert "renderRecommendCards" in text
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
     assert "/api/market/fund-flow" in text
