@@ -60,7 +60,7 @@
 | M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | done |
 | M13 | US/HK 静态交易日历 | 大 | `v1.6.0` | in_progress |
 | M13.1 | us/hk closed days + 日历加载 | 小 | `v1.5.1` | done |
-| M13.2 | MarketStrategy 验收 + 文档 | 小 | `v1.5.2` | planned |
+| M13.2 | MarketStrategy 验收 + 文档 | 小 | `v1.5.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -497,7 +497,7 @@
 
 验收：
 
-- [ ] `MarketStrategy` US/HK 假日断言；文档更新
+- [x] `MarketStrategy` US/HK 假日断言；文档更新
 
 验收（大）：
 
