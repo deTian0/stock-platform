@@ -11,6 +11,7 @@
 | **M3.3 / v0.3.3** | `stock-platform-score` 批处理 CSV |
 | **M24.1 / v1.16.1** | `load_universe` + `build_cross_section_panel`（ADR 0029） |
 | **M25 / v1.18.0** | `build_premarket_brief` + `stock-platform-brief` |
+| **M29 / v2.1.0** | `run_refresh` + `stock-platform-refresh` |
 
 ## 安装
 
@@ -31,3 +32,10 @@ python -m pytest -q
 - 信号日与成交日分离：信号用 T 收盘特征，成交用 T+1 open
 - 跨除权日比价前先经 `stock_platform_providers.apply_adjust`（M23）；本包不内嵌抓取
 - 宇宙空列表 / 空文件 **fail-closed**（`UniverseEmptyError`）；截面经注入 provider，CI 零公网
+- 日刷新 CLI 默认 `--provider replay`；live HTTP 不在本包内嵌
+
+刷新：
+
+```powershell
+stock-platform-refresh --asof 2026-09-02 --universe fixtures\universe_cn_sample.json --out $env:TEMP\sp-refresh --provider replay --fixtures path\to\fixtures
+```

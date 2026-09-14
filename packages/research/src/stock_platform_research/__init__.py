@@ -5,6 +5,7 @@ from .brief import brief_to_orders, build_premarket_brief, write_brief_csv
 from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, panel_to_csv
+from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .universe import (
     UniverseEmptyError,
@@ -28,6 +29,9 @@ __all__ = [
     "load_universe",
     "normalize_universe",
     "panel_to_csv",
+    "REFRESH_DATASETS",
+    "RefreshReport",
+    "run_refresh",
     "run_pit_long_only",
     "score_cross_section",
     "score_cross_section_csv",
@@ -35,4 +39,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

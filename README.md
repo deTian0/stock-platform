@@ -9,13 +9,13 @@
 | 组件 | 路径 | 能力 |
 |------|------|------|
 | Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
-| Research | `packages/research` | lvrev / 闸门 / PIT / 宇宙截面 / 盘前简报 / `stock-platform-score` / `stock-platform-brief` |
+| Research | `packages/research` | lvrev / 闸门 / PIT / 宇宙截面 / 盘前简报 / `stock-platform-score` / `stock-platform-brief` / `stock-platform-refresh` |
 | Agents | `packages/agents` | 研报/复盘/确定性辩论插件（仅经 providers） |
 | Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |
 | Workbench | `apps/workbench` | FastAPI + 最小 UI：行情 / 今日推荐 / 研报 / 纸面 |
 
 **默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
-**明确不做（v2.0 Phase A）**：实盘券商、同花顺适配、LLM 辩论图、React SPA、第二套行情主链。
+**明确不做（v2.3 Phase B 仍成立）**：实盘券商、同花顺适配、LLM 辩论图、React SPA、第二套行情主链、默认开启 live。
 
 ## 快速开始
 
@@ -30,6 +30,13 @@ python -m pytest packages apps -q
 python -m stock_platform_workbench
 # → http://127.0.0.1:3018/  （打开「今日推荐」）
 # → http://127.0.0.1:3018/health
+# → http://127.0.0.1:3018/api/ops/health
+```
+
+日数据刷新（离线 replay fixtures）：
+
+```powershell
+stock-platform-refresh --asof 2026-09-02 --universe path\to\universe.json --out D:\data\refresh --provider replay --fixtures path\to\fixtures
 ```
 
 盘前简报 CLI：
@@ -56,7 +63,8 @@ stock-platform/
 │   ├── upstream-archive.md
 │   ├── release-checklist.md
 │   ├── versioning.md
-│   ├── architecture/          # ADR 0001–0029
+│   ├── architecture/          # ADR 0001–0032
+│   ├── ops/                   # 刷新 / fixture 录制
 │   └── contracts/
 └── scripts/{check_docs,check_versions,release_tag}.ps1
 ```
@@ -69,6 +77,7 @@ stock-platform/
 | **v1.0.0** | M7 产品收敛 / 上游归档 |
 | v1.1.0–v1.16.0 | M8–M23（live HTTP、日历、UI、辩论、CN 扩展数据集、复权套价） |
 | **v2.0.0** | Phase A（M24–M28）日更推荐 + 纸面闭环 |
+| **v2.1.0–v2.3.0** | Phase B（M29–M31）日刷新 + live 运维稳定 |
 
 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 

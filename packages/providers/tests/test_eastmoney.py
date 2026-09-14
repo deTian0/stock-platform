@@ -62,3 +62,38 @@ def test_em_get_uses_default_client() -> None:
     assert out["url"].startswith("https://push2.eastmoney.com")
     with pytest.raises(ValueError):
         em_get("https://example.com/")
+
+
+def test_circuit_opens_after_consecutive_failures() -> None:
+    from stock_platform_providers.eastmoney import CircuitOpenError
+
+    calls: list[str] = []
+    clock = {"t": 1.0}
+
+    def transport(url, **kwargs):
+        calls.append(url)
+        raise RuntimeError("429")
+
+    client = EastmoneyClient(
+        min_interval=0.0,
+        sleeper=lambda _s: None,
+        clock=lambda: clock["t"],
+        rng=__import__("random").Random(0),
+        transport=transport,
+        failure_threshold=2,
+        cooldown_sec=30.0,
+    )
+    with pytest.raises(RuntimeError, match="429"):
+        client.get("https://push2.eastmoney.com/a")
+    with pytest.raises(RuntimeError, match="429"):
+        client.get("https://push2.eastmoney.com/b")
+    snap = client.snapshot()
+    assert snap["circuitOpen"] is True
+    assert snap["consecutiveFailures"] == 2
+    with pytest.raises(CircuitOpenError, match="circuit open"):
+        client.get("https://push2.eastmoney.com/c")
+    assert len(calls) == 2
+    clock["t"] = 40.0
+    with pytest.raises(RuntimeError, match="429"):
+        client.get("https://push2.eastmoney.com/d")
+    assert len(calls) == 3

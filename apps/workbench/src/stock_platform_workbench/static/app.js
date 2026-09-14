@@ -137,6 +137,26 @@
     }
   }
 
+  async function applyPreset() {
+    const errEl = $("matrix-error");
+    clearError(errEl);
+    const presetId = $("pref-preset").value;
+    try {
+      const out = await fetchJson("/api/settings/presets/" + encodeURIComponent(presetId) + "/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      $("pref-status").textContent =
+        "preset applied → " +
+        out.applied +
+        " (startup default still replay; liveTradingEnabled=false)";
+      await loadMatrix();
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
   async function applyPreference() {
     const errEl = $("matrix-error");
     clearError(errEl);
@@ -840,6 +860,7 @@
 
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
+    $("btn-preset").addEventListener("click", applyPreset);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);

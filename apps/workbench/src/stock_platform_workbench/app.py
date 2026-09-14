@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import __version__
-from .routes import agents, market, meta, paper, research, settings
+from .routes import agents, market, meta, ops, paper, research, settings
 from .state import CapabilityUnavailable, WorkbenchState, build_default_state
 
 _PKG_DIR = Path(__file__).resolve().parent
@@ -54,6 +54,7 @@ def create_app(
         )
 
     app.include_router(meta.router)
+    app.include_router(ops.router)
     app.include_router(settings.router)
     app.include_router(market.router)
     app.include_router(agents.router)

@@ -14,6 +14,10 @@ import time
 from typing import Any, Callable
 from urllib.parse import urlparse
 
+
+class CircuitOpenError(RuntimeError):
+    """Raised when EastmoneyClient is in open-circuit cooldown."""
+
 DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -43,11 +47,22 @@ def _default_min_interval() -> float:
     return float(os.environ.get("EM_MIN_INTERVAL", "1.0"))
 
 
+def _default_failure_threshold() -> int:
+    return int(os.environ.get("EM_CIRCUIT_FAILURES", "5"))
+
+
+def _default_cooldown_sec() -> float:
+    return float(os.environ.get("EM_CIRCUIT_COOLDOWN", "60"))
+
+
 class EastmoneyClient:
     """Serial throttle + Keep-Alive session for eastmoney.com.
 
     Parameters mirror TradingAgents / a-stock-data ``em_get`` behaviour:
     min interval (env ``EM_MIN_INTERVAL``, default 1.0s) + 0.1–0.5s jitter.
+
+    Consecutive transport failures open a cooldown circuit
+    (``EM_CIRCUIT_FAILURES`` default 5, ``EM_CIRCUIT_COOLDOWN`` default 60s).
     """
 
     def __init__(
@@ -59,9 +74,19 @@ class EastmoneyClient:
         clock: Callable[[], float] = time.time,
         rng: random.Random | None = None,
         transport: Callable[..., Any] | None = None,
+        failure_threshold: int | None = None,
+        cooldown_sec: float | None = None,
     ) -> None:
         self.min_interval = (
             _default_min_interval() if min_interval is None else float(min_interval)
+        )
+        self.failure_threshold = (
+            _default_failure_threshold()
+            if failure_threshold is None
+            else int(failure_threshold)
+        )
+        self.cooldown_sec = (
+            _default_cooldown_sec() if cooldown_sec is None else float(cooldown_sec)
         )
         self._sleeper = sleeper
         self._clock = clock
@@ -70,6 +95,9 @@ class EastmoneyClient:
         self._last_call = 0.0
         self._session = session
         self._transport = transport
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._last_error: str | None = None
 
     def _ensure_session(self) -> Any:
         if self._session is not None:
@@ -96,20 +124,57 @@ class EastmoneyClient:
     ) -> Any:
         assert_eastmoney_url(url)
         with self._lock:
-            wait = self.min_interval - (self._clock() - self._last_call)
+            now = self._clock()
+            if self.failure_threshold > 0 and now < self._circuit_open_until:
+                raise CircuitOpenError(
+                    "eastmoney circuit open until "
+                    f"{self._circuit_open_until:.3f} (last error: {self._last_error})"
+                )
+            wait = self.min_interval - (now - self._last_call)
             if wait > 0:
                 self._sleeper(wait + self._rng.uniform(0.1, 0.5))
             try:
                 if self._transport is not None:
-                    return self._transport(
+                    result = self._transport(
                         url, params=params, headers=headers, timeout=timeout, **kwargs
                     )
-                session = self._ensure_session()
-                return session.get(
-                    url, params=params, headers=headers, timeout=timeout, **kwargs
-                )
+                else:
+                    session = self._ensure_session()
+                    result = session.get(
+                        url, params=params, headers=headers, timeout=timeout, **kwargs
+                    )
+                self._consecutive_failures = 0
+                self._circuit_open_until = 0.0
+                self._last_error = None
+                return result
+            except CircuitOpenError:
+                raise
+            except Exception as exc:
+                self._consecutive_failures += 1
+                self._last_error = f"{type(exc).__name__}: {exc}"
+                if (
+                    self.failure_threshold > 0
+                    and self._consecutive_failures >= self.failure_threshold
+                ):
+                    self._circuit_open_until = self._clock() + self.cooldown_sec
+                raise
             finally:
                 self._last_call = self._clock()
+
+    def snapshot(self) -> dict[str, Any]:
+        """Ops-facing throttle / circuit snapshot (no network)."""
+        now = self._clock()
+        open_until = self._circuit_open_until
+        circuit_open = self.failure_threshold > 0 and now < open_until
+        return {
+            "minInterval": self.min_interval,
+            "failureThreshold": self.failure_threshold,
+            "cooldownSec": self.cooldown_sec,
+            "consecutiveFailures": self._consecutive_failures,
+            "circuitOpen": circuit_open,
+            "circuitOpenUntil": open_until if circuit_open else None,
+            "lastError": self._last_error,
+        }
 
 
 _default_client = EastmoneyClient()

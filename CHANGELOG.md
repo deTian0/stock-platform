@@ -8,6 +8,33 @@
 
 - （无）
 
+## [2.3.0] - 2026-09-14
+
+### Added
+
+- **Phase B 运维稳定收口（M29–M31）**
+  - M29：`stock-platform-refresh` 日 K / 复权因子 / 资金流 / full_minute 落盘（ADR 0030）
+  - M30：live 偏好模板 + 东财熔断（ADR 0031）
+  - M31：`GET /api/ops/health` + fixture 录制文档（ADR 0032）
+  - 默认仍 replay；SIMULATE；CI 零公网
+
+## [2.2.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M30 完成**：live 偏好模板 + 东财节流/熔断
+  - 预设 `replay` / `cn_astock_http` / `us_hk_global_http`（启动默认仍 replay）
+  - `EM_CIRCUIT_FAILURES` / `EM_CIRCUIT_COOLDOWN`；`EastmoneyClient.snapshot()`
+  - workbench `GET /api/settings/presets` + `POST .../apply`
+
+## [2.1.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M29 完成**：CN 日数据刷新 / full_minute 落盘
+  - `run_refresh` / `stock-platform-refresh`；重试 + manifest；`STOCK_PLATFORM_REFRESH_DIR`
+  - ReplayTransport 文件名；CI `--provider replay`；ADR 0030
+
 ## [2.0.0] - 2026-09-14
 
 ### Added

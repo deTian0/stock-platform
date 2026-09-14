@@ -33,7 +33,7 @@
 | US/HK 官方假日 API 运行时拉取 | M13 已固化静态表（2024–2027）；不拉 NYSE/HKEX API |
 | 半日市 / 多市场纸面默认非 CN | M14 已接 CN/US/HK timing（默认仍 CN）；半日市不建模 |
 | UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |
-| 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M22 已交付个股批量 `full_minute`；M23 已交付 `apply_adjust` 套价。分钟/板块资金流、全市场龙虎榜与全市场解禁、`get_intraday_latest` 仍延期 |
+| 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M29 已交付 CLI `stock-platform-refresh`（个股 daily/adj_factor/fund_flow/full_minute 落盘，非常驻后台）。板块资金流、全市场龙虎榜/解禁、`get_intraday_latest` 仍延期 |
 | 同花顺 / 实盘券商适配 | Phase A（`v2.0.0`）仍纸面 SIMULATE；实盘开关与同花顺适配刻意延期 |
 | 全市场自动宇宙扩容 | M24 以 config/fixtures 宇宙为先；空宇宙 fail-closed；全市场扫描延期 |
 
@@ -51,3 +51,7 @@
 
 平台已具备：**宇宙 → PIT 截面 → lvrev 简报 → 工作台今日推荐 → 纸面草稿**闭环。  
 仍默认 replay；东财仅 `em_get`；无 LLM / SPA / 实盘。
+
+## Phase B 运维稳定（`v2.3.0`）
+
+日刷新落盘 + live 预设/熔断 + `/api/ops/health`。默认仍 replay；不启用实盘。

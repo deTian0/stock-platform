@@ -19,6 +19,16 @@
 
 批量任务建议 `EM_MIN_INTERVAL=1.5`～`2`。
 
+## 熔断（M30）
+
+| 项 | 默认 | 覆盖 |
+|----|------|------|
+| 连续失败阈值 | 5 | `EM_CIRCUIT_FAILURES`（`0` 关闭熔断） |
+| 冷却 | 60s | `EM_CIRCUIT_COOLDOWN` |
+| 打开后 | 抛 `CircuitOpenError`，不打东财 | `snapshot()` 可读状态 |
+
+成功请求清零失败计数。不自动换源（fail-closed）。
+
 ## 依赖
 
 ```powershell
