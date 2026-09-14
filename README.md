@@ -10,7 +10,7 @@
 |------|------|------|
 | Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
 | Research | `packages/research` | lvrev / 闸门 / PIT / `stock-platform-score` |
-| Agents | `packages/agents` | 研报/复盘插件（仅经 providers） |
+| Agents | `packages/agents` | 研报/复盘/确定性辩论插件（仅经 providers） |
 | Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |
 | Workbench | `apps/workbench` | FastAPI + 最小 UI（`GET /`）：行情 / 研报 / 纸面 |
 

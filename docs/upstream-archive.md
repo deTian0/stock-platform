@@ -28,7 +28,7 @@
 | 能力 | 原因 |
 |------|------|
 | live HTTP 默认开启 | `astock_http`（M8）与 `global_http`（M9）均已接线；**CI / 默认偏好仍 replay** |
-| TradingAgents 完整辩论图 | Agent 槽位已够；完整图可选后续 minor |
+| TradingAgents 完整 LLM 辩论图 | M12 已提供确定性轻量辩论；完整 LangGraph/LLM 仍可选后续 |
 | 券商实盘 / OpenD | M6 明确不吸收 |
 | US/HK 官方假日表 | CN 静态日历已于 M10 接线；美港仍 weekday stub |
 | UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |

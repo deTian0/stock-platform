@@ -13,7 +13,7 @@ TradingAgents 内嵌 a_stock HTTP 与平台 providers 双维护。M4 要求研�
 2. 唯一数据入口：注入的 `MarketDataProvider`（经 workbench `resolve("daily")`）。
 3. 历史 `asof` 禁止注入 realtime，并写入 warnings。
 4. workbench 暴露 `/api/research/report` 与 `/api/review/report`。
-5. 完整 LangGraph 辩论仍可后续接入；不得把东财 URL 写回 agents 包。
+5. 完整 LangGraph/LLM 辩论仍可后续接入；M12 起平台权威路径为确定性轻量辩论（ADR 0017）；不得把东财 URL 写回 agents 包。
 
 ## 后果
 
