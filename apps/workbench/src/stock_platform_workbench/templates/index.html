@@ -451,6 +451,41 @@
       <pre id="debate-json" class="code"></pre>
     </section>
 
+    <section id="recommend" class="panel">
+      <h2>今日推荐</h2>
+      <p class="hint">盘前简报 TopN（lvrev + 闸门）；默认 replay；非投资建议。可跳转 <a href="#daily">日 K</a> / <a href="#paper">纸面</a>。</p>
+      <form id="recommend-form" class="row">
+        <label>asof
+          <input id="recommend-asof" name="asof" type="date" value="2026-09-02" />
+        </label>
+        <label>symbols
+          <input id="recommend-symbols" name="symbols" value="600519,000001" autocomplete="off" />
+        </label>
+        <label>topN
+          <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="5" />
+        </label>
+        <button type="submit">刷新推荐</button>
+        <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
+      </form>
+      <p id="recommend-meta" class="status" aria-live="polite"></p>
+      <pre id="recommend-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="recommend-table">
+          <thead>
+            <tr>
+              <th>rank</th>
+              <th>symbol</th>
+              <th>score</th>
+              <th>close</th>
+              <th>reason</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="recommend-json" class="code"></pre>
+    </section>
+
     <section id="paper" class="panel">
       <h2>纸面状态</h2>
       <p class="hint">只读；无实盘开关。</p>

@@ -18,12 +18,16 @@
 | **M21.2 / v1.13.2** | `GET /api/market/adj-factor` + UI；默认 replay |
 | **M22.2 / v1.14.2** | `GET /api/market/full-minute` + UI；默认 replay |
 | **M23.2 / v1.15.2** | `GET /api/market/daily-adjusted` + UI；默认 replay |
+| **M25 / v1.18.0** | `GET /api/research/brief` 盘前简报 |
+| **M26 / v1.19.0** | UI「今日推荐」`#recommend` |
+| **M27 / v1.20.0** | `POST /api/research/brief/to-paper` → PaperLedger |
 
 ## 安装与运行
 
 ```powershell
 cd D:\workspace\git\stock-platform
 python -m pip install -e ".\packages\providers[dev]"
+python -m pip install -e ".\packages\research[dev]"
 python -m pip install -e ".\packages\agents[dev]"
 python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
@@ -51,6 +55,8 @@ python -m stock_platform_workbench
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
+| GET | `/api/research/brief?asof=&symbols=&topN=` | 盘前 TopN 简报（矩阵 daily；默认 replay） |
+| POST | `/api/research/brief/to-paper` | TopN → 纸面草稿（SIMULATE；需 active strategy） |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
 | GET | `/api/debate/report?symbol=&asof=` | 确定性 Bull/Bear/Risk 辩论 |
