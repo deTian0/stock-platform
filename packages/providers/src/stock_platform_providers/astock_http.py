@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Callable
 
 from .base import AssetType
 from .eastmoney import EastmoneyClient, get_default_client
-from .normalize import normalize_daily_row, normalize_fund_flow_row, normalize_realtime_row
+from .normalize import (
+    normalize_daily_row,
+    normalize_fund_flow_row,
+    normalize_lhb_payload,
+    normalize_realtime_row,
+)
 from .symbol import exchange_prefix, normalize_symbol
 
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 
 
 def em_secid(code: str) -> str:
@@ -206,6 +212,149 @@ class AStockHttpProvider:
                     continue
                 rows.append(row)
         return rows
+
+    def _datacenter(
+        self,
+        report_name: str,
+        *,
+        filter_str: str = "",
+        page_size: int = 50,
+        sort_columns: str = "",
+        sort_types: str = "-1",
+    ) -> list[dict[str, Any]]:
+        """East Money datacenter-web query via em_get / injected get_json."""
+        payload = self._fetch(
+            DATACENTER_URL,
+            {
+                "reportName": report_name,
+                "columns": "ALL",
+                "filter": filter_str,
+                "pageNumber": "1",
+                "pageSize": str(page_size),
+                "sortColumns": sort_columns,
+                "sortTypes": sort_types,
+                "source": "WEB",
+                "client": "WEB",
+            },
+        )
+        result = payload.get("result") or {}
+        data = result.get("data") or []
+        return list(data) if isinstance(data, list) else []
+
+    def get_lhb(
+        self,
+        symbols: list[str],
+        *,
+        asof_date: date,
+        look_back_days: int = 30,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Dragon-tiger board via datacenter-web (amounts in 元).
+
+        Empty look-back windows return empty records/seats and zero institution
+        (no crash) — aligned with a-stock-data #45.
+        """
+        items: list[dict[str, Any]] = []
+        look_back = max(1, int(look_back_days))
+        start = asof_date - timedelta(days=look_back)
+        start_s = start.isoformat()
+        end_s = asof_date.isoformat()
+
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            records_raw = self._datacenter(
+                "RPT_DAILYBILLBOARD_DETAILSNEW",
+                filter_str=(
+                    f"(TRADE_DATE>='{start_s}')"
+                    f"(TRADE_DATE<='{end_s}')"
+                    f"(SECURITY_CODE=\"{code}\")"
+                ),
+                page_size=50,
+                sort_columns="TRADE_DATE",
+                sort_types="-1",
+            )
+
+            buy_data: list[dict[str, Any]] = []
+            sell_data: list[dict[str, Any]] = []
+            seats: dict[str, list[dict[str, Any]]] = {"buy": [], "sell": []}
+            if records_raw:
+                latest = str(records_raw[0].get("TRADE_DATE", ""))[:10]
+                buy_data = self._datacenter(
+                    "RPT_BILLBOARD_DAILYDETAILSBUY",
+                    filter_str=f"(TRADE_DATE='{latest}')(SECURITY_CODE=\"{code}\")",
+                    page_size=10,
+                    sort_columns="BUY",
+                    sort_types="-1",
+                )
+                for row in buy_data[:5]:
+                    seats["buy"].append(
+                        {
+                            "name": row.get("OPERATEDEPT_NAME", ""),
+                            "buy_amt": row.get("BUY"),
+                            "sell_amt": row.get("SELL"),
+                            "net": row.get("NET"),
+                        }
+                    )
+                sell_data = self._datacenter(
+                    "RPT_BILLBOARD_DAILYDETAILSSELL",
+                    filter_str=f"(TRADE_DATE='{latest}')(SECURITY_CODE=\"{code}\")",
+                    page_size=10,
+                    sort_columns="SELL",
+                    sort_types="-1",
+                )
+                for row in sell_data[:5]:
+                    seats["sell"].append(
+                        {
+                            "name": row.get("OPERATEDEPT_NAME", ""),
+                            "buy_amt": row.get("BUY"),
+                            "sell_amt": row.get("SELL"),
+                            "net": row.get("NET"),
+                        }
+                    )
+
+            inst_buy = 0.0
+            inst_sell = 0.0
+            for detail, side in ((buy_data, "buy"), (sell_data, "sell")):
+                for row in detail:
+                    if str(row.get("OPERATEDEPT_CODE", "")) == "0":
+                        if side == "buy":
+                            inst_buy += float(row.get("BUY") or 0)
+                        else:
+                            inst_sell += float(row.get("SELL") or 0)
+
+            raw_payload = {
+                "symbol": code,
+                "asof_date": asof_date.isoformat(),
+                "look_back_days": look_back,
+                "records": [
+                    {
+                        "date": str(r.get("TRADE_DATE", ""))[:10],
+                        "reason": r.get("EXPLANATION", ""),
+                        "net_buy": r.get("BILLBOARD_NET_AMT"),
+                        "turnover_rate": r.get("TURNOVERRATE"),
+                        "pct_unit": "percent",
+                    }
+                    for r in records_raw
+                ],
+                "seats": seats,
+                "institution": {
+                    "buy_amt": inst_buy,
+                    "sell_amt": inst_sell,
+                    "net_amt": inst_buy - inst_sell,
+                },
+            }
+            items.append(
+                normalize_lhb_payload(
+                    raw_payload,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    asof_date=asof_date,
+                    look_back_days=look_back,
+                    market="CN",
+                )
+            )
+        return items
 
 
 def _parse_fund_flow_csv(line: str) -> dict[str, Any]:

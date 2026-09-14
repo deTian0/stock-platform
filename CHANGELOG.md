@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.8.1] - 2026-09-14
+
+### Added
+
+- M16.1：CN 龙虎榜 `lhb`（能力矩阵第九项；ADR 0021）
+  - `ReplayProvider` / `AStockHttpProvider.get_lhb`；fixtures；空窗口不崩；CI 零公网
+
 ## [1.8.0] - 2026-09-14
 
 ### Added

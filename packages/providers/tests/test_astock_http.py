@@ -101,3 +101,99 @@ def test_fund_flow_rejects_hk() -> None:
     provider = AStockHttpProvider(get_json=lambda *a, **k: {"data": {}})
     with pytest.raises(SymbolError):
         provider.get_fund_flow(["00700"])
+
+
+def test_lhb_from_datacenter() -> None:
+    calls: list[str] = []
+
+    def get_json(url, params=None):
+        assert "datacenter-web.eastmoney.com" in url
+        report = (params or {}).get("reportName", "")
+        calls.append(report)
+        if report == "RPT_DAILYBILLBOARD_DETAILSNEW":
+            return {
+                "result": {
+                    "data": [
+                        {
+                            "TRADE_DATE": "2026-05-16 00:00:00",
+                            "EXPLANATION": "日涨幅偏离值达到7%",
+                            "BILLBOARD_NET_AMT": 85200000.0,
+                            "TURNOVERRATE": 12.34,
+                        }
+                    ]
+                }
+            }
+        if report == "RPT_BILLBOARD_DAILYDETAILSBUY":
+            return {
+                "result": {
+                    "data": [
+                        {
+                            "OPERATEDEPT_NAME": "机构专用",
+                            "OPERATEDEPT_CODE": "0",
+                            "BUY": 50000000.0,
+                            "SELL": 0.0,
+                            "NET": 50000000.0,
+                        },
+                        {
+                            "OPERATEDEPT_NAME": "华泰证券上海分公司",
+                            "OPERATEDEPT_CODE": "123",
+                            "BUY": 32000000.0,
+                            "SELL": 1000000.0,
+                            "NET": 31000000.0,
+                        },
+                    ]
+                }
+            }
+        if report == "RPT_BILLBOARD_DAILYDETAILSSELL":
+            return {
+                "result": {
+                    "data": [
+                        {
+                            "OPERATEDEPT_NAME": "中信证券深圳分公司",
+                            "OPERATEDEPT_CODE": "456",
+                            "BUY": 0.0,
+                            "SELL": 28000000.0,
+                            "NET": -28000000.0,
+                        }
+                    ]
+                }
+            }
+        return {"result": {"data": []}}
+
+    items = AStockHttpProvider(get_json=get_json).get_lhb(
+        ["SZ002475"], asof_date=date(2026, 5, 17), look_back_days=30
+    )
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "002475"
+    assert item["source"] == "astock_http"
+    assert len(item["records"]) == 1
+    assert item["records"][0]["net_buy"] == 85200000.0
+    assert abs(item["records"][0]["turnover_rate"] - 0.1234) < 1e-6
+    assert item["seats"]["buy"][0]["name"] == "机构专用"
+    assert item["institution"]["buy_amt"] == 50000000.0
+    assert item["institution"]["net_amt"] == 50000000.0
+    assert calls == [
+        "RPT_DAILYBILLBOARD_DETAILSNEW",
+        "RPT_BILLBOARD_DAILYDETAILSBUY",
+        "RPT_BILLBOARD_DAILYDETAILSSELL",
+    ]
+
+
+def test_lhb_empty_window() -> None:
+    def get_json(url, params=None):
+        return {"result": {"data": []}}
+
+    items = AStockHttpProvider(get_json=get_json).get_lhb(
+        ["600519"], asof_date=date(2026, 5, 17)
+    )
+    assert len(items) == 1
+    assert items[0]["records"] == []
+    assert items[0]["seats"] == {"buy": [], "sell": []}
+    assert items[0]["institution"]["net_amt"] == 0.0
+
+
+def test_lhb_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"result": {"data": []}})
+    with pytest.raises(SymbolError):
+        provider.get_lhb(["00700"], asof_date=date(2026, 5, 17))

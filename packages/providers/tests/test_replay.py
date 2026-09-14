@@ -11,10 +11,16 @@ from stock_platform_providers import SymbolError, normalize_symbol
 from stock_platform_providers.normalize import (
     normalize_daily_row,
     normalize_fund_flow_row,
+    normalize_lhb_payload,
     normalize_realtime_row,
 )
 from stock_platform_providers.replay import ReplayProvider, ReplayTransport
-from stock_platform_providers.schemas import DAILY_COLUMNS, FUND_FLOW_COLUMNS, REALTIME_COLUMNS
+from stock_platform_providers.schemas import (
+    DAILY_COLUMNS,
+    FUND_FLOW_COLUMNS,
+    LHB_TOP_KEYS,
+    REALTIME_COLUMNS,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -94,6 +100,35 @@ def test_normalize_fund_flow_requires_date() -> None:
             {"symbol": "600519", "main_net": 1.0},
             source="test",
         )
+
+
+def test_replay_lhb_with_records() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    items = provider.get_lhb(
+        ["SZ002475"], asof_date=date(2026, 5, 17), look_back_days=30
+    )
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "002475"
+    assert item["source"] == "replay"
+    assert len(item["records"]) == 2
+    assert item["records"][0]["net_buy"] == 85200000.0
+    assert item["seats"]["buy"][0]["name"] == "机构专用"
+    assert item["institution"]["net_amt"] == 50000000.0
+    assert set(LHB_TOP_KEYS) <= set(item.keys())
+
+
+def test_replay_lhb_empty_window() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    items = provider.get_lhb(["600519"], asof_date=date(2026, 5, 17))
+    assert items[0]["records"] == []
+    assert items[0]["seats"]["buy"] == []
+    assert items[0]["institution"]["buy_amt"] == 0.0
+
+
+def test_normalize_lhb_requires_asof() -> None:
+    with pytest.raises(ValueError, match="asof_date"):
+        normalize_lhb_payload({"symbol": "002475", "records": []}, source="test")
 
 
 def test_normalize_symbol_still_public() -> None:

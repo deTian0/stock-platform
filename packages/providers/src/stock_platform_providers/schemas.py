@@ -46,3 +46,35 @@ FUND_FLOW_COLUMNS = [
     "large_net",
     "super_net",
 ]
+
+# CN dragon-tiger board (龙虎榜) aggregate payload keys (amounts in 元).
+LHB_TOP_KEYS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "asof_date",
+    "look_back_days",
+    "records",
+    "seats",
+    "institution",
+]
+
+LHB_RECORD_COLUMNS = [
+    "date",
+    "reason",
+    "net_buy",
+    "turnover_rate",
+]
+
+LHB_SEAT_COLUMNS = [
+    "name",
+    "buy_amt",
+    "sell_amt",
+    "net",
+]
+
+LHB_INSTITUTION_COLUMNS = [
+    "buy_amt",
+    "sell_amt",
+    "net_amt",
+]

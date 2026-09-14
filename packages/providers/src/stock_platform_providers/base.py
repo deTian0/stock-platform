@@ -11,8 +11,10 @@ AssetType = Literal["stock", "etf", "index"]
 class MarketDataProvider(Protocol):
     """Minimal CN provider surface for M1.2 (daily + realtime).
 
-    Optional M15+: ``get_fund_flow`` when the provider declares the
-    ``fund_flow`` capability.
+    Optional extensions when declared on the capability matrix:
+
+    - M15+ ``get_fund_flow`` → ``fund_flow``
+    - M16+ ``get_lhb`` → ``lhb`` (dragon-tiger board)
     """
 
     name: str
