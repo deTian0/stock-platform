@@ -8,6 +8,12 @@
 
 - （无）
 
+## [0.6.3] - 2026-09-14
+
+### Added
+
+- M6.3 验收：workbench 纸面路由与显式激活（无 live 开关）
+
 ## [0.6.2] - 2026-09-14
 
 ### Added
@@ -237,7 +243,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/local/stock-platform/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/local/stock-platform/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/local/stock-platform/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/local/stock-platform/compare/v0.5.3...v0.6.0

@@ -38,7 +38,7 @@
 | M6 | 纸面执行安全模型（可选） | 大 | `v0.7.0` | in_progress |
 | M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
 | M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | done |
-| M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | planned |
+| M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | done |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
@@ -292,8 +292,8 @@
 
 验收：
 
-- [ ] workbench `/api/paper/status|drafts|strategies/*`
-- [ ] 无 live 开关；显式激活
+- [x] workbench `/api/paper/status|drafts|strategies/*`
+- [x] 无 live 开关；显式激活
 
 验收（大）：
 
