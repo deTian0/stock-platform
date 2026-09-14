@@ -41,7 +41,7 @@
 | M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | done |
 | M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | in_progress |
 | M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
-| M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | planned |
+| M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | done |
 | M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
@@ -321,7 +321,7 @@
 
 验收：
 
-- [ ] README / CONTRIBUTING / AGENTS 按 v1 交付面改写（去掉「架子」表述）
+- [x] README / CONTRIBUTING / AGENTS 按 v1 交付面改写（去掉「架子」表述）
 
 #### M7.3 → `v0.7.3`
 
