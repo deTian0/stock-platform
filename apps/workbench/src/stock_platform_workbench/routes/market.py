@@ -59,3 +59,30 @@ def get_minute(
         "rows": [],
         "symbols": [s.strip() for s in symbols.split(",") if s.strip()],
     }
+
+
+@router.get("/fund-flow")
+def get_fund_flow(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = Query(120, ge=1, le=1000),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("fund_flow")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_fund_flow", None)
+    if getter is None:
+        return {
+            "capability": "fund_flow",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_fund_flow",
+        }
+    rows = getter(syms, start=start, end=end, limit=limit)
+    return {
+        "capability": "fund_flow",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "rows": rows,
+    }

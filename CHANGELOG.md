@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.7.2] - 2026-09-14
+
+### Added
+
+- M15.2：workbench `GET /api/market/fund-flow` + UI `#fund-flow`；默认偏好 replay
+
 ## [1.7.1] - 2026-09-14
 
 ### Added

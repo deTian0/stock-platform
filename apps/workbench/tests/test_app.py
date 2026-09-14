@@ -39,6 +39,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     body = r.text
     assert 'id="capability"' in body
     assert 'id="daily"' in body
+    assert 'id="fund-flow"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert "/static/app.js" in body
@@ -53,6 +54,7 @@ def test_static_assets(client: TestClient) -> None:
     text = js.text
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
+    assert "/api/market/fund-flow" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
     assert "fail_closed" in text
@@ -63,10 +65,12 @@ def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 7
+    assert len(rows) == 8
     by_id = {row["id"]: row for row in rows}
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
+    assert by_id["fund_flow"]["usable"] is True
+    assert by_id["fund_flow"]["effective"] == "replay"
     assert by_id["minute"]["usable"] is False
 
 
@@ -81,6 +85,31 @@ def test_daily_and_realtime(client: TestClient) -> None:
     rt = client.get("/api/market/realtime", params={"symbols": "600519"})
     assert rt.status_code == 200
     assert rt.json()["rows"][0]["change_pct"] == pytest.approx(0.010638)
+
+
+def test_fund_flow_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/fund-flow",
+        params={"symbols": "SH600519", "start": "2026-09-01", "end": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "fund_flow"
+    assert body["provider"] == "replay"
+    assert len(body["rows"]) == 2
+    assert body["rows"][0]["main_net"] == 125000000.0
+
+
+def test_can_prefer_fund_flow_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"fund_flow": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["fund_flow"]["effective"] == "astock_http"
+    assert by_id["fund_flow"]["usable"] is True
 
 
 def test_minute_fail_closed(client: TestClient) -> None:

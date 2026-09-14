@@ -66,7 +66,7 @@
 | M14.2 | PaperLedger + workbench market | 小 | `v1.6.2` | done |
 | M15 | CN 日级资金流 | 大 | `v1.8.0` | in_progress |
 | M15.1 | fund_flow provider + matrix + ADR 0020 | 小 | `v1.7.1` | done |
-| M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | planned |
+| M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -554,7 +554,7 @@
 
 验收：
 
-- [ ] workbench `GET /api/market/fund-flow`；默认偏好 replay；可选 UI
+- [x] workbench `GET /api/market/fund-flow`；默认偏好 replay；可选 UI
 
 验收（大）：
 

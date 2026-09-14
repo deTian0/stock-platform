@@ -64,8 +64,18 @@
       });
       if (daily && daily.effective) {
         $("pref-daily").value = daily.effective;
-        $("pref-status").textContent = "daily effective=" + daily.effective;
       }
+      const fundFlow = rows.find(function (r) {
+        return r.id === "fund_flow";
+      });
+      if (fundFlow && fundFlow.effective) {
+        $("pref-fund-flow").value = fundFlow.effective;
+      }
+      $("pref-status").textContent =
+        "daily=" +
+        (daily && daily.effective ? daily.effective : "") +
+        " · fund_flow=" +
+        (fundFlow && fundFlow.effective ? fundFlow.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -75,13 +85,21 @@
     const errEl = $("matrix-error");
     clearError(errEl);
     const daily = $("pref-daily").value;
+    const fundFlow = $("pref-fund-flow").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences: { daily: daily, realtime: daily } }),
+        body: JSON.stringify({
+          preferences: {
+            daily: daily,
+            realtime: daily,
+            fund_flow: fundFlow,
+          },
+        }),
       });
-      $("pref-status").textContent = "preferences updated → " + daily;
+      $("pref-status").textContent =
+        "preferences updated → daily/realtime=" + daily + " fund_flow=" + fundFlow;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -169,11 +187,56 @@
     }
   }
 
+  async function loadFundFlow(event) {
+    if (event) event.preventDefault();
+    const errEl = $("fund-flow-error");
+    clearError(errEl);
+    $("fund-flow-meta").textContent = "";
+    const symbols = $("fund-flow-symbols").value.trim();
+    const start = $("fund-flow-start").value;
+    const end = $("fund-flow-end").value;
+    const params = new URLSearchParams({ symbols: symbols });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    try {
+      const data = await fetchJson("/api/market/fund-flow?" + params.toString());
+      $("fund-flow-meta").textContent =
+        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
+      const tbody = $("fund-flow-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          row.symbol +
+          "</td><td>" +
+          row.date +
+          "</td><td>" +
+          row.main_net +
+          "</td><td>" +
+          row.large_net +
+          "</td><td>" +
+          row.super_net +
+          "</td>";
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("fund-flow-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);
+    $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("debate-form").addEventListener("submit", loadDebate);
     loadMatrix();
     loadPaper();
