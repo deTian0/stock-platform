@@ -19,6 +19,8 @@ from stock_platform_execution import (
 from stock_platform_execution.timing import market_now
 from stock_platform_providers import get_market_strategy
 
+from ..paper_ux import ensure_active_simulate_strategy, friendly_execution_detail
+
 router = APIRouter(tags=["paper"])
 
 
@@ -79,7 +81,7 @@ def validate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]
     try:
         return paper.lifecycle.mark_validated(body.strategy_hash)
     except ActivationBlocked as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
 
 
 @router.post("/api/paper/strategies/activate")
@@ -100,18 +102,38 @@ def activate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]
             execution_safety_passed=admission["passed"],
         )
     except ActivationBlocked as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
+
+
+@router.post("/api/paper/strategies/ensure-default")
+def ensure_default_strategy(request: Request) -> dict[str, Any]:
+    """One-click / idempotent: create+activate default SIMULATE strategy if none active."""
+    paper = request.app.state.workbench.paper
+    try:
+        ensured = ensure_active_simulate_strategy(paper.lifecycle)
+    except ActivationBlocked as exc:
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
+    return {
+        "active": ensured["active"],
+        "strategyHash": ensured["strategyHash"],
+        "strategyAutoActivated": ensured["autoActivated"],
+        "strategyStatus": ensured["statusMessage"],
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+    }
 
 
 @router.post("/api/paper/drafts")
 def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
     paper = request.app.state.workbench.paper
-    active = paper.lifecycle.active
-    if not active:
-        raise HTTPException(status_code=400, detail="no active strategy; activate explicitly first")
+    try:
+        ensured = ensure_active_simulate_strategy(paper.lifecycle)
+    except ActivationBlocked as exc:
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
+    active = ensured["active"]
     try:
         mid = get_market_strategy(body.market).market_id
-        return paper.broker.build_draft(
+        draft = paper.broker.build_draft(
             strategy_hash=str(active["strategyHash"]),
             signal_trade_date=body.signal_trade_date,
             orders=body.orders,
@@ -120,7 +142,13 @@ def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
             now=_parse_now(body.now, mid) or market_now(mid),
         )
     except (DraftBlocked, ProfileBlocked, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
+    return {
+        **draft,
+        "strategyAutoActivated": ensured["autoActivated"],
+        "strategyStatus": ensured["statusMessage"],
+        "liveTradingEnabled": False,
+    }
 
 
 @router.post("/api/paper/drafts/{draft_id}/execute")
@@ -148,4 +176,4 @@ def execute_draft(
             "liveTradingEnabled": False,
         }
     except (DraftBlocked, ProfileBlocked, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc

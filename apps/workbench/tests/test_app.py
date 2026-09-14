@@ -787,24 +787,7 @@ def test_research_brief_api(client: TestClient) -> None:
 
 
 def test_research_brief_to_paper(client: TestClient) -> None:
-    blocked = client.post(
-        "/api/research/brief/to-paper",
-        json={
-            "asof": "2026-09-02",
-            "symbols": "600519",
-            "topN": 1,
-            "adjust_kind": "none",
-            "decision_only": True,
-            "now": "2026-09-07T09:40:00+08:00",
-        },
-    )
-    assert blocked.status_code == 400
-
-    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "x", "universe": ["600519"]})
-    h = draft.json()["strategyHash"]
-    client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
-    client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
-
+    # Daily path: no prior activate — auto-ensures default SIMULATE strategy
     ok = client.post(
         "/api/research/brief/to-paper",
         json={
@@ -821,8 +804,51 @@ def test_research_brief_to_paper(client: TestClient) -> None:
     body = ok.json()
     assert body["liveTradingEnabled"] is False
     assert body["environment"] == "SIMULATE"
+    assert body["strategyAutoActivated"] is True
+    assert body["strategyStatus"] == "已自动激活默认纸面策略"
     assert body["draft"]["signalTradeDate"] == "2026-09-02"
     assert body["draft"]["decisionOnly"] is True
+
+    # Idempotent: second call keeps existing active strategy
+    again = client.post(
+        "/api/research/brief/to-paper",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+            "market": "CN",
+        },
+    )
+    assert again.status_code == 200
+    assert again.json()["strategyAutoActivated"] is False
+    assert again.json()["strategyStatus"] is None
+
+
+def test_paper_ensure_default_and_draft_auto_activate(client: TestClient) -> None:
+    ensured = client.post("/api/paper/strategies/ensure-default")
+    assert ensured.status_code == 200
+    body = ensured.json()
+    assert body["liveTradingEnabled"] is False
+    assert body["strategyAutoActivated"] is True
+    assert body["strategyStatus"] == "已自动激活默认纸面策略"
+
+    # Fresh client state already has active from same process — use drafts without prior activate
+    # on a path that previously would 400
+    created = client.post(
+        "/api/paper/drafts",
+        json={
+            "signal_trade_date": "2026-09-04",
+            "orders": [{"symbol": "510300", "side": "buy", "qty": 100}],
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+        },
+    )
+    assert created.status_code == 200
+    assert created.json()["strategyAutoActivated"] is False  # already active
+    assert created.json()["liveTradingEnabled"] is False
 
 
 def test_broker_status_readonly(client: TestClient) -> None:
@@ -871,10 +897,7 @@ def test_ops_health_last_refresh_manifest(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
-    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "wiz", "universe": ["600519"]})
-    h = draft.json()["strategyHash"]
-    client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
-    client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
+    # No manual draft/validate/activate — wizard auto-ensures default SIMULATE strategy
     r = client.post(
         "/api/research/wizard/daily",
         json={
@@ -893,8 +916,13 @@ def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
     assert body["ok"] is True
     assert body["liveTradingEnabled"] is False
     assert body["environment"] == "SIMULATE"
+    assert body["strategyAutoActivated"] is True
+    assert body["strategyStatus"] == "已自动激活默认纸面策略"
     steps = {s["step"]: s for s in body["steps"]}
     assert steps["refresh"]["skipped"] is True
     assert steps["brief"]["ok"] is True
     assert steps["to_paper"]["ok"] is True
+    assert steps["to_paper"]["strategyAutoActivated"] is True
     assert "/api/research/wizard/daily" in client.get("/static/app.js").text
+    assert "已自动激活默认纸面策略" in client.get("/static/app.js").text
+    assert "/api/paper/strategies/ensure-default" in client.get("/static/app.js").text

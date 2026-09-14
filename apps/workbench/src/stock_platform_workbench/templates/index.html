@@ -32,7 +32,7 @@
         <h2>日用向导</h2>
         <span class="pill">主流程</span>
       </div>
-      <p class="hint">一键：刷新（可选）→ 推荐 brief → 纸面草稿。默认可跳过 refresh；无实盘开关；非投资建议。</p>
+      <p class="hint">一键：刷新（可选）→ 推荐 brief → 纸面草稿。无激活策略时会自动创建并激活默认 SIMULATE 策略；默认可跳过 refresh；无实盘开关；非投资建议。</p>
       <form id="wizard-form" class="row">
         <label>asof
           <input id="wizard-asof" type="date" value="2026-09-02" />
@@ -110,6 +110,7 @@
       </div>
       <p class="hint">只读；无实盘开关。</p>
       <button type="button" id="btn-paper">刷新纸面</button>
+      <button type="button" id="btn-paper-ensure" class="secondary">激活默认策略</button>
       <pre id="paper-banner" class="banner" aria-live="polite"></pre>
       <dl id="paper-kv" class="kv" hidden></dl>
       <pre id="paper-error" class="error" hidden></pre>

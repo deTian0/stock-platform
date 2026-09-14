@@ -29,6 +29,8 @@
 | **M47 / v3.9.0** | **生产默认 CN live**（`astock_http`）；CI 用 `STOCK_PLATFORM_PROVIDER_PRESET=replay` |
 | **v3.9.1** | Workbench UI 日用抛光：主流程置顶、推荐卡片、次级折叠（ADR 0047） |
 | **v3.9.2** | Workbench UI 结构化扫读：向导步骤 / 运维键值 / 矩阵 pill / 绩效条 |
+| **v3.9.3** | Workbench 行情查询结果可读性（表/卡片/万亿/五档着色） |
+| **v3.9.4** | 向导/一键纸面自动激活默认 SIMULATE 策略（幂等；状态文案） |
 
 ## 安装与运行
 
@@ -71,12 +73,13 @@ python -m stock_platform_workbench
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
 | GET | `/api/research/brief?asof=&symbols=&topN=` | 盘前 TopN 简报（矩阵 daily；生产默认 live） |
-| POST | `/api/research/brief/to-paper` | TopN → 纸面草稿（SIMULATE；需 active strategy） |
+| POST | `/api/research/brief/to-paper` | TopN → 纸面草稿（SIMULATE；无激活时自动 ensure 默认策略） |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
 | GET | `/api/debate/report?symbol=&asof=` | 确定性 Bull/Bear/Risk 辩论 |
 | GET | `/api/paper/status` | 纸面状态（SIMULATE · 实盘关闭） |
 | POST | `/api/paper/strategies/draft\|validate\|activate` | 草稿 / 校验 / 显式激活 |
+| POST | `/api/paper/strategies/ensure-default` | 幂等：无激活时创建并激活默认 SIMULATE 策略 |
 | POST | `/api/paper/drafts` | 建纸面订单草稿 |
 | POST | `/api/paper/drafts/{id}/execute` | 提交（幂等） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |

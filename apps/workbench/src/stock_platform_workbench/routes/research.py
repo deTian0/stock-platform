@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
-from stock_platform_execution import DraftBlocked, ProfileBlocked
+from stock_platform_execution import ActivationBlocked, DraftBlocked, ProfileBlocked
 from stock_platform_execution.timing import market_now
 from stock_platform_providers import apply_adjust, get_market_strategy
 from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
@@ -28,6 +28,7 @@ from stock_platform_research import (
 from stock_platform_research.strategy_config import default_strategy_config_dir
 import pandas as pd
 
+from ..paper_ux import ensure_active_simulate_strategy, friendly_execution_detail
 from ..state import CapabilityUnavailable
 
 router = APIRouter(prefix="/api/research", tags=["research"])
@@ -137,11 +138,13 @@ class BriefToPaperRequest(BaseModel):
 
 @router.post("/brief/to-paper")
 def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
-    """Create a SIMULATE paper draft from brief TopN (requires active strategy)."""
+    """Create a SIMULATE paper draft from brief TopN (auto-ensures default strategy)."""
     paper = request.app.state.workbench.paper
-    active = paper.lifecycle.active
-    if not active:
-        raise HTTPException(status_code=400, detail="no active strategy; activate explicitly first")
+    try:
+        ensured = ensure_active_simulate_strategy(paper.lifecycle)
+    except ActivationBlocked as exc:
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
+    active = ensured["active"]
 
     kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
     brief = _build_brief_for_request(
@@ -171,7 +174,7 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
             now=now,
         )
     except (DraftBlocked, ProfileBlocked, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
 
     return {
         "brief": brief,
@@ -179,8 +182,9 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
         "broker": getattr(paper.broker, "name", "paper"),
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
+        "strategyAutoActivated": ensured["autoActivated"],
+        "strategyStatus": ensured["statusMessage"],
     }
-
 
 @router.post("/brief/to-broker")
 def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
@@ -311,10 +315,22 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
             now=body.now,
             market=body.market,
         )
+        strategy_auto = False
+        strategy_status = None
         try:
             paper_out = brief_to_paper(request, paper_body)
             draft = paper_out.get("draft")
-            steps.append({"step": "to_paper", "ok": True, "draftId": (draft or {}).get("draftId")})
+            strategy_auto = bool(paper_out.get("strategyAutoActivated"))
+            strategy_status = paper_out.get("strategyStatus")
+            steps.append(
+                {
+                    "step": "to_paper",
+                    "ok": True,
+                    "draftId": (draft or {}).get("draftId"),
+                    "strategyAutoActivated": strategy_auto,
+                    "strategyStatus": strategy_status,
+                }
+            )
         except HTTPException as exc:
             steps.append({"step": "to_paper", "ok": False, "error": exc.detail})
             return {
@@ -323,9 +339,11 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                 "brief": brief,
                 "environment": "SIMULATE",
                 "liveTradingEnabled": False,
-                "error": "to-paper failed",
+                "error": "纸面草稿失败",
             }
     else:
+        strategy_auto = False
+        strategy_status = None
         steps.append({"step": "to_paper", "ok": True, "skipped": True})
 
     return {
@@ -335,9 +353,10 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
         "draft": draft,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
-        "disclaimer": "Wizard is paper SIMULATE only; not investment advice.",
+        "strategyAutoActivated": strategy_auto,
+        "strategyStatus": strategy_status,
+        "disclaimer": "向导仅纸面 SIMULATE；非投资建议。",
     }
-
 
 @router.get("/performance")
 def get_performance(

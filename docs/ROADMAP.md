@@ -880,7 +880,7 @@
 验收：
 
 - [x] `POST` brief→paper；无 liveTradingEnabled
-- [x] UI 一键；需 active strategy
+- [x] UI 一键；无激活时自动 ensure 默认 SIMULATE 策略（v3.9.4）
 
 ---
 

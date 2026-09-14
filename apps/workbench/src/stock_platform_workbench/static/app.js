@@ -33,11 +33,16 @@
     if (err.reason) parts.push(String(err.reason));
     if (err.message && err.message !== "request_failed") parts.push(String(err.message));
     if (err.detail && typeof err.detail === "string") parts.push(err.detail);
+    else if (err.detail && typeof err.detail === "object" && err.detail.error) {
+      parts.push(String(err.detail.error));
+    }
     if (err.capability) parts.push("能力=" + err.capability);
     if (err.provider) parts.push("provider=" + err.provider);
     if (err.status) parts.push("HTTP " + err.status);
     if (!parts.length) return JSON.stringify(err, null, 2);
     var head = parts.join(" · ");
+    // Prefer short Chinese head when detail alone is enough
+    if (parts.length === 1 && err.detail && typeof err.detail === "string") return err.detail;
     return head + "\n" + JSON.stringify(err, null, 2);
   }
 
@@ -1045,6 +1050,30 @@
     }
   }
 
+  async function ensureDefaultPaperStrategy() {
+    const errEl = $("paper-error");
+    clearError(errEl);
+    try {
+      const data = await fetchJson("/api/paper/strategies/ensure-default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      var note =
+        data.strategyStatus ||
+        (data.strategyAutoActivated ? "已自动激活默认纸面策略" : "已有激活策略（幂等）");
+      $("paper-banner").textContent =
+        note +
+        "\nliveTradingEnabled=" +
+        String(data.liveTradingEnabled) +
+        "\nenvironment=" +
+        (data.environment || "SIMULATE");
+      loadPaper();
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
   async function loadBroker() {
     const errEl = $("broker-error");
     clearError(errEl);
@@ -1223,11 +1252,13 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      $("recommend-meta").textContent =
-        "to-paper draftId=" +
-        (data.draft && data.draft.draftId) +
-        " · liveTradingEnabled=" +
-        String(data.liveTradingEnabled);
+      var statusBits = [
+        "to-paper draftId=" + (data.draft && data.draft.draftId),
+        "liveTradingEnabled=" + String(data.liveTradingEnabled),
+      ];
+      if (data.strategyStatus) statusBits.push(data.strategyStatus);
+      else if (data.strategyAutoActivated) statusBits.push("已自动激活默认纸面策略");
+      $("recommend-meta").textContent = statusBits.join(" · ");
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
       loadPaper();
     } catch (e) {
@@ -1300,13 +1331,22 @@
       if (view) view.hidden = false;
       renderSteps($("wizard-steps"), data.steps);
       var draft = data.draft || {};
+      var strategyLabel = "—";
+      if (data.strategyStatus) strategyLabel = data.strategyStatus;
+      else if (data.strategyAutoActivated) strategyLabel = "已自动激活默认纸面策略";
+      else if (draft.draftId) strategyLabel = "沿用已激活策略";
       renderKv($("wizard-kv"), [
         ["结果", data.ok ? "成功" : "失败"],
         ["环境", data.environment || "SIMULATE"],
         ["实盘", data.liveTradingEnabled ? "开（异常）" : "关"],
+        ["策略", strategyLabel],
         ["草稿 ID", draft.draftId || "—"],
         ["可执行", draft.executionEligible == null ? "—" : String(draft.executionEligible)],
       ]);
+      if (data.strategyStatus) {
+        $("wizard-meta").textContent =
+          $("wizard-meta").textContent + " · " + data.strategyStatus;
+      }
       $("wizard-json").textContent = JSON.stringify(data, null, 2);
       var brief = data.brief || (data.steps && data.steps.find(function (s) {
         return s.step === "brief" && s.result;
@@ -1730,6 +1770,7 @@
     $("btn-preset").addEventListener("click", applyPreset);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
+    $("btn-paper-ensure").addEventListener("click", ensureDefaultPaperStrategy);
     $("btn-broker").addEventListener("click", loadBroker);
     $("daily-form").addEventListener("submit", loadDaily);
     $("realtime-form").addEventListener("submit", loadRealtime);

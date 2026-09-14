@@ -31,6 +31,21 @@ def test_profile_blocks_non_simulate() -> None:
         validate_simulation_profile({"allowedEnvironment": "REAL"})
 
 
+def test_lifecycle_ensure_default_simulate_active_idempotent() -> None:
+    from stock_platform_execution.lifecycle import AUTO_ACTIVATED_STATUS_ZH
+
+    life = StrategyLifecycle()
+    first = life.ensure_default_simulate_active(execution_safety_passed=True)
+    assert first["autoActivated"] is True
+    assert first["statusMessage"] == AUTO_ACTIVATED_STATUS_ZH
+    assert life.active is not None
+    h = first["strategyHash"]
+    second = life.ensure_default_simulate_active(execution_safety_passed=True)
+    assert second["autoActivated"] is False
+    assert second["statusMessage"] is None
+    assert second["strategyHash"] == h
+
+
 def test_lifecycle_activate_requires_safety_and_hash() -> None:
     life = StrategyLifecycle()
     spec = build_strategy_spec(universe=["510300"])

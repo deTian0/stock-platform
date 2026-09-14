@@ -10,6 +10,8 @@ from .errors import ActivationBlocked
 
 HASH_SCHEMA = "stock-platform-strategy-v1"
 STAGES = ("draft", "backtested", "validated", "active")
+DEFAULT_SIMULATE_UNIVERSE = ["510300"]
+AUTO_ACTIVATED_STATUS_ZH = "已自动激活默认纸面策略"
 
 
 def _normalize(value: Any) -> Any:
@@ -93,6 +95,39 @@ class StrategyLifecycle:
             "spec": self.validated["spec"],
         }
         return dict(self.active)
+
+    def ensure_default_simulate_active(
+        self,
+        *,
+        universe: list[str] | None = None,
+        execution_safety_passed: bool = True,
+    ) -> dict[str, Any]:
+        """Idempotent daily-path helper: create+activate a SIMULATE default if none active.
+
+        Does not enable live trading. Callers must still enforce timing/admission gates
+        on draft build / execute.
+        """
+        if self.active:
+            return {
+                "active": dict(self.active),
+                "autoActivated": False,
+                "statusMessage": None,
+                "strategyHash": str(self.active["strategyHash"]),
+            }
+        if not execution_safety_passed:
+            raise ActivationBlocked("executionSafety.passed is required to activate")
+        codes = list(universe) if universe else list(DEFAULT_SIMULATE_UNIVERSE)
+        spec = build_strategy_spec(universe=codes or list(DEFAULT_SIMULATE_UNIVERSE))
+        saved = self.save_draft(spec)
+        h = str(saved["strategyHash"])
+        self.mark_validated(h)
+        active = self.activate(h, execution_safety_passed=True)
+        return {
+            "active": dict(active),
+            "autoActivated": True,
+            "statusMessage": AUTO_ACTIVATED_STATUS_ZH,
+            "strategyHash": h,
+        }
 
     def snapshot(self) -> dict[str, Any]:
         return {
