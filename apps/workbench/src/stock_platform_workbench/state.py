@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from stock_platform_providers import (
+    AStockHttpProvider,
     ProviderDeclaration,
     ReplayProvider,
     ReplayTransport,
@@ -93,9 +94,12 @@ def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None =
     }
     transport = ReplayTransport(fixtures_dir)
     replay = ReplayProvider(transport)
+    providers: dict[str, MarketDataProvider] = {"replay": replay}
+    # Live EM adapter is always constructible; network only happens on call.
+    providers["astock_http"] = AStockHttpProvider()
     return WorkbenchState(
         fixtures_dir=fixtures_dir,
         preferences=prefs,
-        providers={"replay": replay},
+        providers=providers,
         declarations=reg.list(),
     )

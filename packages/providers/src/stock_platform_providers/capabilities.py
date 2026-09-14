@@ -85,9 +85,9 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             display="A-stock HTTP (EM throttled)",
             kind="builtin",
             datasets=frozenset({"daily", "realtime"}),
-            available=False,
-            status="pending",
-            pending_reason="Live HTTP adapter not wired yet; use em_get for EM calls only",
+            available=True,
+            status="ok",
+            note="Live East Money via em_get; prefer replay for offline CI",
         )
     )
     reg.register(

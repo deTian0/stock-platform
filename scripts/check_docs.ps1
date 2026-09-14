@@ -32,6 +32,7 @@ $required = @(
   'docs/architecture/0010-market-strategy-global.md',
   'docs/architecture/0011-paper-execution-safety.md',
   'docs/architecture/0012-v1-product-boundary.md',
+  'docs/architecture/0013-astock-http-live.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',

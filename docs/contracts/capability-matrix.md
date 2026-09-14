@@ -49,9 +49,9 @@ CapabilityStatus {
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
 | `replay` | fixtures | **M1.2 已实现** | daily, realtime（CN） |
-| `astock_http` | a-stock-data 库化 | M1.3 声明 pending；live 后续 | daily, realtime, … |
+| `astock_http` | a-stock-data 配方 | **M8.1 已实现**（em_get） | daily, realtime |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
-| `global_http` | global-stock-data 配方 | M5 pending；勿整仓搬 Skill | daily, realtime（US/HK） |
+| `global_http` | global-stock-data 配方 | pending | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |
 | `yaml_custom` | 用户 YAML | M2 | 声明集 |
 

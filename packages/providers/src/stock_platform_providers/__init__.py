@@ -1,5 +1,6 @@
-"""stock-platform providers ? unified Vendor surface (A-share first, US/HK via market)."""
+"""stock-platform providers — unified Vendor surface (A-share first, US/HK via market)."""
 
+from .astock_http import AStockHttpProvider, em_secid
 from .capabilities import (
     CAPABILITY_IDS,
     CAPABILITY_REGISTRY,
@@ -29,6 +30,7 @@ from .symbol import (
 )
 
 __all__ = [
+    "AStockHttpProvider",
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
     "EastmoneyClient",
@@ -45,6 +47,7 @@ __all__ = [
     "SymbolRef",
     "build_capability_matrix",
     "em_get",
+    "em_secid",
     "exchange_prefix",
     "get_market_strategy",
     "get_provider_registry",
@@ -57,4 +60,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
