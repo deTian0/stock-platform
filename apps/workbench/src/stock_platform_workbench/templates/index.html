@@ -24,6 +24,12 @@
             <option value="global_http">global_http</option>
           </select>
         </label>
+        <label>fund_flow provider
+          <select id="pref-fund-flow">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -70,6 +76,39 @@
               <th>close</th>
               <th>volume</th>
               <th>change_pct</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fund-flow" class="panel">
+      <h2>日级资金流</h2>
+      <p class="hint">主力/大小单净流入（元）；默认 replay；可选 astock_http。</p>
+      <form id="fund-flow-form" class="row">
+        <label>symbols
+          <input id="fund-flow-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>start
+          <input id="fund-flow-start" name="start" type="date" value="2026-09-01" />
+        </label>
+        <label>end
+          <input id="fund-flow-end" name="end" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="fund-flow-meta" class="status" aria-live="polite"></p>
+      <pre id="fund-flow-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="fund-flow-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>date</th>
+              <th>main_net</th>
+              <th>large_net</th>
+              <th>super_net</th>
             </tr>
           </thead>
           <tbody></tbody>
