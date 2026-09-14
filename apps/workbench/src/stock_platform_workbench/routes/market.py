@@ -228,3 +228,34 @@ def get_adj_factor(
         "kind": kind,
         "rows": rows,
     }
+
+
+@router.get("/full-minute")
+def get_full_minute(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    trade_date: date | None = Query(
+        None, description="Session day YYYY-MM-DD; default provider today (CN)"
+    ),
+    count: int = Query(300, ge=0, le=1000, description="Max 1m bars per symbol"),
+) -> dict[str, Any]:
+    """Same-day 1m batch (full_minute) — distinct from multi-freq /minute."""
+    state = request.app.state.workbench
+    provider = state.resolve("full_minute")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_full_minute", None)
+    if getter is None:
+        return {
+            "capability": "full_minute",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_full_minute",
+        }
+    rows = getter(syms, trade_date=trade_date, count=count)
+    return {
+        "capability": "full_minute",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "trade_date": trade_date.isoformat() if trade_date else None,
+        "count": count,
+        "rows": rows,
+    }

@@ -43,6 +43,8 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="fund-flow"' in body
     assert 'id="lhb"' in body
     assert 'id="unlock"' in body
+    assert 'id="adj-factor"' in body
+    assert 'id="full-minute"' in body
     assert 'id="paper"' in body
     assert 'id="debate"' in body
     assert "/static/app.js" in body
@@ -60,6 +62,8 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/fund-flow" in text
     assert "/api/market/lhb" in text
     assert "/api/market/unlock" in text
+    assert "/api/market/adj-factor" in text
+    assert "/api/market/full-minute" in text
     assert "/api/paper/status" in text
     assert "/api/debate/report" in text
     assert "fail_closed" in text
@@ -88,7 +92,8 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["financial"]["effective"] == "replay"
     assert by_id["adj_factor"]["usable"] is True
     assert by_id["adj_factor"]["effective"] == "replay"
-    assert by_id["full_minute"]["usable"] is False
+    assert by_id["full_minute"]["usable"] is True
+    assert by_id["full_minute"]["effective"] == "replay"
 
 
 def test_daily_and_realtime(client: TestClient) -> None:
@@ -312,27 +317,45 @@ def test_can_prefer_adj_factor_astock_http(client: TestClient) -> None:
     assert by_id["adj_factor"]["usable"] is True
 
 
-def test_full_minute_fail_closed(client: TestClient) -> None:
-    r = client.get("/api/market/adj-factor", params={"symbols": "600519"})
-    # adj_factor usable; full_minute remains fail-closed sentinel
-    assert r.status_code == 200
-    matrix = client.get("/api/settings/capability-matrix").json()
-    by_id = {row["id"]: row for row in matrix}
-    assert by_id["adj_factor"]["usable"] is True
-    assert by_id["full_minute"]["usable"] is False
-
-
-def test_prefer_unavailable_capability_still_fail_closed(client: TestClient) -> None:
-    r = client.put(
-        "/api/settings/preferences",
-        json={"preferences": {"full_minute": "astock_http", "daily": "replay"}},
+def test_full_minute_replay(client: TestClient) -> None:
+    r = client.get(
+        "/api/market/full-minute",
+        params={"symbols": "600519,000001", "trade_date": "2026-09-01", "count": 300},
     )
     assert r.status_code == 200
-    assert r.json()["preferences"]["full_minute"] == "astock_http"
+    body = r.json()
+    assert body["capability"] == "full_minute"
+    assert body["provider"] == "replay"
+    assert body["trade_date"] == "2026-09-01"
+    assert len(body["rows"]) == 5
+    assert all(row["freq"] == "1m" for row in body["rows"])
+    assert {row["symbol"] for row in body["rows"]} == {"600519", "000001"}
+
+
+def test_can_prefer_full_minute_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"full_minute": "astock_http"}},
+    )
+    assert put.status_code == 200
     matrix = client.get("/api/settings/capability-matrix").json()
     by_id = {row["id"]: row for row in matrix}
-    assert by_id["full_minute"]["usable"] is False
-    assert by_id["full_minute"]["candidates"] == []
+    assert by_id["full_minute"]["effective"] == "astock_http"
+    assert by_id["full_minute"]["usable"] is True
+
+
+def test_prefer_unknown_provider_falls_back(client: TestClient) -> None:
+    """Preferring a non-candidate name still leaves full_minute usable via fallback."""
+    r = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"full_minute": "tickflow", "daily": "replay"}},
+    )
+    assert r.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["full_minute"]["usable"] is True
+    assert by_id["full_minute"]["effective"] == "replay"
+    assert by_id["full_minute"]["candidates"]
 
 
 def test_routes_do_not_hardcode_tickflow(client: TestClient) -> None:
