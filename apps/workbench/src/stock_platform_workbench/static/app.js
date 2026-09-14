@@ -89,6 +89,12 @@
       if (minute && minute.effective) {
         $("pref-minute").value = minute.effective;
       }
+      const depth5 = rows.find(function (r) {
+        return r.id === "depth5";
+      });
+      if (depth5 && depth5.effective) {
+        $("pref-depth5").value = depth5.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
@@ -99,7 +105,9 @@
         " · unlock=" +
         (unlock && unlock.effective ? unlock.effective : "") +
         " · minute=" +
-        (minute && minute.effective ? minute.effective : "");
+        (minute && minute.effective ? minute.effective : "") +
+        " · depth5=" +
+        (depth5 && depth5.effective ? depth5.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -113,6 +121,7 @@
     const lhb = $("pref-lhb").value;
     const unlock = $("pref-unlock").value;
     const minute = $("pref-minute").value;
+    const depth5 = $("pref-depth5").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -125,6 +134,7 @@
             lhb: lhb,
             unlock: unlock,
             minute: minute,
+            depth5: depth5,
           },
         }),
       });
@@ -138,7 +148,9 @@
         " unlock=" +
         unlock +
         " minute=" +
-        minute;
+        minute +
+        " depth5=" +
+        depth5;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -236,6 +248,52 @@
         showError(errEl, detail);
       }
       $("minute-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
+  async function loadDepth5(event) {
+    if (event) event.preventDefault();
+    const errEl = $("depth5-error");
+    clearError(errEl);
+    $("depth5-meta").textContent = "";
+    $("depth5-json").textContent = "";
+    const symbols = $("depth5-symbols").value.trim();
+    const params = new URLSearchParams({ symbols: symbols });
+    try {
+      const data = await fetchJson("/api/market/depth5?" + params.toString());
+      $("depth5-meta").textContent =
+        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
+      const tbody = $("depth5-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.rows || []) {
+        for (let i = 0; i < 5; i++) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            row.symbol +
+            "</td><td>" +
+            (i + 1) +
+            "</td><td>" +
+            (row.bid_prices ? row.bid_prices[i] : "") +
+            "</td><td>" +
+            (row.bid_volumes ? row.bid_volumes[i] : "") +
+            "</td><td>" +
+            (row.ask_prices ? row.ask_prices[i] : "") +
+            "</td><td>" +
+            (row.ask_volumes ? row.ask_volumes[i] : "") +
+            "</td>";
+          tbody.appendChild(tr);
+        }
+      }
+      $("depth5-json").textContent = JSON.stringify(data.rows || [], null, 2);
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("depth5-table").querySelector("tbody").innerHTML = "";
     }
   }
 
@@ -465,6 +523,7 @@
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);
     $("minute-form").addEventListener("submit", loadMinute);
+    $("depth5-form").addEventListener("submit", loadDepth5);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);

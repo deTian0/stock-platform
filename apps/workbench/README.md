@@ -13,6 +13,7 @@
 | **M6.3 / v0.6.3** | `/api/paper/*` 纸面执行（SIMULATE only） |
 | **M11 / v1.3.1+** | `GET /` 最小 UI（矩阵 / 日 K / 纸面） |
 | **M18.2 / v1.10.2** | `GET /api/market/minute` + UI；默认 replay |
+| **M19.2 / v1.11.2** | `GET /api/market/depth5` + UI；默认 replay |
 
 ## 安装与运行
 
@@ -35,10 +36,11 @@ python -m stock_platform_workbench
 |------|------|------|
 | GET | `/` | 最小操作台 UI |
 | GET | `/health` | 健康检查 |
-| GET | `/api/settings/capability-matrix` | 能力矩阵（含 minute / fund_flow / lhb / unlock） |
+| GET | `/api/settings/capability-matrix` | 能力矩阵（含 minute / depth5 / fund_flow / lhb / unlock） |
 | GET | `/api/market/daily?symbols=` | 经矩阵 resolve(`daily`) |
 | GET | `/api/market/realtime?symbols=` | 经矩阵 resolve(`realtime`) |
 | GET | `/api/market/minute?symbols=&freq=` | 经矩阵 resolve(`minute`)；无候选仍 **409** |
+| GET | `/api/market/depth5?symbols=` | 经矩阵 resolve(`depth5`)；无候选仍 **409** |
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |

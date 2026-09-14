@@ -48,6 +48,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>depth5 provider
+          <select id="pref-depth5">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -141,6 +147,35 @@
           <tbody></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="depth5" class="panel">
+      <h2>五档盘口</h2>
+      <p class="hint">买/卖各五档；量=手；默认 replay；可选 astock_http。</p>
+      <form id="depth5-form" class="row">
+        <label>symbols
+          <input id="depth5-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="depth5-meta" class="status" aria-live="polite"></p>
+      <pre id="depth5-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="depth5-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>level</th>
+              <th>bid</th>
+              <th>bid_vol</th>
+              <th>ask</th>
+              <th>ask_vol</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="depth5-json" class="code"></pre>
     </section>
 
     <section id="fund-flow" class="panel">
