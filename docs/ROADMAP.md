@@ -43,7 +43,7 @@
 | M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
 | M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | done |
 | M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | done |
-| M8 | A 股 live HTTP（可选） | 大 | `v1.1.0` | in_progress |
+| M8 | A 股 live HTTP（可选） | 大 | `v1.1.0` | done |
 | M8.1 | `AStockHttpProvider` via `em_get` | 小 | `v1.0.1` | done |
 | M8.2 | workbench 可偏好 live daily/realtime | 小 | `v1.0.2` | done |
 
@@ -359,7 +359,7 @@
 
 验收（大）：
 
-- [ ] M8.1–M8.2 done；CHANGELOG 含 `1.1.0`
+- [x] M8.1–M8.2 done；CHANGELOG 含 `1.1.0`
 
 ---
 
