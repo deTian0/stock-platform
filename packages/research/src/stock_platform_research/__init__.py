@@ -35,4 +35,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "1.18.0"
+__version__ = "1.19.0"
