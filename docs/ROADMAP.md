@@ -95,8 +95,8 @@
 | M24.1 | universe + panel 内核 + ADR 0029 | 小 | `v1.16.1` | done |
 | M25 | 盘前简报批处理 | 大 | `v1.18.0` | done |
 | M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | done |
-| M27 | Recommend → PaperLedger | 大 | `v1.20.0` | in_progress |
-| M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | planned |
+| M27 | Recommend → PaperLedger | 大 | `v1.20.0` | done |
+| M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | in_progress |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -852,8 +852,8 @@
 
 验收：
 
-- [ ] `POST` brief→paper；无 liveTradingEnabled
-- [ ] UI 一键；需 active strategy
+- [x] `POST` brief→paper；无 liveTradingEnabled
+- [x] UI 一键；需 active strategy
 
 ---
 
