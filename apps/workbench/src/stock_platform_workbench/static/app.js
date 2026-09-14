@@ -95,6 +95,12 @@
       if (depth5 && depth5.effective) {
         $("pref-depth5").value = depth5.effective;
       }
+      const financial = rows.find(function (r) {
+        return r.id === "financial";
+      });
+      if (financial && financial.effective) {
+        $("pref-financial").value = financial.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
@@ -107,7 +113,9 @@
         " · minute=" +
         (minute && minute.effective ? minute.effective : "") +
         " · depth5=" +
-        (depth5 && depth5.effective ? depth5.effective : "");
+        (depth5 && depth5.effective ? depth5.effective : "") +
+        " · financial=" +
+        (financial && financial.effective ? financial.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -122,6 +130,7 @@
     const unlock = $("pref-unlock").value;
     const minute = $("pref-minute").value;
     const depth5 = $("pref-depth5").value;
+    const financial = $("pref-financial").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -135,6 +144,7 @@
             unlock: unlock,
             minute: minute,
             depth5: depth5,
+            financial: financial,
           },
         }),
       });
@@ -150,7 +160,9 @@
         " minute=" +
         minute +
         " depth5=" +
-        depth5;
+        depth5 +
+        " financial=" +
+        financial;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -294,6 +306,63 @@
         showError(errEl, detail);
       }
       $("depth5-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
+  async function loadFinancial(event) {
+    if (event) event.preventDefault();
+    const errEl = $("financial-error");
+    clearError(errEl);
+    $("financial-meta").textContent = "";
+    $("financial-json").textContent = "";
+    const symbols = $("financial-symbols").value.trim();
+    const periods = $("financial-periods").value.trim() || "8";
+    const params = new URLSearchParams({ symbols: symbols, periods: periods });
+    try {
+      const data = await fetchJson("/api/market/financial?" + params.toString());
+      const items = data.items || [];
+      $("financial-meta").textContent =
+        "provider=" + data.provider + " · items=" + items.length;
+      const tbody = $("financial-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const item of items) {
+        const income = item.income || [];
+        const balance = item.balance || [];
+        const cashflow = item.cashflow || [];
+        const n = Math.max(income.length, balance.length, cashflow.length, 1);
+        for (let i = 0; i < n; i++) {
+          const inc = income[i] || {};
+          const bal = balance[i] || {};
+          const cf = cashflow[i] || {};
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            item.symbol +
+            "</td><td>" +
+            (inc.period_end || bal.period_end || cf.period_end || "") +
+            "</td><td>" +
+            (inc.revenue != null ? inc.revenue : "") +
+            "</td><td>" +
+            (inc.net_income != null ? inc.net_income : "") +
+            "</td><td>" +
+            (bal.total_assets != null ? bal.total_assets : "") +
+            "</td><td>" +
+            (cf.net_operating_cash_flow != null
+              ? cf.net_operating_cash_flow
+              : "") +
+            "</td>";
+          tbody.appendChild(tr);
+        }
+      }
+      $("financial-json").textContent = JSON.stringify(items, null, 2);
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("financial-table").querySelector("tbody").innerHTML = "";
     }
   }
 
@@ -524,6 +593,7 @@
     $("daily-form").addEventListener("submit", loadDaily);
     $("minute-form").addEventListener("submit", loadMinute);
     $("depth5-form").addEventListener("submit", loadDepth5);
+    $("financial-form").addEventListener("submit", loadFinancial);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);

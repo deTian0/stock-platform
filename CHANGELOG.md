@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.12.2] - 2026-09-14
+
+### Added
+
+- M20.2：workbench `GET /api/market/financial` + UI `#financial`；默认偏好 replay
+
 ## [1.12.1] - 2026-09-14
 
 ### Added

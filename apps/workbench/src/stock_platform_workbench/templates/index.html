@@ -54,6 +54,12 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>financial provider
+          <select id="pref-financial">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <button type="button" id="btn-pref" class="secondary">应用偏好</button>
         <button type="button" id="btn-matrix">刷新矩阵</button>
       </div>
@@ -176,6 +182,38 @@
         </table>
       </div>
       <pre id="depth5-json" class="code"></pre>
+    </section>
+
+    <section id="financial" class="panel">
+      <h2>财务报表</h2>
+      <p class="hint">利润表/资产负债表/现金流量表（元）；默认 replay；可选新浪 live。</p>
+      <form id="financial-form" class="row">
+        <label>symbols
+          <input id="financial-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>periods
+          <input id="financial-periods" name="periods" type="number" min="1" max="40" value="8" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="financial-meta" class="status" aria-live="polite"></p>
+      <pre id="financial-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="financial-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>period_end</th>
+              <th>revenue</th>
+              <th>net_income</th>
+              <th>total_assets</th>
+              <th>op_cf</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <pre id="financial-json" class="code"></pre>
     </section>
 
     <section id="fund-flow" class="panel">

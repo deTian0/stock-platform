@@ -84,8 +84,10 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["minute"]["effective"] == "replay"
     assert by_id["depth5"]["usable"] is True
     assert by_id["depth5"]["effective"] == "replay"
+    assert by_id["financial"]["usable"] is True
+    assert by_id["financial"]["effective"] == "replay"
     assert by_id["adj_factor"]["usable"] is False
-    assert by_id["financial"]["usable"] is False
+    assert by_id["full_minute"]["usable"] is False
 
 
 def test_daily_and_realtime(client: TestClient) -> None:
@@ -259,28 +261,53 @@ def test_can_prefer_depth5_astock_http(client: TestClient) -> None:
     assert by_id["depth5"]["usable"] is True
 
 
-def test_financial_fail_closed(client: TestClient) -> None:
-    r = client.get("/api/market/minute", params={"symbols": "600519"})
-    # minute/depth5 usable; financial remains the fail-closed sentinel via matrix
+def test_financial_replay(client: TestClient) -> None:
+    r = client.get("/api/market/financial", params={"symbols": "SH600519", "periods": 2})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "financial"
+    assert body["provider"] == "replay"
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert item["symbol"] == "600519"
+    assert item["income"][0]["revenue"] == 39112000000.0
+    assert item["balance"][0]["total_assets"] == 310000000000.0
+
+
+def test_can_prefer_financial_astock_http(client: TestClient) -> None:
+    put = client.put(
+        "/api/settings/preferences",
+        json={"preferences": {"financial": "astock_http"}},
+    )
+    assert put.status_code == 200
+    matrix = client.get("/api/settings/capability-matrix").json()
+    by_id = {row["id"]: row for row in matrix}
+    assert by_id["financial"]["effective"] == "astock_http"
+    assert by_id["financial"]["usable"] is True
+
+
+def test_adj_factor_fail_closed(client: TestClient) -> None:
+    r = client.get("/api/market/financial", params={"symbols": "600519"})
+    # financial usable; adj_factor / full_minute remain fail-closed sentinels
     assert r.status_code == 200
     matrix = client.get("/api/settings/capability-matrix").json()
     by_id = {row["id"]: row for row in matrix}
-    assert by_id["depth5"]["usable"] is True
-    assert by_id["financial"]["usable"] is False
+    assert by_id["financial"]["usable"] is True
     assert by_id["adj_factor"]["usable"] is False
+    assert by_id["full_minute"]["usable"] is False
 
 
 def test_prefer_unavailable_capability_still_fail_closed(client: TestClient) -> None:
     r = client.put(
         "/api/settings/preferences",
-        json={"preferences": {"financial": "astock_http", "daily": "replay"}},
+        json={"preferences": {"adj_factor": "astock_http", "daily": "replay"}},
     )
     assert r.status_code == 200
-    assert r.json()["preferences"]["financial"] == "astock_http"
+    assert r.json()["preferences"]["adj_factor"] == "astock_http"
     matrix = client.get("/api/settings/capability-matrix").json()
     by_id = {row["id"]: row for row in matrix}
-    assert by_id["financial"]["usable"] is False
-    assert by_id["financial"]["candidates"] == []
+    assert by_id["adj_factor"]["usable"] is False
+    assert by_id["adj_factor"]["candidates"] == []
 
 
 def test_routes_do_not_hardcode_tickflow(client: TestClient) -> None:
