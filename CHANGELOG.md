@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.12.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M19 完成**：CN 个股五档盘口（能力矩阵 `depth5`；replay + `em_get` push2 stock/get）
+  - ADR 0024；workbench API/UI；默认仍 replay；mootdx / 交易所官方备胎不做
+
 ## [1.11.2] - 2026-09-14
 
 ### Added

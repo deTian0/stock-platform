@@ -76,7 +76,7 @@
 | M18 | CN 分钟 K | 大 | `v1.11.0` | done |
 | M18.1 | minute provider + matrix + ADR 0023 | 小 | `v1.10.1` | done |
 | M18.2 | workbench minute API + UI | 小 | `v1.10.2` | done |
-| M19 | CN 五档盘口 | 大 | `v1.12.0` | in_progress |
+| M19 | CN 五档盘口 | 大 | `v1.12.0` | done |
 | M19.1 | depth5 provider + matrix + ADR 0024 | 小 | `v1.11.1` | done |
 | M19.2 | workbench depth5 API + UI | 小 | `v1.11.2` | done |
 
@@ -672,7 +672,7 @@
 
 验收（大）：
 
-- [ ] M19.1–M19.2 done；CHANGELOG 含 `1.12.0`
+- [x] M19.1–M19.2 done；CHANGELOG 含 `1.12.0`
 
 ---
 
