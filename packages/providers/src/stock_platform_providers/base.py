@@ -17,6 +17,7 @@ class MarketDataProvider(Protocol):
     - M19+ ``get_depth5`` → ``depth5`` (CN five-level order book; volumes in 手)
     - M20+ ``get_financial`` → ``financial`` (CN income/balance/cashflow; amounts in 元)
     - M21+ ``get_adj_factor`` → ``adj_factor`` (CN ex-rights factors; column ``ex_factor``)
+    - M23+ ``apply_adjust`` (deterministic OHLC scale; not a capability id)
     - M22+ ``get_full_minute`` → ``full_minute`` (same-day 1m batch; not multi-freq minute)
     - M15+ ``get_fund_flow`` → ``fund_flow``
     - M16+ ``get_lhb`` → ``lhb`` (dragon-tiger board)

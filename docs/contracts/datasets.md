@@ -67,6 +67,10 @@ asset_type ∈ { "stock", "etf", "index" }
 
 毫秒零点戳转日期时须按 **Asia/Shanghai**，禁止直接用 UTC `from_epoch().date()`（会整体早一天）。
 
+套价（**非独立能力**，M23）：`apply_adjust(bars, factors, kind=qfq|hfq)` 把因子阶梯套到不复权 OHLC。
+`qfq` 为除数、`hfq` 为乘数；输出带 `ex_factor` + `adjust_kind`。空因子不得返回未复权价。
+只缩放 `open/high/low/close/pre_close`。涨跌停判定仍用不复权 raw。
+
 ### `realtime`（实时快照）
 
 | 字段 | 类型 | 必填 | 单位 / 语义 |

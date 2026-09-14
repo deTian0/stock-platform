@@ -88,6 +88,9 @@
 | M22 | CN 全量分钟 | 大 | `v1.15.0` | done |
 | M22.1 | full_minute provider + matrix + ADR 0027 | 小 | `v1.14.1` | done |
 | M22.2 | workbench full-minute API + UI | 小 | `v1.14.2` | done |
+| M23 | CN 复权套价 | 大 | `v1.16.0` | in_progress |
+| M23.1 | apply_adjust 内核 + ADR 0028 | 小 | `v1.15.1` | done |
+| M23.2 | workbench daily-adjusted API + UI | 小 | `v1.15.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -760,6 +763,32 @@
 验收（大）：
 
 - [x] M22.1–M22.2 done；CHANGELOG 含 `1.15.0`
+
+---
+
+## M23 — CN 复权套价 → `v1.16.0`
+
+**目标**：用已有 `adj_factor` 对不复权日 K 做确定性套价（qfq 除 / hfq 乘）；不新增能力 id；默认 replay；CI 零公网。
+
+### 小里程碑
+
+#### M23.1 → `v1.15.1`
+
+验收：
+
+- [x] `apply_adjust` + ADR 0028；qfq/hfq 方向与空因子 fail-closed 单测
+- [x] 不新增能力 id；无 HTTP / 无 pandas
+
+#### M23.2 → `v1.15.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/daily-adjusted`；默认偏好 replay；可选 UI
+- [ ] 路由 `resolve("daily")` + `resolve("adj_factor")`
+
+验收（大）：
+
+- [ ] M23.1–M23.2 done；CHANGELOG 含 `1.16.0`
 
 ---
 

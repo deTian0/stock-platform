@@ -22,6 +22,7 @@
 | **M19.1 / v1.11.1** | CN 五档盘口 `get_depth5`（replay + push2 stock/get / `em_get`） |
 | **M20.1 / v1.12.1** | CN 财务报表 `get_financial`（replay + 新浪三表；非 em_get） |
 | **M21.1 / v1.13.1** | CN 复权因子 `get_adj_factor`（replay + 新浪 qfq/hfq；非 em_get） |
+| **M23.1 / v1.15.1** | `apply_adjust` 确定性套价（qfq 除 / hfq 乘；非独立能力） |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
@@ -51,7 +52,7 @@ python -m pip install -e ".[http]"
 | `GlobalHttpProvider` / `GlobalHttpRouter` | 美港 live（Yahoo + 新浪；不经 `em_get`） |
 | `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口 |
 | `build_capability_matrix` / `register_builtin_providers` | 能力路由 |
-| `SymbolError` | 非法代码 |
+| `apply_adjust` | 用 `adj_factor` 套不复权 OHLC（qfq 除 / hfq 乘） |
 
 ## 硬约束
 

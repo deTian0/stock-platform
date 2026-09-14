@@ -27,3 +27,4 @@ python -m pytest -q
 
 - 评分不得使用 `fwd_*` / `next_*` 等未来列（`assert_no_lookahead_columns`）
 - 信号日与成交日分离：信号用 T 收盘特征，成交用 T+1 open
+- 跨除权日比价前先经 `stock_platform_providers.apply_adjust`（M23）；本包不内嵌抓取
