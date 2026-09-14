@@ -579,16 +579,56 @@
     $("debate-meta").textContent = "";
     const symbol = $("debate-symbol").value.trim();
     const asof = $("debate-asof").value;
-    const params = new URLSearchParams({ symbol: symbol });
+    const engine = ($("debate-engine") && $("debate-engine").value) || "deterministic";
+    const params = new URLSearchParams({ symbol: symbol, engine: engine });
     if (asof) params.set("asof", asof);
     try {
       const data = await fetchJson("/api/debate/report?" + params.toString());
       $("debate-meta").textContent =
-        "verdict=" + data.verdict + " · net=" + (data.score && data.score.net);
+        "engine=" +
+        engine +
+        " · kind=" +
+        (data.kind || "") +
+        " · verdict=" +
+        data.verdict +
+        " · net=" +
+        (data.score && data.score.net);
       $("debate-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
       $("debate-json").textContent = "";
+    }
+  }
+
+  async function recommendDebate() {
+    const errEl = $("recommend-error");
+    clearError(errEl);
+    const asof = $("recommend-asof").value;
+    const symbols = $("recommend-symbols").value.trim();
+    const topN = Number($("recommend-topn").value || "5");
+    const engine = ($("debate-engine") && $("debate-engine").value) || "deterministic";
+    const body = {
+      asof: asof,
+      topN: topN,
+      adjust_kind: "none",
+      engine: engine,
+      maxPicks: topN,
+    };
+    if (symbols) body.symbols = symbols;
+    try {
+      const data = await fetchJson("/api/research/brief/debate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      $("recommend-meta").textContent =
+        "brief/debate engine=" +
+        data.engine +
+        " · debates=" +
+        (data.debates ? data.debates.length : 0);
+      $("recommend-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
     }
   }
 
@@ -897,6 +937,7 @@
     $("debate-form").addEventListener("submit", loadDebate);
     $("recommend-form").addEventListener("submit", loadRecommend);
     $("btn-recommend-paper").addEventListener("click", recommendToPaper);
+    $("btn-recommend-debate").addEventListener("click", recommendDebate);
     $("btn-performance").addEventListener("click", loadPerformance);
     loadMatrix();
     loadPaper();

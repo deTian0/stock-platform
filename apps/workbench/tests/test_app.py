@@ -85,6 +85,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/debate/report" in text
     assert "/api/research/brief" in text
     assert "/api/research/brief/to-paper" in text
+    assert "/api/research/brief/debate" in text
     assert "/api/research/performance" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
@@ -481,6 +482,53 @@ def test_debate_slot(client: TestClient) -> None:
     assert body["verdict"] in {"Buy", "Hold", "Sell"}
     assert any(round_["role"] == "bull" for round_ in body["rounds"])
     assert "非投资建议" in body["disclaimer"]
+
+
+def test_debate_llm_fail_closed_without_env(client: TestClient) -> None:
+    st = client.get("/api/debate/status")
+    assert st.status_code == 200
+    assert st.json()["defaultEngine"] == "deterministic"
+    r = client.get(
+        "/api/debate/report",
+        params={"symbol": "600519", "asof": "2026-09-02", "engine": "llm"},
+    )
+    assert r.status_code == 400
+    assert "fail-closed" in r.json()["detail"]
+
+
+def test_brief_debate_deterministic(client: TestClient) -> None:
+    r = client.post(
+        "/api/research/brief/debate",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 2,
+            "adjust_kind": "none",
+            "engine": "deterministic",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["engine"] == "deterministic"
+    assert body["liveTradingEnabled"] is False
+    assert "brief" in body
+    assert isinstance(body["debates"], list)
+    # Fixture panel may gate to zero picks; unit tests cover non-empty debate_brief_picks.
+    for item in body["debates"]:
+        assert item["debate"]["kind"] == "debate"
+
+    llm = client.post(
+        "/api/research/brief/debate",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "engine": "llm",
+        },
+    )
+    assert llm.status_code == 400
+    assert "fail-closed" in llm.json()["detail"]
 
 
 def test_research_rejects_hk(client: TestClient) -> None:

@@ -8,6 +8,16 @@
 
 - （无）
 
+## [2.5.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M33 完成**：可选 LLM 辩论挂在 TopN 之后
+  - 默认仍 M12 确定性 `engine=deterministic`
+  - `engine=llm` + `[llm]` optional-extra；缺依赖/密钥 fail-closed
+  - `POST /api/research/brief/debate`；`GET /api/debate/report?engine=`
+  - ADR 0034；mocked LLM 单测
+
 ## [2.4.0] - 2026-09-14
 
 ### Added

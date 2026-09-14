@@ -24,6 +24,7 @@
 | **M30 / v2.2.0** | live 预设 `GET/POST /api/settings/presets*` |
 | **M31 / v2.3.0** | `GET /api/ops/health` |
 | **M32 / v2.4.0** | `GET /api/research/performance` + `#performance` |
+| **M33 / v2.5.0** | `engine=llm` 可选辩论 + `POST /api/research/brief/debate` |
 
 ## 安装与运行
 

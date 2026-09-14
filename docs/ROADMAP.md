@@ -101,7 +101,7 @@
 | M30 | live 偏好模板 + 东财熔断 | 大 | `v2.2.0` | done |
 | M31 | 运维健康检查 + Phase B 收口 | 大 | `v2.3.0` | done |
 | M32 | 推荐绩效统计 | 大 | `v2.4.0` | done |
-| M33 | 可选 LLM 辩论挂在 TopN 之后 | 大 | `v2.5.0` | planned |
+| M33 | 可选 LLM 辩论挂在 TopN 之后 | 大 | `v2.5.0` | done |
 | M34 | 策略配置版本化 + 回测对比 + Phase C 收口 | 大 | `v2.6.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
@@ -950,8 +950,8 @@
 
 验收：
 
-- [ ] Soft import / `[llm]` extra；默认 deterministic
-- [ ] TopN 后辩论 API；mocked LLM 单测；ADR 0034
+- [x] Soft import / `[llm]` extra；默认 deterministic
+- [x] TopN 后辩论 API；mocked LLM 单测；ADR 0034
 
 ---
 
