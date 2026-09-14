@@ -146,3 +146,27 @@ def test_daily_cli_requires_fixtures() -> None:
     except SystemExit as exc:
         code = int(exc.code or 1)
     assert code != 0
+
+
+def test_daily_pipeline_repo_fixtures_nonempty_picks(tmp_path: Path) -> None:
+    """Documented replay path: sample universe + provider fixtures → exit-ok + picks."""
+    from stock_platform_providers import ReplayProvider, ReplayTransport
+    from stock_platform_research.universe import default_universe_fixture_path
+
+    repo = Path(__file__).resolve().parents[3]
+    fixtures = repo / "packages" / "providers" / "tests" / "fixtures"
+    assert fixtures.is_dir()
+    provider = ReplayProvider(ReplayTransport(fixtures))
+    report = run_daily_pipeline(
+        asof=date(2026, 9, 2),
+        provider=provider,
+        out_dir=tmp_path,
+        universe_path=default_universe_fixture_path(),
+        top_n=10,
+    )
+    assert report.ok, report.error or report.failures
+    assert report.brief_path
+    brief = json.loads(Path(report.brief_path).read_text(encoding="utf-8"))
+    assert brief["environment"] == "SIMULATE"
+    assert len(brief.get("picks") or []) >= 1
+    assert (tmp_path / "briefs" / "latest.json").is_file()

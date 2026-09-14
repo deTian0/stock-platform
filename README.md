@@ -21,8 +21,9 @@
 ## 日用路径（Phase E）
 
 ```powershell
-# 1) CLI 日流水线（replay / CI）
+# 1) CLI 日流水线（replay / CI，零公网；默认样例宇宙对齐 fixtures）
 stock-platform-daily --asof 2026-09-02 --provider replay --fixtures .\packages\providers\tests\fixtures --out $env:TEMP\sp-daily
+# 细节与 --skip-refresh 变体：docs/ops/daily-pipeline.md
 
 # 2) Windows 调度（交易日跳过休市）
 powershell -NoProfile -File .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02

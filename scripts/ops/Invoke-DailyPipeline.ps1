@@ -38,6 +38,10 @@
   # skips (CN New Year observed) with exit 0
 
 .EXAMPLE
+  .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02
+  # replay demo against repo fixtures (default universe + fixtures path)
+
+.EXAMPLE
   .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2028-01-05 -SkipRefresh
 #>
 [CmdletBinding()]

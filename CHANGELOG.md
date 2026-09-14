@@ -8,6 +8,12 @@
 
 - （无）
 
+## [3.8.1] - 2026-09-14
+
+### Fixed
+
+- **日流水线 replay 默认可跑通**：样例宇宙（`600519`/`000001`/`510300`）对齐 providers fixtures；日线扩至 ≥60 根以支撑 lvrev；补齐 `fund_flow`/`adj_factor`/`full_minute`；文档命令与 `test_daily_pipeline_repo_fixtures_nonempty_picks` 断言 exit 0 + 非空 picks
+
 ## [3.8.0] - 2026-09-14
 
 ### Added
