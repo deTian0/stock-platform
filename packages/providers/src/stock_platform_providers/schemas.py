@@ -128,3 +128,36 @@ DEPTH5_COLUMNS = [
 ]
 
 DEPTH5_LEVELS = 5
+
+# CN financial statements aggregate (三表). Amounts in 元.
+FINANCIAL_TOP_KEYS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "periods",
+    "income",
+    "balance",
+    "cashflow",
+]
+
+FINANCIAL_INCOME_COLUMNS = [
+    "period_end",
+    "revenue",
+    "net_income",
+    "net_income_attributable",
+    "basic_eps",
+]
+
+FINANCIAL_BALANCE_COLUMNS = [
+    "period_end",
+    "total_assets",
+    "total_liabilities",
+    "total_equity",
+]
+
+FINANCIAL_CASHFLOW_COLUMNS = [
+    "period_end",
+    "net_operating_cash_flow",
+    "net_investing_cash_flow",
+    "net_financing_cash_flow",
+]

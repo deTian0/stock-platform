@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.12.1] - 2026-09-14
+
+### Added
+
+- M20.1：CN 财务报表 `financial`（激活矩阵第六项；ADR 0025）
+  - `ReplayProvider` / `AStockHttpProvider.get_financial`；新浪三表（非 em_get）；fixtures；CI 零公网
+
 ## [1.12.0] - 2026-09-14
 
 ### Added

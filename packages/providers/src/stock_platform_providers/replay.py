@@ -12,6 +12,7 @@ from .errors import SymbolError
 from .normalize import (
     normalize_daily_row,
     normalize_depth5_row,
+    normalize_financial_payload,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -33,6 +34,7 @@ class ReplayTransport:
         lhb_{symbol}.json         # dict aggregate {records, seats, institution}
         unlock_{symbol}.json      # dict aggregate {history, upcoming}
         depth5_{symbol}.json      # dict or {"quote": {...}} five-level book
+        financial_{symbol}.json   # dict aggregate {income, balance, cashflow}
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -107,6 +109,13 @@ class ReplayTransport:
             if isinstance(quote, dict):
                 return quote
         raise ValueError(f"unexpected depth5 fixture shape in {path}")
+
+    def load_financial(self, symbol: str) -> dict[str, Any]:
+        path = self.fixtures_dir / f"financial_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        raise ValueError(f"unexpected financial fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -321,3 +330,29 @@ class ReplayProvider:
                 )
             )
         return rows
+
+    def get_financial(
+        self,
+        symbols: list[str],
+        *,
+        periods: int = 8,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Three-statement financial aggregate. Missing fixture → skip."""
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                raw = self._transport.load_financial(symbol)
+            except FileNotFoundError:
+                continue
+            items.append(
+                normalize_financial_payload(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                    periods=periods if "periods" not in raw else None,
+                )
+            )
+        return items

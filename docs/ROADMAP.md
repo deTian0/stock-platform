@@ -79,6 +79,9 @@
 | M19 | CN 五档盘口 | 大 | `v1.12.0` | done |
 | M19.1 | depth5 provider + matrix + ADR 0024 | 小 | `v1.11.1` | done |
 | M19.2 | workbench depth5 API + UI | 小 | `v1.11.2` | done |
+| M20 | CN 财务报表 | 大 | `v1.13.0` | in_progress |
+| M20.1 | financial provider + matrix + ADR 0025 | 小 | `v1.12.1` | done |
+| M20.2 | workbench financial API + UI | 小 | `v1.12.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -673,6 +676,32 @@
 验收（大）：
 
 - [x] M19.1–M19.2 done；CHANGELOG 含 `1.12.0`
+
+---
+
+## M20 — CN 财务报表 → `v1.13.0`
+
+**目标**：个股财报三表（利润表/资产负债表/现金流量表）；经新浪 HTTP（非 `em_get`）；默认 replay；CI 零公网；激活矩阵既有 `financial`。
+
+### 小里程碑
+
+#### M20.1 → `v1.12.1`
+
+验收：
+
+- [x] 契约字段 + ADR 0025；`ReplayProvider` / `AStockHttpProvider.get_financial` + fixtures / 注入测
+- [x] `replay` / `astock_http` 声明 `financial`；空 report / 缺 fixture 不崩
+
+#### M20.2 → `v1.12.2`
+
+验收：
+
+- [ ] workbench `GET /api/market/financial` 真正取数；默认偏好 replay；可选 UI
+- [ ] 有候选时不再 409；`adj_factor` / `full_minute` 等仍 fail-closed
+
+验收（大）：
+
+- [ ] M20.1–M20.2 done；CHANGELOG 含 `1.13.0`
 
 ---
 
