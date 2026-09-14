@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.14.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M21 完成**：CN 个股复权因子（能力矩阵 `adj_factor`；replay + 新浪 qfq/hfq HTTP）
+  - ADR 0026；workbench API/UI；默认仍 replay；mootdx / 东财复权备胎 / apply_adjust 套价不做
+
 ## [1.13.2] - 2026-09-14
 
 ### Added
