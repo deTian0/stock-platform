@@ -567,6 +567,131 @@ td.num {
   margin-bottom: 0.35rem;
 }
 
+.empty-row td,
+.empty-hint {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+  padding: 0.85rem 0.5rem;
+}
+
+.empty-hint {
+  margin: 0.35rem 0 0.75rem;
+  text-align: left;
+}
+
+.pos {
+  color: #c23b3b;
+}
+
+.neg {
+  color: #1f7a45;
+}
+
+td.bid,
+.bid {
+  color: #c23b3b;
+}
+
+td.ask,
+.ask {
+  color: #1f7a45;
+}
+
+.snap-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 0.75rem 0.85rem 0.85rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.snap-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.snap-symbol {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.snap-name {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+}
+
+.snap-price {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.snap-chg {
+  font-family: var(--mono);
+  font-size: 0.88rem;
+}
+
+.snap-kv {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 0.2rem 0.65rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+}
+
+.snap-kv dt {
+  color: var(--muted);
+}
+
+.snap-kv dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.news-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.45rem 0 0.75rem;
+}
+
+.news-item {
+  border-left: 3px solid var(--accent);
+  background: #fff;
+  padding: 0.45rem 0.7rem 0.55rem;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-left-color: var(--accent);
+  border-radius: 4px;
+}
+
+.news-item h3 {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.news-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.news-summary {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .code {
   margin: 0;
   padding: 0.65rem 0.75rem;

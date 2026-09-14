@@ -148,12 +148,12 @@
     </section>
 
     <details id="market-tools" class="group">
-      <summary class="group-summary">行情与基本面工具 <span class="count">12</span></summary>
+      <summary class="group-summary">行情与基本面工具 <span class="count">13</span></summary>
       <div class="group-body">
 
     <section id="daily" class="panel">
       <h2>日 K</h2>
-      <p class="hint">经能力矩阵解析 provider；默认 fixtures replay。</p>
+      <p class="hint">OHLCV 日线；涨跌幅为小数契约，界面显示为百分比。经能力矩阵解析 provider。</p>
       <form id="daily-form" class="row">
         <label>symbols
           <input id="daily-symbols" name="symbols" value="600519" autocomplete="off" />
@@ -172,16 +172,58 @@
         <table id="daily-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>date</th>
-              <th>close</th>
-              <th>volume</th>
-              <th>change_pct</th>
+              <th>代码</th>
+              <th>日期</th>
+              <th class="num">开</th>
+              <th class="num">高</th>
+              <th class="num">低</th>
+              <th class="num">收</th>
+              <th class="num">量(手)</th>
+              <th class="num">额</th>
+              <th class="num">涨跌幅</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="daily-json" class="code"></pre>
+      </details>
+    </section>
+
+    <section id="realtime" class="panel">
+      <h2>实时快照</h2>
+      <p class="hint">盘中报价快照；与日 K 共用 daily provider 偏好。默认 replay。</p>
+      <form id="realtime-form" class="row">
+        <label>symbols
+          <input id="realtime-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="realtime-meta" class="status" aria-live="polite"></p>
+      <pre id="realtime-error" class="error" hidden></pre>
+      <div id="realtime-cards" class="card-grid" aria-live="polite"></div>
+      <div class="table-wrap table-compact">
+        <table id="realtime-table">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th class="num">现价</th>
+              <th class="num">涨跌</th>
+              <th class="num">涨跌幅</th>
+              <th class="num">量(手)</th>
+              <th class="num">额</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="realtime-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="minute" class="panel">
@@ -214,16 +256,20 @@
         <table id="minute-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>datetime</th>
-              <th>close</th>
-              <th>volume</th>
-              <th>freq</th>
+              <th>代码</th>
+              <th>时间</th>
+              <th class="num">收盘</th>
+              <th class="num">量(手)</th>
+              <th>频率</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="minute-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="depth5" class="panel">
@@ -241,12 +287,12 @@
         <table id="depth5-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>level</th>
-              <th>bid</th>
-              <th>bid_vol</th>
-              <th>ask</th>
-              <th>ask_vol</th>
+              <th>代码</th>
+              <th class="num">档</th>
+              <th class="num">买价</th>
+              <th class="num">买量</th>
+              <th class="num">卖价</th>
+              <th class="num">卖量</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -260,7 +306,7 @@
 
     <section id="financial" class="panel">
       <h2>财务报表</h2>
-      <p class="hint">利润表/资产负债表/现金流量表（元）；默认 replay；可选新浪 live。</p>
+      <p class="hint">利润表/资产负债表/现金流量表（元→万/亿）；默认 replay；可选新浪 live。</p>
       <form id="financial-form" class="row">
         <label>symbols
           <input id="financial-symbols" name="symbols" value="600519" autocomplete="off" />
@@ -276,12 +322,12 @@
         <table id="financial-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>period_end</th>
-              <th>revenue</th>
-              <th>net_income</th>
-              <th>total_assets</th>
-              <th>op_cf</th>
+              <th>代码</th>
+              <th>报告期</th>
+              <th class="num">营收</th>
+              <th class="num">净利润</th>
+              <th class="num">总资产</th>
+              <th class="num">经营现金流</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -314,9 +360,9 @@
         <table id="adj-factor-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>trade_date</th>
-              <th>ex_factor</th>
+              <th>代码</th>
+              <th>交易日</th>
+              <th class="num">除权因子</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -355,16 +401,20 @@
         <table id="daily-adjusted-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>date</th>
-              <th>close</th>
-              <th>ex_factor</th>
-              <th>kind</th>
+              <th>代码</th>
+              <th>日期</th>
+              <th class="num">复权收盘</th>
+              <th class="num">除权因子</th>
+              <th>类型</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="daily-adjusted-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="full-minute" class="panel">
@@ -388,21 +438,25 @@
         <table id="full-minute-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>datetime</th>
-              <th>close</th>
-              <th>volume</th>
-              <th>freq</th>
+              <th>代码</th>
+              <th>时间</th>
+              <th class="num">收盘</th>
+              <th class="num">量(手)</th>
+              <th>频率</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="full-minute-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="fund-flow" class="panel">
       <h2>日级资金流</h2>
-      <p class="hint">主力/大小单净流入（元）；默认 replay；可选 astock_http。</p>
+      <p class="hint">主力/大小单净流入（元→万/亿）；默认 replay；可选 astock_http。</p>
       <form id="fund-flow-form" class="row">
         <label>symbols
           <input id="fund-flow-symbols" name="symbols" value="600519" autocomplete="off" />
@@ -421,21 +475,25 @@
         <table id="fund-flow-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>date</th>
-              <th>main_net</th>
-              <th>large_net</th>
-              <th>super_net</th>
+              <th>代码</th>
+              <th>日期</th>
+              <th class="num">主力净流入</th>
+              <th class="num">大单净流入</th>
+              <th class="num">超大单净流入</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="fund-flow-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="sector-fund-flow" class="panel">
       <h2>板块资金流</h2>
-      <p class="hint">板块日级主力净流入（元）；默认 replay；可选 astock_http。</p>
+      <p class="hint">板块日级主力净流入（元→万/亿）；默认 replay；可选 astock_http。</p>
       <form id="sector-fund-flow-form" class="row">
         <label>sectors
           <input id="sector-fund-flow-sectors" name="sectors" value="BK0477" autocomplete="off" />
@@ -454,15 +512,20 @@
         <table id="sector-fund-flow-table">
           <thead>
             <tr>
-              <th>sector_code</th>
-              <th>date</th>
-              <th>main_net</th>
-              <th>change_pct</th>
+              <th>板块代码</th>
+              <th>板块名</th>
+              <th>日期</th>
+              <th class="num">主力净流入</th>
+              <th class="num">涨跌幅</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="sector-fund-flow-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="news" class="panel">
@@ -482,24 +545,29 @@
       </form>
       <p id="news-meta" class="status" aria-live="polite"></p>
       <pre id="news-error" class="error" hidden></pre>
-      <div class="table-wrap">
+      <div id="news-list" class="news-list" aria-live="polite"></div>
+      <div class="table-wrap table-compact">
         <table id="news-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>date</th>
-              <th>title</th>
-              <th>sentiment</th>
+              <th>代码</th>
+              <th>日期</th>
+              <th>标题</th>
+              <th class="num">情绪</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="news-json" class="code"></pre>
+      </details>
     </section>
 
     <section id="lhb" class="panel">
       <h2>龙虎榜</h2>
-      <p class="hint">上榜记录 + 席位 TOP5 + 机构动向（元）；默认 replay；可选 astock_http。</p>
+      <p class="hint">上榜记录 + 席位 TOP5 + 机构动向（元→万/亿）；默认 replay；可选 astock_http。</p>
       <form id="lhb-form" class="row">
         <label>symbols
           <input id="lhb-symbols" name="symbols" value="002475" autocomplete="off" />
@@ -518,11 +586,11 @@
         <table id="lhb-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>date</th>
-              <th>reason</th>
-              <th>net_buy</th>
-              <th>turnover_rate</th>
+              <th>代码</th>
+              <th>日期</th>
+              <th>上榜原因</th>
+              <th class="num">净买入</th>
+              <th class="num">换手率</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -555,12 +623,12 @@
         <table id="unlock-table">
           <thead>
             <tr>
-              <th>symbol</th>
-              <th>bucket</th>
-              <th>date</th>
-              <th>type</th>
-              <th>shares</th>
-              <th>ratio</th>
+              <th>代码</th>
+              <th>区间</th>
+              <th>日期</th>
+              <th>类型</th>
+              <th class="num">股数</th>
+              <th class="num">占比</th>
             </tr>
           </thead>
           <tbody></tbody>

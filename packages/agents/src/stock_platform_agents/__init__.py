@@ -1,4 +1,4 @@
-"""Thin agent plugins â€?data only via stock_platform_providers."""
+"""Thin agent plugins  - data only via stock_platform_providers."""
 
 from .debate import DebateReport, build_debate_report
 from .errors import AgentError
@@ -30,4 +30,4 @@ __all__ = [
     "run_debate",
     "warn_if_truncated",
 ]
-__version__ = "3.9.2"
+__version__ = "3.9.3"

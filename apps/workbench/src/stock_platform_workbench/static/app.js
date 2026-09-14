@@ -16,16 +16,29 @@
 
   function showError(el, err) {
     el.hidden = false;
-    if (typeof err === "string") {
-      el.textContent = err;
-      return;
-    }
-    el.textContent = JSON.stringify(err, null, 2);
+    el.textContent = formatErrorMessage(err);
   }
 
   function clearError(el) {
     el.hidden = true;
     el.textContent = "";
+  }
+
+  function formatErrorMessage(err) {
+    if (err == null) return "请求失败";
+    if (typeof err === "string") return err;
+    if (typeof err !== "object") return String(err);
+    var parts = [];
+    if (err.fail_closed) parts.push("能力不可用（fail-closed）");
+    if (err.reason) parts.push(String(err.reason));
+    if (err.message && err.message !== "request_failed") parts.push(String(err.message));
+    if (err.detail && typeof err.detail === "string") parts.push(err.detail);
+    if (err.capability) parts.push("能力=" + err.capability);
+    if (err.provider) parts.push("provider=" + err.provider);
+    if (err.status) parts.push("HTTP " + err.status);
+    if (!parts.length) return JSON.stringify(err, null, 2);
+    var head = parts.join(" · ");
+    return head + "\n" + JSON.stringify(err, null, 2);
   }
 
   function formatScore(score) {
@@ -44,6 +57,128 @@
     if (!value) return "—";
     var s = String(value);
     return s.length > 12 ? s.slice(0, 8) + "…" : s;
+  }
+
+  /** Price: 2–4 decimals depending on magnitude. */
+  function formatPrice(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    var abs = Math.abs(n);
+    var digits = abs >= 1000 ? 2 : abs >= 100 ? 2 : abs >= 10 ? 3 : 4;
+    return n.toLocaleString("zh-CN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: digits,
+    });
+  }
+
+  /** Decimal ratio → percent text, e.g. 0.0106 → +1.06%. */
+  function formatPct(value, digits) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    var d = digits == null ? 2 : digits;
+    var pct = n * 100;
+    var sign = pct > 0 ? "+" : "";
+    return sign + pct.toFixed(d) + "%";
+  }
+
+  /** Large CNY nets: 亿 / 万 / plain. */
+  function formatMoney(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    var abs = Math.abs(n);
+    var sign = n < 0 ? "-" : "";
+    if (abs >= 1e8) return sign + (abs / 1e8).toFixed(2) + "亿";
+    if (abs >= 1e4) return sign + (abs / 1e4).toFixed(2) + "万";
+    return (
+      sign +
+      abs.toLocaleString("zh-CN", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })
+    );
+  }
+
+  function formatVolume(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(2) + "亿";
+    if (Math.abs(n) >= 1e4) return (n / 1e4).toFixed(2) + "万";
+    return n.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+  }
+
+  function formatFactor(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    return n.toLocaleString("zh-CN", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 6,
+    });
+  }
+
+  function formatSharesWan(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    return n.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) + "万股";
+  }
+
+  function formatSentiment(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    var sign = n > 0 ? "+" : "";
+    return sign + n.toFixed(2);
+  }
+
+  function signedClass(value) {
+    var n = Number(value);
+    if (Number.isNaN(n) || n === 0) return "";
+    return n > 0 ? "pos" : "neg";
+  }
+
+  function td(text, className) {
+    return (
+      '<td' +
+      (className ? ' class="' + className + '"' : "") +
+      ">" +
+      escapeHtml(text == null || text === "" ? "—" : String(text)) +
+      "</td>"
+    );
+  }
+
+  function tdNum(text, className) {
+    var cls = "num" + (className ? " " + className : "");
+    return td(text, cls);
+  }
+
+  function setRawJson(elId, data) {
+    var el = $(elId);
+    if (!el) return;
+    el.textContent = data == null ? "" : JSON.stringify(data, null, 2);
+  }
+
+  function emptyTable(tbody, colSpan, message) {
+    tbody.innerHTML = "";
+    var tr = document.createElement("tr");
+    tr.className = "empty-row";
+    tr.innerHTML =
+      '<td colspan="' +
+      colSpan +
+      '">' +
+      escapeHtml(message || "暂无数据") +
+      "</td>";
+    tbody.appendChild(tr);
+  }
+
+  function marketMeta(provider, rowCount, extra) {
+    var parts = ["provider=" + (provider || "—"), "行数=" + (rowCount || 0)];
+    if (extra) parts.push(extra);
+    return parts.join(" · ");
   }
 
   function renderKv(el, rows) {
@@ -447,32 +582,36 @@
     const errEl = $("daily-error");
     clearError(errEl);
     $("daily-meta").textContent = "";
+    setRawJson("daily-json", null);
     const symbols = $("daily-symbols").value.trim();
     const start = $("daily-start").value;
     const end = $("daily-end").value;
     const params = new URLSearchParams({ symbols: symbols });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("daily-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/daily?" + params.toString());
-      $("daily-meta").textContent =
-        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
-      const tbody = $("daily-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("daily-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("daily-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 9, "暂无日 K 数据");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.date +
-          "</td><td>" +
-          row.close +
-          "</td><td>" +
-          row.volume +
-          "</td><td>" +
-          row.change_pct +
-          "</td>";
+          td(row.symbol) +
+          td(row.date) +
+          tdNum(formatPrice(row.open)) +
+          tdNum(formatPrice(row.high)) +
+          tdNum(formatPrice(row.low)) +
+          tdNum(formatPrice(row.close)) +
+          tdNum(formatVolume(row.volume)) +
+          tdNum(formatMoney(row.amount)) +
+          tdNum(formatPct(row.change_pct), signedClass(row.change_pct));
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -482,7 +621,103 @@
       } else {
         showError(errEl, detail);
       }
-      $("daily-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 9, "查询失败");
+      setRawJson("daily-json", null);
+    }
+  }
+
+  function renderRealtimeCards(rows) {
+    var host = $("realtime-cards");
+    if (!host) return;
+    host.innerHTML = "";
+    if (!rows || !rows.length) {
+      host.innerHTML = '<p class="empty-hint">暂无实时快照</p>';
+      return;
+    }
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var card = document.createElement("article");
+      card.className = "snap-card";
+      var chgCls = signedClass(row.change_pct);
+      card.innerHTML =
+        '<div class="snap-top"><div><span class="snap-symbol">' +
+        escapeHtml(dash(row.symbol)) +
+        '</span> <span class="snap-name">' +
+        escapeHtml(dash(row.name)) +
+        '</span></div><div class="snap-price ' +
+        chgCls +
+        '">' +
+        escapeHtml(formatPrice(row.price)) +
+        "</div></div>" +
+        '<div class="snap-chg ' +
+        chgCls +
+        '">' +
+        escapeHtml(formatPrice(row.change_amount)) +
+        " · " +
+        escapeHtml(formatPct(row.change_pct)) +
+        "</div>" +
+        '<dl class="snap-kv">' +
+        "<dt>昨收</dt><dd>" +
+        escapeHtml(formatPrice(row.prev_close)) +
+        "</dd>" +
+        "<dt>成交量</dt><dd>" +
+        escapeHtml(formatVolume(row.volume)) +
+        "</dd>" +
+        "<dt>成交额</dt><dd>" +
+        escapeHtml(formatMoney(row.amount)) +
+        "</dd>" +
+        "<dt>换手</dt><dd>" +
+        escapeHtml(formatPct(row.turnover_rate)) +
+        "</dd>" +
+        "<dt>振幅</dt><dd>" +
+        escapeHtml(formatPct(row.amplitude)) +
+        "</dd></dl>";
+      host.appendChild(card);
+    }
+  }
+
+  async function loadRealtime(event) {
+    if (event) event.preventDefault();
+    const errEl = $("realtime-error");
+    clearError(errEl);
+    $("realtime-meta").textContent = "";
+    setRawJson("realtime-json", null);
+    const symbols = $("realtime-symbols").value.trim();
+    const params = new URLSearchParams({ symbols: symbols });
+    const tbody = $("realtime-table").querySelector("tbody");
+    try {
+      const data = await fetchJson("/api/market/realtime?" + params.toString());
+      const rows = data.rows || [];
+      $("realtime-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("realtime-json", data);
+      renderRealtimeCards(rows);
+      tbody.innerHTML = "";
+      if (!rows.length) {
+        emptyTable(tbody, 7, "暂无实时快照");
+        return;
+      }
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          td(row.symbol) +
+          td(row.name) +
+          tdNum(formatPrice(row.price), signedClass(row.change_pct)) +
+          tdNum(formatPrice(row.change_amount), signedClass(row.change_amount)) +
+          tdNum(formatPct(row.change_pct), signedClass(row.change_pct)) +
+          tdNum(formatVolume(row.volume)) +
+          tdNum(formatMoney(row.amount));
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      renderRealtimeCards([]);
+      emptyTable(tbody, 7, "查询失败");
+      setRawJson("realtime-json", null);
     }
   }
 
@@ -491,6 +726,7 @@
     const errEl = $("minute-error");
     clearError(errEl);
     $("minute-meta").textContent = "";
+    setRawJson("minute-json", null);
     const symbols = $("minute-symbols").value.trim();
     const freq = $("minute-freq").value;
     const start = $("minute-start").value;
@@ -498,31 +734,29 @@
     const params = new URLSearchParams({ symbols: symbols, freq: freq });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("minute-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/minute?" + params.toString());
-      $("minute-meta").textContent =
-        "provider=" +
-        data.provider +
-        " · freq=" +
-        (data.freq || freq) +
-        " · rows=" +
-        (data.rows ? data.rows.length : 0);
-      const tbody = $("minute-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("minute-meta").textContent = marketMeta(
+        data.provider,
+        rows.length,
+        "freq=" + (data.freq || freq)
+      );
+      setRawJson("minute-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 5, "暂无分钟 K 数据");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.datetime +
-          "</td><td>" +
-          row.close +
-          "</td><td>" +
-          row.volume +
-          "</td><td>" +
-          row.freq +
-          "</td>";
+          td(row.symbol) +
+          td(row.datetime) +
+          tdNum(formatPrice(row.close)) +
+          tdNum(formatVolume(row.volume)) +
+          td(row.freq);
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -532,7 +766,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("minute-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("minute-json", null);
     }
   }
 
@@ -541,36 +776,33 @@
     const errEl = $("depth5-error");
     clearError(errEl);
     $("depth5-meta").textContent = "";
-    $("depth5-json").textContent = "";
+    setRawJson("depth5-json", null);
     const symbols = $("depth5-symbols").value.trim();
     const params = new URLSearchParams({ symbols: symbols });
+    const tbody = $("depth5-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/depth5?" + params.toString());
-      $("depth5-meta").textContent =
-        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
-      const tbody = $("depth5-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("depth5-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("depth5-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 6, "暂无五档盘口");
+        return;
+      }
+      for (const row of rows) {
         for (let i = 0; i < 5; i++) {
           const tr = document.createElement("tr");
           tr.innerHTML =
-            "<td>" +
-            row.symbol +
-            "</td><td>" +
-            (i + 1) +
-            "</td><td>" +
-            (row.bid_prices ? row.bid_prices[i] : "") +
-            "</td><td>" +
-            (row.bid_volumes ? row.bid_volumes[i] : "") +
-            "</td><td>" +
-            (row.ask_prices ? row.ask_prices[i] : "") +
-            "</td><td>" +
-            (row.ask_volumes ? row.ask_volumes[i] : "") +
-            "</td>";
+            td(row.symbol) +
+            tdNum(String(i + 1)) +
+            tdNum(formatPrice(row.bid_prices ? row.bid_prices[i] : null), "bid") +
+            tdNum(formatVolume(row.bid_volumes ? row.bid_volumes[i] : null), "bid") +
+            tdNum(formatPrice(row.ask_prices ? row.ask_prices[i] : null), "ask") +
+            tdNum(formatVolume(row.ask_volumes ? row.ask_volumes[i] : null), "ask");
           tbody.appendChild(tr);
         }
       }
-      $("depth5-json").textContent = JSON.stringify(data.rows || [], null, 2);
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -578,7 +810,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("depth5-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 6, "查询失败");
+      setRawJson("depth5-json", null);
     }
   }
 
@@ -587,47 +820,44 @@
     const errEl = $("financial-error");
     clearError(errEl);
     $("financial-meta").textContent = "";
-    $("financial-json").textContent = "";
+    setRawJson("financial-json", null);
     const symbols = $("financial-symbols").value.trim();
     const periods = $("financial-periods").value.trim() || "8";
     const params = new URLSearchParams({ symbols: symbols, periods: periods });
+    const tbody = $("financial-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/financial?" + params.toString());
       const items = data.items || [];
       $("financial-meta").textContent =
-        "provider=" + data.provider + " · items=" + items.length;
-      const tbody = $("financial-table").querySelector("tbody");
+        "provider=" + data.provider + " · 标的=" + items.length;
+      setRawJson("financial-json", data);
       tbody.innerHTML = "";
+      var wrote = false;
       for (const item of items) {
         const income = item.income || [];
         const balance = item.balance || [];
         const cashflow = item.cashflow || [];
-        const n = Math.max(income.length, balance.length, cashflow.length, 1);
+        const n = Math.max(income.length, balance.length, cashflow.length, 0);
         for (let i = 0; i < n; i++) {
+          wrote = true;
           const inc = income[i] || {};
           const bal = balance[i] || {};
           const cf = cashflow[i] || {};
           const tr = document.createElement("tr");
           tr.innerHTML =
-            "<td>" +
-            item.symbol +
-            "</td><td>" +
-            (inc.period_end || bal.period_end || cf.period_end || "") +
-            "</td><td>" +
-            (inc.revenue != null ? inc.revenue : "") +
-            "</td><td>" +
-            (inc.net_income != null ? inc.net_income : "") +
-            "</td><td>" +
-            (bal.total_assets != null ? bal.total_assets : "") +
-            "</td><td>" +
-            (cf.net_operating_cash_flow != null
-              ? cf.net_operating_cash_flow
-              : "") +
-            "</td>";
+            td(item.symbol) +
+            td(inc.period_end || bal.period_end || cf.period_end || "") +
+            tdNum(formatMoney(inc.revenue)) +
+            tdNum(formatMoney(inc.net_income), signedClass(inc.net_income)) +
+            tdNum(formatMoney(bal.total_assets)) +
+            tdNum(
+              formatMoney(cf.net_operating_cash_flow),
+              signedClass(cf.net_operating_cash_flow)
+            );
           tbody.appendChild(tr);
         }
       }
-      $("financial-json").textContent = JSON.stringify(items, null, 2);
+      if (!wrote) emptyTable(tbody, 6, "暂无财务报表");
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -635,7 +865,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("financial-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 6, "查询失败");
+      setRawJson("financial-json", null);
     }
   }
 
@@ -644,35 +875,31 @@
     const errEl = $("adj-factor-error");
     clearError(errEl);
     $("adj-factor-meta").textContent = "";
-    $("adj-factor-json").textContent = "";
+    setRawJson("adj-factor-json", null);
     const symbols = $("adj-factor-symbols").value.trim();
     const kind = $("adj-factor-kind").value || "qfq";
     const params = new URLSearchParams({ symbols: symbols, kind: kind });
+    const tbody = $("adj-factor-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/adj-factor?" + params.toString());
       const rows = data.rows || [];
-      $("adj-factor-meta").textContent =
-        "provider=" +
-        data.provider +
-        " · kind=" +
-        data.kind +
-        " · rows=" +
-        rows.length;
-      const tbody = $("adj-factor-table").querySelector("tbody");
+      $("adj-factor-meta").textContent = marketMeta(
+        data.provider,
+        rows.length,
+        "kind=" + data.kind
+      );
+      setRawJson("adj-factor-json", data);
       tbody.innerHTML = "";
+      if (!rows.length) {
+        emptyTable(tbody, 3, "暂无复权因子");
+        return;
+      }
       for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.trade_date +
-          "</td><td>" +
-          row.ex_factor +
-          "</td>";
+          td(row.symbol) + td(row.trade_date) + tdNum(formatFactor(row.ex_factor));
         tbody.appendChild(tr);
       }
-      $("adj-factor-json").textContent = JSON.stringify(rows, null, 2);
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -680,7 +907,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("adj-factor-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 3, "查询失败");
+      setRawJson("adj-factor-json", null);
     }
   }
 
@@ -689,6 +917,7 @@
     const errEl = $("daily-adjusted-error");
     clearError(errEl);
     $("daily-adjusted-meta").textContent = "";
+    setRawJson("daily-adjusted-json", null);
     const symbols = $("daily-adjusted-symbols").value.trim();
     const kind = $("daily-adjusted-kind").value || "qfq";
     const start = $("daily-adjusted-start").value;
@@ -696,6 +925,7 @@
     const params = new URLSearchParams({ symbols: symbols, kind: kind });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("daily-adjusted-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/daily-adjusted?" + params.toString());
       const rows = data.rows || [];
@@ -707,24 +937,22 @@
         (providers.adj_factor || "") +
         " · kind=" +
         data.kind +
-        " · rows=" +
+        " · 行数=" +
         rows.length;
-      const tbody = $("daily-adjusted-table").querySelector("tbody");
+      setRawJson("daily-adjusted-json", data);
       tbody.innerHTML = "";
+      if (!rows.length) {
+        emptyTable(tbody, 5, "暂无复权日 K");
+        return;
+      }
       for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.date +
-          "</td><td>" +
-          row.close +
-          "</td><td>" +
-          row.ex_factor +
-          "</td><td>" +
-          (row.adjust_kind || data.kind) +
-          "</td>";
+          td(row.symbol) +
+          td(row.date) +
+          tdNum(formatPrice(row.close)) +
+          tdNum(formatFactor(row.ex_factor)) +
+          td(row.adjust_kind || data.kind);
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -734,7 +962,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("daily-adjusted-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("daily-adjusted-json", null);
     }
   }
 
@@ -743,36 +972,35 @@
     const errEl = $("full-minute-error");
     clearError(errEl);
     $("full-minute-meta").textContent = "";
+    setRawJson("full-minute-json", null);
     const symbols = $("full-minute-symbols").value.trim();
     const tradeDate = $("full-minute-date").value;
     const count = $("full-minute-count").value || "300";
     const params = new URLSearchParams({ symbols: symbols, count: count });
     if (tradeDate) params.set("trade_date", tradeDate);
+    const tbody = $("full-minute-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/full-minute?" + params.toString());
-      $("full-minute-meta").textContent =
-        "provider=" +
-        data.provider +
-        " · trade_date=" +
-        (data.trade_date || tradeDate || "") +
-        " · rows=" +
-        (data.rows ? data.rows.length : 0);
-      const tbody = $("full-minute-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("full-minute-meta").textContent = marketMeta(
+        data.provider,
+        rows.length,
+        "trade_date=" + (data.trade_date || tradeDate || "")
+      );
+      setRawJson("full-minute-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 5, "暂无全量分钟");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.datetime +
-          "</td><td>" +
-          row.close +
-          "</td><td>" +
-          row.volume +
-          "</td><td>" +
-          row.freq +
-          "</td>";
+          td(row.symbol) +
+          td(row.datetime) +
+          tdNum(formatPrice(row.close)) +
+          tdNum(formatVolume(row.volume)) +
+          td(row.freq);
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -782,7 +1010,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("full-minute-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("full-minute-json", null);
     }
   }
 
@@ -949,17 +1178,13 @@
       for (const row of picks) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          escapeHtml(row.rank) +
-          '</td><td><a href="#daily">' +
+          td(row.rank) +
+          '<td><a href="#daily">' +
           escapeHtml(row.symbol) +
-          "</a></td><td>" +
-          escapeHtml(row.composite_score) +
-          "</td><td>" +
-          escapeHtml(row.close) +
-          "</td><td>" +
-          escapeHtml(row.reasonSummary || row.reason || "") +
-          "</td>";
+          "</a></td>" +
+          tdNum(formatScore(row.composite_score)) +
+          tdNum(formatPrice(row.close)) +
+          td(row.reasonSummary || row.reason || "");
         tbody.appendChild(tr);
       }
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
@@ -1189,32 +1414,32 @@
     const errEl = $("fund-flow-error");
     clearError(errEl);
     $("fund-flow-meta").textContent = "";
+    setRawJson("fund-flow-json", null);
     const symbols = $("fund-flow-symbols").value.trim();
     const start = $("fund-flow-start").value;
     const end = $("fund-flow-end").value;
     const params = new URLSearchParams({ symbols: symbols });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("fund-flow-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/fund-flow?" + params.toString());
-      $("fund-flow-meta").textContent =
-        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
-      const tbody = $("fund-flow-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("fund-flow-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("fund-flow-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 5, "暂无资金流数据");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.symbol +
-          "</td><td>" +
-          row.date +
-          "</td><td>" +
-          row.main_net +
-          "</td><td>" +
-          row.large_net +
-          "</td><td>" +
-          row.super_net +
-          "</td>";
+          td(row.symbol) +
+          td(row.date) +
+          tdNum(formatMoney(row.main_net), signedClass(row.main_net)) +
+          tdNum(formatMoney(row.large_net), signedClass(row.large_net)) +
+          tdNum(formatMoney(row.super_net), signedClass(row.super_net));
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -1224,7 +1449,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("fund-flow-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("fund-flow-json", null);
     }
   }
 
@@ -1233,30 +1459,32 @@
     const errEl = $("sector-fund-flow-error");
     clearError(errEl);
     $("sector-fund-flow-meta").textContent = "";
+    setRawJson("sector-fund-flow-json", null);
     const sectors = $("sector-fund-flow-sectors").value.trim();
     const start = $("sector-fund-flow-start").value;
     const end = $("sector-fund-flow-end").value;
     const params = new URLSearchParams({ sectors: sectors });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("sector-fund-flow-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/sector-fund-flow?" + params.toString());
-      $("sector-fund-flow-meta").textContent =
-        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
-      const tbody = $("sector-fund-flow-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("sector-fund-flow-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("sector-fund-flow-json", data);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 5, "暂无板块资金流");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          row.sector_code +
-          "</td><td>" +
-          row.date +
-          "</td><td>" +
-          row.main_net +
-          "</td><td>" +
-          (row.change_pct == null ? "" : row.change_pct) +
-          "</td>";
+          td(row.sector_code) +
+          td(row.sector_name || "") +
+          td(row.date) +
+          tdNum(formatMoney(row.main_net), signedClass(row.main_net)) +
+          tdNum(formatPct(row.change_pct), signedClass(row.change_pct));
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -1266,7 +1494,44 @@
       } else {
         showError(errEl, detail);
       }
-      $("sector-fund-flow-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("sector-fund-flow-json", null);
+    }
+  }
+
+  function renderNewsList(rows) {
+    var host = $("news-list");
+    if (!host) return;
+    host.innerHTML = "";
+    if (!rows || !rows.length) {
+      host.innerHTML = '<p class="empty-hint">暂无新闻</p>';
+      return;
+    }
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var article = document.createElement("article");
+      article.className = "news-item";
+      var sent = row.sentiment == null ? "" : formatSentiment(row.sentiment);
+      article.innerHTML =
+        '<div class="news-meta-line"><span>' +
+        escapeHtml(dash(row.symbol || row.sector_code)) +
+        "</span><span>" +
+        escapeHtml(dash(row.date)) +
+        "</span>" +
+        (sent
+          ? '<span class="' +
+            signedClass(row.sentiment) +
+            '">' +
+            escapeHtml(sent) +
+            "</span>"
+          : "") +
+        "</div><h3>" +
+        escapeHtml(dash(row.title)) +
+        "</h3>" +
+        (row.summary
+          ? '<p class="news-summary">' + escapeHtml(row.summary) + "</p>"
+          : "");
+      host.appendChild(article);
     }
   }
 
@@ -1275,30 +1540,35 @@
     const errEl = $("news-error");
     clearError(errEl);
     $("news-meta").textContent = "";
+    setRawJson("news-json", null);
     const symbols = $("news-symbols").value.trim();
     const start = $("news-start").value;
     const end = $("news-end").value;
     const params = new URLSearchParams({ symbols: symbols });
     if (start) params.set("start", start);
     if (end) params.set("end", end);
+    const tbody = $("news-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/news?" + params.toString());
-      $("news-meta").textContent =
-        "provider=" + data.provider + " · rows=" + (data.rows ? data.rows.length : 0);
-      const tbody = $("news-table").querySelector("tbody");
+      const rows = data.rows || [];
+      $("news-meta").textContent = marketMeta(data.provider, rows.length);
+      setRawJson("news-json", data);
+      renderNewsList(rows);
       tbody.innerHTML = "";
-      for (const row of data.rows || []) {
+      if (!rows.length) {
+        emptyTable(tbody, 4, "暂无新闻");
+        return;
+      }
+      for (const row of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" +
-          (row.symbol || "") +
-          "</td><td>" +
-          row.date +
-          "</td><td>" +
-          row.title +
-          "</td><td>" +
-          (row.sentiment == null ? "" : row.sentiment) +
-          "</td>";
+          td(row.symbol || row.sector_code || "") +
+          td(row.date) +
+          td(row.title) +
+          tdNum(
+            row.sentiment == null ? "—" : formatSentiment(row.sentiment),
+            signedClass(row.sentiment)
+          );
         tbody.appendChild(tr);
       }
     } catch (e) {
@@ -1308,7 +1578,9 @@
       } else {
         showError(errEl, detail);
       }
-      $("news-table").querySelector("tbody").innerHTML = "";
+      renderNewsList([]);
+      emptyTable(tbody, 4, "查询失败");
+      setRawJson("news-json", null);
     }
   }
 
@@ -1317,54 +1589,53 @@
     const errEl = $("lhb-error");
     clearError(errEl);
     $("lhb-meta").textContent = "";
-    $("lhb-json").textContent = "";
+    setRawJson("lhb-json", null);
     const symbols = $("lhb-symbols").value.trim();
     const asof = $("lhb-asof").value;
     const lookBack = $("lhb-lookback").value;
     const params = new URLSearchParams({ symbols: symbols, asof_date: asof });
     if (lookBack) params.set("look_back_days", lookBack);
+    const tbody = $("lhb-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/lhb?" + params.toString());
       const items = data.items || [];
-      const records = items.length ? items[0].records || [] : [];
+      var recCount = 0;
+      for (var i = 0; i < items.length; i++) {
+        recCount += (items[i].records || []).length;
+      }
       $("lhb-meta").textContent =
         "provider=" +
         data.provider +
-        " · items=" +
+        " · 标的=" +
         items.length +
-        " · records=" +
-        records.length;
-      const tbody = $("lhb-table").querySelector("tbody");
+        " · 记录=" +
+        recCount;
+      setRawJson("lhb-json", data);
       tbody.innerHTML = "";
+      if (!items.length) {
+        emptyTable(tbody, 5, "暂无龙虎榜记录");
+        return;
+      }
       for (const item of items) {
         const recs = item.records || [];
         if (!recs.length) {
           const tr = document.createElement("tr");
-          tr.innerHTML =
-            "<td>" +
-            item.symbol +
-            "</td><td colspan=\"4\">(空窗口)</td>";
+          tr.className = "empty-row";
+          tr.innerHTML = td(item.symbol) + '<td colspan="4">近窗口无上榜记录</td>';
           tbody.appendChild(tr);
           continue;
         }
         for (const row of recs) {
           const tr = document.createElement("tr");
           tr.innerHTML =
-            "<td>" +
-            item.symbol +
-            "</td><td>" +
-            row.date +
-            "</td><td>" +
-            (row.reason || "") +
-            "</td><td>" +
-            row.net_buy +
-            "</td><td>" +
-            row.turnover_rate +
-            "</td>";
+            td(item.symbol) +
+            td(row.date) +
+            td(row.reason || "") +
+            tdNum(formatMoney(row.net_buy), signedClass(row.net_buy)) +
+            tdNum(formatPct(row.turnover_rate));
           tbody.appendChild(tr);
         }
       }
-      $("lhb-json").textContent = JSON.stringify(items, null, 2);
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -1372,7 +1643,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("lhb-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("lhb-json", null);
     }
   }
 
@@ -1381,32 +1653,41 @@
     const errEl = $("unlock-error");
     clearError(errEl);
     $("unlock-meta").textContent = "";
-    $("unlock-json").textContent = "";
+    setRawJson("unlock-json", null);
     const symbols = $("unlock-symbols").value.trim();
     const asof = $("unlock-asof").value;
     const forward = $("unlock-forward").value;
     const params = new URLSearchParams({ symbols: symbols, asof_date: asof });
     if (forward) params.set("forward_days", forward);
+    const tbody = $("unlock-table").querySelector("tbody");
     try {
       const data = await fetchJson("/api/market/unlock?" + params.toString());
       const items = data.items || [];
-      const history = items.length ? items[0].history || [] : [];
-      const upcoming = items.length ? items[0].upcoming || [] : [];
+      var history = 0;
+      var upcoming = 0;
+      for (var i = 0; i < items.length; i++) {
+        history += (items[i].history || []).length;
+        upcoming += (items[i].upcoming || []).length;
+      }
       $("unlock-meta").textContent =
         "provider=" +
         data.provider +
-        " · items=" +
+        " · 标的=" +
         items.length +
-        " · history=" +
-        history.length +
-        " · upcoming=" +
-        upcoming.length;
-      const tbody = $("unlock-table").querySelector("tbody");
+        " · 历史=" +
+        history +
+        " · 待解禁=" +
+        upcoming;
+      setRawJson("unlock-json", data);
       tbody.innerHTML = "";
+      if (!items.length) {
+        emptyTable(tbody, 6, "暂无解禁记录");
+        return;
+      }
       for (const item of items) {
         const buckets = [
-          ["history", item.history || []],
-          ["upcoming", item.upcoming || []],
+          ["历史", item.history || []],
+          ["待解禁", item.upcoming || []],
         ];
         let wrote = false;
         for (let b = 0; b < buckets.length; b++) {
@@ -1416,30 +1697,22 @@
             wrote = true;
             const tr = document.createElement("tr");
             tr.innerHTML =
-              "<td>" +
-              item.symbol +
-              "</td><td>" +
-              bucket +
-              "</td><td>" +
-              row.date +
-              "</td><td>" +
-              (row.type || "") +
-              "</td><td>" +
-              row.shares +
-              "</td><td>" +
-              row.ratio +
-              "</td>";
+              td(item.symbol) +
+              td(bucket) +
+              td(row.date) +
+              td(row.type || "") +
+              tdNum(formatSharesWan(row.shares)) +
+              tdNum(formatPct(row.ratio));
             tbody.appendChild(tr);
           }
         }
         if (!wrote) {
           const tr = document.createElement("tr");
-          tr.innerHTML =
-            "<td>" + item.symbol + "</td><td colspan=\"5\">(无解禁记录)</td>";
+          tr.className = "empty-row";
+          tr.innerHTML = td(item.symbol) + '<td colspan="5">无解禁记录</td>';
           tbody.appendChild(tr);
         }
       }
-      $("unlock-json").textContent = JSON.stringify(items, null, 2);
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -1447,7 +1720,8 @@
       } else {
         showError(errEl, detail);
       }
-      $("unlock-table").querySelector("tbody").innerHTML = "";
+      emptyTable(tbody, 6, "查询失败");
+      setRawJson("unlock-json", null);
     }
   }
 
@@ -1458,6 +1732,7 @@
     $("btn-paper").addEventListener("click", loadPaper);
     $("btn-broker").addEventListener("click", loadBroker);
     $("daily-form").addEventListener("submit", loadDaily);
+    $("realtime-form").addEventListener("submit", loadRealtime);
     $("minute-form").addEventListener("submit", loadMinute);
     $("depth5-form").addEventListener("submit", loadDepth5);
     $("financial-form").addEventListener("submit", loadFinancial);

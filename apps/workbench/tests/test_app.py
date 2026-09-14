@@ -53,7 +53,13 @@ def test_ui_index_shell(client: TestClient) -> None:
     body = r.text
     assert 'id="capability"' in body
     assert 'id="daily"' in body
+    assert 'id="realtime"' in body
     assert 'id="minute"' in body
+    assert 'id="realtime-cards"' in body
+    assert 'id="news-list"' in body
+    assert "主力净流入" in body
+    assert "现价" in body
+    assert "涨跌幅" in body
     assert 'id="fund-flow"' in body
     assert 'id="sector-fund-flow"' in body
     assert 'id="news"' in body
@@ -91,6 +97,10 @@ def test_static_assets(client: TestClient) -> None:
     assert "group-summary" in css.text
     assert ".kv" in css.text
     assert ".steps" in css.text
+    assert ".snap-card" in css.text
+    assert ".news-item" in css.text
+    assert ".pos" in css.text
+    assert ".neg" in css.text
     js = client.get("/static/app.js")
     assert js.status_code == 200
     # M11.2: UI must call existing APIs (fail-closed path included).
@@ -98,8 +108,16 @@ def test_static_assets(client: TestClient) -> None:
     assert "renderRecommendCards" in text
     assert "renderKv" in text
     assert "renderSteps" in text
+    assert "formatPrice" in text
+    assert "formatPct" in text
+    assert "formatMoney" in text
+    assert "formatVolume" in text
+    assert "emptyTable" in text
+    assert "renderRealtimeCards" in text
+    assert "renderNewsList" in text
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
+    assert "/api/market/realtime" in text
     assert "/api/market/fund-flow" in text
     assert "/api/market/sector-fund-flow" in text
     assert "/api/market/news" in text
