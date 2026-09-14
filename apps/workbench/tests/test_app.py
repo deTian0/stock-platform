@@ -59,6 +59,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="daily-adjusted"' in body
     assert 'id="full-minute"' in body
     assert 'id="paper"' in body
+    assert 'id="broker"' in body
     assert 'id="debate"' in body
     assert 'id="recommend"' in body
     assert 'id="performance"' in body
@@ -83,9 +84,11 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/daily-adjusted" in text
     assert "/api/market/full-minute" in text
     assert "/api/paper/status" in text
+    assert "/api/broker/status" in text
     assert "/api/debate/report" in text
     assert "/api/research/brief" in text
     assert "/api/research/brief/to-paper" in text
+    assert "/api/research/brief/to-broker" in text
     assert "/api/research/brief/debate" in text
     assert "/api/research/performance" in text
     assert "/api/research/strategy/compare" in text
@@ -705,6 +708,36 @@ def test_research_brief_to_paper(client: TestClient) -> None:
     assert body["environment"] == "SIMULATE"
     assert body["draft"]["signalTradeDate"] == "2026-09-02"
     assert body["draft"]["decisionOnly"] is True
+
+
+def test_broker_status_readonly(client: TestClient) -> None:
+    r = client.get("/api/broker/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    assert body["broker"] == "paper"
+    assert "hint" in body
+
+
+def test_brief_to_broker_alias(client: TestClient) -> None:
+    draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "x", "universe": ["600519"]})
+    h = draft.json()["strategyHash"]
+    client.post("/api/paper/strategies/validate", json={"strategy_hash": h})
+    client.post("/api/paper/strategies/activate", json={"strategy_hash": h})
+    ok = client.post(
+        "/api/research/brief/to-broker",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "decision_only": True,
+            "now": "2026-09-07T09:40:00+08:00",
+        },
+    )
+    assert ok.status_code == 200
+    assert ok.json()["liveTradingEnabled"] is False
 
 
 def test_ops_health_last_refresh_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

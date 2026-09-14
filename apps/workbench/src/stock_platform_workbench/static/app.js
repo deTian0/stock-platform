@@ -572,6 +572,25 @@
     }
   }
 
+  async function loadBroker() {
+    const errEl = $("broker-error");
+    clearError(errEl);
+    try {
+      const data = await fetchJson("/api/broker/status");
+      $("broker-banner").textContent =
+        (data.banner || "") +
+        "\nbroker=" +
+        (data.broker || "") +
+        "\nliveTradingEnabled=" +
+        String(data.liveTradingEnabled) +
+        "\nlastErrors=" +
+        JSON.stringify(data.lastErrors || []);
+      $("broker-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
   async function loadDebate(event) {
     if (event) event.preventDefault();
     const errEl = $("debate-error");
@@ -683,6 +702,7 @@
   }
 
   async function recommendToPaper() {
+    // Also available: POST /api/research/brief/to-broker (same SIMULATE path via resolve_broker)
     const errEl = $("recommend-error");
     clearError(errEl);
     const asof = $("recommend-asof").value;
@@ -962,6 +982,7 @@
     $("btn-preset").addEventListener("click", applyPreset);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
+    $("btn-broker").addEventListener("click", loadBroker);
     $("daily-form").addEventListener("submit", loadDaily);
     $("minute-form").addEventListener("submit", loadMinute);
     $("depth5-form").addEventListener("submit", loadDepth5);
@@ -981,6 +1002,7 @@
     $("btn-strategy-list").addEventListener("click", listStrategies);
     loadMatrix();
     loadPaper();
+    loadBroker();
   }
 
   if (document.readyState === "loading") {

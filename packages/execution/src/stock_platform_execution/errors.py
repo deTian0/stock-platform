@@ -24,3 +24,11 @@ class IdempotentReplay(ExecutionError):
         self.draft_id = draft_id
         self.execution_id = execution_id
         super().__init__(f"draft {draft_id} already executed as {execution_id}")
+
+
+class BrokerConfigError(ExecutionError):
+    """Broker selection / credentials / mode misconfiguration (fail-closed)."""
+
+
+class BrokerTransportError(ExecutionError):
+    """External SIMULATE transport failed (still not live trading)."""

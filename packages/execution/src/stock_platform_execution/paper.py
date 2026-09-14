@@ -79,7 +79,7 @@ class PaperLedger:
         self._drafts[draft_id] = draft
         return dict(draft)
 
-    def execute_draft(
+    def assert_executable(
         self,
         draft_id: str,
         *,
@@ -88,6 +88,7 @@ class PaperLedger:
         max_draft_age_seconds: int = 600,
         market: str = "CN",
     ) -> dict[str, Any]:
+        """Validate draft can execute now; does not accept. Raises DraftBlocked / IdempotentReplay."""
         validate_simulation_profile(profile)
         if draft_id in self._accepted:
             prior = self._accepted[draft_id]
@@ -122,6 +123,28 @@ class PaperLedger:
         )
         if window != "open":
             raise DraftBlocked(f"execution window is {window}; late fill forbidden")
+        return dict(draft)
+
+    def execute_draft(
+        self,
+        draft_id: str,
+        *,
+        profile: dict[str, Any] | None = None,
+        now: datetime | None = None,
+        max_draft_age_seconds: int = 600,
+        market: str = "CN",
+    ) -> dict[str, Any]:
+        draft = self.assert_executable(
+            draft_id,
+            profile=profile,
+            now=now,
+            max_draft_age_seconds=max_draft_age_seconds,
+            market=market,
+        )
+
+        mid = str(draft.get("marketId") or market)
+        mid = get_market_strategy(mid).market_id
+        local = market_now(mid, now)
 
         execution_id = str(uuid.uuid4())
         result = {
