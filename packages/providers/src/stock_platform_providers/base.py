@@ -15,6 +15,7 @@ class MarketDataProvider(Protocol):
 
     - M15+ ``get_fund_flow`` → ``fund_flow``
     - M16+ ``get_lhb`` → ``lhb`` (dragon-tiger board)
+    - M17+ ``get_unlock`` → ``unlock`` (lockup expiry / 限售解禁)
     """
 
     name: str

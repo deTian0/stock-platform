@@ -12,12 +12,13 @@ from stock_platform_providers.capabilities import (
 )
 
 
-def test_registry_has_nine_capabilities() -> None:
-    assert len(CAPABILITY_IDS) == 9
+def test_registry_has_ten_capabilities() -> None:
+    assert len(CAPABILITY_IDS) == 10
     assert CAPABILITY_IDS[0] == "daily"
     assert CAPABILITY_IDS[6] == "full_minute"
     assert CAPABILITY_IDS[7] == "fund_flow"
     assert CAPABILITY_IDS[8] == "lhb"
+    assert CAPABILITY_IDS[9] == "unlock"
 
 
 def test_build_matrix_replay_usable_for_daily_realtime() -> None:
@@ -30,6 +31,7 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
             "minute": "replay",
             "fund_flow": "replay",
             "lhb": "replay",
+            "unlock": "replay",
         },
         providers=reg.list(),
     )
@@ -49,6 +51,10 @@ def test_build_matrix_replay_usable_for_daily_realtime() -> None:
     assert by_id["lhb"]["effective"] == "replay"
     assert any(c["name"] == "astock_http" for c in by_id["lhb"]["candidates"])
     assert not any(c["name"] == "global_http" for c in by_id["lhb"]["candidates"])
+    assert by_id["unlock"]["usable"] is True
+    assert by_id["unlock"]["effective"] == "replay"
+    assert any(c["name"] == "astock_http" for c in by_id["unlock"]["candidates"])
+    assert not any(c["name"] == "global_http" for c in by_id["unlock"]["candidates"])
     assert any(c["name"] == "astock_http" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "replay" for c in by_id["daily"]["candidates"])
     assert any(c["name"] == "global_http" for c in by_id["daily"]["candidates"])

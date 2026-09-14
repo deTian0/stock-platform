@@ -17,6 +17,7 @@
 | **M13.1 / v1.5.1** | US/HK 静态休市日（`us_closed_days.txt` / `hk_closed_days.txt`） |
 | **M15.1 / v1.7.1** | CN 日级资金流 `get_fund_flow`（replay + `astock_http` / `em_get`） |
 | **M16.1 / v1.8.1** | CN 龙虎榜 `get_lhb`（replay + datacenter-web / `em_get`） |
+| **M17.1 / v1.9.1** | CN 限售解禁 `get_unlock`（replay + datacenter-web / `em_get`） |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装

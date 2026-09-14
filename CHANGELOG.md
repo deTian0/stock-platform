@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.9.1] - 2026-09-14
+
+### Added
+
+- M17.1：CN 限售解禁 `unlock`（能力矩阵第十项；ADR 0022）
+  - `ReplayProvider` / `AStockHttpProvider.get_unlock`；fixtures；空窗口不崩；CI 零公网
+
 ## [1.9.0] - 2026-09-14
 
 ### Added

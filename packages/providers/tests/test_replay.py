@@ -13,6 +13,7 @@ from stock_platform_providers.normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_realtime_row,
+    normalize_unlock_payload,
 )
 from stock_platform_providers.replay import ReplayProvider, ReplayTransport
 from stock_platform_providers.schemas import (
@@ -20,6 +21,7 @@ from stock_platform_providers.schemas import (
     FUND_FLOW_COLUMNS,
     LHB_TOP_KEYS,
     REALTIME_COLUMNS,
+    UNLOCK_TOP_KEYS,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -129,6 +131,34 @@ def test_replay_lhb_empty_window() -> None:
 def test_normalize_lhb_requires_asof() -> None:
     with pytest.raises(ValueError, match="asof_date"):
         normalize_lhb_payload({"symbol": "002475", "records": []}, source="test")
+
+
+def test_replay_unlock_with_events() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    items = provider.get_unlock(
+        ["SZ002475"], asof_date=date(2026, 5, 17), forward_days=90
+    )
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "002475"
+    assert item["source"] == "replay"
+    assert len(item["history"]) == 2
+    assert item["history"][0]["shares"] == 8500.0
+    assert len(item["upcoming"]) == 1
+    assert item["upcoming"][0]["type"] == "首发原股东限售股份"
+    assert set(UNLOCK_TOP_KEYS) <= set(item.keys())
+
+
+def test_replay_unlock_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    items = provider.get_unlock(["600519"], asof_date=date(2026, 5, 17))
+    assert items[0]["history"] == []
+    assert items[0]["upcoming"] == []
+
+
+def test_normalize_unlock_requires_asof() -> None:
+    with pytest.raises(ValueError, match="asof_date"):
+        normalize_unlock_payload({"symbol": "002475", "history": []}, source="test")
 
 
 def test_normalize_symbol_still_public() -> None:

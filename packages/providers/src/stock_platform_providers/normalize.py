@@ -13,6 +13,8 @@ from .schemas import (
     LHB_SEAT_COLUMNS,
     LHB_TOP_KEYS,
     REALTIME_COLUMNS,
+    UNLOCK_EVENT_COLUMNS,
+    UNLOCK_TOP_KEYS,
 )
 from .symbol import normalize_symbol
 
@@ -295,3 +297,91 @@ def normalize_lhb_payload(
         "institution": institution,
     }
     return {k: payload.get(k) for k in LHB_TOP_KEYS}
+
+
+def _normalize_unlock_event(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """Normalize one unlock event; shares/able_shares stay in 万股 (EM raw)."""
+    d = _as_date(raw.get("date") or raw.get("FREE_DATE") or raw.get("free_date"))
+    if d is None:
+        return None
+    event_type = str(
+        raw.get("type")
+        or raw.get("FREE_SHARES_TYPE")
+        or raw.get("LIMITED_STOCK_TYPE")
+        or ""
+    )
+    shares = _as_float(
+        raw.get("shares")
+        if "shares" in raw
+        else raw.get("FREE_SHARES", raw.get("FREE_SHARES_NUM"))
+    )
+    able = _as_float(
+        raw.get("able_shares")
+        if "able_shares" in raw
+        else raw.get("ABLE_FREE_SHARES")
+    )
+    ratio = _as_float(raw.get("ratio") if "ratio" in raw else raw.get("FREE_RATIO"))
+    event = {
+        "date": d.isoformat(),
+        "type": event_type,
+        "shares": shares,
+        "able_shares": able,
+        "ratio": ratio,
+    }
+    return {k: event.get(k) for k in UNLOCK_EVENT_COLUMNS}
+
+
+def normalize_unlock_payload(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    asof_date: date | None = None,
+    forward_days: int | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Normalize a lockup-expiry aggregate payload (shares in 万股).
+
+    Empty ``history`` / ``upcoming`` lists are valid.
+    """
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("unlock payload missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    asof = _as_date(raw.get("asof_date") or raw.get("trade_date") or asof_date)
+    if asof is None:
+        raise ValueError(f"unlock payload for {symbol} missing asof_date")
+
+    forward = raw.get("forward_days", forward_days)
+    if forward is None:
+        forward = 90
+    forward_i = int(forward)
+
+    history: list[dict[str, Any]] = []
+    for item in raw.get("history") or []:
+        if not isinstance(item, dict):
+            continue
+        event = _normalize_unlock_event(item)
+        if event is not None:
+            history.append(event)
+
+    upcoming: list[dict[str, Any]] = []
+    for item in raw.get("upcoming") or []:
+        if not isinstance(item, dict):
+            continue
+        event = _normalize_unlock_event(item)
+        if event is not None:
+            upcoming.append(event)
+
+    payload = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "asof_date": asof.isoformat(),
+        "forward_days": forward_i,
+        "history": history,
+        "upcoming": upcoming,
+    }
+    return {k: payload.get(k) for k in UNLOCK_TOP_KEYS}

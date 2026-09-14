@@ -197,3 +197,75 @@ def test_lhb_rejects_hk() -> None:
     provider = AStockHttpProvider(get_json=lambda *a, **k: {"result": {"data": []}})
     with pytest.raises(SymbolError):
         provider.get_lhb(["00700"], asof_date=date(2026, 5, 17))
+
+
+def test_unlock_from_datacenter() -> None:
+    calls: list[str] = []
+    filters: list[str] = []
+
+    def get_json(url, params=None):
+        assert "datacenter-web.eastmoney.com" in url
+        report = (params or {}).get("reportName", "")
+        calls.append(report)
+        filters.append((params or {}).get("filter", ""))
+        filt = (params or {}).get("filter", "")
+        if "FREE_DATE>=" in filt:
+            return {
+                "result": {
+                    "data": [
+                        {
+                            "FREE_DATE": "2026-07-01 00:00:00",
+                            "FREE_SHARES_TYPE": "首发原股东限售股份",
+                            "FREE_SHARES": 32000.0,
+                            "ABLE_FREE_SHARES": 28000.0,
+                            "FREE_RATIO": 0.0456,
+                        }
+                    ]
+                }
+            }
+        return {
+            "result": {
+                "data": [
+                    {
+                        "FREE_DATE": "2025-11-20 00:00:00",
+                        "FREE_SHARES_TYPE": "定向增发机构配售股份",
+                        "FREE_SHARES": 8500.0,
+                        "ABLE_FREE_SHARES": 8500.0,
+                        "FREE_RATIO": 0.0123,
+                    }
+                ]
+            }
+        }
+
+    items = AStockHttpProvider(get_json=get_json).get_unlock(
+        ["SZ002475"], asof_date=date(2026, 5, 17), forward_days=90
+    )
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "002475"
+    assert item["source"] == "astock_http"
+    assert item["forward_days"] == 90
+    assert len(item["history"]) == 1
+    assert item["history"][0]["shares"] == 8500.0
+    assert len(item["upcoming"]) == 1
+    assert item["upcoming"][0]["able_shares"] == 28000.0
+    assert calls == ["RPT_LIFT_STAGE", "RPT_LIFT_STAGE"]
+    assert "FREE_DATE>=" in filters[1]
+
+
+def test_unlock_empty_window() -> None:
+    def get_json(url, params=None):
+        return {"result": {"data": []}}
+
+    items = AStockHttpProvider(get_json=get_json).get_unlock(
+        ["600519"], asof_date=date(2026, 5, 17)
+    )
+    assert len(items) == 1
+    assert items[0]["history"] == []
+    assert items[0]["upcoming"] == []
+
+
+def test_unlock_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {"result": {"data": []}})
+    with pytest.raises(SymbolError):
+        provider.get_unlock(["00700"], asof_date=date(2026, 5, 17))

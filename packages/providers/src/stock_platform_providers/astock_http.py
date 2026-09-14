@@ -12,6 +12,7 @@ from .normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_realtime_row,
+    normalize_unlock_payload,
 )
 from .symbol import exchange_prefix, normalize_symbol
 
@@ -351,6 +352,77 @@ class AStockHttpProvider:
                     default_symbol=code,
                     asof_date=asof_date,
                     look_back_days=look_back,
+                    market="CN",
+                )
+            )
+        return items
+
+    def get_unlock(
+        self,
+        symbols: list[str],
+        *,
+        asof_date: date,
+        forward_days: int = 90,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Lockup expiry calendar via datacenter-web (shares in 万股).
+
+        Empty history / upcoming windows return empty lists (no crash).
+        Column names follow a-stock-data §3.6 (FREE_SHARES_TYPE / FREE_SHARES).
+        """
+        items: list[dict[str, Any]] = []
+        forward = max(1, int(forward_days))
+        end_date = asof_date + timedelta(days=forward)
+        asof_s = asof_date.isoformat()
+        end_s = end_date.isoformat()
+
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            history_raw = self._datacenter(
+                "RPT_LIFT_STAGE",
+                filter_str=f'(SECURITY_CODE="{code}")',
+                page_size=15,
+                sort_columns="FREE_DATE",
+                sort_types="-1",
+            )
+            upcoming_raw = self._datacenter(
+                "RPT_LIFT_STAGE",
+                filter_str=(
+                    f'(SECURITY_CODE="{code}")'
+                    f"(FREE_DATE>='{asof_s}')"
+                    f"(FREE_DATE<='{end_s}')"
+                ),
+                page_size=20,
+                sort_columns="FREE_DATE",
+                sort_types="1",
+            )
+
+            def _row_event(row: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "date": str(row.get("FREE_DATE", ""))[:10],
+                    "type": row.get("FREE_SHARES_TYPE")
+                    or row.get("LIMITED_STOCK_TYPE")
+                    or "",
+                    "shares": row.get("FREE_SHARES", row.get("FREE_SHARES_NUM")),
+                    "able_shares": row.get("ABLE_FREE_SHARES"),
+                    "ratio": row.get("FREE_RATIO"),
+                }
+
+            raw_payload = {
+                "symbol": code,
+                "asof_date": asof_s,
+                "forward_days": forward,
+                "history": [_row_event(r) for r in history_raw],
+                "upcoming": [_row_event(r) for r in upcoming_raw],
+            }
+            items.append(
+                normalize_unlock_payload(
+                    raw_payload,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    asof_date=asof_date,
+                    forward_days=forward,
                     market="CN",
                 )
             )

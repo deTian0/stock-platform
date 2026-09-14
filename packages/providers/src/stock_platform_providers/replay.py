@@ -14,6 +14,7 @@ from .normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_realtime_row,
+    normalize_unlock_payload,
 )
 from .symbol import normalize_symbol
 
@@ -27,6 +28,7 @@ class ReplayTransport:
         realtime_{symbol}.json    # dict or {"quote": {...}}
         fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
         lhb_{symbol}.json         # dict aggregate {records, seats, institution}
+        unlock_{symbol}.json      # dict aggregate {history, upcoming}
     """
 
     def __init__(self, fixtures_dir: str | Path) -> None:
@@ -71,6 +73,13 @@ class ReplayTransport:
         if isinstance(data, dict):
             return data
         raise ValueError(f"unexpected lhb fixture shape in {path}")
+
+    def load_unlock(self, symbol: str) -> dict[str, Any]:
+        path = self.fixtures_dir / f"unlock_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        raise ValueError(f"unexpected unlock fixture shape in {path}")
 
 
 class ReplayProvider:
@@ -188,6 +197,33 @@ class ReplayProvider:
                     default_symbol=symbol,
                     asof_date=asof_date,
                     look_back_days=look_back_days,
+                )
+            )
+        return items
+
+    def get_unlock(
+        self,
+        symbols: list[str],
+        *,
+        asof_date: date,
+        forward_days: int = 90,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                raw = self._transport.load_unlock(symbol)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no unlock fixture for {symbol}") from exc
+            items.append(
+                normalize_unlock_payload(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                    asof_date=asof_date,
+                    forward_days=forward_days,
                 )
             )
         return items
