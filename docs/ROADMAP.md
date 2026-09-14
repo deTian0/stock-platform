@@ -48,7 +48,7 @@
 | M8.2 | workbench 可偏好 live daily/realtime | 小 | `v1.0.2` | done |
 | M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | in_progress |
 | M9.1 | `GlobalHttpProvider`（Yahoo + 新浪） | 小 | `v1.1.1` | done |
-| M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | planned |
+| M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | done |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -383,7 +383,7 @@
 
 验收：
 
-- [ ] workbench 注册 `global_http`（按标的 US/HK 分发）；preferences 可切；默认仍 replay
+- [x] workbench 注册 `global_http`（按标的 US/HK 分发）；preferences 可切；默认仍 replay
 
 验收（大）：
 
