@@ -1,4 +1,4 @@
-"""Trading calendars — CN static closed weekdays; US/HK weekday stub."""
+"""Trading calendars — CN / US / HK static closed weekdays (weekends always closed)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ from typing import Literal
 from .errors import SymbolError
 
 MarketId = Literal["CN", "US", "HK"]
+
+_FILE_BY_MARKET: dict[str, str] = {
+    "CN": "cn_closed_days.txt",
+    "US": "us_closed_days.txt",
+    "HK": "hk_closed_days.txt",
+}
 
 
 @dataclass(frozen=True)
@@ -38,10 +44,10 @@ class TradingCalendar:
         return candidate
 
 
-def _load_cn_closed_weekdays() -> frozenset[date]:
+def _load_closed_weekdays(filename: str) -> frozenset[date]:
     text = (
         resources.files("stock_platform_providers")
-        .joinpath("data/cn_closed_days.txt")
+        .joinpath(f"data/{filename}")
         .read_text(encoding="utf-8")
     )
     days: set[date] = set()
@@ -56,9 +62,7 @@ def _load_cn_closed_weekdays() -> frozenset[date]:
 @lru_cache(maxsize=8)
 def get_trading_calendar(market_id: str) -> TradingCalendar:
     key = str(market_id).strip().upper()
-    if key == "CN":
-        return TradingCalendar(market_id="CN", closed_weekdays=_load_cn_closed_weekdays())
-    if key in {"US", "HK"}:
-        # Weekday-only stub (no exchange holiday table in M10).
-        return TradingCalendar(market_id=key, closed_weekdays=frozenset())  # type: ignore[arg-type]
-    raise SymbolError(f"unknown market_id={market_id!r}; expected CN, US, or HK")
+    filename = _FILE_BY_MARKET.get(key)
+    if filename is None:
+        raise SymbolError(f"unknown market_id={market_id!r}; expected CN, US, or HK")
+    return TradingCalendar(market_id=key, closed_weekdays=_load_closed_weekdays(filename))  # type: ignore[arg-type]
