@@ -91,10 +91,17 @@
 | M23 | CN 复权套价 | 大 | `v1.16.0` | done |
 | M23.1 | apply_adjust 内核 + ADR 0028 | 小 | `v1.15.1` | done |
 | M23.2 | workbench daily-adjusted API + UI | 小 | `v1.15.2` | done |
+| M24 | Universe + PIT 截面面板 | 大 | `v1.17.0` | in_progress |
+| M24.1 | universe + panel 内核 + ADR 0029 | 小 | `v1.16.1` | done |
+| M25 | 盘前简报批处理 | 大 | `v1.18.0` | planned |
+| M26 | 工作台「今日推荐」 | 大 | `v1.19.0` | planned |
+| M27 | Recommend → PaperLedger | 大 | `v1.20.0` | planned |
+| M28 | Phase A 产品稳定收口 | 大 | `v2.0.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
-> 上表「目标 tag」列与阶段绑定；若插入额外小里程碑，只增加 patch，不跳过已规划的大 tag。
+> 上表「目标 tag」列与阶段绑定；若插入额外小里程碑，只增加 patch，不跳过已规划的大 tag。  
+> **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。
 
 ---
 
@@ -789,6 +796,75 @@
 验收（大）：
 
 - [x] M23.1–M23.2 done；CHANGELOG 含 `1.16.0`
+
+---
+
+## Phase A — 产品稳定（M24–M28）→ `v2.0.0`
+
+**产品目标**：日更选股推荐 + 纸面交易闭环（SIMULATE；无同花顺/实盘；无 LLM；无 SPA）。
+
+---
+
+## M24 — Universe + PIT 截面面板 → `v1.17.0`
+
+**目标**：CN 股票宇宙（config/fixtures；空则 fail-closed）；按交易日 as-of 经能力矩阵 providers 构建 PIT 截面面板（daily / 可选 adj_factor / 可选 fund_flow）。
+
+### 小里程碑
+
+#### M24.1 → `v1.16.1`
+
+验收：
+
+- [x] `load_universe` + `build_cross_section_panel`；ADR 0029
+- [x] 注入 provider 单测；零公网；空宇宙 fail-closed
+
+验收（大）：
+
+- [ ] CSV 兼容导出；CHANGELOG 含 `1.17.0`
+
+---
+
+## M25 — 盘前简报批处理 → `v1.18.0`
+
+**目标**：`score_lvrev` + `apply_entry_gates` → TopN 简报；CLI 与/或 `GET /api/research/brief`；确定性 fixtures。
+
+验收：
+
+- [ ] `build_premarket_brief`（含 reasons）
+- [ ] CLI / API；默认 replay；CI 零公网
+
+---
+
+## M26 — 工作台「今日推荐」→ `v1.19.0`
+
+**目标**：UI「今日推荐」+ TopN 分数/理由；链接既有行情面板。
+
+验收：
+
+- [ ] `#recommend` UI + API 接线
+- [ ] `test_app` 断言静态资源调用 brief API
+
+---
+
+## M27 — Recommend → PaperLedger → `v1.20.0`
+
+**目标**：一键 / API：brief TopN → paper draft（SIMULATE only）；复用 timing/window/freshness；默认 CN。
+
+验收：
+
+- [ ] `POST` brief→paper；无 liveTradingEnabled
+- [ ] UI 一键；需 active strategy
+
+---
+
+## M28 — Phase A 收口 → `v2.0.0`
+
+**目标**：ROADMAP Phase A done；CHANGELOG major；upstream-archive / README；全量 pytest；`release_tag -Kind major`。
+
+验收：
+
+- [ ] Phase A 勾选完成；CHANGELOG `2.0.0`
+- [ ] 全量 pytest 绿；tag `v2.0.0` push
 
 ---
 

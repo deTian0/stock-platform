@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.16.1] - 2026-09-14
+
+### Added
+
+- M24.1：CN 宇宙 + PIT 日截面面板（ADR 0029）
+  - `load_universe` / `build_cross_section_panel` / `panel_to_csv`；空宇宙 fail-closed
+  - 注入 daily（可选 adj_factor / fund_flow）；CI 零公网
+
 ## [1.16.0] - 2026-09-14
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-execution"
-version = "1.16.0"
+version = "1.16.1"
 description = "Paper-only execution safety kernel for stock-platform (broker-free)."
 readme = "README.md"
 requires-python = ">=3.10"
