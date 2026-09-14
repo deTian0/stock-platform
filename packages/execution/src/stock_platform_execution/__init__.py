@@ -53,4 +53,4 @@ __all__ = [
     "validate_simulation_profile",
 ]
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"

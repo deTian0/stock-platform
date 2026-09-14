@@ -58,6 +58,9 @@
 | M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | done |
 | M12.1 | 确定性 Bull/Bear/Risk 内核 | 小 | `v1.4.1` | done |
 | M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | done |
+| M13 | US/HK 静态交易日历 | 大 | `v1.6.0` | in_progress |
+| M13.1 | us/hk closed days + 日历加载 | 小 | `v1.5.1` | done |
+| M13.2 | MarketStrategy 验收 + 文档 | 小 | `v1.5.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -474,6 +477,31 @@
 验收（大）：
 
 - [x] M12.1–M12.2 done；CHANGELOG 含 `1.5.0`
+
+---
+
+## M13 — US/HK 静态交易日历 → `v1.6.0`
+
+**目标**：美港静态休市日对标 CN；MarketStrategy 自动生效；不改 CN 纸面 timing。
+
+### 小里程碑
+
+#### M13.1 → `v1.5.1`
+
+验收：
+
+- [x] `us_closed_days.txt` / `hk_closed_days.txt` + 通用加载
+- [x] ADR 0018；US/HK 假日单测
+
+#### M13.2 → `v1.5.2`
+
+验收：
+
+- [ ] `MarketStrategy` US/HK 假日断言；文档更新
+
+验收（大）：
+
+- [ ] M13.1–M13.2 done；CHANGELOG 含 `1.6.0`
 
 ---
 
