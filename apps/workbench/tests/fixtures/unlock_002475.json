@@ -1,0 +1,30 @@
+{
+  "symbol": "002475",
+  "asof_date": "2026-05-17",
+  "forward_days": 90,
+  "history": [
+    {
+      "date": "2025-11-20",
+      "type": "定向增发机构配售股份",
+      "shares": 8500.0,
+      "able_shares": 8500.0,
+      "ratio": 0.0123
+    },
+    {
+      "date": "2024-06-15",
+      "type": "股权激励限售股份",
+      "shares": 1200.5,
+      "able_shares": 1200.5,
+      "ratio": 0.0018
+    }
+  ],
+  "upcoming": [
+    {
+      "date": "2026-07-01",
+      "type": "首发原股东限售股份",
+      "shares": 32000.0,
+      "able_shares": 28000.0,
+      "ratio": 0.0456
+    }
+  ]
+}

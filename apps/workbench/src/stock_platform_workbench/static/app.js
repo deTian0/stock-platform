@@ -77,13 +77,21 @@
       if (lhb && lhb.effective) {
         $("pref-lhb").value = lhb.effective;
       }
+      const unlock = rows.find(function (r) {
+        return r.id === "unlock";
+      });
+      if (unlock && unlock.effective) {
+        $("pref-unlock").value = unlock.effective;
+      }
       $("pref-status").textContent =
         "daily=" +
         (daily && daily.effective ? daily.effective : "") +
         " · fund_flow=" +
         (fundFlow && fundFlow.effective ? fundFlow.effective : "") +
         " · lhb=" +
-        (lhb && lhb.effective ? lhb.effective : "");
+        (lhb && lhb.effective ? lhb.effective : "") +
+        " · unlock=" +
+        (unlock && unlock.effective ? unlock.effective : "");
     } catch (e) {
       showError(errEl, e.detail || String(e));
     }
@@ -95,6 +103,7 @@
     const daily = $("pref-daily").value;
     const fundFlow = $("pref-fund-flow").value;
     const lhb = $("pref-lhb").value;
+    const unlock = $("pref-unlock").value;
     try {
       await fetchJson("/api/settings/preferences", {
         method: "PUT",
@@ -105,6 +114,7 @@
             realtime: daily,
             fund_flow: fundFlow,
             lhb: lhb,
+            unlock: unlock,
           },
         }),
       });
@@ -114,7 +124,9 @@
         " fund_flow=" +
         fundFlow +
         " lhb=" +
-        lhb;
+        lhb +
+        " unlock=" +
+        unlock;
       await loadMatrix();
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -310,6 +322,81 @@
     }
   }
 
+  async function loadUnlock(event) {
+    if (event) event.preventDefault();
+    const errEl = $("unlock-error");
+    clearError(errEl);
+    $("unlock-meta").textContent = "";
+    $("unlock-json").textContent = "";
+    const symbols = $("unlock-symbols").value.trim();
+    const asof = $("unlock-asof").value;
+    const forward = $("unlock-forward").value;
+    const params = new URLSearchParams({ symbols: symbols, asof_date: asof });
+    if (forward) params.set("forward_days", forward);
+    try {
+      const data = await fetchJson("/api/market/unlock?" + params.toString());
+      const items = data.items || [];
+      const history = items.length ? items[0].history || [] : [];
+      const upcoming = items.length ? items[0].upcoming || [] : [];
+      $("unlock-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · items=" +
+        items.length +
+        " · history=" +
+        history.length +
+        " · upcoming=" +
+        upcoming.length;
+      const tbody = $("unlock-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const item of items) {
+        const buckets = [
+          ["history", item.history || []],
+          ["upcoming", item.upcoming || []],
+        ];
+        let wrote = false;
+        for (let b = 0; b < buckets.length; b++) {
+          const bucket = buckets[b][0];
+          const rows = buckets[b][1];
+          for (const row of rows) {
+            wrote = true;
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+              "<td>" +
+              item.symbol +
+              "</td><td>" +
+              bucket +
+              "</td><td>" +
+              row.date +
+              "</td><td>" +
+              (row.type || "") +
+              "</td><td>" +
+              row.shares +
+              "</td><td>" +
+              row.ratio +
+              "</td>";
+            tbody.appendChild(tr);
+          }
+        }
+        if (!wrote) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + item.symbol + "</td><td colspan=\"5\">(无解禁记录)</td>";
+          tbody.appendChild(tr);
+        }
+      }
+      $("unlock-json").textContent = JSON.stringify(items, null, 2);
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      $("unlock-table").querySelector("tbody").innerHTML = "";
+    }
+  }
+
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
     $("btn-pref").addEventListener("click", applyPreference);
@@ -317,6 +404,7 @@
     $("daily-form").addEventListener("submit", loadDaily);
     $("fund-flow-form").addEventListener("submit", loadFundFlow);
     $("lhb-form").addEventListener("submit", loadLhb);
+    $("unlock-form").addEventListener("submit", loadUnlock);
     $("debate-form").addEventListener("submit", loadDebate);
     loadMatrix();
     loadPaper();
