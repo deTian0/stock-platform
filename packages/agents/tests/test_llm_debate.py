@@ -7,12 +7,13 @@ from typing import Any
 
 import pytest
 
-from stock_platform_agents import AgentError, build_debate_report
 from stock_platform_agents.llm_debate import (
+    LlmBudgetExceeded,
     LlmUnavailableError,
     debate_brief_picks,
     llm_debate_status,
     run_debate,
+    warn_if_truncated,
 )
 
 
@@ -89,10 +90,27 @@ def test_llm_engine_with_mock() -> None:
     assert any(r.role == "bull" and "momentum" in r.thesis for r in report.rounds)
 
 
-def test_llm_fail_closed_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_llm_fallback_deterministic_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("STOCK_PLATFORM_LLM_DEBATE", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("STOCK_PLATFORM_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_FALLBACK", "deterministic")
+    closes = [100 + i for i in range(20)]
+    report = run_debate(
+        _SeqProvider(closes),
+        "600519",
+        asof=date(2026, 2, 20),
+        engine="llm",
+    )
+    assert report.kind == "debate"
+    assert any("LLM fallback" in w for w in report.warnings)
+
+
+def test_llm_fail_closed_when_fallback_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("STOCK_PLATFORM_LLM_DEBATE", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("STOCK_PLATFORM_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_FALLBACK", "fail-closed")
     closes = [100 + i for i in range(20)]
     with pytest.raises(LlmUnavailableError, match="fail-closed"):
         run_debate(
@@ -101,6 +119,53 @@ def test_llm_fail_closed_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
             asof=date(2026, 2, 20),
             engine="llm",
         )
+
+
+def test_llm_budget_exceeded_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_MAX_CALLS", "0")
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_FALLBACK", "deterministic")
+    closes = [100 + i for i in range(20)]
+    report = run_debate(
+        _SeqProvider(closes),
+        "600519",
+        asof=date(2026, 2, 20),
+        engine="llm",
+        llm_call=_fake_llm,
+    )
+    assert report.kind == "debate"
+    assert any("budget" in w.lower() or "LlmBudgetExceeded" in w for w in report.warnings)
+
+
+def test_llm_budget_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_MAX_CALLS", "0")
+    monkeypatch.setenv("STOCK_PLATFORM_LLM_FALLBACK", "fail-closed")
+    closes = [100 + i for i in range(20)]
+    with pytest.raises(LlmBudgetExceeded):
+        run_debate(
+            _SeqProvider(closes),
+            "600519",
+            asof=date(2026, 2, 20),
+            engine="llm",
+            llm_call=_fake_llm,
+        )
+
+
+def test_warn_if_truncated_provider_shapes() -> None:
+    with pytest.warns(UserWarning, match="truncated"):
+        assert warn_if_truncated({"stop_reason": "max_tokens"})
+    with pytest.warns(UserWarning, match="truncated"):
+        assert warn_if_truncated({"finish_reason": "length"})
+    with pytest.warns(UserWarning, match="truncated"):
+        assert warn_if_truncated({"finish_reason": "MAX_TOKENS"})
+    with pytest.warns(UserWarning, match="truncated"):
+        assert warn_if_truncated(
+            {
+                "status": "incomplete",
+                "incomplete_details": {"reason": "max_output_tokens"},
+            }
+        )
+    assert warn_if_truncated({"finish_reason": "stop"}) == []
+    assert warn_if_truncated(None) == []
 
 
 def test_debate_brief_picks_deterministic() -> None:
@@ -133,3 +198,5 @@ def test_llm_status_default_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     st = llm_debate_status()
     assert st["defaultEngine"] == "deterministic"
     assert st["ready"] is False
+    assert st["fallback"] == "deterministic"
+    assert st["maxCalls"] == 6

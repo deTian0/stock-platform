@@ -1,7 +1,14 @@
-"""Optional LLM debate — soft-import / fail-closed; MarketDataProvider only.
+"""Optional LLM debate — soft-import / budget / truncation / fallback (ADR 0034 + 0044).
 
 Default product path remains ``build_debate_report`` (deterministic, ADR 0017).
 This module never embeds Eastmoney URLs; bars come only from the injected provider.
+
+Cost / quality (ADR 0045):
+- ``STOCK_PLATFORM_LLM_MAX_CALLS`` (default 6)
+- ``STOCK_PLATFORM_LLM_MAX_TOKENS`` soft estimate (chars/4); unset = no soft cap
+- ``warn_if_truncated`` covers Anthropic / OpenAI Chat / Gemini / Responses shapes
+- On budget exceed or LLM failure: degrade to deterministic when
+  ``STOCK_PLATFORM_LLM_FALLBACK=deterministic`` (default); else fail-closed
 """
 
 from __future__ import annotations
@@ -9,9 +16,9 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import asdict
+import warnings
 from datetime import date
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping
 
 from stock_platform_providers import normalize_symbol
 
@@ -24,6 +31,18 @@ LlmCall = Callable[[str, str], str]
 
 class LlmUnavailableError(AgentError):
     """Raised when optional LLM deps/keys are missing or the call fails closed."""
+
+
+class LlmBudgetExceeded(LlmUnavailableError):
+    """Raised when call/token budget is exhausted before or during LLM use."""
+
+
+# Provider truncation markers (lowercase compare). Missing one shape = silent truncate.
+_TRUNCATION_MARKERS = {
+    "stop_reason": {"max_tokens"},
+    "finish_reason": {"length", "max_tokens"},
+}
+_RESPONSES_INCOMPLETE_REASONS = {"max_output_tokens", "max_tokens"}
 
 
 def llm_debate_status() -> dict[str, Any]:
@@ -65,7 +84,106 @@ def llm_debate_status() -> dict[str, Any]:
         "ready": ready,
         "reasons": reasons,
         "defaultEngine": "deterministic",
+        "fallback": _llm_fallback_mode(),
+        "maxCalls": _max_calls(),
+        "maxTokensSoft": _max_tokens_soft(),
     }
+
+
+def _llm_fallback_mode() -> str:
+    return (
+        os.environ.get("STOCK_PLATFORM_LLM_FALLBACK", "deterministic").strip().lower()
+        or "deterministic"
+    )
+
+
+def _max_calls() -> int:
+    raw = os.environ.get("STOCK_PLATFORM_LLM_MAX_CALLS", "6").strip() or "6"
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 6
+
+
+def _max_tokens_soft() -> int | None:
+    raw = os.environ.get("STOCK_PLATFORM_LLM_MAX_TOKENS", "").strip()
+    if not raw:
+        return None
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return None
+
+
+def _estimate_tokens(text: str) -> int:
+    """Soft char/4 estimate — not a billing meter."""
+    return max(0, (len(text) + 3) // 4)
+
+
+def _truncation_field(metadata: Mapping[str, Any]) -> tuple[str, str] | None:
+    for field, truncated_values in _TRUNCATION_MARKERS.items():
+        value = metadata.get(field)
+        if isinstance(value, str) and value.strip().lower() in truncated_values:
+            return field, value
+    if str(metadata.get("status", "")).lower() == "incomplete":
+        details = metadata.get("incomplete_details") or {}
+        reason = details.get("reason") if isinstance(details, Mapping) else None
+        if isinstance(reason, str) and reason.strip().lower() in _RESPONSES_INCOMPLETE_REASONS:
+            return "incomplete_details.reason", reason
+    return None
+
+
+def warn_if_truncated(response_meta: Mapping[str, Any] | None) -> list[str]:
+    """Return warning strings when response metadata indicates output truncation.
+
+    Covers:
+    - Anthropic ``stop_reason=max_tokens``
+    - OpenAI Chat ``finish_reason=length``
+    - Gemini ``finish_reason=MAX_TOKENS`` (case-insensitive via lower())
+    - OpenAI Responses ``status=incomplete`` + ``incomplete_details.reason=max_output_tokens``
+    """
+    if not response_meta:
+        return []
+    hit = _truncation_field(response_meta)
+    if not hit:
+        return []
+    field, value = hit
+    msg = (
+        f"LLM response truncated ({field}={value}); raise max_tokens / "
+        "STOCK_PLATFORM_LLM_MAX_TOKENS awareness — report may be incomplete."
+    )
+    warnings.warn(msg, UserWarning, stacklevel=2)
+    return [msg]
+
+
+class _LlmBudget:
+    """Per-session call + soft token budget."""
+
+    def __init__(self) -> None:
+        self.max_calls = _max_calls()
+        self.max_tokens = _max_tokens_soft()
+        self.calls = 0
+        self.tokens_est = 0
+
+    def before_call(self, system: str, user: str) -> None:
+        if self.calls >= self.max_calls:
+            raise LlmBudgetExceeded(
+                f"LLM call budget exceeded ({self.calls}>={self.max_calls} "
+                f"STOCK_PLATFORM_LLM_MAX_CALLS)"
+            )
+        prompt_est = _estimate_tokens(system) + _estimate_tokens(user)
+        if self.max_tokens is not None and self.tokens_est + prompt_est > self.max_tokens:
+            raise LlmBudgetExceeded(
+                f"LLM soft token budget exceeded "
+                f"(est {self.tokens_est + prompt_est}>{self.max_tokens} "
+                f"STOCK_PLATFORM_LLM_MAX_TOKENS)"
+            )
+
+    def after_call(self, system: str, user: str, content: str) -> None:
+        self.calls += 1
+        self.tokens_est += (
+            _estimate_tokens(system) + _estimate_tokens(user) + _estimate_tokens(content)
+        )
 
 
 def _require_llm_env(*, llm_call: LlmCall | None) -> None:
@@ -104,6 +222,15 @@ def _default_openai_call(system: str, user: str) -> str:
         ],
         temperature=0,
     )
+    meta: dict[str, Any] = {}
+    try:
+        choice0 = resp.choices[0]
+        fr = getattr(choice0, "finish_reason", None)
+        if fr is not None:
+            meta["finish_reason"] = fr
+    except Exception:  # noqa: BLE001
+        pass
+    warn_if_truncated(meta)
     content = resp.choices[0].message.content or ""
     if not content.strip():
         raise LlmUnavailableError("empty LLM response (fail-closed)")
@@ -143,6 +270,28 @@ def _normalize_verdict(value: Any) -> Verdict:
     return "Hold"
 
 
+def _maybe_deterministic_fallback(
+    provider: SupportsMarketData,
+    symbol: str,
+    *,
+    asof: str | date | None,
+    lookback_days: int,
+    exc: BaseException,
+) -> DebateReport:
+    mode = _llm_fallback_mode()
+    if mode in {"deterministic", "rules", "m12", "1", "true", "yes", "on"}:
+        report = build_debate_report(
+            provider, symbol, asof=asof, lookback_days=lookback_days
+        )
+        report.warnings.append(
+            f"LLM fallback to deterministic ({type(exc).__name__}: {exc})"
+        )
+        return report
+    if isinstance(exc, LlmUnavailableError):
+        raise exc
+    raise LlmUnavailableError(f"LLM failed (fail-closed): {exc}") from exc
+
+
 def build_llm_debate_report(
     provider: SupportsMarketData,
     symbol: str,
@@ -150,17 +299,20 @@ def build_llm_debate_report(
     asof: str | date | None = None,
     lookback_days: int = 60,
     llm_call: LlmCall | None = None,
+    budget: _LlmBudget | None = None,
+    response_meta: Mapping[str, Any] | None = None,
 ) -> DebateReport:
     """Run Bull/Bear/Risk via optional LLM; market data only from ``provider``."""
     _require_llm_env(llm_call=llm_call)
     call = llm_call or _default_openai_call
+    session = budget or _LlmBudget()
 
     code = normalize_symbol(symbol)
     asof_d = _parse_asof(asof)
-    warnings: list[str] = []
+    warnings_list: list[str] = []
     hist = _historical_warning(asof_d)
     if hist:
-        warnings.append(hist)
+        warnings_list.append(hist)
 
     start = date.fromordinal(max(asof_d.toordinal() - int(lookback_days), 1))
     bars = provider.get_daily([code], start=start, end=asof_d)
@@ -172,9 +324,9 @@ def build_llm_debate_report(
         try:
             provider.get_realtime([code])
         except Exception as exc:  # noqa: BLE001
-            warnings.append(f"realtime unavailable: {exc}")
+            warnings_list.append(f"realtime unavailable: {exc}")
     else:
-        warnings.append("已跳过 realtime（历史分析日）")
+        warnings_list.append("已跳过 realtime（历史分析日）")
 
     closes = _closes(bars)
     last_close = closes[-1] if closes else None
@@ -193,8 +345,13 @@ def build_llm_debate_report(
         f"recent_closes={closes[-10:]}"
     )
     try:
-        payload = _parse_llm_payload(call(system, user))
-    except LlmUnavailableError:
+        session.before_call(system, user)
+        content = call(system, user)
+        session.after_call(system, user, content)
+        trunc = warn_if_truncated(response_meta)
+        warnings_list.extend(trunc)
+        payload = _parse_llm_payload(content)
+    except (LlmUnavailableError, LlmBudgetExceeded):
         raise
     except Exception as exc:  # noqa: BLE001
         raise LlmUnavailableError(f"LLM call failed (fail-closed): {exc}") from exc
@@ -225,7 +382,7 @@ def build_llm_debate_report(
         verdict=verdict,
         daily_bars=len(bars),
         last_close=last_close,
-        warnings=warnings,
+        warnings=warnings_list,
         kind="llm_debate",
         disclaimer="模板结论，非投资建议；可选 LLM 辩论路径；数据仅经 MarketDataProvider。",
     )
@@ -239,6 +396,7 @@ def run_debate(
     engine: str = "deterministic",
     llm_call: LlmCall | None = None,
     lookback_days: int = 60,
+    budget: _LlmBudget | None = None,
 ) -> DebateReport:
     """Dispatch deterministic (default) vs optional LLM debate."""
     eng = (engine or "deterministic").strip().lower()
@@ -247,13 +405,23 @@ def run_debate(
             provider, symbol, asof=asof, lookback_days=lookback_days
         )
     if eng in {"llm", "openai"}:
-        return build_llm_debate_report(
-            provider,
-            symbol,
-            asof=asof,
-            lookback_days=lookback_days,
-            llm_call=llm_call,
-        )
+        try:
+            return build_llm_debate_report(
+                provider,
+                symbol,
+                asof=asof,
+                lookback_days=lookback_days,
+                llm_call=llm_call,
+                budget=budget,
+            )
+        except (LlmUnavailableError, LlmBudgetExceeded) as exc:
+            return _maybe_deterministic_fallback(
+                provider,
+                symbol,
+                asof=asof,
+                lookback_days=lookback_days,
+                exc=exc,
+            )
     raise AgentError(f"unknown debate engine={engine!r}; use deterministic|llm")
 
 
@@ -267,25 +435,49 @@ def debate_brief_picks(
 ) -> dict[str, Any]:
     """Run debate for each TopN pick after a brief (default deterministic).
 
-    On LLM engine, missing deps/keys raise ``LlmUnavailableError`` before any
-    silent degradation — callers must not pretend brief failed.
+    On LLM engine, missing deps/keys / budget / call failure either degrade to
+    deterministic (default ``STOCK_PLATFORM_LLM_FALLBACK``) or raise
+    ``LlmUnavailableError`` when fallback is fail-closed.
     """
     eng = (engine or "deterministic").strip().lower()
     if eng in {"llm", "openai"}:
-        _require_llm_env(llm_call=llm_call)
+        try:
+            _require_llm_env(llm_call=llm_call)
+        except LlmUnavailableError as exc:
+            if _llm_fallback_mode() in {
+                "deterministic",
+                "rules",
+                "m12",
+                "1",
+                "true",
+                "yes",
+                "on",
+            }:
+                eng = "deterministic"
+            else:
+                raise exc
 
     asof = brief.get("asof")
     picks = list(brief.get("picks") or [])
     if max_picks is not None:
         picks = picks[: int(max_picks)]
     debates: list[dict[str, Any]] = []
+    budget = _LlmBudget() if eng in {"llm", "openai"} else None
+    used_engine = "llm" if eng in {"llm", "openai"} else "deterministic"
     for pick in picks:
         sym = str(pick.get("symbol") or "").strip()
         if not sym:
             continue
         report = run_debate(
-            provider, sym, asof=asof, engine=eng, llm_call=llm_call
+            provider,
+            sym,
+            asof=asof,
+            engine=eng,
+            llm_call=llm_call,
+            budget=budget,
         )
+        if report.kind != "llm_debate" and eng in {"llm", "openai"}:
+            used_engine = "deterministic_fallback"
         debates.append(
             {
                 "rank": pick.get("rank"),
@@ -295,7 +487,7 @@ def debate_brief_picks(
         )
     return {
         "brief": dict(brief),
-        "engine": "llm" if eng in {"llm", "openai"} else "deterministic",
+        "engine": used_engine if eng in {"llm", "openai"} else "deterministic",
         "debates": debates,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
