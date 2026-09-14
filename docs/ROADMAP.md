@@ -64,7 +64,7 @@
 | M14 | 多市场纸面 timing | 大 | `v1.7.0` | done |
 | M14.1 | timing market= + ADR 0019 | 小 | `v1.6.1` | done |
 | M14.2 | PaperLedger + workbench market | 小 | `v1.6.2` | done |
-| M15 | CN 日级资金流 | 大 | `v1.8.0` | in_progress |
+| M15 | CN 日级资金流 | 大 | `v1.8.0` | done |
 | M15.1 | fund_flow provider + matrix + ADR 0020 | 小 | `v1.7.1` | done |
 | M15.2 | workbench fund-flow API + UI | 小 | `v1.7.2` | done |
 
@@ -558,7 +558,7 @@
 
 验收（大）：
 
-- [ ] M15.1–M15.2 done；CHANGELOG 含 `1.8.0`
+- [x] M15.1–M15.2 done；CHANGELOG 含 `1.8.0`
 
 ---
 
