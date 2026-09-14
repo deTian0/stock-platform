@@ -18,7 +18,8 @@
 **已完成（M3 / v0.4.0）**：lvrev / PIT / 盘前批处理（`packages/research`）。  
 **已完成（M4 / v0.5.0）**：投研 Agent 插件（`packages/agents`，无内嵌抓取）。  
 **已完成（M5 / v0.6.0）**：美港策略表 + `GlobalReplayProvider`。  
-**进行中（M6 / → v0.7.0）**：纸面执行安全模型（`packages/execution`）。
+**已完成（M6 / v0.7.0）**：纸面执行安全（`packages/execution`，SIMULATE only）。  
+**下一步（M7）**：产品收敛 / 上游仓归档 → `v1.0.0`。
 
 ## 仓库布局
 

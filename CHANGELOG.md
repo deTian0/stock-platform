@@ -8,6 +8,19 @@
 
 - （无）
 
+## [0.7.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M6 完成**：纸面执行安全模型
+  - `packages/execution` broker-free 内核（吸 V2 结论，无券商 SDK）
+  - SIMULATE-only / live=false；草稿≠激活；窗口外禁补单；draftId 幂等
+  - workbench `/api/paper/*`
+
+### Notes
+
+- Admission 通过 ≠ 策略已证明；下一步 M7 产品收敛 / 上游归档
+
 ## [0.6.3] - 2026-09-14
 
 ### Added
@@ -243,7 +256,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/local/stock-platform/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/local/stock-platform/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/local/stock-platform/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/local/stock-platform/compare/v0.6.0...v0.6.1
