@@ -8,6 +8,13 @@
 
 - （无）
 
+## [1.10.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M17 完成**：CN 个股限售解禁（能力矩阵 `unlock`；replay + `em_get` datacenter）
+  - ADR 0022；workbench API/UI；默认仍 replay；全市场解禁日历不做
+
 ## [1.9.2] - 2026-09-14
 
 ### Added
