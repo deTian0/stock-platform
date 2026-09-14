@@ -1,4 +1,4 @@
-"""A-share live HTTP provider — East Money push2/push2his via em_get only."""
+"""A-share live HTTP provider — East Money via em_get; financial via Sina."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from .eastmoney import EastmoneyClient, get_default_client
 from .normalize import (
     normalize_daily_row,
     normalize_depth5_row,
+    normalize_financial_payload,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -22,6 +23,23 @@ KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+SINA_FINANCE_URL = (
+    "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
+)
+
+DEFAULT_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
+SINA_REFERER = "https://finance.sina.com.cn/"
+
+# Sina report_type → contract statement key
+_SINA_REPORT_TYPES: tuple[tuple[str, str], ...] = (
+    ("lrb", "income"),
+    ("fzb", "balance"),
+    ("llb", "cashflow"),
+)
 
 # East Money klt → contract freq (minute only; 101=daily used separately).
 _MINUTE_KLT: dict[str, str] = {
@@ -107,7 +125,7 @@ def _parse_minute_kline_csv(line: str) -> dict[str, Any]:
 
 
 class AStockHttpProvider:
-    """MarketDataProvider backed by East Money HTTP through ``EastmoneyClient``."""
+    """MarketDataProvider: East Money via ``em_get``; financial via Sina HTTP."""
 
     name = "astock_http"
 
@@ -125,6 +143,21 @@ class AStockHttpProvider:
             return self._get_json(url, params=params)
         resp = self._client.get(url, params=params)
         return _response_json(resp)
+
+    def _fetch_sina(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Non-EM HTTP (Sina). Must not go through ``em_get``."""
+        if self._get_json is not None:
+            return self._get_json(url, params=params)
+        import requests
+
+        resp = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": DEFAULT_UA, "Referer": SINA_REFERER},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     def get_daily(
         self,
@@ -593,6 +626,83 @@ class AStockHttpProvider:
                 )
             )
         return rows
+
+    def get_financial(
+        self,
+        symbols: list[str],
+        *,
+        periods: int = 8,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """CN three-statement financials via Sina (not East Money / em_get).
+
+        Empty report_list for all three statements skips the symbol.
+        """
+        num = max(1, int(periods))
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            paper = f"{exchange_prefix(code)}{code}"
+            statements: dict[str, list[dict[str, Any]]] = {
+                "income": [],
+                "balance": [],
+                "cashflow": [],
+            }
+            for report_type, key in _SINA_REPORT_TYPES:
+                payload = self._fetch_sina(
+                    SINA_FINANCE_URL,
+                    {
+                        "paperCode": paper,
+                        "source": report_type,
+                        "type": "0",
+                        "page": "1",
+                        "num": str(num),
+                    },
+                )
+                statements[key] = _parse_sina_finance_report(payload, num=num)
+            if not (statements["income"] or statements["balance"] or statements["cashflow"]):
+                continue
+            raw_payload = {
+                "symbol": code,
+                "periods": num,
+                **statements,
+            }
+            items.append(
+                normalize_financial_payload(
+                    raw_payload,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    periods=num,
+                    market="CN",
+                )
+            )
+        return items
+
+
+def _parse_sina_finance_report(payload: dict[str, Any], *, num: int) -> list[dict[str, Any]]:
+    """Parse Sina ``report_list`` into period_end + Chinese title rows."""
+    report_list = ((payload.get("result") or {}).get("data") or {}).get("report_list") or {}
+    if not isinstance(report_list, dict):
+        return []
+    rows: list[dict[str, Any]] = []
+    for period in sorted(report_list.keys(), reverse=True)[:num]:
+        obj = report_list[period] or {}
+        period_s = str(period)
+        if len(period_s) == 8 and period_s.isdigit():
+            period_end = f"{period_s[:4]}-{period_s[4:6]}-{period_s[6:8]}"
+        else:
+            period_end = period_s
+        rec: dict[str, Any] = {"period_end": period_end, "报告期": period_end}
+        for it in obj.get("data", []) or []:
+            if not isinstance(it, dict):
+                continue
+            title = it.get("item_title", "")
+            if not title or it.get("item_value") is None:
+                continue
+            rec[title] = it.get("item_value")
+        rows.append(rec)
+    return rows
 
 
 def _parse_fund_flow_csv(line: str) -> dict[str, Any]:

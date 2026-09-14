@@ -197,6 +197,68 @@ def test_depth5_empty_data() -> None:
     assert rows == []
 
 
+def test_financial_from_sina() -> None:
+    calls: list[str] = []
+
+    def get_json(url, params=None):
+        assert "quotes.sina.cn" in url
+        assert "CompanyFinanceService" in url
+        source = (params or {}).get("source")
+        calls.append(source)
+        period = "20260331"
+        titles = {
+            "lrb": [
+                {"item_title": "营业收入", "item_value": "39112000000"},
+                {"item_title": "净利润", "item_value": "20850000000"},
+                {"item_title": "归属于母公司所有者的净利润", "item_value": "20800000000"},
+                {"item_title": "基本每股收益", "item_value": "16.57"},
+            ],
+            "fzb": [
+                {"item_title": "资产总计", "item_value": "310000000000"},
+                {"item_title": "负债合计", "item_value": "48000000000"},
+                {"item_title": "所有者权益合计", "item_value": "262000000000"},
+            ],
+            "llb": [
+                {"item_title": "经营活动产生的现金流量净额", "item_value": "22000000000"},
+                {"item_title": "投资活动产生的现金流量净额", "item_value": "-1500000000"},
+                {"item_title": "筹资活动产生的现金流量净额", "item_value": "-18000000000"},
+            ],
+        }
+        return {
+            "result": {
+                "data": {
+                    "report_list": {
+                        period: {"data": titles[source]},
+                    }
+                }
+            }
+        }
+
+    items = AStockHttpProvider(get_json=get_json).get_financial(["SH600519"], periods=1)
+    assert calls == ["lrb", "fzb", "llb"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "600519"
+    assert item["source"] == "astock_http"
+    assert item["periods"] == 1
+    assert item["income"][0]["revenue"] == 39112000000.0
+    assert item["balance"][0]["total_equity"] == 262000000000.0
+    assert item["cashflow"][0]["net_financing_cash_flow"] == -18000000000.0
+
+
+def test_financial_rejects_hk() -> None:
+    provider = AStockHttpProvider(get_json=lambda *a, **k: {})
+    with pytest.raises(SymbolError):
+        provider.get_financial(["00700"])
+
+
+def test_financial_empty_reports() -> None:
+    items = AStockHttpProvider(
+        get_json=lambda *a, **k: {"result": {"data": {"report_list": {}}}}
+    ).get_financial(["600519"])
+    assert items == []
+
+
 def test_lhb_from_datacenter() -> None:
     calls: list[str] = []
 

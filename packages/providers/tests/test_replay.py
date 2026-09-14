@@ -11,6 +11,7 @@ from stock_platform_providers import SymbolError, normalize_symbol
 from stock_platform_providers.normalize import (
     normalize_daily_row,
     normalize_depth5_row,
+    normalize_financial_payload,
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
@@ -130,6 +131,42 @@ def test_replay_depth5() -> None:
 def test_replay_depth5_missing_fixture_empty() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
     assert provider.get_depth5(["000001"]) == []
+
+
+def test_replay_financial() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    items = provider.get_financial(["SH600519"])
+    assert len(items) == 1
+    item = items[0]
+    assert item["symbol"] == "600519"
+    assert item["source"] == "replay"
+    assert item["periods"] == 2
+    assert item["income"][0]["period_end"] == "2026-03-31"
+    assert item["income"][0]["revenue"] == 39112000000.0
+    assert item["income"][0]["net_income"] == 20850000000.0
+    assert item["balance"][0]["total_assets"] == 310000000000.0
+    assert item["cashflow"][0]["net_operating_cash_flow"] == 22000000000.0
+
+
+def test_replay_financial_missing_fixture_empty() -> None:
+    provider = ReplayProvider(ReplayTransport(FIXTURES))
+    assert provider.get_financial(["000001"]) == []
+
+
+def test_normalize_financial_aliases() -> None:
+    payload = normalize_financial_payload(
+        {
+            "symbol": "600519",
+            "income": [{"报告期": "2026-06-30", "营业收入": "1", "净利润": "2"}],
+            "balance": [],
+            "cashflow": [],
+        },
+        source="test",
+    )
+    assert payload["income"][0]["revenue"] == 1.0
+    assert payload["income"][0]["net_income"] == 2.0
+    assert payload["balance"] == []
+    assert payload["periods"] == 1
 
 
 def test_normalize_depth5_pads_levels() -> None:

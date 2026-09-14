@@ -20,6 +20,7 @@
 | **M17.1 / v1.9.1** | CN 限售解禁 `get_unlock`（replay + datacenter-web / `em_get`） |
 | **M18.1 / v1.10.1** | CN 分钟 K `get_minute`（replay + push2his kline / `em_get`） |
 | **M19.1 / v1.11.1** | CN 五档盘口 `get_depth5`（replay + push2 stock/get / `em_get`） |
+| **M20.1 / v1.12.1** | CN 财务报表 `get_financial`（replay + 新浪三表；非 em_get） |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装

@@ -77,7 +77,16 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             display="Replay fixtures",
             kind="builtin",
             datasets=frozenset(
-                {"daily", "realtime", "minute", "depth5", "fund_flow", "lhb", "unlock"}
+                {
+                    "daily",
+                    "realtime",
+                    "minute",
+                    "depth5",
+                    "financial",
+                    "fund_flow",
+                    "lhb",
+                    "unlock",
+                }
             ),
             available=True,
             status="ok",
@@ -90,11 +99,23 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             display="A-stock HTTP (EM throttled)",
             kind="builtin",
             datasets=frozenset(
-                {"daily", "realtime", "minute", "depth5", "fund_flow", "lhb", "unlock"}
+                {
+                    "daily",
+                    "realtime",
+                    "minute",
+                    "depth5",
+                    "financial",
+                    "fund_flow",
+                    "lhb",
+                    "unlock",
+                }
             ),
             available=True,
             status="ok",
-            note="Live East Money via em_get; prefer replay for offline CI",
+            note=(
+                "Live: East Money via em_get; financial via Sina HTTP "
+                "(not em_get); prefer replay for offline CI"
+            ),
         )
     )
     reg.register(

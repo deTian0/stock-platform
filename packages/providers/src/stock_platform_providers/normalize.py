@@ -9,6 +9,10 @@ from .schemas import (
     DAILY_COLUMNS,
     DEPTH5_COLUMNS,
     DEPTH5_LEVELS,
+    FINANCIAL_BALANCE_COLUMNS,
+    FINANCIAL_CASHFLOW_COLUMNS,
+    FINANCIAL_INCOME_COLUMNS,
+    FINANCIAL_TOP_KEYS,
     FUND_FLOW_COLUMNS,
     LHB_INSTITUTION_COLUMNS,
     LHB_RECORD_COLUMNS,
@@ -528,3 +532,152 @@ def normalize_depth5_row(
         "asof_ts": asof,
     }
     return {k: row.get(k) for k in DEPTH5_COLUMNS}
+
+
+# Sina / vendor Chinese titles → canonical English keys (first match wins).
+_INCOME_ALIASES: dict[str, tuple[str, ...]] = {
+    "revenue": ("revenue", "营业收入", "营业总收入", "operating_income"),
+    "net_income": ("net_income", "净利润", "net_profit"),
+    "net_income_attributable": (
+        "net_income_attributable",
+        "归属于母公司所有者的净利润",
+        "归属于母公司股东的净利润",
+        "归母净利润",
+        "parent_holder_net_profit",
+    ),
+    "basic_eps": ("basic_eps", "基本每股收益", "basic_earnings_per_share"),
+}
+
+_BALANCE_ALIASES: dict[str, tuple[str, ...]] = {
+    "total_assets": ("total_assets", "资产总计", "资产合计", "总资产", "assets_total"),
+    "total_liabilities": (
+        "total_liabilities",
+        "负债合计",
+        "负债总计",
+        "总负债",
+        "total_debt",
+    ),
+    "total_equity": (
+        "total_equity",
+        "所有者权益合计",
+        "股东权益合计",
+        "归属于母公司所有者权益合计",
+        "holder_equity_total",
+    ),
+}
+
+_CASHFLOW_ALIASES: dict[str, tuple[str, ...]] = {
+    "net_operating_cash_flow": (
+        "net_operating_cash_flow",
+        "经营活动产生的现金流量净额",
+        "act_cash_flow_net",
+    ),
+    "net_investing_cash_flow": (
+        "net_investing_cash_flow",
+        "投资活动产生的现金流量净额",
+        "invest_cash_flow_net",
+    ),
+    "net_financing_cash_flow": (
+        "net_financing_cash_flow",
+        "筹资活动产生的现金流量净额",
+        "finance_cash_flow_net",
+    ),
+}
+
+
+def _pick_aliased(raw: dict[str, Any], aliases: tuple[str, ...]) -> Any:
+    for key in aliases:
+        if key in raw and raw[key] not in (None, ""):
+            return raw[key]
+    return None
+
+
+def _normalize_statement_row(
+    raw: dict[str, Any],
+    *,
+    columns: list[str],
+    field_aliases: dict[str, tuple[str, ...]],
+) -> dict[str, Any] | None:
+    period = _as_date(
+        raw.get("period_end")
+        or raw.get("报告期")
+        or raw.get("report_date")
+        or raw.get("period")
+    )
+    if period is None:
+        return None
+    row: dict[str, Any] = {"period_end": period.isoformat()}
+    for col in columns:
+        if col == "period_end":
+            continue
+        aliases = field_aliases.get(col, (col,))
+        row[col] = _as_float(_pick_aliased(raw, aliases))
+    return {k: row.get(k) for k in columns}
+
+
+def normalize_financial_payload(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    periods: int | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Normalize a CN financial three-statement aggregate (amounts in 元).
+
+    Empty statement lists are valid. ``periods`` defaults to max length of the
+    three lists (or explicit override).
+    """
+    sym = raw.get("symbol") or raw.get("code") or default_symbol
+    if not sym:
+        raise ValueError("financial payload missing symbol")
+    symbol = normalize_symbol(str(sym), market=market)
+
+    income: list[dict[str, Any]] = []
+    for item in raw.get("income") or raw.get("lrb") or []:
+        if not isinstance(item, dict):
+            continue
+        row = _normalize_statement_row(
+            item, columns=FINANCIAL_INCOME_COLUMNS, field_aliases=_INCOME_ALIASES
+        )
+        if row is not None:
+            income.append(row)
+
+    balance: list[dict[str, Any]] = []
+    for item in raw.get("balance") or raw.get("fzb") or raw.get("balance_sheet") or []:
+        if not isinstance(item, dict):
+            continue
+        row = _normalize_statement_row(
+            item, columns=FINANCIAL_BALANCE_COLUMNS, field_aliases=_BALANCE_ALIASES
+        )
+        if row is not None:
+            balance.append(row)
+
+    cashflow: list[dict[str, Any]] = []
+    for item in raw.get("cashflow") or raw.get("llb") or raw.get("cash_flow") or []:
+        if not isinstance(item, dict):
+            continue
+        row = _normalize_statement_row(
+            item, columns=FINANCIAL_CASHFLOW_COLUMNS, field_aliases=_CASHFLOW_ALIASES
+        )
+        if row is not None:
+            cashflow.append(row)
+
+    if periods is None:
+        periods = raw.get("periods")
+    if periods is None:
+        periods_i = max(len(income), len(balance), len(cashflow), 0)
+    else:
+        periods_i = int(periods)
+
+    payload = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "periods": periods_i,
+        "income": income,
+        "balance": balance,
+        "cashflow": cashflow,
+    }
+    return {k: payload.get(k) for k in FINANCIAL_TOP_KEYS}
