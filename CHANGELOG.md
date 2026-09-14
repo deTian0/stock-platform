@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.3.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M41 完成**：板块资金流 / 新闻特征
+  - 能力 `sector_fund_flow` / `news`；replay + `astock_http`（`em_get`）
+  - 契约 + fixtures；workbench API/薄 UI；缺能力 fail-closed
+  - ADR 0042；默认 replay；CI 零公网
+
 ## [3.2.0] - 2026-09-14
 
 ### Added

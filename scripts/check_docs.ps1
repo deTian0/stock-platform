@@ -61,6 +61,7 @@ $required = @(
   'docs/architecture/0039-phase-d-e2e.md',
   'docs/architecture/0040-daily-universe-readable-reasons.md',
   'docs/architecture/0041-daily-pipeline.md',
+  'docs/architecture/0042-sector-fund-flow-news.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

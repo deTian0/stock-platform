@@ -22,11 +22,13 @@ from .schemas import (
     LHB_TOP_KEYS,
     MINUTE_COLUMNS,
     MINUTE_FREQS,
+    NEWS_COLUMNS,
     REALTIME_COLUMNS,
+    SECTOR_FUND_FLOW_COLUMNS,
     UNLOCK_EVENT_COLUMNS,
     UNLOCK_TOP_KEYS,
 )
-from .symbol import normalize_symbol
+from .symbol import normalize_sector_code, normalize_symbol
 
 
 def _as_float(value: Any) -> float | None:
@@ -268,6 +270,96 @@ def normalize_fund_flow_row(
         "super_net": _as_float(raw.get("super_net")),
     }
     return {k: row.get(k) for k in FUND_FLOW_COLUMNS}
+
+
+def normalize_sector_fund_flow_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "sector",
+    default_sector_code: str | None = None,
+) -> dict[str, Any]:
+    """Map a board/sector day-level fund-flow bar (nets in 元)."""
+    if asset_type not in {"sector", "index"}:
+        raise ValueError(
+            f"sector_fund_flow asset_type must be 'sector' or 'index', got {asset_type!r}"
+        )
+    code_raw = (
+        raw.get("sector_code")
+        or raw.get("code")
+        or raw.get("board_code")
+        or default_sector_code
+    )
+    if not code_raw:
+        raise ValueError("sector_fund_flow row missing sector_code")
+    sector_code = normalize_sector_code(str(code_raw))
+
+    trade_date = _as_date(raw.get("date") or raw.get("trade_date") or raw.get("day"))
+    if trade_date is None:
+        raise ValueError(f"sector_fund_flow row for {sector_code} missing date")
+
+    name = raw.get("sector_name") or raw.get("name") or raw.get("board_name")
+    sector_name = str(name).strip() if name not in (None, "") else None
+
+    row = {
+        "sector_code": sector_code,
+        "sector_name": sector_name,
+        "asset_type": asset_type,
+        "source": source,
+        "date": trade_date.isoformat(),
+        "main_net": _as_float(raw.get("main_net")),
+        "change_pct": _as_float(raw.get("change_pct")),
+    }
+    return {k: row.get(k) for k in SECTOR_FUND_FLOW_COLUMNS}
+
+
+def normalize_news_row(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    default_symbol: str | None = None,
+    default_sector_code: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map a lightweight news feature row (no LLM summary required)."""
+    sym_raw = raw.get("symbol") or default_symbol
+    sector_raw = raw.get("sector_code") or default_sector_code
+    symbol: str | None = None
+    sector_code: str | None = None
+    if sym_raw not in (None, ""):
+        symbol = normalize_symbol(str(sym_raw), market=market)
+    if sector_raw not in (None, ""):
+        sector_code = normalize_sector_code(str(sector_raw))
+    if symbol is None and sector_code is None:
+        raise ValueError("news row missing symbol or sector_code")
+
+    trade_date = _as_date(
+        raw.get("date") or raw.get("trade_date") or raw.get("day") or raw.get("time")
+    )
+    if trade_date is None:
+        raise ValueError("news row missing date")
+
+    title = raw.get("title")
+    if title in (None, ""):
+        raise ValueError("news row missing title")
+
+    summary = raw.get("summary") or raw.get("content")
+    if summary is not None:
+        summary = str(summary).strip() or None
+
+    sentiment = raw.get("sentiment")
+    sentiment_f = _as_float(sentiment) if sentiment not in (None, "") else None
+
+    row = {
+        "symbol": symbol,
+        "sector_code": sector_code,
+        "date": trade_date.isoformat(),
+        "title": str(title).strip(),
+        "summary": summary,
+        "source": source,
+        "sentiment": sentiment_f,
+    }
+    return {k: row.get(k) for k in NEWS_COLUMNS}
 
 
 def normalize_adj_factor_row(

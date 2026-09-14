@@ -100,6 +100,8 @@ asset_type ∈ { "stock", "etf", "index" }
 | `fund_flow` | 见下表（M15） |
 | `lhb` | 见下表（M16） |
 | `unlock` | 见下表（M17） |
+| `sector_fund_flow` | 见下表（M41） |
+| `news` | 见下表（M41） |
 
 ### `depth5`（五档盘口，M19）
 
@@ -152,7 +154,7 @@ asset_type ∈ { "stock", "etf", "index" }
 | `large_net` | float | 建议 | 大单净流入，**元** |
 | `super_net` | float | 建议 | 超大单净流入，**元** |
 
-配方：东财 push2his `fflow/daykline`（经 `em_get`）；分钟/板块资金流不在本契约。
+配方：东财 push2his `fflow/daykline`（经 `em_get`）；分钟资金流不在本契约（板块日级见 `sector_fund_flow`）。
 
 ### `lhb`（龙虎榜，M16）
 
@@ -197,6 +199,34 @@ asset_type ∈ { "stock", "etf", "index" }
 | `*.ratio` | float | 建议 | 占总股本比，**小数制** |
 
 配方：东财 datacenter-web `RPT_LIFT_STAGE`（经 `em_get`；历史 + 未来各一次）。全市场解禁日历不在本契约。
+
+### `sector_fund_flow`（板块资金流，M41）
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `sector_code` | str | ✅ | 东财板块代码（如 `BK0477`） |
+| `sector_name` | str | 建议 | 板块名称 |
+| `asset_type` | str | 建议 | `sector` 或 `index` |
+| `source` | str | 建议 | Provider 名 |
+| `date` | date | ✅ | 交易日 |
+| `main_net` | float | ✅ | 主力净流入，**元** |
+| `change_pct` | float | 建议 | 板块涨跌幅（百分数口径由源决定；可 null） |
+
+配方：东财 push2his `fflow/daykline`，`secid=90.BK####`（经 `em_get`）。排名截面（clist 今日/5日/10日）不在本契约。
+
+### `news`（轻量新闻特征，M41）
+
+| 字段 | 类型 | 必填 | 单位 / 语义 |
+|------|------|------|-------------|
+| `symbol` | str | 条件 | CN=6 位；与 `sector_code` 至少其一 |
+| `sector_code` | str | 条件 | 东财板块代码；与 `symbol` 至少其一 |
+| `date` | date | ✅ | 新闻日（取自发布时间） |
+| `title` | str | ✅ | 标题 |
+| `summary` | str | 建议 | 短摘要；可 null（**非** LLM 生成） |
+| `source` | str | 建议 | Provider 名 |
+| `sentiment` | float | 建议 | 可选情绪分；可 null；不做默认模型推断 |
+
+配方：东财 np-weblist `getFastNewsList`（经 `em_get`；轻量列表）。默认路径不做 LLM 摘要。
 
 ## Enriched 层（消费侧，非 Provider 原始出口）
 

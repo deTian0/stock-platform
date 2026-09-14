@@ -17,8 +17,10 @@
 | `fund_flow` | 日级资金流 | fund_flow | 个股主力/大小单日级净流入（**元**） | —（平台扩展，ADR 0020） | — |
 | `lhb` | 龙虎榜 | lhb | 个股上榜记录 + 买卖席位 TOP5 + 机构动向（**元**） | —（平台扩展，ADR 0021） | — |
 | `unlock` | 限售解禁 | unlock | 个股历史解禁 + 未来待解禁（**万股**） | —（平台扩展，ADR 0022） | — |
+| `sector_fund_flow` | 板块资金流 | sector_fund_flow | 板块/概念日级主力净流入（**元**） | —（平台扩展，ADR 0042） | — |
+| `news` | 轻量新闻 | news | 个股/板块轻量新闻特征（非 LLM 摘要） | —（平台扩展，ADR 0042） | — |
 
-前七项对齐 TSP `CAPABILITY_REGISTRY`；`fund_flow` / `lhb` / `unlock` 为本仓平台扩展，不绑定 TickFlow 套餐文案。
+前七项对齐 TSP `CAPABILITY_REGISTRY`；`fund_flow` / `lhb` / `unlock` / `sector_fund_flow` / `news` 为本仓平台扩展，不绑定 TickFlow 套餐文案。
 
 本仓 **不绑定** TickFlow 套餐文案；上表档位仅作迁入 TSP 时的对照。新 Provider（如 `astock_http`）用自身 `usable` 探测，不继承套餐词。
 
@@ -53,8 +55,8 @@ CapabilityStatus {
 
 | Provider ID | 来源 | 阶段 | 预期 datasets |
 |-------------|------|------|----------------|
-| `replay` | fixtures | **M1.2 已实现**；**M15–M23**（含套价 `apply_adjust`） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock（CN） |
-| `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M23**（`full_minute` 经 `em_get`；adj_factor/financial 新浪；套价纯函数） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock |
+| `replay` | fixtures | **M1.2 已实现**；**M15–M23** + **M41**（含套价 `apply_adjust`） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock, sector_fund_flow, news（CN） |
+| `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M23** + **M41**（`full_minute`/板块资金流/新闻经 `em_get`；adj_factor/financial 新浪；套价纯函数） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock, sector_fund_flow, news |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
 | `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现** | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |

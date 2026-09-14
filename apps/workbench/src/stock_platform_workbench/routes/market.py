@@ -102,6 +102,60 @@ def get_fund_flow(
     }
 
 
+@router.get("/sector-fund-flow")
+def get_sector_fund_flow(
+    request: Request,
+    sectors: str = Query(..., description="Comma-separated board codes (e.g. BK0477)"),
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = Query(60, ge=1, le=1000),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("sector_fund_flow")
+    codes = [s.strip() for s in sectors.split(",") if s.strip()]
+    getter = getattr(provider, "get_sector_fund_flow", None)
+    if getter is None:
+        return {
+            "capability": "sector_fund_flow",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_sector_fund_flow",
+        }
+    rows = getter(codes, start=start, end=end, limit=limit)
+    return {
+        "capability": "sector_fund_flow",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "rows": rows,
+    }
+
+
+@router.get("/news")
+def get_news(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("news")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = getattr(provider, "get_news", None)
+    if getter is None:
+        return {
+            "capability": "news",
+            "provider": getattr(provider, "name", type(provider).__name__),
+            "rows": [],
+            "reason": "provider_missing_get_news",
+        }
+    rows = getter(syms, start=start, end=end, limit=limit)
+    return {
+        "capability": "news",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "rows": rows,
+    }
+
+
 @router.get("/lhb")
 def get_lhb(
     request: Request,

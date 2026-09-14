@@ -17,6 +17,8 @@ CAPABILITY_REGISTRY: list[dict[str, str]] = [
     {"id": "fund_flow", "label": "日级资金流", "desc": "个股主力/大小单日级净流入（元）"},
     {"id": "lhb", "label": "龙虎榜", "desc": "个股上榜记录 + 买卖席位 TOP5 + 机构动向（元）"},
     {"id": "unlock", "label": "限售解禁", "desc": "个股历史解禁 + 未来待解禁（万股）"},
+    {"id": "sector_fund_flow", "label": "板块资金流", "desc": "板块/概念日级主力净流入（元）"},
+    {"id": "news", "label": "轻量新闻", "desc": "个股/板块轻量新闻特征（非 LLM 摘要）"},
 ]
 
 CAPABILITY_IDS: tuple[str, ...] = tuple(item["id"] for item in CAPABILITY_REGISTRY)
@@ -88,6 +90,8 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "fund_flow",
                     "lhb",
                     "unlock",
+                    "sector_fund_flow",
+                    "news",
                 }
             ),
             available=True,
@@ -112,12 +116,15 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "fund_flow",
                     "lhb",
                     "unlock",
+                    "sector_fund_flow",
+                    "news",
                 }
             ),
             available=True,
             status="ok",
             note=(
-                "Live: East Money via em_get (incl. full_minute 1m batch); "
+                "Live: East Money via em_get (incl. full_minute 1m batch, "
+                "sector_fund_flow, news); "
                 "financial/adj_factor via Sina HTTP (not em_get); prefer replay for offline CI"
             ),
         )

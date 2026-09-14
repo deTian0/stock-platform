@@ -30,6 +30,18 @@
             <option value="astock_http">astock_http</option>
           </select>
         </label>
+        <label>sector_fund_flow provider
+          <select id="pref-sector-fund-flow">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>news provider
+          <select id="pref-news">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
         <label>lhb provider
           <select id="pref-lhb">
             <option value="replay">replay</option>
@@ -366,6 +378,70 @@
               <th>main_net</th>
               <th>large_net</th>
               <th>super_net</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sector-fund-flow" class="panel">
+      <h2>板块资金流</h2>
+      <p class="hint">板块日级主力净流入（元）；默认 replay；可选 astock_http。</p>
+      <form id="sector-fund-flow-form" class="row">
+        <label>sectors
+          <input id="sector-fund-flow-sectors" name="sectors" value="BK0477" autocomplete="off" />
+        </label>
+        <label>start
+          <input id="sector-fund-flow-start" name="start" type="date" value="2026-09-01" />
+        </label>
+        <label>end
+          <input id="sector-fund-flow-end" name="end" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="sector-fund-flow-meta" class="status" aria-live="polite"></p>
+      <pre id="sector-fund-flow-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="sector-fund-flow-table">
+          <thead>
+            <tr>
+              <th>sector_code</th>
+              <th>date</th>
+              <th>main_net</th>
+              <th>change_pct</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="news" class="panel">
+      <h2>轻量新闻</h2>
+      <p class="hint">新闻特征（非 LLM 摘要）；默认 replay；可选 astock_http。</p>
+      <form id="news-form" class="row">
+        <label>symbols
+          <input id="news-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>start
+          <input id="news-start" name="start" type="date" value="2026-09-01" />
+        </label>
+        <label>end
+          <input id="news-end" name="end" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="news-meta" class="status" aria-live="polite"></p>
+      <pre id="news-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="news-table">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>date</th>
+              <th>title</th>
+              <th>sentiment</th>
             </tr>
           </thead>
           <tbody></tbody>

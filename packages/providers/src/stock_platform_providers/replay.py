@@ -17,11 +17,13 @@ from .normalize import (
     normalize_fund_flow_row,
     normalize_lhb_payload,
     normalize_minute_row,
+    normalize_news_row,
     normalize_realtime_row,
+    normalize_sector_fund_flow_row,
     normalize_unlock_payload,
     validate_adj_factor_kind,
 )
-from .symbol import normalize_symbol
+from .symbol import normalize_sector_code, normalize_symbol
 
 
 class ReplayTransport:
@@ -33,6 +35,8 @@ class ReplayTransport:
         realtime_{symbol}.json    # dict or {"quote": {...}}
         minute_{symbol}.json      # list[dict] or {"bars": [...]}
         fund_flow_{symbol}.json   # list[dict] or {"bars": [...]} / {"flows": [...]}
+        sector_fund_flow_{code}.json  # list[dict] or {"bars": [...]} / {"flows": [...]}
+        news_{symbol}.json        # list[dict] or {"items": [...]} / {"news": [...]}
         lhb_{symbol}.json         # dict aggregate {records, seats, institution}
         unlock_{symbol}.json      # dict aggregate {history, upcoming}
         depth5_{symbol}.json      # dict or {"quote": {...}} five-level book
@@ -86,6 +90,26 @@ class ReplayTransport:
         if isinstance(data, list):
             return data
         raise ValueError(f"unexpected fund_flow fixture shape in {path}")
+
+    def load_sector_fund_flow(self, sector_code: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"sector_fund_flow_{sector_code}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            bars = data.get("bars") or data.get("flows") or data.get("data") or []
+            return list(bars)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected sector_fund_flow fixture shape in {path}")
+
+    def load_news(self, symbol: str) -> list[dict[str, Any]]:
+        path = self.fixtures_dir / f"news_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            items = data.get("items") or data.get("news") or data.get("data") or []
+            return list(items)
+        if isinstance(data, list):
+            return data
+        raise ValueError(f"unexpected news fixture shape in {path}")
 
     def load_lhb(self, symbol: str) -> dict[str, Any]:
         path = self.fixtures_dir / f"lhb_{symbol}.json"
@@ -274,6 +298,74 @@ class ReplayProvider:
                 sym_rows.append(row)
             if limit > 0:
                 sym_rows = sym_rows[-limit:]
+            rows.extend(sym_rows)
+        return rows
+
+    def get_sector_fund_flow(
+        self,
+        sectors: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        limit: int = 60,
+        asset_type: str = "sector",
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for raw_code in sectors:
+            sector_code = normalize_sector_code(raw_code)
+            try:
+                bars = self._transport.load_sector_fund_flow(sector_code)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no sector_fund_flow fixture for {sector_code}") from exc
+            code_rows: list[dict[str, Any]] = []
+            for bar in bars:
+                row = normalize_sector_fund_flow_row(
+                    bar,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_sector_code=sector_code,
+                )
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                code_rows.append(row)
+            if limit > 0:
+                code_rows = code_rows[-limit:]
+            rows.extend(code_rows)
+        return rows
+
+    def get_news(
+        self,
+        symbols: list[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                items = self._transport.load_news(symbol)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no news fixture for {symbol}") from exc
+            sym_rows: list[dict[str, Any]] = []
+            for item in items:
+                row = normalize_news_row(
+                    item,
+                    source=self.name,
+                    default_symbol=symbol,
+                )
+                d = date.fromisoformat(row["date"])
+                if start and d < start:
+                    continue
+                if end and d > end:
+                    continue
+                sym_rows.append(row)
+            if limit > 0:
+                sym_rows = sym_rows[:limit]
             rows.extend(sym_rows)
         return rows
 

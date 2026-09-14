@@ -121,6 +121,8 @@ def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None =
         "lhb": "replay",
         "unlock": "replay",
         "full_minute": "replay",
+        "sector_fund_flow": "replay",
+        "news": "replay",
         **(preferences or {}),
     }
     transport = ReplayTransport(fixtures_dir)
