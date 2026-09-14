@@ -39,7 +39,7 @@
 | M6.1 | 执行安全内核（broker-free） | 小 | `v0.6.1` | done |
 | M6.2 | Paper ledger 草稿/提交/幂等 | 小 | `v0.6.2` | done |
 | M6.3 | workbench `/api/paper/*` | 小 | `v0.6.3` | done |
-| M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | in_progress |
+| M7 | 产品收敛 / 上游仓归档说明 | 大 | `v1.0.0` | done |
 | M7.1 | 上游归档清单 + v1 边界 ADR | 小 | `v0.7.1` | done |
 | M7.2 | README / CONTRIBUTING / AGENTS 产品化 | 小 | `v0.7.2` | done |
 | M7.3 | 发版清单 + 版本一致性脚本 | 小 | `v0.7.3` | done |
@@ -331,7 +331,7 @@
 
 验收（大）：
 
-- [ ] M7.1–M7.3 done；CHANGELOG 含 `1.0.0`；`release_tag -Kind major`
+- [x] M7.1–M7.3 done；CHANGELOG 含 `1.0.0`；`release_tag -Kind major`
 
 ---
 
