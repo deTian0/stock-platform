@@ -1,0 +1,15 @@
+{
+  "symbol": "000001",
+  "factors": [
+    {
+      "symbol": "000001",
+      "trade_date": "2026-06-26",
+      "ex_factor": 1.0
+    },
+    {
+      "symbol": "000001",
+      "trade_date": "1900-01-01",
+      "adj_factor": 1.0
+    }
+  ]
+}

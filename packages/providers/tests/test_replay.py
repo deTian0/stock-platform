@@ -196,7 +196,8 @@ def test_replay_adj_factor() -> None:
 
 def test_replay_adj_factor_missing_fixture_empty() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
-    assert provider.get_adj_factor(["000001"]) == []
+    # 510300 has daily/fund_flow for sample universe but no adj_factor fixture.
+    assert provider.get_adj_factor(["510300"]) == []
 
 
 def test_replay_full_minute() -> None:

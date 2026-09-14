@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -94,11 +95,13 @@ def test_mixed_symbols_require_factor_symbol() -> None:
 
 def test_replay_daily_qfq_latest_factor_is_one() -> None:
     provider = ReplayProvider(ReplayTransport(FIXTURES))
-    daily = provider.get_daily(["600519"])
+    daily = provider.get_daily(
+        ["600519"], start=date(2026, 9, 1), end=date(2026, 9, 2)
+    )
     factors = provider.get_adj_factor(["600519"], kind="qfq")
     out = apply_adjust(daily, factors, kind="qfq")
     assert len(out) == len(daily)
-    # fixture daily is 2026-09; latest qfq factor is 1.0 from 2026-06-26
+    # Sep-2026 bars sit after the latest qfq factor date (2026-06-26 → 1.0)
     assert all(row["ex_factor"] == 1.0 for row in out)
     assert out[0]["close"] == daily[0]["close"]
     assert out[0]["volume"] == daily[0]["volume"]

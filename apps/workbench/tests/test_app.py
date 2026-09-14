@@ -437,7 +437,8 @@ def test_daily_adjusted_replay(client: TestClient) -> None:
 
 
 def test_daily_adjusted_missing_factors_400(client: TestClient) -> None:
-    r = client.get("/api/market/daily-adjusted", params={"symbols": "000001", "kind": "qfq"})
+    # 510300 has daily for sample universe but no adj_factor → 400.
+    r = client.get("/api/market/daily-adjusted", params={"symbols": "510300", "kind": "qfq"})
     assert r.status_code == 400
 
 
