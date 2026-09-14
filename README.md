@@ -107,6 +107,8 @@ stock-platform/
 | **v3.0.0** | Phase D（M35–M38）执行端口 + ths_sim |
 | **v3.1.0–v3.8.0** | Phase E 日用稳定 |
 | **v3.9.0** | M47 生产 live 行情默认（交易仍 SIMULATE） |
+| **v3.9.1** | Workbench UI 渐进披露 + 推荐卡片 |
+| **v3.9.2** | Workbench UI 结构化扫读（步骤/键值/状态） |
 
 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 

@@ -35,6 +35,135 @@
     return n.toFixed(4);
   }
 
+  function dash(value) {
+    if (value == null || value === "") return "—";
+    return String(value);
+  }
+
+  function shortHash(value) {
+    if (!value) return "—";
+    var s = String(value);
+    return s.length > 12 ? s.slice(0, 8) + "…" : s;
+  }
+
+  function renderKv(el, rows) {
+    if (!el) return;
+    el.innerHTML = "";
+    if (!rows || !rows.length) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    for (var i = 0; i < rows.length; i++) {
+      var dt = document.createElement("dt");
+      dt.textContent = rows[i][0];
+      var dd = document.createElement("dd");
+      dd.textContent = rows[i][1] == null || rows[i][1] === "" ? "—" : String(rows[i][1]);
+      el.appendChild(dt);
+      el.appendChild(dd);
+    }
+  }
+
+  function renderSteps(el, steps) {
+    if (!el) return;
+    el.innerHTML = "";
+    var names = { refresh: "刷新", brief: "推荐", to_paper: "纸面" };
+    (steps || []).forEach(function (s) {
+      var li = document.createElement("li");
+      var kind = s.ok ? (s.skipped ? "skip" : "ok") : "fail";
+      li.className = "step step-" + kind;
+      var extra = s.skipped ? "跳过" : s.ok ? "完成" : "失败";
+      if (s.pickCount != null) extra += " · " + s.pickCount + " 只";
+      if (s.draftId) extra += " · " + shortHash(s.draftId);
+      if (s.error) {
+        extra += " · " + (typeof s.error === "string" ? s.error : JSON.stringify(s.error));
+      }
+      li.innerHTML =
+        "<strong>" +
+        escapeHtml(names[s.step] || s.step) +
+        "</strong><span>" +
+        escapeHtml(extra) +
+        "</span>";
+      el.appendChild(li);
+    });
+  }
+
+  function renderStats(host, items) {
+    if (!host) return;
+    host.innerHTML = "";
+    if (!items || !items.length) {
+      host.hidden = true;
+      return;
+    }
+    host.hidden = false;
+    items.forEach(function (it) {
+      var div = document.createElement("div");
+      div.className = "stat";
+      div.innerHTML =
+        '<div class="lbl">' +
+        escapeHtml(it[0]) +
+        '</div><div class="val">' +
+        escapeHtml(dash(it[1])) +
+        "</div>";
+      host.appendChild(div);
+    });
+  }
+
+  function renderDebateView(host, data) {
+    if (!host) return;
+    if (!data) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    host.hidden = false;
+    var score = data.score || {};
+    var rounds = data.rounds || [];
+    var html =
+      '<dl class="kv"><dt>裁决</dt><dd>' +
+      escapeHtml(dash(data.verdict)) +
+      "</dd><dt>净分</dt><dd>" +
+      escapeHtml(dash(score.net)) +
+      "</dd><dt>代码</dt><dd>" +
+      escapeHtml(dash(data.symbol)) +
+      "</dd><dt>asof</dt><dd>" +
+      escapeHtml(dash(data.asof)) +
+      "</dd></dl>";
+    if (rounds.length) {
+      html += '<div class="rounds">';
+      for (var r = 0; r < rounds.length; r++) {
+        var round = rounds[r];
+        html +=
+          '<article class="round"><h3>' +
+          escapeHtml(round.role || "round") +
+          "</h3><p>" +
+          escapeHtml(round.thesis || "") +
+          "</p></article>";
+      }
+      html += "</div>";
+    }
+    host.innerHTML = html;
+  }
+
+  function markNav() {
+    var links = document.querySelectorAll(".ia-nav a");
+    var y = window.scrollY + 88;
+    var current = null;
+    links.forEach(function (a) {
+      var id = (a.getAttribute("href") || "").replace(/^#/, "");
+      var el = id ? document.getElementById(id) : null;
+      if (!el) return;
+      var top = el.getBoundingClientRect().top + window.scrollY;
+      if (top <= y) current = a;
+    });
+    links.forEach(function (a) {
+      var on = a === current;
+      a.classList.toggle("is-active", on);
+      if (on) a.setAttribute("aria-current", "location");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
   function renderRecommendCards(picks) {
     var host = $("recommend-cards");
     if (!host) return;
@@ -125,13 +254,15 @@
         const tr = document.createElement("tr");
         tr.innerHTML =
           "<td>" +
-          row.id +
+          escapeHtml(row.id) +
           "</td><td>" +
-          String(row.usable) +
+          (row.usable
+            ? '<span class="pill">可用</span>'
+            : '<span class="pill muted">不可用</span>') +
           "</td><td>" +
-          (row.effective || "") +
+          escapeHtml(row.effective || "") +
           "</td><td>" +
-          (row.label || "") +
+          escapeHtml(row.label || "") +
           "</td>";
         tbody.appendChild(tr);
       }
@@ -666,6 +797,19 @@
         String(data.liveTradingEnabled) +
         "\nenvironment=" +
         (data.allowedEnvironment || data.environment || "");
+      var life = data.lifecycle || {};
+      var adm = data.admission || {};
+      renderKv($("paper-kv"), [
+        ["横幅", data.banner || ""],
+        ["环境", data.allowedEnvironment || data.environment || "SIMULATE"],
+        ["实盘", data.liveTradingEnabled ? "开（异常）" : "关"],
+        ["草稿数", data.draftCount],
+        ["已接受", data.acceptedCount],
+        ["策略草稿", life.draft ? shortHash(life.draft.strategyHash) : "无"],
+        ["已校验", life.validated ? shortHash(life.validated.strategyHash) : "无"],
+        ["已激活", life.active ? shortHash(life.active.strategyHash) : "无"],
+        ["准入", adm.passed ? "通过" : "未通过"],
+      ]);
       $("paper-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -685,6 +829,31 @@
         String(data.liveTradingEnabled) +
         "\nlastErrors=" +
         JSON.stringify(data.lastErrors || []);
+      var acct = data.account || {};
+      renderKv($("broker-kv"), [
+        ["Broker", data.broker],
+        ["环境", data.environment],
+        ["实盘", data.liveTradingEnabled ? "开（异常）" : "关"],
+        ["准入", data.admission && data.admission.passed ? "通过" : "未通过"],
+        ["现金", acct.cash],
+        ["权益", acct.equity],
+      ]);
+      var posBody = $("broker-positions") && $("broker-positions").querySelector("tbody");
+      if (posBody) {
+        posBody.innerHTML = "";
+        (data.positions || []).forEach(function (p) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            escapeHtml(p.symbol || "") +
+            '</td><td class="num">' +
+            escapeHtml(dash(p.qty)) +
+            '</td><td class="num">' +
+            escapeHtml(dash(p.avg_price != null ? p.avg_price : p.avgPrice)) +
+            "</td>";
+          posBody.appendChild(tr);
+        });
+      }
       $("broker-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -712,6 +881,7 @@
         data.verdict +
         " · net=" +
         (data.score && data.score.net);
+      renderDebateView($("debate-view"), data);
       $("debate-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -745,6 +915,8 @@
         data.engine +
         " · debates=" +
         (data.debates ? data.debates.length : 0);
+      var firstDebate = data.debates && data.debates[0] && data.debates[0].debate;
+      if (firstDebate) renderDebateView($("debate-view"), firstDebate);
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -852,6 +1024,13 @@
         m.direction_accuracy +
         " · avg_return=" +
         m.avg_return;
+      renderStats($("performance-view"), [
+        ["已结算", data.settledCount],
+        ["方向正确率", m.direction_accuracy],
+        ["平均收益", m.avg_return],
+        ["上涨占比", m.up_rate],
+        ["超额占比", m.outperform_rate],
+      ]);
       $("performance-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -892,6 +1071,17 @@
         stepSummary +
         " · liveTradingEnabled=" +
         data.liveTradingEnabled;
+      var view = $("wizard-view");
+      if (view) view.hidden = false;
+      renderSteps($("wizard-steps"), data.steps);
+      var draft = data.draft || {};
+      renderKv($("wizard-kv"), [
+        ["结果", data.ok ? "成功" : "失败"],
+        ["环境", data.environment || "SIMULATE"],
+        ["实盘", data.liveTradingEnabled ? "开（异常）" : "关"],
+        ["草稿 ID", draft.draftId || "—"],
+        ["可执行", draft.executionEligible == null ? "—" : String(draft.executionEligible)],
+      ]);
       $("wizard-json").textContent = JSON.stringify(data, null, 2);
       var brief = data.brief || (data.steps && data.steps.find(function (s) {
         return s.step === "brief" && s.result;
@@ -906,12 +1096,33 @@
     } catch (e) {
       showError(errEl, e.detail || String(e));
       $("wizard-json").textContent = "";
+      var wv = $("wizard-view");
+      if (wv) wv.hidden = true;
     }
   }
 
   async function loadOpsHealth() {
     try {
       const data = await fetchJson("/api/ops/health");
+      var em = data.eastmoney || {};
+      var lr = data.lastRefresh;
+      var refreshText = "无";
+      if (lr) {
+        refreshText = lr.ok
+          ? "ok · " + dash(lr.asof)
+          : "失败 · " + dash(lr.error || lr.asof);
+      }
+      renderKv($("ops-kv"), [
+        ["状态", data.status],
+        ["版本", data.version],
+        ["执行", data.executionMode],
+        ["实盘", String(data.liveTradingEnabled)],
+        ["默认 replay", String(data.defaultReplay)],
+        ["EM 间隔", em.minInterval],
+        ["熔断", em.circuitOpen ? "开" : "关"],
+        ["连续失败", em.consecutiveFailures],
+        ["上次刷新", refreshText],
+      ]);
       $("ops-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       $("ops-json").textContent = String(e);
@@ -924,6 +1135,16 @@
     try {
       const data = await fetchJson("/api/research/strategy/configs");
       $("strategy-meta").textContent = "configs=" + (data.configs ? data.configs.length : 0);
+      var ids = (data.configs || [])
+        .map(function (c) {
+          return c.id || c;
+        })
+        .join("、");
+      renderKv($("strategy-kv"), [
+        ["数量", data.configs ? data.configs.length : 0],
+        ["配置", ids || "—"],
+        ["实盘", String(data.liveTradingEnabled)],
+      ]);
       $("strategy-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -949,6 +1170,13 @@
         data.deltaFinalEquity +
         " · liveTradingEnabled=" +
         String(data.liveTradingEnabled);
+      renderKv($("strategy-kv"), [
+        ["胜出", data.winner],
+        ["权益差", data.deltaFinalEquity],
+        ["A 成交", data.a && data.a.tradeCount],
+        ["B 成交", data.b && data.b.tradeCount],
+        ["实盘", String(data.liveTradingEnabled)],
+      ]);
       $("strategy-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       showError(errEl, e.detail || String(e));
@@ -1251,7 +1479,9 @@
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
     window.addEventListener("hashchange", revealHashTarget);
+    window.addEventListener("scroll", markNav, { passive: true });
     revealHashTarget();
+    markNav();
     loadMatrix();
     loadPaper();
     loadBroker();

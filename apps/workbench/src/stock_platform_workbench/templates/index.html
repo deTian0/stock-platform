@@ -50,6 +50,10 @@
       </form>
       <p id="wizard-meta" class="status" aria-live="polite"></p>
       <pre id="wizard-error" class="error" hidden></pre>
+      <div id="wizard-view" class="readable" hidden>
+        <ol id="wizard-steps" class="steps"></ol>
+        <dl id="wizard-kv" class="kv"></dl>
+      </div>
       <details class="raw-json">
         <summary>原始 JSON</summary>
         <pre id="wizard-json" class="code"></pre>
@@ -83,10 +87,10 @@
         <table id="recommend-table">
           <thead>
             <tr>
-              <th>rank</th>
-              <th>symbol</th>
-              <th>score</th>
-              <th>close</th>
+              <th>排名</th>
+              <th>代码</th>
+              <th class="num">综合分</th>
+              <th class="num">收盘</th>
               <th>理由</th>
             </tr>
           </thead>
@@ -107,6 +111,7 @@
       <p class="hint">只读；无实盘开关。</p>
       <button type="button" id="btn-paper">刷新纸面</button>
       <pre id="paper-banner" class="banner" aria-live="polite"></pre>
+      <dl id="paper-kv" class="kv" hidden></dl>
       <pre id="paper-error" class="error" hidden></pre>
       <details class="raw-json">
         <summary>原始 JSON</summary>
@@ -122,6 +127,19 @@
       <p class="hint">只读；默认 paper。ths_sim 仅环境变量 opt-in，非实盘开关。</p>
       <button type="button" id="btn-broker">刷新 broker</button>
       <pre id="broker-banner" class="banner" aria-live="polite"></pre>
+      <dl id="broker-kv" class="kv" hidden></dl>
+      <div class="table-wrap">
+        <table id="broker-positions">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th class="num">数量</th>
+              <th class="num">均价</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <pre id="broker-error" class="error" hidden></pre>
       <details class="raw-json">
         <summary>原始 JSON</summary>
@@ -565,8 +583,9 @@
       <h2>运维健康</h2>
       <p class="hint">只读；观察 last_refresh / EM 限流；调度见 docs/ops/scheduler.md。</p>
       <button type="button" id="btn-ops-health">刷新健康</button>
-      <details class="raw-json" open>
-        <summary>健康 JSON</summary>
+      <dl id="ops-kv" class="kv" hidden></dl>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
         <pre id="ops-json" class="code"></pre>
       </details>
     </section>
@@ -658,10 +677,10 @@
         <table id="matrix-table">
           <thead>
             <tr>
-              <th>id</th>
-              <th>usable</th>
-              <th>effective</th>
-              <th>label</th>
+              <th>能力</th>
+              <th>可用</th>
+              <th>生效</th>
+              <th>说明</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -697,8 +716,9 @@
       </form>
       <p id="debate-meta" class="status" aria-live="polite"></p>
       <pre id="debate-error" class="error" hidden></pre>
-      <details class="raw-json" open>
-        <summary>辩论 JSON</summary>
+      <div id="debate-view" class="readable" hidden></div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
         <pre id="debate-json" class="code"></pre>
       </details>
     </section>
@@ -709,8 +729,9 @@
       <button type="button" id="btn-performance">刷新绩效</button>
       <p id="performance-meta" class="status" aria-live="polite"></p>
       <pre id="performance-error" class="error" hidden></pre>
-      <details class="raw-json" open>
-        <summary>绩效 JSON</summary>
+      <div id="performance-view" class="stats" hidden></div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
         <pre id="performance-json" class="code"></pre>
       </details>
     </section>
@@ -730,8 +751,9 @@
       </form>
       <p id="strategy-meta" class="status" aria-live="polite"></p>
       <pre id="strategy-error" class="error" hidden></pre>
-      <details class="raw-json" open>
-        <summary>对比 JSON</summary>
+      <dl id="strategy-kv" class="kv" hidden></dl>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
         <pre id="strategy-json" class="code"></pre>
       </details>
     </section>
