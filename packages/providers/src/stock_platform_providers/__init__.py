@@ -1,4 +1,4 @@
-"""stock-platform providers â€” unified Vendor surface (A-share first, US/HK via market)."""
+"""stock-platform providers â€?unified Vendor surface (A-share first, US/HK via market)."""
 
 from .adjust import apply_adjust
 from .astock_http import AStockHttpProvider, em_board_secid, em_secid
@@ -97,4 +97,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "3.9.1"
+__version__ = "3.9.2"

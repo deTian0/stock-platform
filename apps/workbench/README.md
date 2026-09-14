@@ -28,6 +28,7 @@
 | **M34 / v2.6.0** | `GET/POST /api/research/strategy/*` + `#strategy-compare` |
 | **M47 / v3.9.0** | **生产默认 CN live**（`astock_http`）；CI 用 `STOCK_PLATFORM_PROVIDER_PRESET=replay` |
 | **v3.9.1** | Workbench UI 日用抛光：主流程置顶、推荐卡片、次级折叠（ADR 0047） |
+| **v3.9.2** | Workbench UI 结构化扫读：向导步骤 / 运维键值 / 矩阵 pill / 绩效条 |
 
 ## 安装与运行
 

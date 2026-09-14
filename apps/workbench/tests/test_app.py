@@ -69,8 +69,12 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="wizard"' in body
     assert 'id="ops"' in body
     assert 'id="recommend-cards"' in body
+    assert 'id="wizard-view"' in body
+    assert 'id="ops-kv"' in body
+    assert 'id="paper-kv"' in body
     assert 'id="market-tools"' in body
     assert 'id="lab"' in body
+    assert "原始 JSON" in body
     assert "日用向导" in body
     assert "无实盘" in body or "SIMULATE" in body
     assert 'id="performance"' in body
@@ -85,11 +89,15 @@ def test_static_assets(client: TestClient) -> None:
     assert css.status_code == 200
     assert "rec-card" in css.text
     assert "group-summary" in css.text
+    assert ".kv" in css.text
+    assert ".steps" in css.text
     js = client.get("/static/app.js")
     assert js.status_code == 200
     # M11.2: UI must call existing APIs (fail-closed path included).
     text = js.text
     assert "renderRecommendCards" in text
+    assert "renderKv" in text
+    assert "renderSteps" in text
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
     assert "/api/market/fund-flow" in text
