@@ -79,7 +79,7 @@
 | M19 | CN 五档盘口 | 大 | `v1.12.0` | done |
 | M19.1 | depth5 provider + matrix + ADR 0024 | 小 | `v1.11.1` | done |
 | M19.2 | workbench depth5 API + UI | 小 | `v1.11.2` | done |
-| M20 | CN 财务报表 | 大 | `v1.13.0` | in_progress |
+| M20 | CN 财务报表 | 大 | `v1.13.0` | done |
 | M20.1 | financial provider + matrix + ADR 0025 | 小 | `v1.12.1` | done |
 | M20.2 | workbench financial API + UI | 小 | `v1.12.2` | done |
 
@@ -701,7 +701,7 @@
 
 验收（大）：
 
-- [ ] M20.1–M20.2 done；CHANGELOG 含 `1.13.0`
+- [x] M20.1–M20.2 done；CHANGELOG 含 `1.13.0`
 
 ---
 
