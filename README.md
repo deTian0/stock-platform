@@ -8,14 +8,14 @@
 
 | 组件 | 路径 | 能力 |
 |------|------|------|
-| Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、能力矩阵、`MarketStrategy` |
+| Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、`astock_http` / `global_http`（可选 live）、能力矩阵、`MarketStrategy` |
 | Research | `packages/research` | lvrev / 闸门 / PIT / `stock-platform-score` |
 | Agents | `packages/agents` | 研报/复盘插件（仅经 providers） |
 | Execution | `packages/execution` | 纸面 SIMULATE、事务态、草稿≠激活 |
 | Workbench | `apps/workbench` | FastAPI：行情 / 研报 / 纸面 API |
 
-**默认运行时**：fixtures replay（离线可测）。`astock_http` / `global_http` live 仍为 pending。  
-**明确不做（v1.0）**：实盘券商、第二套行情主链、把 Skill 仓当 pip 依赖。
+**默认运行时**：fixtures replay（离线可测）。可选 preferences 切 `astock_http`（A 股）或 `global_http`（美港 Yahoo+新浪）。  
+**明确不做（v1.x）**：实盘券商、第二套行情主链、把 Skill 仓当 pip 依赖。
 
 ## 快速开始
 

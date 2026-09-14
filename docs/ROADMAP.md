@@ -46,7 +46,7 @@
 | M8 | A 股 live HTTP（可选） | 大 | `v1.1.0` | done |
 | M8.1 | `AStockHttpProvider` via `em_get` | 小 | `v1.0.1` | done |
 | M8.2 | workbench 可偏好 live daily/realtime | 小 | `v1.0.2` | done |
-| M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | in_progress |
+| M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | done |
 | M9.1 | `GlobalHttpProvider`（Yahoo + 新浪） | 小 | `v1.1.1` | done |
 | M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | done |
 
@@ -387,7 +387,7 @@
 
 验收（大）：
 
-- [ ] M9.1–M9.2 done；CHANGELOG 含 `1.2.0`
+- [x] M9.1–M9.2 done；CHANGELOG 含 `1.2.0`
 
 ---
 

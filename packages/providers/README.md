@@ -12,6 +12,7 @@
 | **M1 / v0.2.0** | 大里程碑收口（上列能力齐备） |
 | **M5.1+ / v0.5.1** | `MarketStrategy` CN/US/HK；`normalize_symbol(market=)`；`GlobalReplayProvider` |
 | **M8.1 / v1.0.1** | `AStockHttpProvider` live daily/realtime（经 `em_get`） |
+| **M9.1 / v1.1.1** | `GlobalHttpProvider` / `GlobalHttpRouter`（Yahoo + 新浪） |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
@@ -36,6 +37,8 @@ python -m pip install -e ".[http]"
 | `get_market_strategy` / `MarketStrategy` | 市场策略表（settle / limit / 时区） |
 | `ReplayTransport` / `ReplayProvider` | CN fixtures 回放 |
 | `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
+| `AStockHttpProvider` | A 股 live（经 `em_get`） |
+| `GlobalHttpProvider` / `GlobalHttpRouter` | 美港 live（Yahoo + 新浪；不经 `em_get`） |
 | `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口 |
 | `build_capability_matrix` / `register_builtin_providers` | 能力路由 |
 | `SymbolError` | 非法代码 |

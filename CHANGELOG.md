@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.2.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M9 完成**：可选美港 live HTTP（`GlobalHttpProvider` / Yahoo + 新浪）
+  - workbench preferences 可切 `global_http`；默认仍 replay
+  - ADR 0014；`a-stock-engine` 归档横幅
+
 ## [1.1.2] - 2026-09-14
 
 ### Added
