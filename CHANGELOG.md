@@ -8,6 +8,20 @@
 
 - （无）
 
+## [1.0.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M7 完成 / 产品 v1.0.0**
+  - 上游归档说明与 v1 产品边界（ADR 0012）
+  - 产品化文档与发版检查清单
+  - 版本一致性脚本接入 CI
+
+### Notes
+
+- v1.0 = 可发布研究与纸面决策平台骨架（默认 replay；live HTTP / 实盘仍延期）
+- 自本版本起破坏契约须 MAJOR
+
 ## [0.7.3] - 2026-09-14
 
 ### Added
@@ -277,7 +291,8 @@
 - `VERSION` 单一版本源与 `scripts/release_tag.ps1`
 - Git 初始化（`main`）与首个工程 tag `v0.0.1`
 
-[Unreleased]: https://github.com/local/stock-platform/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/local/stock-platform/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/local/stock-platform/compare/v0.7.3...v1.0.0
 [0.7.3]: https://github.com/local/stock-platform/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/local/stock-platform/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/local/stock-platform/compare/v0.7.0...v0.7.1
