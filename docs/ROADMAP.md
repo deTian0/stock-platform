@@ -107,6 +107,14 @@
 | M36 | 同花顺模拟盘适配器（mock / experimental） | 大 | `v2.8.0` | done |
 | M37 | 风控闸门接到外部模拟 | 大 | `v2.9.0` | done |
 | M38 | Phase D E2E 收口（recommend → ths_sim） | 大 | `v3.0.0` | done |
+| M39 | 日用宇宙扩容 + 可读推荐理由 | 大 | `v3.1.0` | planned |
+| M40 | 定时 refresh→brief 日流水线 | 大 | `v3.2.0` | planned |
+| M41 | 板块资金流 / 新闻特征 | 大 | `v3.3.0` | planned |
+| M42 | 日历 2028+ + Task Scheduler/cron 运维包 | 大 | `v3.4.0` | planned |
+| M43 | （可选）组合回测加深 + 绩效对齐纸面成交 | 大 | `v3.5.0` | planned |
+| M44 | （可选）LLM 成本/质量控制 | 大 | `v3.6.0` | planned |
+| M45 | Workbench IA + 一键向导（刷新→推荐→纸面） | 大 | `v3.7.0` | planned |
+| M46 | Phase E 日用稳定收口 | 大 | `v3.8.0` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -114,7 +122,8 @@
 > **Phase A（M24–M28）**：日更选股推荐 + 纸面闭环 → major `v2.0.0`。  
 > **Phase B（M29–M31）**：日刷新落盘 + live 运维稳定 → `v2.1.0`–`v2.3.0`。  
 > **Phase C（M32–M34）**：投研稳定（绩效 / 可选 LLM / 策略对比）→ `v2.4.0`–`v2.6.0`。  
-> **Phase D（M35–M38）**：同花顺**模拟盘**外部 broker（默认仍 paper）→ `v2.7.0`–`v3.0.0`。
+> **Phase D（M35–M38）**：同花顺**模拟盘**外部 broker（默认仍 paper）→ `v2.7.0`–`v3.0.0`。  
+> **Phase E（M39–M46）**：每日推荐真日用 + 数据/运维加固（可选投研/体验）→ `v3.1.0`–`v3.8.0`（不跳 `v4`）。
 
 ---
 
@@ -1021,6 +1030,110 @@
 
 - [x] E2E + `#broker` 面板；Phase D ROADMAP done
 - [x] `release_tag -Kind major`；push `--follow-tags`
+
+---
+
+## Phase E / 后续 — 每日日用稳定（M39–M46）→ `v3.8.0`
+
+**产品目标**：把「今日推荐」从 demo 做成可坚持的真日用——更大宇宙、定时 refresh→brief、可读理由；加固板块/新闻数据与日历/调度运维；可选加深投研与工作台向导。默认仍 paper + replay；SIMULATE；无 SPA；无真实券商；东财经 `em_get`；矩阵 fail-closed。
+
+**状态**：planned（基线 `v3.0.0`）
+
+**详细设计**：`C:\Users\63516\.cursor\plans\phase_e_daily_use_roadmap_20260914.plan.md`
+
+**非目标**：同花顺真实 HTTP transport；SPA；默认 live / 默认 `ths_sim`；真实券商 / `liveTradingEnabled=true`。
+
+**Backlog（deferred，非本 Phase 活动项）**：
+
+- **BL-THS-REAL**：同花顺真实 transport —— 待稳定合规接入方式再单独立项；保持现有 mock / experimental 扩展点，不阻塞 Phase E。
+
+---
+
+## M39 — 日用宇宙扩容 + 可读推荐理由 → `v3.1.0`
+
+**目标**：配置化日用宇宙（CI 仍小 fixture）；brief reasons 对人可读；`#recommend` 展示摘要。
+
+验收：
+
+- [ ] 日用宇宙配置样例 + 文档；空宇宙 fail-closed
+- [ ] brief API/CLI 可读 `reasons`；单测；默认 replay
+- [ ] ADR（建议 0040）；CHANGELOG `3.1.0`
+
+---
+
+## M40 — 定时 refresh→brief 日流水线 → `v3.2.0`
+
+**目标**：可调度流水线 refresh→brief（产物 + 退出码）；不仅人手 CLI。
+
+验收：
+
+- [ ] 日流水线脚本/CLI 在 replay 下 E2E；失败 fail-closed
+- [ ] 运维文档约定路径；ADR（建议 0041）；CHANGELOG `3.2.0`
+
+---
+
+## M41 — 板块资金流 / 新闻特征 → `v3.3.0`
+
+**目标**：能力矩阵新增板块资金流与新闻特征；经 `em_get`（东财）；默认 replay；CI 零公网。
+
+验收：
+
+- [ ] 契约 + replay/http 注入测；缺能力 fail-closed
+- [ ] 可选 workbench API/薄 UI；ADR；CHANGELOG `3.3.0`
+
+---
+
+## M42 — 日历 2028+ + Task Scheduler/cron 运维包 → `v3.4.0`
+
+**目标**：静态休市日维护到 2028+；Windows Task Scheduler / cron 可复制运维包（调度 M40 流水线）。
+
+验收：
+
+- [ ] CN（及必要时 US/HK）2028+ 休市日 + 单测
+- [ ] `docs/ops/` 调度安装步骤 + 包装脚本/XML 样例；CHANGELOG `3.4.0`
+
+---
+
+## M43 —（可选）组合回测加深 + 绩效对齐纸面成交 → `v3.5.0`
+
+**目标**：更接近组合持仓的 PIT 回测；绩效日志可与 paper fills 自动对齐。可整段 `deferred`。
+
+验收：
+
+- [ ] 组合级回测指标范围经 ADR 冻结；CLI/API 之一 + 单测
+- [ ] 纸面成交 → 绩效回填路径；CHANGELOG `3.5.0`
+
+---
+
+## M44 —（可选）LLM 成本/质量控制 → `v3.6.0`
+
+**目标**：可选 LLM 预算/截断/降级到确定性辩论；默认仍 deterministic。可整段 `deferred`。
+
+验收：
+
+- [ ] 预算/降级 mock 单测；文档费用护栏；CHANGELOG `3.6.0`
+
+---
+
+## M45 — Workbench IA + 一键向导 → `v3.7.0`
+
+**目标**：整理工作台分区；一键「刷新→推荐→纸面」；仍 Jinja/静态，不做 SPA。
+
+验收：
+
+- [ ] 向导路径 replay E2E 或 `test_app` 断言；无 live 默认文案
+- [ ] CHANGELOG `3.7.0`；ADR（建议 0045）
+
+---
+
+## M46 — Phase E 日用稳定收口 → `v3.8.0`
+
+**目标**：Phase E 勾选完成；README/ops 日用路径写清；全量 pytest；**minor** `v3.8.0`（不打 `v4`）。
+
+验收：
+
+- [ ] M39–M42 done；M43–M45 已做或 ROADMAP 标 `deferred`
+- [ ] CHANGELOG `3.8.0`；`release_tag -Kind minor`；全量 pytest 绿
 
 ---
 
