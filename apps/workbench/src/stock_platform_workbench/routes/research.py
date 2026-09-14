@@ -17,11 +17,15 @@ from stock_platform_research import (
     UniverseEmptyError,
     brief_to_orders,
     build_premarket_brief,
+    compare_strategy_configs,
     default_performance_log_path,
     default_universe_fixture_path,
+    list_strategy_configs,
     log_brief_decisions,
     performance_summary,
 )
+from stock_platform_research.strategy_config import default_strategy_config_dir
+import pandas as pd
 
 from ..state import CapabilityUnavailable
 
@@ -271,4 +275,74 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
     except LlmUnavailableError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (AgentError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _fixture_compare_panel() -> pd.DataFrame:
+    """Tiny deterministic panel for strategy compare when body omits rows."""
+    rows = []
+    for sym, closes, opens, vols, revs in [
+        ("AAA", [10, 10.5, 11], [10, 10.2, 10.8], [0.1, 0.1, 0.1], [-0.1, -0.1, -0.1]),
+        ("BBB", [20, 19, 18], [20, 19.5, 18.5], [0.5, 0.5, 0.5], [0.05, 0.05, 0.05]),
+    ]:
+        for i, d in enumerate(["2026-09-01", "2026-09-02", "2026-09-03"]):
+            rows.append(
+                {
+                    "trade_date": d,
+                    "symbol": sym,
+                    "open": opens[i],
+                    "close": closes[i],
+                    "vol20": vols[i],
+                    "rev_chg": revs[i],
+                    "ma20": closes[i],
+                    "ma60": closes[i] * 0.9,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+@router.get("/strategy/configs")
+def get_strategy_configs() -> dict[str, Any]:
+    return {
+        "configs": list_strategy_configs(),
+        "directory": str(default_strategy_config_dir()),
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+    }
+
+
+class StrategyCompareRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    config_a: str = Field(..., alias="configA", description="Config id or JSON path")
+    config_b: str = Field(..., alias="configB")
+    panel: list[dict[str, Any]] | None = None
+
+
+def _resolve_config_ref(ref: str) -> Any:
+    raw = ref.strip()
+    root = default_strategy_config_dir()
+    candidate = root / f"{raw}.json" if not raw.endswith(".json") else root / Path(raw).name
+    if candidate.is_file():
+        return candidate
+    path = Path(raw)
+    if path.is_file():
+        return path
+    # Allow bare id match
+    for cfg in list_strategy_configs():
+        if cfg["id"] == raw:
+            return cfg["path"]
+    raise HTTPException(status_code=404, detail=f"unknown strategy config: {ref}")
+
+
+@router.post("/strategy/compare")
+def post_strategy_compare(body: StrategyCompareRequest) -> dict[str, Any]:
+    panel = pd.DataFrame(body.panel) if body.panel else _fixture_compare_panel()
+    try:
+        return compare_strategy_configs(
+            panel,
+            _resolve_config_ref(body.config_a),
+            _resolve_config_ref(body.config_b),
+        )
+    except (FileNotFoundError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

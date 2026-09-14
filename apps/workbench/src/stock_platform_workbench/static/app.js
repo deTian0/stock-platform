@@ -736,6 +736,44 @@
     }
   }
 
+  async function listStrategies() {
+    const errEl = $("strategy-error");
+    clearError(errEl);
+    try {
+      const data = await fetchJson("/api/research/strategy/configs");
+      $("strategy-meta").textContent = "configs=" + (data.configs ? data.configs.length : 0);
+      $("strategy-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
+  async function compareStrategies(event) {
+    if (event) event.preventDefault();
+    const errEl = $("strategy-error");
+    clearError(errEl);
+    const configA = $("strategy-a").value.trim();
+    const configB = $("strategy-b").value.trim();
+    try {
+      const data = await fetchJson("/api/research/strategy/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ configA: configA, configB: configB }),
+      });
+      $("strategy-meta").textContent =
+        "winner=" +
+        data.winner +
+        " · deltaFinalEquity=" +
+        data.deltaFinalEquity +
+        " · liveTradingEnabled=" +
+        String(data.liveTradingEnabled);
+      $("strategy-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+      $("strategy-json").textContent = "";
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -939,6 +977,8 @@
     $("btn-recommend-paper").addEventListener("click", recommendToPaper);
     $("btn-recommend-debate").addEventListener("click", recommendDebate);
     $("btn-performance").addEventListener("click", loadPerformance);
+    $("strategy-form").addEventListener("submit", compareStrategies);
+    $("btn-strategy-list").addEventListener("click", listStrategies);
     loadMatrix();
     loadPaper();
   }

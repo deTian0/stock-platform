@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-research"
-version = "2.5.0"
+version = "2.6.0"
 description = "Selection / backtest research kernels for stock-platform (lvrev, PIT)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,7 +28,7 @@ dev = ["pytest>=8.0"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-stock_platform_research = ["py.typed", "fixtures/*.json"]
+stock_platform_research = ["py.typed", "fixtures/*.json", "strategy_configs/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

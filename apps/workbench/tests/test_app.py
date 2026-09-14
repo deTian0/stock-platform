@@ -62,6 +62,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="debate"' in body
     assert 'id="recommend"' in body
     assert 'id="performance"' in body
+    assert 'id="strategy-compare"' in body
     assert 'id="pref-preset"' in body
     assert "/static/app.js" in body
 
@@ -87,6 +88,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/research/brief/to-paper" in text
     assert "/api/research/brief/debate" in text
     assert "/api/research/performance" in text
+    assert "/api/research/strategy/compare" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
     assert "/api/settings/presets/" in text
@@ -101,6 +103,22 @@ def test_research_performance(client: TestClient) -> None:
     assert body["settledCount"] >= 1
     assert "direction_accuracy" in body["metrics"]
     assert "direction_accuracy" in body["metricDefinitions"]
+
+
+def test_strategy_compare_api(client: TestClient) -> None:
+    listed = client.get("/api/research/strategy/configs")
+    assert listed.status_code == 200
+    assert listed.json()["liveTradingEnabled"] is False
+    assert len(listed.json()["configs"]) >= 2
+    r = client.post(
+        "/api/research/strategy/compare",
+        json={"configA": "lvrev-default-v1", "configB": "lvrev-rev-heavy-v1"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["liveTradingEnabled"] is False
+    assert "deltaFinalEquity" in body
+    assert body["a"]["tradeCount"] >= 1
 
 
 def test_capability_matrix(client: TestClient) -> None:

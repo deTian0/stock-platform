@@ -84,4 +84,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"

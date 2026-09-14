@@ -510,6 +510,24 @@
       <pre id="performance-json" class="code"></pre>
     </section>
 
+    <section id="strategy-compare" class="panel">
+      <h2>策略对比</h2>
+      <p class="hint">版本化策略 JSON × 轻量 PIT（fixture 面板）；SIMULATE；非投资建议。</p>
+      <form id="strategy-form" class="row">
+        <label>configA
+          <input id="strategy-a" value="lvrev-default-v1" autocomplete="off" />
+        </label>
+        <label>configB
+          <input id="strategy-b" value="lvrev-rev-heavy-v1" autocomplete="off" />
+        </label>
+        <button type="submit">对比</button>
+        <button type="button" id="btn-strategy-list" class="secondary">列出配置</button>
+      </form>
+      <p id="strategy-meta" class="status" aria-live="polite"></p>
+      <pre id="strategy-error" class="error" hidden></pre>
+      <pre id="strategy-json" class="code"></pre>
+    </section>
+
     <section id="paper" class="panel">
       <h2>纸面状态</h2>
       <p class="hint">只读；无实盘开关。</p>

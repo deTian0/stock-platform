@@ -1,0 +1,10 @@
+{
+  "id": "lvrev-default-v1",
+  "version": "1",
+  "top_n": 1,
+  "reversal_q": 0.50,
+  "value_factor": false,
+  "weights": {"vol": 0.5, "rev": 0.5, "value": 0.0, "q": 0.0, "g": 0.0},
+  "universe_ref": "fixtures/universe_cn_sample.json",
+  "description": "Baseline equal vol/rev weights; looser reversal gate for fixtures."
+}

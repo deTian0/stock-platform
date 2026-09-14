@@ -25,6 +25,7 @@
 | **M31 / v2.3.0** | `GET /api/ops/health` |
 | **M32 / v2.4.0** | `GET /api/research/performance` + `#performance` |
 | **M33 / v2.5.0** | `engine=llm` 可选辩论 + `POST /api/research/brief/debate` |
+| **M34 / v2.6.0** | `GET/POST /api/research/strategy/*` + `#strategy-compare` |
 
 ## 安装与运行
 

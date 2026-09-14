@@ -36,6 +36,8 @@ def run_pit_long_only(
     *,
     top_n: int = 1,
     reversal_q: float = 0.30,
+    value_factor: bool = False,
+    weights: dict | None = None,
     feature_columns: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run a tiny long-only PIT loop.
@@ -77,7 +79,7 @@ def run_pit_long_only(
         cross = df[df["trade_date"] == d].copy()
         score_input = cross.drop(columns=["_next_open"], errors="ignore")
         assert_no_lookahead_columns(score_input.columns)
-        scored = score_lvrev(score_input)
+        scored = score_lvrev(score_input, value_factor=value_factor, weights=weights)
         mask = apply_entry_gates(scored, reversal_q=reversal_q)
         picks = scored.loc[mask].head(top_n)
         if picks.empty:
