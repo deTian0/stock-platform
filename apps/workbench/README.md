@@ -40,6 +40,7 @@ python -m stock_platform_workbench
 | GET | `/api/market/minute?symbols=` | 无候选时 **409** fail-closed |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |
+| GET | `/api/debate/report?symbol=&asof=` | 确定性 Bull/Bear/Risk 辩论 |
 | GET | `/api/paper/status` | 纸面状态（SIMULATE · 实盘关闭） |
 | POST | `/api/paper/strategies/draft\|validate\|activate` | 草稿 / 校验 / 显式激活 |
 | POST | `/api/paper/drafts` | 建纸面订单草稿 |

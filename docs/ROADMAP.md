@@ -55,7 +55,7 @@
 | M11 | Workbench 最小 UI | 大 | `v1.4.0` | done |
 | M11.1 | 壳与首页 `GET /` | 小 | `v1.3.1` | done |
 | M11.2 | 三区交互（矩阵/日K/纸面） | 小 | `v1.3.2` | done |
-| M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | in_progress |
+| M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | done |
 | M12.1 | 确定性 Bull/Bear/Risk 内核 | 小 | `v1.4.1` | done |
 | M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | done |
 
@@ -473,7 +473,7 @@
 
 验收（大）：
 
-- [ ] M12.1–M12.2 done；CHANGELOG 含 `1.5.0`
+- [x] M12.1–M12.2 done；CHANGELOG 含 `1.5.0`
 
 ---
 
