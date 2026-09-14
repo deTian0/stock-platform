@@ -55,6 +55,9 @@
 | M11 | Workbench 最小 UI | 大 | `v1.4.0` | done |
 | M11.1 | 壳与首页 `GET /` | 小 | `v1.3.1` | done |
 | M11.2 | 三区交互（矩阵/日K/纸面） | 小 | `v1.3.2` | done |
+| M12 | Agent 轻量辩论图 | 大 | `v1.5.0` | in_progress |
+| M12.1 | 确定性 Bull/Bear/Risk 内核 | 小 | `v1.4.1` | done |
+| M12.2 | `/api/debate/report` + UI | 小 | `v1.4.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -445,6 +448,32 @@
 验收（大）：
 
 - [x] M11.1–M11.2 done；CHANGELOG 含 `1.4.0`
+
+---
+
+## M12 — Agent 轻量辩论图 → `v1.5.0`
+
+**目标**：确定性 Bull/Bear/Risk 辩论；零 LLM / 零内嵌抓取；仅经 providers。
+
+### 小里程碑
+
+#### M12.1 → `v1.4.1`
+
+验收：
+
+- [x] `build_debate_report` + ADR 0017
+- [x] 上涨偏 Buy、下跌偏 Sell 单测
+
+#### M12.2 → `v1.4.2`
+
+验收：
+
+- [ ] `DebateAgentPlugin` + `GET /api/debate/report`
+- [ ] UI `#debate` 区
+
+验收（大）：
+
+- [ ] M12.1–M12.2 done；CHANGELOG 含 `1.5.0`
 
 ---
 

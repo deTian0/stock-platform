@@ -8,6 +8,12 @@
 
 - （无）
 
+## [1.4.1] - 2026-09-14
+
+### Added
+
+- M12.1：确定性 `build_debate_report` / Bull·Bear·Risk（ADR 0017；无 LLM）
+
 ## [1.4.0] - 2026-09-14
 
 ### Added
