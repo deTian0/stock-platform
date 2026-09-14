@@ -77,6 +77,23 @@
       </div>
     </section>
 
+    <section id="debate" class="panel">
+      <h2>轻量辩论</h2>
+      <p class="hint">确定性 Bull/Bear/Risk；无 LLM；非投资建议。</p>
+      <form id="debate-form" class="row">
+        <label>symbol
+          <input id="debate-symbol" name="symbol" value="600519" autocomplete="off" />
+        </label>
+        <label>asof
+          <input id="debate-asof" name="asof" type="date" value="2026-09-02" />
+        </label>
+        <button type="submit">运行辩论</button>
+      </form>
+      <p id="debate-meta" class="status" aria-live="polite"></p>
+      <pre id="debate-error" class="error" hidden></pre>
+      <pre id="debate-json" class="code"></pre>
+    </section>
+
     <section id="paper" class="panel">
       <h2>纸面状态</h2>
       <p class="hint">只读；无实盘开关。</p>

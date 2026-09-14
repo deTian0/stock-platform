@@ -149,11 +149,32 @@
     }
   }
 
+  async function loadDebate(event) {
+    if (event) event.preventDefault();
+    const errEl = $("debate-error");
+    clearError(errEl);
+    $("debate-meta").textContent = "";
+    const symbol = $("debate-symbol").value.trim();
+    const asof = $("debate-asof").value;
+    const params = new URLSearchParams({ symbol: symbol });
+    if (asof) params.set("asof", asof);
+    try {
+      const data = await fetchJson("/api/debate/report?" + params.toString());
+      $("debate-meta").textContent =
+        "verdict=" + data.verdict + " · net=" + (data.score && data.score.net);
+      $("debate-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+      $("debate-json").textContent = "";
+    }
+  }
+
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
     $("btn-pref").addEventListener("click", applyPreference);
     $("btn-paper").addEventListener("click", loadPaper);
     $("daily-form").addEventListener("submit", loadDaily);
+    $("debate-form").addEventListener("submit", loadDebate);
     loadMatrix();
     loadPaper();
   }

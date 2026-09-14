@@ -40,6 +40,7 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="capability"' in body
     assert 'id="daily"' in body
     assert 'id="paper"' in body
+    assert 'id="debate"' in body
     assert "/static/app.js" in body
 
 
@@ -53,6 +54,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/settings/capability-matrix" in text
     assert "/api/market/daily" in text
     assert "/api/paper/status" in text
+    assert "/api/debate/report" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
 
@@ -157,6 +159,19 @@ def test_research_and_review_slots(client: TestClient) -> None:
     )
     assert rev.status_code == 200
     assert rev.json()["kind"] == "review"
+
+
+def test_debate_slot(client: TestClient) -> None:
+    r = client.get(
+        "/api/debate/report",
+        params={"symbol": "600519", "asof": "2026-09-02"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "debate"
+    assert body["verdict"] in {"Buy", "Hold", "Sell"}
+    assert any(round_["role"] == "bull" for round_ in body["rounds"])
+    assert "非投资建议" in body["disclaimer"]
 
 
 def test_research_rejects_hk(client: TestClient) -> None:
