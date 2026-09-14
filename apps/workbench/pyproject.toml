@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-workbench"
-version = "3.9.2"
+version = "3.9.3"
 description = "Minimal research workbench shell for stock-platform."
 readme = "README.md"
 requires-python = ">=3.10"
