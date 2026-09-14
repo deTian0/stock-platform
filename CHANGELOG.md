@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.1.0] - 2026-09-14
+
+### Added
+
+- **大里程碑 M39 完成**：日用宇宙扩容 + 可读推荐理由
+  - 分层宇宙 `core` / `watch` / `full`（`load_universe_tiers`）；样例 `universe_cn_daily.json`
+  - brief `reasons[]` + `reasonSummary`（保留兼容 `reason`）；`#recommend` 展示中文摘要
+  - `docs/ops/daily-universe.md`；ADR 0040；CI 仍用小 fixture；默认 replay + SIMULATE
+
 ## [3.0.0] - 2026-09-14
 
 ### Added

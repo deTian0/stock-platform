@@ -14,6 +14,7 @@
 | **M29 / v2.1.0** | `run_refresh` + `stock-platform-refresh` |
 | **M32 / v2.4.0** | `performance` JSONL + `stock-platform-performance` |
 | **M34 / v2.6.0** | 策略配置版本化 + `compare_strategy_configs` |
+| **M39 / v3.1.0** | 分层宇宙 core/watch/full + 可读 `reasons[]`（ADR 0040） |
 
 ## 安装
 

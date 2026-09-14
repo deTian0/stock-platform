@@ -107,7 +107,7 @@
 | M36 | 同花顺模拟盘适配器（mock / experimental） | 大 | `v2.8.0` | done |
 | M37 | 风控闸门接到外部模拟 | 大 | `v2.9.0` | done |
 | M38 | Phase D E2E 收口（recommend → ths_sim） | 大 | `v3.0.0` | done |
-| M39 | 日用宇宙扩容 + 可读推荐理由 | 大 | `v3.1.0` | planned |
+| M39 | 日用宇宙扩容 + 可读推荐理由 | 大 | `v3.1.0` | done |
 | M40 | 定时 refresh→brief 日流水线 | 大 | `v3.2.0` | planned |
 | M41 | 板块资金流 / 新闻特征 | 大 | `v3.3.0` | planned |
 | M42 | 日历 2028+ + Task Scheduler/cron 运维包 | 大 | `v3.4.0` | planned |
@@ -1037,7 +1037,7 @@
 
 **产品目标**：把「今日推荐」从 demo 做成可坚持的真日用——更大宇宙、定时 refresh→brief、可读理由；加固板块/新闻数据与日历/调度运维；可选加深投研与工作台向导。默认仍 paper + replay；SIMULATE；无 SPA；无真实券商；东财经 `em_get`；矩阵 fail-closed。
 
-**状态**：planned（基线 `v3.0.0`）
+**状态**：in_progress（基线 `v3.0.0`；已完成 M39 → `v3.1.0`）
 
 **详细设计**：`C:\Users\63516\.cursor\plans\phase_e_daily_use_roadmap_20260914.plan.md`
 
@@ -1055,9 +1055,9 @@
 
 验收：
 
-- [ ] 日用宇宙配置样例 + 文档；空宇宙 fail-closed
-- [ ] brief API/CLI 可读 `reasons`；单测；默认 replay
-- [ ] ADR（建议 0040）；CHANGELOG `3.1.0`
+- [x] 日用宇宙配置样例 + 文档；空宇宙 fail-closed
+- [x] brief API/CLI 可读 `reasons`；单测；默认 replay
+- [x] ADR（建议 0040）；CHANGELOG `3.1.0`
 
 ---
 
