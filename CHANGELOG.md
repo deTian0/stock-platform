@@ -8,6 +8,14 @@
 
 - （无）
 
+## [1.2.2] - 2026-09-14
+
+### Added
+
+- M10.2：`MarketStrategy.is_trading_day` 与纸面 `timing` 共用 CN 日历
+- `completed_bar_cutoff` 回退跳过非交易日；execution 依赖 providers
+- 修复：包内 `data/cn_closed_days.txt` 不再被根 `.gitignore` 的 `data/` 规则忽略
+
 ## [1.2.1] - 2026-09-14
 
 ### Added

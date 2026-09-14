@@ -25,7 +25,8 @@ frontend/dist/
 Thumbs.db
 
 # Runtime data & caches (never commit market data)
-data/
+# Only repo-root /data — package calendars live under packages/*/src/*/data/
+/data/
 data_cache/
 *.db
 *.sqlite

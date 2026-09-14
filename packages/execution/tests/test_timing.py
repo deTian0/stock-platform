@@ -30,6 +30,16 @@ def test_planned_execution_skips_weekend() -> None:
     assert planned_execution_date("2026-09-04") == "2026-09-07"
 
 
+def test_planned_execution_skips_national_day_holiday() -> None:
+    # Last session before 2024 National Day → first open after holiday
+    assert planned_execution_date("2024-09-30") == "2024-10-08"
+
+
+def test_completed_bar_cutoff_skips_weekend_on_monday_morning() -> None:
+    now = datetime(2026, 9, 7, 10, 0, tzinfo=CHINA_TZ)
+    assert completed_bar_cutoff(now).isoformat() == "2026-09-04"
+
+
 def test_window_open_with_nonzero_seconds() -> None:
     now = datetime(2026, 9, 7, 9, 40, 37, tzinfo=CHINA_TZ)
     assert execution_window_status("2026-09-07", "09:35-10:00", now) == "open"
