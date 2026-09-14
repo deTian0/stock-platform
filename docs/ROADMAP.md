@@ -85,7 +85,7 @@
 | M21 | CN 复权因子 | 大 | `v1.14.0` | done |
 | M21.1 | adj_factor provider + matrix + ADR 0026 | 小 | `v1.13.1` | done |
 | M21.2 | workbench adj-factor API + UI | 小 | `v1.13.2` | done |
-| M22 | CN 全量分钟 | 大 | `v1.15.0` | in_progress |
+| M22 | CN 全量分钟 | 大 | `v1.15.0` | done |
 | M22.1 | full_minute provider + matrix + ADR 0027 | 小 | `v1.14.1` | done |
 | M22.2 | workbench full-minute API + UI | 小 | `v1.14.2` | done |
 
@@ -759,7 +759,7 @@
 
 验收（大）：
 
-- [ ] M22.1–M22.2 done；CHANGELOG 含 `1.15.0`
+- [x] M22.1–M22.2 done；CHANGELOG 含 `1.15.0`
 
 ---
 
