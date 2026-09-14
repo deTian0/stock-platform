@@ -51,6 +51,28 @@ def test_hk_lunar_new_year_2025() -> None:
     assert cal.next_trading_day(date(2025, 1, 28)) == date(2025, 2, 3)
 
 
+def test_cn_2028_closed_and_trading_sample() -> None:
+    cal = get_trading_calendar("CN")
+    # provisional 2028 samples (weekdays only in cn_closed_days.txt)
+    assert not cal.is_trading_day(date(2028, 1, 3))  # New Year observed
+    assert not cal.is_trading_day(date(2028, 1, 26))  # Spring Festival (LNY)
+    assert not cal.is_trading_day(date(2028, 5, 1))  # Labor Day
+    assert not cal.is_trading_day(date(2028, 10, 2))  # National Day window
+    assert cal.is_trading_day(date(2028, 1, 5))  # Wednesday trading day
+    assert cal.is_trading_day(date(2028, 3, 1))  # ordinary Wednesday
+
+
+def test_us_hk_2028_sample_closed() -> None:
+    us = get_trading_calendar("US")
+    assert not us.is_trading_day(date(2028, 7, 4))
+    assert not us.is_trading_day(date(2028, 12, 25))
+    assert us.is_trading_day(date(2028, 7, 5))
+    hk = get_trading_calendar("HK")
+    assert not hk.is_trading_day(date(2028, 1, 26))
+    assert not hk.is_trading_day(date(2028, 12, 25))
+    assert hk.is_trading_day(date(2028, 1, 25))
+
+
 def test_unknown_market() -> None:
     with pytest.raises(SymbolError):
         get_trading_calendar("JP")

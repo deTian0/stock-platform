@@ -1,0 +1,16 @@
+# Example cron fragment for M40 daily pipeline (M42 ops pack).
+# Default: replay; non-trading days exit 0 via TradingCalendar.
+# Adjust REPO path; do not put secrets here.
+#
+# Install:
+#   crontab -e
+#   # paste one of the lines below after editing paths
+#
+# Recommended: call the PowerShell wrapper (handles skip itself).
+# Every day 08:30 local — wrapper skips CN weekends / closed weekdays:
+
+# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -SkipRefresh
+
+# Weekdays-only trigger (still need calendar for public holidays):
+
+# 30 8 * * 1-5 cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -SkipRefresh
