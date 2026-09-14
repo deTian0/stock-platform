@@ -46,6 +46,9 @@
 | M8 | A 股 live HTTP（可选） | 大 | `v1.1.0` | done |
 | M8.1 | `AStockHttpProvider` via `em_get` | 小 | `v1.0.1` | done |
 | M8.2 | workbench 可偏好 live daily/realtime | 小 | `v1.0.2` | done |
+| M9 | 美港 live HTTP（可选） | 大 | `v1.2.0` | in_progress |
+| M9.1 | `GlobalHttpProvider`（Yahoo + 新浪） | 小 | `v1.1.1` | done |
+| M9.2 | workbench 可偏好 `global_http` | 小 | `v1.1.2` | planned |
 
 > **说明**：M0 完成打 `v0.1.0`；其间小步用 `v0.0.x`。  
 > M1 完成打 `v0.2.0`；M1 期间的小步在 `v0.1.x`（即 M0 大版本之后的 patch 线）。  
@@ -360,6 +363,31 @@
 验收（大）：
 
 - [x] M8.1–M8.2 done；CHANGELOG 含 `1.1.0`
+
+---
+
+## M9 — 美港 live HTTP → `v1.2.0`
+
+**目标**：可选 US/HK live 日 K / 实时；默认仍 replay；不经 `em_get`；仅 daily+realtime。
+
+### 小里程碑
+
+#### M9.1 → `v1.1.1`
+
+验收：
+
+- [x] `GlobalHttpProvider`（Yahoo chart 日 K + 新浪实时）
+- [x] 可注入 `get_json` / `get_text`；ADR 0014；矩阵 `global_http` usable
+
+#### M9.2 → `v1.1.2`
+
+验收：
+
+- [ ] workbench 注册 `global_http`（按标的 US/HK 分发）；preferences 可切；默认仍 replay
+
+验收（大）：
+
+- [ ] M9.1–M9.2 done；CHANGELOG 含 `1.2.0`
 
 ---
 

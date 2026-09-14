@@ -58,7 +58,7 @@ market_id ∈ { "CN", "US", "HK" }
 | A 股式涨跌停 | **无**（`has_limits=False`） | **无** |
 | 代码归一化 | 大写字母 ticker（`AAPL` / `BRK.B`） | 5 位补零（`00700`） |
 | 进入 CN `normalize_symbol` | 必须失败 | 必须失败 |
-| Vendor（M5） | `global_replay` fixtures；`global_http` pending | 同左 |
+| Vendor（M5 / M9） | `global_replay` fixtures；`global_http` live（Yahoo+新浪） | 同左 |
 
 实现：`packages/providers` → `get_market_strategy` / `GlobalReplayProvider`。
 

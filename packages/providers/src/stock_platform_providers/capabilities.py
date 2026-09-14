@@ -104,12 +104,12 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
     reg.register(
         ProviderDeclaration(
             name="global_http",
-            display="Global HTTP (US/HK)",
+            display="Global HTTP (Yahoo + Sina)",
             kind="builtin",
             datasets=frozenset({"daily", "realtime"}),
-            available=False,
-            status="pending",
-            pending_reason="Live global vendor not wired; use global_replay + MarketStrategy",
+            available=True,
+            status="ok",
+            note="Live US/HK via Yahoo chart + Sina quotes; prefer global_replay for offline CI",
         )
     )
 
