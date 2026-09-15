@@ -30,6 +30,14 @@ def test_cn_national_day_2024_next_prev() -> None:
     assert not cal.is_trading_day(date(2024, 10, 1))
     assert cal.next_trading_day(date(2024, 9, 30)) == date(2024, 10, 8)
     assert cal.prev_trading_day(date(2024, 10, 8)) == date(2024, 9, 30)
+    assert cal.last_trading_day(date(2024, 10, 3)) == date(2024, 9, 30)
+
+
+def test_last_trading_day_helper() -> None:
+    from stock_platform_providers import last_trading_day
+
+    assert last_trading_day("CN", on=date(2024, 10, 5)) == date(2024, 9, 30)
+    assert last_trading_day("CN", on=date(2026, 9, 4)) == date(2026, 9, 4)
 
 
 def test_us_independence_and_christmas() -> None:

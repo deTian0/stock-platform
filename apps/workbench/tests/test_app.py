@@ -952,7 +952,7 @@ def test_wizard_brief_connection_abort_returns_503_zh(
         )
 
     monkeypatch.setattr(
-        "stock_platform_workbench.routes.research.build_premarket_brief",
+        "stock_platform_workbench.brief_ux.build_premarket_brief",
         boom,
     )
     r = client.post(
@@ -969,9 +969,140 @@ def test_wizard_brief_connection_abort_returns_503_zh(
     assert r.status_code == 503
     detail = r.json()["detail"]
     assert detail["ok"] is False
-    assert detail["reason"] == "upstream_unavailable"
     assert detail["liveTradingEnabled"] is False
-    assert detail["tip"] == "STOCK_PLATFORM_PROVIDER_PRESET=replay"
-    assert UPSTREAM_LIVE_TIP_ZH in detail["error"]
+    assert UPSTREAM_LIVE_TIP_ZH in str(detail.get("error") or "")
     assert detail["steps"][1]["step"] == "brief"
     assert detail["steps"][1]["ok"] is False
+
+
+def test_brief_fallback_to_replay_when_live_fails(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live daily transport failure + STOCK_PLATFORM_BRIEF_FALLBACK=replay → fixtures."""
+    from http.client import RemoteDisconnected
+
+    import requests
+
+    monkeypatch.setenv("STOCK_PLATFORM_BRIEF_FALLBACK", "replay")
+    state = client.app.state.workbench
+    state.preferences["daily"] = "astock_http"
+    live = state.providers["astock_http"]
+
+    def boom_daily(*_a, **_k):
+        raise requests.exceptions.ConnectionError(
+            "Connection aborted.",
+            RemoteDisconnected("Remote end closed connection without response"),
+        )
+
+    monkeypatch.setattr(live, "get_daily", boom_daily)
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 5,
+            "adjust_kind": "none",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["picks"]) >= 1
+    assert body.get("providerFallback") is True
+    assert "已回退" in (body.get("dataNote") or "")
+    assert body["provider"] == "replay"
+
+
+def test_brief_fallback_to_supplementary_with_token(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live fail + token set → supplementary HTTP daily (mocked POST)."""
+    from http.client import RemoteDisconnected
+
+    import requests
+
+    monkeypatch.delenv("STOCK_PLATFORM_BRIEF_FALLBACK", raising=False)
+    monkeypatch.setenv("STOCK_PLATFORM_TUSHARE_TOKEN", "test-token-not-real")
+    state = client.app.state.workbench
+    state.preferences["daily"] = "astock_http"
+    live = state.providers["astock_http"]
+    monkeypatch.setattr(
+        live,
+        "get_daily",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            requests.exceptions.ConnectionError(
+                "Connection aborted.",
+                RemoteDisconnected("Remote end closed connection without response"),
+            )
+        ),
+    )
+
+    # Point supplementary provider at replay transport via get_daily delegate
+    replay = state.providers["replay"]
+
+    def ts_daily(symbols, start=None, end=None, **_k):
+        return replay.get_daily(symbols, start=start, end=end)
+
+    monkeypatch.setattr(state.providers["tushare_http"], "get_daily", ts_daily)
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 5,
+            "adjust_kind": "none",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["picks"]) >= 1
+    assert body.get("providerFallback") is True
+    assert "已回退 Tushare" in (body.get("dataNote") or "")
+    assert body["provider"] == "tushare_http"
+
+
+def test_brief_empty_picks_message_when_panel_empty(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-15",
+            "symbols": "600519",
+            "topN": 5,
+            "adjust_kind": "none",
+            "softGates": "true",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["picks"] == []
+    assert body["panelSize"] == 0
+    assert "emptyPicksMessage" in body
+    assert "截面为空" in body["emptyPicksMessage"]
+    assert "emptyPicksTip" in body
+
+
+def test_research_defaults_and_brief_without_asof(client: TestClient) -> None:
+    defaults = client.get("/api/research/defaults")
+    assert defaults.status_code == 200
+    body = defaults.json()
+    assert body["asof"] == "2026-09-02"  # replay fixture horizon
+    assert "600519" in body["symbols"]
+    assert body["liveTradingEnabled"] is False
+
+    r = client.get(
+        "/api/research/brief",
+        params={"symbols": "600519,000001,510300", "topN": 5, "adjust_kind": "none"},
+    )
+    assert r.status_code == 200
+    brief = r.json()
+    assert brief["asof"] == "2026-09-02"
+    assert len(brief["picks"]) >= 1
+    assert "生成今日推荐" in client.get("/").text
+    assert "/api/research/defaults" in client.get("/static/app.js").text
+
+
+def test_ui_shows_generate_cta(client: TestClient) -> None:
+    body = client.get("/").text
+    assert "生成今日推荐" in body
+    js = client.get("/static/app.js").text
+    assert "applyBriefToRecommendPanel" in js
+    assert "loadRecommendDefaults" in js

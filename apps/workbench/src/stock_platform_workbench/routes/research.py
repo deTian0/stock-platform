@@ -11,15 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from stock_platform_execution import ActivationBlocked, DraftBlocked, ProfileBlocked
 from stock_platform_execution.timing import market_now
-from stock_platform_providers import apply_adjust, get_market_strategy
+from stock_platform_providers import get_market_strategy
 from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
 from stock_platform_research import (
     UniverseEmptyError,
     brief_to_orders,
-    build_premarket_brief,
     compare_strategy_configs,
     default_performance_log_path,
-    default_universe_fixture_path,
     list_strategy_configs,
     log_brief_decisions,
     performance_summary,
@@ -28,10 +26,16 @@ from stock_platform_research import (
 from stock_platform_research.strategy_config import default_strategy_config_dir
 import pandas as pd
 
+from ..brief_ux import (
+    build_brief_with_fallback,
+    default_brief_asof,
+    friendly_brief_error,
+    paper_now_iso_for_asof,
+    recommend_defaults,
+)
 from ..paper_ux import (
     ensure_active_simulate_strategy,
     friendly_execution_detail,
-    friendly_upstream_detail,
     is_upstream_transport_error,
 )
 from ..state import CapabilityUnavailable
@@ -45,74 +49,66 @@ def _parse_symbols(raw: str | None) -> list[str] | None:
     return [s.strip() for s in str(raw).split(",") if s.strip()]
 
 
-def _optional_resolve(state: Any, capability: str) -> Any | None:
-    try:
-        return state.resolve(capability)
-    except CapabilityUnavailable:
-        return None
+def _resolve_asof(request: Request, asof: date | None) -> date:
+    if asof is not None:
+        return asof
+    return default_brief_asof(request.app.state.workbench)
 
 
 def _build_brief_for_request(
     request: Request,
     *,
-    asof: date,
+    asof: date | None,
     symbols: list[str] | None,
     top_n: int,
     value_factor: bool,
     reversal_q: float,
     adjust_kind: str | None,
+    soft_gates: bool = True,
 ) -> dict[str, Any]:
     state = request.app.state.workbench
-    daily = state.resolve("daily")
-    adj = None
-    adjust_fn = None
-    kind = adjust_kind
-    if kind:
-        adj = _optional_resolve(state, "adj_factor")
-        if adj is not None:
-            adjust_fn = apply_adjust
-        else:
-            kind = None
-    fund = _optional_resolve(state, "fund_flow")
-
-    universe_path = None
-    if symbols is None:
-        packaged = default_universe_fixture_path()
-        local = Path(state.fixtures_dir) / "universe_cn_sample.json"
-        universe_path = local if local.is_file() else packaged
-
     try:
-        return build_premarket_brief(
-            asof=asof,
+        return build_brief_with_fallback(
+            state,
+            asof=_resolve_asof(request, asof),
             symbols=symbols,
-            universe_path=universe_path,
-            daily_provider=daily,
-            adj_provider=adj,
-            fund_flow_provider=fund,
-            apply_adjust_fn=adjust_fn,
-            adjust_kind=kind,
             top_n=top_n,
             value_factor=value_factor,
             reversal_q=reversal_q,
+            adjust_kind=adjust_kind,
+            soft_gates=soft_gates,
         )
     except UniverseEmptyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CapabilityUnavailable as exc:
+        raise HTTPException(status_code=409, detail=exc.detail) from exc
+    except Exception as exc:  # noqa: BLE001
+        if is_upstream_transport_error(exc):
+            raise HTTPException(status_code=503, detail=friendly_brief_error(exc)) from exc
+        raise
+
+
+@router.get("/defaults")
+def get_recommend_defaults(request: Request) -> dict[str, Any]:
+    """Default asof / symbols for wizard + recommend one-click path."""
+    return recommend_defaults(request.app.state.workbench)
 
 
 @router.get("/brief")
 def get_brief(
     request: Request,
-    asof: date = Query(..., description="Signal trade date (PIT as-of)"),
+    asof: date | None = Query(None, description="Signal trade date; default last CN / fixture"),
     symbols: str | None = Query(None, description="Comma-separated; default sample universe"),
     top_n: int = Query(10, ge=1, le=100, alias="topN"),
     value_factor: bool = Query(False, alias="valueFactor"),
     reversal_q: float = Query(0.30, alias="reversalQ"),
     adjust_kind: str | None = Query("qfq", description="qfq/hfq/none"),
+    soft_gates: bool = Query(True, alias="softGates"),
 ) -> dict[str, Any]:
     kind = None if (adjust_kind or "").lower() in {"", "none", "raw"} else adjust_kind
-    brief = _build_brief_for_request(
+    return _build_brief_for_request(
         request,
         asof=asof,
         symbols=_parse_symbols(symbols),
@@ -120,21 +116,20 @@ def get_brief(
         value_factor=value_factor,
         reversal_q=reversal_q,
         adjust_kind=kind,
+        soft_gates=soft_gates,
     )
-    daily = request.app.state.workbench.resolve("daily")
-    brief["provider"] = getattr(daily, "name", type(daily).__name__)
-    return brief
 
 
 class BriefToPaperRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date
+    asof: date | None = None
     symbols: str | None = None
     top_n: int = Field(10, ge=1, le=100, alias="topN")
     value_factor: bool = Field(False, alias="valueFactor")
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
+    soft_gates: bool = Field(True, alias="softGates")
     qty: int = Field(100, ge=1, le=1_000_000)
     decision_only: bool = False
     now: str | None = None
@@ -152,14 +147,16 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
     active = ensured["active"]
 
     kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+    asof = _resolve_asof(request, body.asof)
     brief = _build_brief_for_request(
         request,
-        asof=body.asof,
+        asof=asof,
         symbols=_parse_symbols(body.symbols),
         top_n=body.top_n,
         value_factor=body.value_factor,
         reversal_q=body.reversal_q,
         adjust_kind=kind,
+        soft_gates=body.soft_gates,
     )
     orders = brief_to_orders(brief, qty=body.qty)
     mid = get_market_strategy(body.market).market_id
@@ -167,12 +164,12 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
         dt = datetime.fromisoformat(body.now.replace("Z", "+00:00"))
         now = market_now(mid, dt) if dt.tzinfo is None else dt
     else:
-        now = market_now(mid)
+        now = market_now(mid, datetime.fromisoformat(paper_now_iso_for_asof(asof)))
 
     try:
         draft = paper.broker.build_draft(
             strategy_hash=str(active["strategyHash"]),
-            signal_trade_date=body.asof.isoformat(),
+            signal_trade_date=asof.isoformat(),
             orders=orders,
             decision_only=body.decision_only,
             market=mid,
@@ -191,6 +188,7 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
         "strategyStatus": ensured["statusMessage"],
     }
 
+
 @router.post("/brief/to-broker")
 def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
     """Alias of to-paper routed through resolve_broker (paper or ths_sim)."""
@@ -200,13 +198,14 @@ def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, An
 class WizardDailyRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date
+    asof: date | None = None
     symbols: str | None = None
     top_n: int = Field(5, ge=1, le=100, alias="topN")
     adjust_kind: str | None = "none"
+    soft_gates: bool = Field(True, alias="softGates")
     qty: int = Field(100, ge=1, le=1_000_000)
     decision_only: bool = True
-    now: str | None = "2026-09-07T09:40:00+08:00"
+    now: str | None = None
     market: str = "CN"
     skip_refresh: bool = Field(True, alias="skipRefresh")
     to_paper: bool = Field(True, alias="toPaper")
@@ -222,17 +221,18 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
     state = request.app.state.workbench
     steps: list[dict[str, Any]] = []
     symbols = _parse_symbols(body.symbols)
+    asof = _resolve_asof(request, body.asof)
+    now_iso = body.now or paper_now_iso_for_asof(asof)
 
-    # Step 1: refresh (local provider path; default skipped for thin UI demos)
     if body.skip_refresh:
         steps.append({"step": "refresh", "ok": True, "skipped": True})
     else:
         try:
             daily = state.resolve("daily")
             report = run_refresh(
-                asof=body.asof,
+                asof=asof,
                 provider=daily,
-                symbols=symbols or ["600519"],
+                symbols=symbols or ["600519", "000001", "510300"],
                 datasets=["daily"],
                 max_attempts=1,
             )
@@ -262,7 +262,7 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                 "error": "refresh unavailable",
             }
         except Exception as exc:  # noqa: BLE001
-            steps.append({"step": "refresh", "ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            steps.append({"step": "refresh", "ok": False, "error": friendly_brief_error(exc)})
             return {
                 "ok": False,
                 "steps": steps,
@@ -271,37 +271,51 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                 "error": "refresh error",
             }
 
-    # Step 2: brief / recommend
     try:
         kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
         brief = _build_brief_for_request(
             request,
-            asof=body.asof,
+            asof=asof,
             symbols=symbols,
             top_n=body.top_n,
             value_factor=False,
             reversal_q=0.30,
             adjust_kind=kind,
+            soft_gates=body.soft_gates,
         )
         steps.append(
             {
                 "step": "brief",
                 "ok": True,
                 "pickCount": len(brief.get("picks") or []),
+                "dataNote": brief.get("dataNote"),
+                "gatesRelaxed": brief.get("gatesRelaxed"),
             }
         )
-    except (HTTPException, CapabilityUnavailable) as exc:
-        detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
-        status = exc.status_code if isinstance(exc, HTTPException) else 409
+    except HTTPException as exc:
+        detail = exc.detail
         steps.append({"step": "brief", "ok": False, "error": detail})
         raise HTTPException(
-            status_code=status,
+            status_code=exc.status_code,
+            detail={
+                "ok": False,
+                "steps": steps,
+                "error": detail,
+                "liveTradingEnabled": False,
+                "environment": "SIMULATE",
+            },
+        ) from exc
+    except CapabilityUnavailable as exc:
+        detail = exc.detail
+        steps.append({"step": "brief", "ok": False, "error": detail})
+        raise HTTPException(
+            status_code=409,
             detail={"ok": False, "steps": steps, "error": detail, "liveTradingEnabled": False},
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        detail = friendly_brief_error(exc)
+        steps.append({"step": "brief", "ok": False, "error": detail})
         if is_upstream_transport_error(exc):
-            detail = friendly_upstream_detail(exc)
-            steps.append({"step": "brief", "ok": False, "error": detail})
             raise HTTPException(
                 status_code=503,
                 detail={
@@ -311,10 +325,9 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                     "reason": "upstream_unavailable",
                     "environment": "SIMULATE",
                     "liveTradingEnabled": False,
-                    "tip": "STOCK_PLATFORM_PROVIDER_PRESET=replay",
+                    "tip": "STOCK_PLATFORM_BRIEF_FALLBACK=replay",
                 },
             ) from exc
-        steps.append({"step": "brief", "ok": False, "error": f"{type(exc).__name__}: {exc}"})
         return {
             "ok": False,
             "steps": steps,
@@ -326,13 +339,14 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
     draft = None
     if body.to_paper:
         paper_body = BriefToPaperRequest(
-            asof=body.asof,
+            asof=asof,
             symbols=body.symbols,
             topN=body.top_n,
             adjust_kind=body.adjust_kind,
+            softGates=body.soft_gates,
             qty=body.qty,
             decision_only=body.decision_only,
-            now=body.now,
+            now=now_iso,
             market=body.market,
         )
         strategy_auto = False
@@ -378,6 +392,7 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
         "disclaimer": "向导仅纸面 SIMULATE；非投资建议。",
     }
 
+
 @router.get("/performance")
 def get_performance(
     request: Request,
@@ -401,12 +416,13 @@ def get_performance(
 class LogBriefRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date
+    asof: date | None = None
     symbols: str | None = None
     top_n: int = Field(10, ge=1, le=100, alias="topN")
     value_factor: bool = Field(False, alias="valueFactor")
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
+    soft_gates: bool = Field(True, alias="softGates")
     holding: str = "5d"
     log: str | None = None
 
@@ -423,6 +439,7 @@ def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
         value_factor=body.value_factor,
         reversal_q=body.reversal_q,
         adjust_kind=kind,
+        soft_gates=body.soft_gates,
     )
     path = Path(body.log) if body.log else default_performance_log_path()
     rows = log_brief_decisions(path, brief, holding=body.holding)
@@ -438,12 +455,13 @@ def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
 class BriefDebateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date
+    asof: date | None = None
     symbols: str | None = None
     top_n: int = Field(5, ge=1, le=50, alias="topN")
     value_factor: bool = Field(False, alias="valueFactor")
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
+    soft_gates: bool = Field(True, alias="softGates")
     engine: str = "deterministic"
     max_picks: int | None = Field(None, ge=1, le=50, alias="maxPicks")
 
@@ -460,9 +478,9 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
         value_factor=body.value_factor,
         reversal_q=body.reversal_q,
         adjust_kind=kind,
+        soft_gates=body.soft_gates,
     )
     daily = request.app.state.workbench.resolve("daily")
-    brief["provider"] = getattr(daily, "name", type(daily).__name__)
     try:
         return debate_brief_picks(
             daily,
@@ -526,7 +544,6 @@ def _resolve_config_ref(ref: str) -> Any:
     path = Path(raw)
     if path.is_file():
         return path
-    # Allow bare id match
     for cfg in list_strategy_configs():
         if cfg["id"] == raw:
             return cfg["path"]

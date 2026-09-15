@@ -91,3 +91,26 @@ def test_empty_gate_reasons() -> None:
     assert reasons
     assert reasons[0]["key"] == "gated_pass"
     assert reason_summary(reasons)
+
+
+def test_soft_gates_relaxes_when_strict_empty() -> None:
+    # All fail entry gates (ma20 <= ma60) but soft mode still returns scored ranks.
+    panel = pd.DataFrame(
+        {
+            "trade_date": ["2026-09-02"] * 2,
+            "symbol": ["A", "B"],
+            "open": [10, 10],
+            "close": [10, 10],
+            "vol20": [0.2, 0.3],
+            "rev_chg": [0.1, 0.2],
+            "ma20": [9.0, 9.0],
+            "ma60": [10.0, 10.0],
+        }
+    )
+    strict = build_premarket_brief(asof="2026-09-02", panel=panel, top_n=2, soft_gates=False)
+    assert strict["picks"] == []
+    assert "emptyPicksMessage" in strict
+    soft = build_premarket_brief(asof="2026-09-02", panel=panel, top_n=2, soft_gates=True)
+    assert len(soft["picks"]) >= 1
+    assert soft["gatesRelaxed"] is True
+    assert "软化" in (soft.get("gatesNote") or "")

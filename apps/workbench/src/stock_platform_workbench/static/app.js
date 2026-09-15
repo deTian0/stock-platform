@@ -32,10 +32,16 @@
     if (err.fail_closed) parts.push("能力不可用（fail-closed）");
     if (err.reason) parts.push(String(err.reason));
     if (err.message && err.message !== "request_failed") parts.push(String(err.message));
+    if (err.error && typeof err.error === "string") parts.push(err.error);
     if (err.detail && typeof err.detail === "string") parts.push(err.detail);
-    else if (err.detail && typeof err.detail === "object" && err.detail.error) {
-      parts.push(String(err.detail.error));
+    else if (err.detail && typeof err.detail === "object") {
+      if (err.detail.error) parts.push(String(err.detail.error));
+      else if (err.detail.detail && typeof err.detail.detail === "string") {
+        parts.push(err.detail.detail);
+      }
+      if (err.detail.tip) parts.push("提示：" + String(err.detail.tip));
     }
+    if (err.tip) parts.push("提示：" + String(err.tip));
     if (err.capability) parts.push("能力=" + err.capability);
     if (err.provider) parts.push("provider=" + err.provider);
     if (err.status) parts.push("HTTP " + err.status);
@@ -304,12 +310,18 @@
     });
   }
 
-  function renderRecommendCards(picks) {
+  function renderRecommendCards(picks, emptyInfo) {
     var host = $("recommend-cards");
     if (!host) return;
     host.innerHTML = "";
     if (!picks || !picks.length) {
-      host.innerHTML = '<p class="hint" style="margin:0">暂无推荐结果</p>';
+      var msg = (emptyInfo && emptyInfo.emptyPicksMessage) || "暂无推荐结果";
+      var tip = (emptyInfo && emptyInfo.emptyPicksTip) || "";
+      host.innerHTML =
+        '<p class="hint" style="margin:0">' +
+        escapeHtml(msg) +
+        (tip ? "<br/>" + escapeHtml(tip) : "") +
+        "</p>";
       return;
     }
     for (var i = 0; i < picks.length; i++) {
@@ -1155,12 +1167,13 @@
     const topN = Number($("recommend-topn").value || "5");
     const engine = ($("debate-engine") && $("debate-engine").value) || "deterministic";
     const body = {
-      asof: asof,
       topN: topN,
       adjust_kind: "none",
+      softGates: true,
       engine: engine,
       maxPicks: topN,
     };
+    if (asof) body.asof = asof;
     if (symbols) body.symbols = symbols;
     try {
       const data = await fetchJson("/api/research/brief/debate", {
@@ -1181,31 +1194,24 @@
     }
   }
 
-  async function loadRecommend(event) {
-    if (event) event.preventDefault();
-    const errEl = $("recommend-error");
-    clearError(errEl);
-    $("recommend-meta").textContent = "";
-    const asof = $("recommend-asof").value;
-    const symbols = $("recommend-symbols").value.trim();
-    const topN = $("recommend-topn").value || "5";
-    const params = new URLSearchParams({ asof: asof, topN: topN, adjust_kind: "none" });
-    if (symbols) params.set("symbols", symbols);
-    try {
-      const data = await fetchJson("/api/research/brief?" + params.toString());
-      $("recommend-meta").textContent =
-        "provider=" +
-        (data.provider || "") +
-        " · picks=" +
-        (data.picks ? data.picks.length : 0) +
-        " · panel=" +
-        data.panelSize;
-      const picks = data.picks || [];
-      renderRecommendCards(picks);
-      const tbody = $("recommend-table").querySelector("tbody");
+  function applyBriefToRecommendPanel(data, sourceLabel) {
+    var picks = (data && data.picks) || [];
+    var metaBits = [];
+    if (sourceLabel) metaBits.push(sourceLabel);
+    metaBits.push("provider=" + ((data && data.provider) || ""));
+    metaBits.push("asof=" + ((data && data.asof) || ""));
+    metaBits.push("picks=" + picks.length);
+    metaBits.push("panel=" + ((data && data.panelSize) || 0));
+    if (data && data.dataNote) metaBits.push(data.dataNote);
+    if (data && data.gatesNote) metaBits.push(data.gatesNote);
+    $("recommend-meta").textContent = metaBits.join(" · ");
+    renderRecommendCards(picks, data || {});
+    var tbody = $("recommend-table").querySelector("tbody");
+    if (tbody) {
       tbody.innerHTML = "";
-      for (const row of picks) {
-        const tr = document.createElement("tr");
+      for (var i = 0; i < picks.length; i++) {
+        var row = picks[i];
+        var tr = document.createElement("tr");
         tr.innerHTML =
           td(row.rank) +
           '<td><a href="#daily">' +
@@ -1216,7 +1222,25 @@
           td(row.reasonSummary || row.reason || "");
         tbody.appendChild(tr);
       }
-      $("recommend-json").textContent = JSON.stringify(data, null, 2);
+    }
+    $("recommend-json").textContent = JSON.stringify(data, null, 2);
+  }
+
+  async function loadRecommend(event) {
+    if (event) event.preventDefault();
+    const errEl = $("recommend-error");
+    clearError(errEl);
+    $("recommend-meta").textContent = "";
+    const asof = $("recommend-asof").value;
+    const symbols = $("recommend-symbols").value.trim();
+    const topN = $("recommend-topn").value || "5";
+    const params = new URLSearchParams({ topN: topN, adjust_kind: "none", softGates: "true" });
+    if (asof) params.set("asof", asof);
+    if (symbols) params.set("symbols", symbols);
+    try {
+      const data = await fetchJson("/api/research/brief?" + params.toString());
+      applyBriefToRecommendPanel(data, "recommend");
+      if (data.asof && $("recommend-asof")) $("recommend-asof").value = data.asof;
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -1238,13 +1262,13 @@
     const symbols = $("recommend-symbols").value.trim();
     const topN = Number($("recommend-topn").value || "5");
     const body = {
-      asof: asof,
       topN: topN,
       adjust_kind: "none",
+      softGates: true,
       decision_only: true,
-      now: "2026-09-07T09:40:00+08:00",
       market: "CN",
     };
+    if (asof) body.asof = asof;
     if (symbols) body.symbols = symbols;
     try {
       const data = await fetchJson("/api/research/brief/to-paper", {
@@ -1258,7 +1282,10 @@
       ];
       if (data.strategyStatus) statusBits.push(data.strategyStatus);
       else if (data.strategyAutoActivated) statusBits.push("已自动激活默认纸面策略");
-      $("recommend-meta").textContent = statusBits.join(" · ");
+      if (data.brief) applyBriefToRecommendPanel(data.brief, "to-paper");
+      $("recommend-meta").textContent =
+        ($("recommend-meta").textContent ? $("recommend-meta").textContent + " · " : "") +
+        statusBits.join(" · ");
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
       loadPaper();
     } catch (e) {
@@ -1299,17 +1326,18 @@
     const errEl = $("wizard-error");
     clearError(errEl);
     $("wizard-meta").textContent = "";
+    const asof = $("wizard-asof").value;
     const body = {
-      asof: $("wizard-asof").value,
       symbols: $("wizard-symbols").value.trim(),
       topN: Number($("wizard-topn").value || "5"),
       adjust_kind: "none",
+      softGates: true,
       decision_only: true,
-      now: "2026-09-07T09:40:00+08:00",
       market: "CN",
       skipRefresh: $("wizard-skip-refresh").checked,
       toPaper: true,
     };
+    if (asof) body.asof = asof;
     try {
       const data = await fetchJson("/api/research/wizard/daily", {
         method: "POST",
@@ -1335,10 +1363,13 @@
       if (data.strategyStatus) strategyLabel = data.strategyStatus;
       else if (data.strategyAutoActivated) strategyLabel = "已自动激活默认纸面策略";
       else if (draft.draftId) strategyLabel = "沿用已激活策略";
+      var briefResult = data.brief || null;
       renderKv($("wizard-kv"), [
         ["结果", data.ok ? "成功" : "失败"],
         ["环境", data.environment || "SIMULATE"],
         ["实盘", data.liveTradingEnabled ? "开（异常）" : "关"],
+        ["asof", (briefResult && briefResult.asof) || asof || "—"],
+        ["推荐数", briefResult && briefResult.picks ? String(briefResult.picks.length) : "0"],
         ["策略", strategyLabel],
         ["草稿 ID", draft.draftId || "—"],
         ["可执行", draft.executionEligible == null ? "—" : String(draft.executionEligible)],
@@ -1348,14 +1379,14 @@
           $("wizard-meta").textContent + " · " + data.strategyStatus;
       }
       $("wizard-json").textContent = JSON.stringify(data, null, 2);
-      var brief = data.brief || (data.steps && data.steps.find(function (s) {
-        return s.step === "brief" && s.result;
-      }));
-      var briefResult = data.brief || (brief && brief.result) || null;
-      if (briefResult && briefResult.picks) {
-        renderRecommendCards(briefResult.picks);
-        $("recommend-meta").textContent =
-          "from wizard · picks=" + briefResult.picks.length;
+      if (briefResult) {
+        if (briefResult.asof) {
+          if ($("wizard-asof")) $("wizard-asof").value = briefResult.asof;
+          if ($("recommend-asof")) $("recommend-asof").value = briefResult.asof;
+        }
+        applyBriefToRecommendPanel(briefResult, "from wizard");
+        location.hash = "#recommend";
+        revealHashTarget();
       }
       if (data.ok) loadPaper();
     } catch (e) {
@@ -1363,6 +1394,22 @@
       $("wizard-json").textContent = "";
       var wv = $("wizard-view");
       if (wv) wv.hidden = true;
+    }
+  }
+
+  async function loadRecommendDefaults() {
+    try {
+      const data = await fetchJson("/api/research/defaults");
+      if (data.asof) {
+        if ($("wizard-asof") && !$("wizard-asof").value) $("wizard-asof").value = data.asof;
+        if ($("recommend-asof") && !$("recommend-asof").value) $("recommend-asof").value = data.asof;
+      }
+      if (data.symbols) {
+        if ($("wizard-symbols")) $("wizard-symbols").value = data.symbols;
+        if ($("recommend-symbols")) $("recommend-symbols").value = data.symbols;
+      }
+    } catch (_) {
+      /* keep HTML defaults */
     }
   }
 
@@ -1798,6 +1845,7 @@
     window.addEventListener("scroll", markNav, { passive: true });
     revealHashTarget();
     markNav();
+    loadRecommendDefaults();
     loadMatrix();
     loadPaper();
     loadBroker();

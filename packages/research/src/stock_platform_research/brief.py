@@ -161,6 +161,18 @@ def reason_summary(reasons: list[dict[str, Any]]) -> str:
     return "；".join(summaries) if summaries else "通过闸门"
 
 
+_EMPTY_PANEL_ZH = (
+    "截面为空：所选 asof 当天无可用日线（replay 样例仅覆盖到 2026-09-02；"
+    "live 请用最近交易日）。"
+)
+_EMPTY_GATES_ZH = "入场闸门后无标的通过（样本过少或趋势/波动条件过严）。"
+_EMPTY_TIP_ZH = (
+    "可扩大 symbols（建议含 600519,000001,510300）、改用最近交易日 asof，"
+    "或开启 softGates 查看按分数排序的演示结果。"
+)
+_SOFT_GATES_NOTE_ZH = "闸门过严已软化：展示未过入场闸门的按分数排序结果（演示用）。"
+
+
 def build_premarket_brief(
     *,
     asof: date | str,
@@ -178,11 +190,15 @@ def build_premarket_brief(
     value_factor: bool = False,
     reversal_q: float = 0.30,
     lookback_calendar_days: int = 120,
+    soft_gates: bool = False,
 ) -> dict[str, Any]:
     """Build a deterministic TopN pre-market brief.
 
     Prefer injecting an already-built ``panel`` in tests; otherwise build via
     ``build_cross_section_panel`` (requires daily provider).
+
+    When ``soft_gates`` is True and strict entry gates yield zero picks while the
+    panel is non-empty, re-score without entry gates and annotate ``gatesRelaxed``.
     """
     if isinstance(asof, str):
         asof_s = asof[:10]
@@ -213,6 +229,7 @@ def build_premarket_brief(
 
     univ_size = len(resolved_symbols) if resolved_symbols is not None else len(panel)
 
+    gates_relaxed = False
     scored = score_cross_section(
         panel,
         value_factor=value_factor,
@@ -220,10 +237,19 @@ def build_premarket_brief(
         apply_gates=True,
         top_n=top_n,
     )
+    if scored.empty and soft_gates and len(panel) > 0:
+        scored = score_cross_section(
+            panel,
+            value_factor=value_factor,
+            reversal_q=reversal_q,
+            apply_gates=False,
+            top_n=top_n,
+        )
+        gates_relaxed = not scored.empty
 
     picks: list[dict[str, Any]] = []
     for rank, (_, row) in enumerate(scored.iterrows(), start=1):
-        reasons = build_reasons_for_row(row, gated=True)
+        reasons = build_reasons_for_row(row, gated=not gates_relaxed)
         item = {
             "rank": rank,
             "symbol": str(row.get("symbol") or row.get("code") or ""),
@@ -241,7 +267,7 @@ def build_premarket_brief(
         }
         picks.append(item)
 
-    return {
+    out: dict[str, Any] = {
         "asof": asof_s,
         "market": "CN",
         "universeSize": int(univ_size),
@@ -250,10 +276,21 @@ def build_premarket_brief(
         "topN": int(top_n),
         "valueFactor": bool(value_factor),
         "reversalQ": float(reversal_q),
+        "softGates": bool(soft_gates),
+        "gatesRelaxed": bool(gates_relaxed),
         "picks": picks,
         "environment": "SIMULATE",
         "disclaimer": "Research brief only; not investment advice; paper SIMULATE by default.",
     }
+    if gates_relaxed:
+        out["gatesNote"] = _SOFT_GATES_NOTE_ZH
+    if not picks:
+        if len(panel) == 0:
+            out["emptyPicksMessage"] = _EMPTY_PANEL_ZH
+        else:
+            out["emptyPicksMessage"] = _EMPTY_GATES_ZH
+        out["emptyPicksTip"] = _EMPTY_TIP_ZH
+    return out
 
 
 def brief_to_orders(brief: dict[str, Any], *, qty: int = 100, side: str = "buy") -> list[dict[str, Any]]:
