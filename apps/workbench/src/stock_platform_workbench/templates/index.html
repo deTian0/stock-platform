@@ -32,13 +32,13 @@
         <h2>日用向导</h2>
         <span class="pill">主流程</span>
       </div>
-      <p class="hint">一键：刷新（可选）→ 推荐 brief → 纸面草稿。无激活策略时会自动创建并激活默认 SIMULATE 策略；默认可跳过 refresh；无实盘开关；非投资建议。</p>
+      <p class="hint">一键生成今日推荐并可选纸面草稿。asof 默认最近交易日（replay 自动用样例日）；无激活策略时会自动创建默认 SIMULATE 策略；无实盘；非投资建议。</p>
       <form id="wizard-form" class="row">
         <label>asof
-          <input id="wizard-asof" type="date" value="2026-09-02" />
+          <input id="wizard-asof" type="date" value="" />
         </label>
         <label>symbols
-          <input id="wizard-symbols" value="600519,000001" autocomplete="off" />
+          <input id="wizard-symbols" value="600519,000001,510300" autocomplete="off" />
         </label>
         <label>topN
           <input id="wizard-topn" type="number" min="1" max="50" value="5" />
@@ -46,7 +46,7 @@
         <label class="check">
           <input id="wizard-skip-refresh" type="checkbox" checked /> 跳过 refresh（本地 demo）
         </label>
-        <button type="submit">一键：刷新→推荐→纸面</button>
+        <button type="submit" id="btn-wizard-go">生成今日推荐</button>
       </form>
       <p id="wizard-meta" class="status" aria-live="polite"></p>
       <pre id="wizard-error" class="error" hidden></pre>
@@ -68,15 +68,15 @@
       <p class="hint">盘前简报 TopN（lvrev + 闸门）；卡片展示代码 / 分数 / 理由。可跳转 <a href="#daily">日 K</a> / <a href="#paper">纸面</a>。非投资建议。</p>
       <form id="recommend-form" class="row">
         <label>asof
-          <input id="recommend-asof" name="asof" type="date" value="2026-09-02" />
+          <input id="recommend-asof" name="asof" type="date" value="" />
         </label>
         <label>symbols
-          <input id="recommend-symbols" name="symbols" value="600519,000001" autocomplete="off" />
+          <input id="recommend-symbols" name="symbols" value="600519,000001,510300" autocomplete="off" />
         </label>
         <label>topN
           <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="5" />
         </label>
-        <button type="submit">刷新推荐</button>
+        <button type="submit" id="btn-recommend-go">生成今日推荐</button>
         <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
         <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
       </form>

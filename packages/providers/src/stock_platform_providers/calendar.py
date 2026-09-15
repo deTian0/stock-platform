@@ -43,6 +43,18 @@ class TradingCalendar:
             candidate -= timedelta(days=1)
         return candidate
 
+    def last_trading_day(self, d: date | None = None) -> date:
+        """Trading day on or before ``d`` (default: today)."""
+        target = d if d is not None else date.today()
+        if self.is_trading_day(target):
+            return target
+        return self.prev_trading_day(target)
+
+
+def last_trading_day(market_id: str = "CN", *, on: date | None = None) -> date:
+    """Convenience: last trading day for ``market_id`` on or before ``on``."""
+    return get_trading_calendar(market_id).last_trading_day(on)
+
 
 def _load_closed_weekdays(filename: str) -> frozenset[date]:
     text = (

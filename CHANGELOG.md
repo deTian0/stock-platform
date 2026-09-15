@@ -8,6 +8,15 @@
 
 - （无）
 
+## [3.10.1] - 2026-09-15
+
+### Fixed
+
+- **可用的「今日推荐」路径**：向导 / `#recommend` 默认 asof 按数据源选择（live→最近 CN 交易日；replay→样例日 `2026-09-02`）；主按钮「生成今日推荐」；向导成功后跳转并渲染 TopN 卡片
+- **live 日线失败显式回退**：`astock_http` 传输失败时，若已设 `STOCK_PLATFORM_TUSHARE_TOKEN` 则回退 `tushare_http` 并标注「已回退 Tushare」；仅当 `STOCK_PLATFORM_BRIEF_FALLBACK=replay` 才回退 fixtures（不静默假数据）
+- **空 picks 可读说明**：截面为空或闸门滤尽时返回中文 `emptyPicksMessage` / `emptyPicksTip`；默认 `softGates` 在闸门过严时软化展示演示排序
+- **友好错误**：ConnectionError 等上游中断返回中文 tip（非整段 traceback）
+
 ## [3.10.0] - 2026-09-15
 
 ### Added

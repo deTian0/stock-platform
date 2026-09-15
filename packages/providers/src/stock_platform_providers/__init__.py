@@ -2,7 +2,7 @@
 
 from .adjust import apply_adjust
 from .astock_http import AStockHttpProvider, em_board_secid, em_secid
-from .calendar import TradingCalendar, get_trading_calendar
+from .calendar import TradingCalendar, get_trading_calendar, last_trading_day
 from .capabilities import (
     CAPABILITY_IDS,
     CAPABILITY_REGISTRY,
@@ -56,6 +56,7 @@ from .tushare_http import (
     TushareHttpError,
     TushareHttpProvider,
     from_ts_code,
+    resolve_tushare_token,
     to_ts_code,
 )
 
@@ -106,13 +107,15 @@ __all__ = [
     "infer_global_market",
     "is_bse_symbol",
     "is_eastmoney_url",
+    "last_trading_day",
     "list_market_ids",
     "normalize_sector_code",
     "normalize_symbol",
     "register_builtin_providers",
     "reset_default_client",
     "reset_provider_registry",
+    "resolve_tushare_token",
     "to_ts_code",
 ]
 
-__version__ = "3.10.0"
+__version__ = "3.10.1"
