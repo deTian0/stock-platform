@@ -152,6 +152,22 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             note="Live US/HK via Yahoo chart + Sina quotes; apply us_hk_global_http preset",
         )
     )
+    reg.register(
+        ProviderDeclaration(
+            name="tushare_http",
+            display="Tushare-compatible HTTP",
+            kind="builtin",
+            datasets=frozenset({"daily"}),
+            available=True,
+            status="ok",
+            note=(
+                "Supplementary CN daily via Tushare-compatible POST api_name=daily; "
+                "token from STOCK_PLATFORM_TUSHARE_TOKEN; "
+                "URL STOCK_PLATFORM_TUSHARE_URL (default https://t.xiaodefa.top/); "
+                "not the production default — apply cn_tushare_http preset"
+            ),
+        )
+    )
 
 
 def build_capability_matrix(

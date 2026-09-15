@@ -24,6 +24,10 @@ def test_cn_live_preset_is_default() -> None:
     assert presets["us_hk_global_http"]["preferences"]["news"] == "replay"
     assert presets["cn_astock_http"]["preferences"]["sector_fund_flow"] == "astock_http"
     assert presets["cn_astock_http"]["preferences"]["news"] == "astock_http"
+    assert "cn_tushare_http" in presets
+    assert presets["cn_tushare_http"]["is_default"] is False
+    assert presets["cn_tushare_http"]["preferences"]["daily"] == "tushare_http"
+    assert presets["cn_tushare_http"]["preferences"]["fund_flow"] == "astock_http"
 
 
 def test_startup_preferences_env_replay() -> None:
