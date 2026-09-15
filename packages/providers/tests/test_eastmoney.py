@@ -76,6 +76,83 @@ def test_http_trust_env_default_false(monkeypatch: pytest.MonkeyPatch) -> None:
     assert session.trust_env is True
 
 
+def test_transient_connection_abort_retries_then_succeeds() -> None:
+    """RemoteDisconnected / ConnectionError: retry with backoff, then succeed."""
+    from http.client import RemoteDisconnected
+
+    import requests
+
+    calls: list[int] = []
+    sleeps: list[float] = []
+
+    def transport(url, **kwargs):
+        calls.append(len(calls) + 1)
+        if len(calls) == 1:
+            raise requests.exceptions.ConnectionError(
+                "Connection aborted.",
+                RemoteDisconnected("Remote end closed connection without response"),
+            )
+        return {"ok": True, "attempt": len(calls)}
+
+    client = EastmoneyClient(
+        min_interval=0.0,
+        sleeper=lambda s: sleeps.append(s),
+        clock=lambda: 1.0,
+        rng=__import__("random").Random(0),
+        transport=transport,
+        http_retries=3,
+        retry_backoff=0.1,
+        failure_threshold=5,
+    )
+    out = client.get("https://push2.eastmoney.com/a")
+    assert out["ok"] is True
+    assert out["attempt"] == 2
+    assert len(calls) == 2
+    assert any(s >= 0.1 for s in sleeps)  # backoff between attempts
+    assert client.snapshot()["consecutiveFailures"] == 0
+
+
+def test_transient_exhausted_records_circuit_failure() -> None:
+    import requests
+
+    def transport(url, **kwargs):
+        raise requests.exceptions.ConnectionError("Connection aborted.")
+
+    client = EastmoneyClient(
+        min_interval=0.0,
+        sleeper=lambda _s: None,
+        clock=lambda: 1.0,
+        rng=__import__("random").Random(0),
+        transport=transport,
+        http_retries=2,
+        retry_backoff=0.0,
+        failure_threshold=1,
+        cooldown_sec=30.0,
+    )
+    with pytest.raises(requests.exceptions.ConnectionError):
+        client.get("https://push2.eastmoney.com/a")
+    snap = client.snapshot()
+    assert snap["consecutiveFailures"] == 1
+    assert snap["circuitOpen"] is True
+    assert snap["httpTrustEnv"] is False
+
+
+def test_is_transient_http_error_markers() -> None:
+    from http.client import RemoteDisconnected
+
+    from stock_platform_providers.eastmoney import is_transient_http_error
+
+    assert is_transient_http_error(
+        ConnectionError(
+            (
+                "Connection aborted.",
+                RemoteDisconnected("Remote end closed connection without response"),
+            )
+        )
+    )
+    assert not is_transient_http_error(ValueError("bad json"))
+
+
 def test_circuit_opens_after_consecutive_failures() -> None:
     from stock_platform_providers.eastmoney import CircuitOpenError
 
@@ -94,6 +171,7 @@ def test_circuit_opens_after_consecutive_failures() -> None:
         transport=transport,
         failure_threshold=2,
         cooldown_sec=30.0,
+        http_retries=1,  # non-transient: one attempt per get
     )
     with pytest.raises(RuntimeError, match="429"):
         client.get("https://push2.eastmoney.com/a")

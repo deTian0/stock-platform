@@ -679,6 +679,8 @@ def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
     listed = client.get("/api/settings/presets")
     assert listed.status_code == 200
     assert listed.json()["default"] == "cn_astock_http"
+    ids = {p["id"] for p in listed.json()["presets"]}
+    assert "cn_tushare_http" in ids
     r = client.post("/api/settings/presets/cn_astock_http/apply")
     assert r.status_code == 200
     body = r.json()
@@ -690,6 +692,12 @@ def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
     health = client.get("/api/ops/health").json()
     assert health["liveTradingEnabled"] is False
     assert health["defaultReplay"] is False
+    ts = client.post("/api/settings/presets/cn_tushare_http/apply")
+    assert ts.status_code == 200
+    assert ts.json()["applied"] == "cn_tushare_http"
+    assert ts.json()["preferences"]["daily"] == "tushare_http"
+    assert ts.json()["preferences"]["fund_flow"] == "astock_http"
+    assert ts.json()["liveTradingEnabled"] is False
     unknown = client.post("/api/settings/presets/tickflow/apply")
     assert unknown.status_code == 404
     put = client.put(
@@ -926,3 +934,44 @@ def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
     assert "/api/research/wizard/daily" in client.get("/static/app.js").text
     assert "已自动激活默认纸面策略" in client.get("/static/app.js").text
     assert "/api/paper/strategies/ensure-default" in client.get("/static/app.js").text
+
+
+def test_wizard_brief_connection_abort_returns_503_zh(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live-style ConnectionError after retries → 503 Chinese tip (no silent replay)."""
+    from http.client import RemoteDisconnected
+
+    import requests
+    from stock_platform_workbench.paper_ux import UPSTREAM_LIVE_TIP_ZH
+
+    def boom(*_a, **_k):
+        raise requests.exceptions.ConnectionError(
+            "Connection aborted.",
+            RemoteDisconnected("Remote end closed connection without response"),
+        )
+
+    monkeypatch.setattr(
+        "stock_platform_workbench.routes.research.build_premarket_brief",
+        boom,
+    )
+    r = client.post(
+        "/api/research/wizard/daily",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "skipRefresh": True,
+            "toPaper": False,
+        },
+    )
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert detail["ok"] is False
+    assert detail["reason"] == "upstream_unavailable"
+    assert detail["liveTradingEnabled"] is False
+    assert detail["tip"] == "STOCK_PLATFORM_PROVIDER_PRESET=replay"
+    assert UPSTREAM_LIVE_TIP_ZH in detail["error"]
+    assert detail["steps"][1]["step"] == "brief"
+    assert detail["steps"][1]["ok"] is False

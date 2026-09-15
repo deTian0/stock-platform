@@ -31,6 +31,7 @@
 | **v3.9.2** | Workbench UI 结构化扫读：向导步骤 / 运维键值 / 矩阵 pill / 绩效条 |
 | **v3.9.3** | Workbench 行情查询结果可读性（表/卡片/万亿/五档着色） |
 | **v3.9.4** | 向导/一键纸面自动激活默认 SIMULATE 策略（幂等；状态文案） |
+| **v3.10.0** | Tushare 补充日 K + 东财瞬时断连重试 / 向导 503 tip（ADR 0048） |
 
 ## 安装与运行
 
@@ -83,7 +84,7 @@ python -m stock_platform_workbench
 | POST | `/api/paper/drafts` | 建纸面订单草稿 |
 | POST | `/api/paper/drafts/{id}/execute` | 提交（幂等） |
 | PUT | `/api/settings/preferences` | 更新能力→Provider 偏好（不绕过 usable） |
-| GET | `/api/settings/presets` | 列出 replay / cn_astock_http / us_hk_global_http（启动默认 cn live） |
+| GET | `/api/settings/presets` | 列出 replay / cn_astock_http / cn_tushare_http / us_hk_global_http（启动默认 cn live） |
 | POST | `/api/settings/presets/{id}/apply` | 应用到当前进程 |
 
 ## 约束

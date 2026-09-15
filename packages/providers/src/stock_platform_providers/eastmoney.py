@@ -29,6 +29,18 @@ _EASTMONEY_HOST_SUFFIXES = (
     "eastmoney.com.cn",
 )
 
+# Substring markers for connection-reset / abort style failures (eastmoney + proxy).
+_TRANSIENT_MARKERS = (
+    "remotedisconnected",
+    "connection aborted",
+    "connection reset",
+    "broken pipe",
+    "temporarily unavailable",
+    "timed out",
+    "read timed out",
+    "max retries exceeded",
+)
+
 
 def is_eastmoney_url(url: str) -> bool:
     host = (urlparse(url).hostname or "").lower()
@@ -55,6 +67,16 @@ def _default_cooldown_sec() -> float:
     return float(os.environ.get("EM_CIRCUIT_COOLDOWN", "60"))
 
 
+def _default_http_retries() -> int:
+    """Total attempts per GET (1 = no retry). Env ``EM_HTTP_RETRIES`` default 3."""
+    return max(1, int(os.environ.get("EM_HTTP_RETRIES", "3")))
+
+
+def _default_retry_backoff() -> float:
+    """Base backoff seconds; attempt n sleeps base * 2**(n-1) + jitter."""
+    return float(os.environ.get("EM_HTTP_RETRY_BACKOFF", "0.5"))
+
+
 def http_trust_env() -> bool:
     """Whether requests should honor HTTP(S)_PROXY env / system proxy.
 
@@ -65,11 +87,53 @@ def http_trust_env() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def is_transient_http_error(exc: BaseException) -> bool:
+    """True for connection reset / abort / timeout style errors worth retrying."""
+    try:
+        from requests.exceptions import (
+            ChunkedEncodingError,
+            ConnectionError as ReqConnectionError,
+            Timeout,
+        )
+    except ImportError:  # pragma: no cover
+        ReqConnectionError = ()  # type: ignore[assignment,misc]
+        ChunkedEncodingError = ()  # type: ignore[assignment,misc]
+        Timeout = ()  # type: ignore[assignment,misc]
+
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+    if ReqConnectionError and isinstance(exc, ReqConnectionError):
+        return True
+    if ChunkedEncodingError and isinstance(exc, ChunkedEncodingError):
+        return True
+    if Timeout and isinstance(exc, Timeout):
+        return True
+
+    name = type(exc).__name__.lower()
+    if name in {
+        "connectionerror",
+        "remotedisconnected",
+        "protocolerror",
+        "chunkedencodingerror",
+        "readtimeout",
+        "connecttimeout",
+        "timeout",
+    }:
+        return True
+
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return any(m in text for m in _TRANSIENT_MARKERS)
+
+
 class EastmoneyClient:
     """Serial throttle + Keep-Alive session for eastmoney.com.
 
     Parameters mirror TradingAgents / a-stock-data ``em_get`` behaviour:
     min interval (env ``EM_MIN_INTERVAL``, default 1.0s) + 0.1–0.5s jitter.
+
+    Transient transport failures (RemoteDisconnected / ConnectionError) are
+    retried with backoff (``EM_HTTP_RETRIES`` default 3, ``EM_HTTP_RETRY_BACKOFF``
+    default 0.5s). Circuit counts only after all attempts for one GET fail.
 
     Consecutive transport failures open a cooldown circuit
     (``EM_CIRCUIT_FAILURES`` default 5, ``EM_CIRCUIT_COOLDOWN`` default 60s).
@@ -86,6 +150,8 @@ class EastmoneyClient:
         transport: Callable[..., Any] | None = None,
         failure_threshold: int | None = None,
         cooldown_sec: float | None = None,
+        http_retries: int | None = None,
+        retry_backoff: float | None = None,
     ) -> None:
         self.min_interval = (
             _default_min_interval() if min_interval is None else float(min_interval)
@@ -97,6 +163,14 @@ class EastmoneyClient:
         )
         self.cooldown_sec = (
             _default_cooldown_sec() if cooldown_sec is None else float(cooldown_sec)
+        )
+        self.http_retries = (
+            _default_http_retries() if http_retries is None else max(1, int(http_retries))
+        )
+        self.retry_backoff = (
+            _default_retry_backoff()
+            if retry_backoff is None
+            else max(0.0, float(retry_backoff))
         )
         self._sleeper = sleeper
         self._clock = clock
@@ -111,6 +185,11 @@ class EastmoneyClient:
 
     def _ensure_session(self) -> Any:
         if self._session is not None:
+            # Re-apply trust_env so env changes after construction still apply.
+            try:
+                self._session.trust_env = http_trust_env()
+            except Exception:  # noqa: BLE001 — custom session stubs may lack attribute
+                pass
             return self._session
         try:
             import requests
@@ -125,15 +204,25 @@ class EastmoneyClient:
         self._session = session
         return session
 
-    def get(
+    def _record_failure(self, exc: BaseException) -> None:
+        self._consecutive_failures += 1
+        self._last_error = f"{type(exc).__name__}: {exc}"
+        if (
+            self.failure_threshold > 0
+            and self._consecutive_failures >= self.failure_threshold
+        ):
+            self._circuit_open_until = self._clock() + self.cooldown_sec
+
+    def _one_attempt(
         self,
         url: str,
-        params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        timeout: float = 15,
-        **kwargs: Any,
+        *,
+        params: dict[str, Any] | None,
+        headers: dict[str, str] | None,
+        timeout: float,
+        kwargs: dict[str, Any],
     ) -> Any:
-        assert_eastmoney_url(url)
+        """Throttle + single transport call. Caller owns retry loop."""
         with self._lock:
             now = self._clock()
             if self.failure_threshold > 0 and now < self._circuit_open_until:
@@ -160,17 +249,49 @@ class EastmoneyClient:
                 return result
             except CircuitOpenError:
                 raise
-            except Exception as exc:
-                self._consecutive_failures += 1
-                self._last_error = f"{type(exc).__name__}: {exc}"
-                if (
-                    self.failure_threshold > 0
-                    and self._consecutive_failures >= self.failure_threshold
-                ):
-                    self._circuit_open_until = self._clock() + self.cooldown_sec
+            except Exception:
+                # Circuit accounting deferred to get() after retries exhaust.
                 raise
             finally:
                 self._last_call = self._clock()
+
+    def get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float = 15,
+        **kwargs: Any,
+    ) -> Any:
+        assert_eastmoney_url(url)
+        last_exc: BaseException | None = None
+        attempts = self.http_retries
+        for attempt in range(1, attempts + 1):
+            try:
+                return self._one_attempt(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=timeout,
+                    kwargs=kwargs,
+                )
+            except CircuitOpenError:
+                raise
+            except Exception as exc:
+                last_exc = exc
+                transient = is_transient_http_error(exc)
+                if transient and attempt < attempts:
+                    # Backoff outside the throttle lock so other callers can proceed.
+                    delay = self.retry_backoff * (2 ** (attempt - 1))
+                    delay += self._rng.uniform(0.05, 0.25)
+                    if delay > 0:
+                        self._sleeper(delay)
+                    continue
+                self._record_failure(exc)
+                raise
+        assert last_exc is not None
+        self._record_failure(last_exc)
+        raise last_exc
 
     def snapshot(self) -> dict[str, Any]:
         """Ops-facing throttle / circuit snapshot (no network)."""
@@ -181,10 +302,13 @@ class EastmoneyClient:
             "minInterval": self.min_interval,
             "failureThreshold": self.failure_threshold,
             "cooldownSec": self.cooldown_sec,
+            "httpRetries": self.http_retries,
+            "retryBackoff": self.retry_backoff,
             "consecutiveFailures": self._consecutive_failures,
             "circuitOpen": circuit_open,
             "circuitOpenUntil": open_until if circuit_open else None,
             "lastError": self._last_error,
+            "httpTrustEnv": http_trust_env(),
         }
 
 

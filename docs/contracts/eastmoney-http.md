@@ -16,8 +16,12 @@
 | 最小间隔 | 1.0s | 环境变量 `EM_MIN_INTERVAL` |
 | 抖动 | 0.1–0.5s | 客户端构造时注入 `rng` |
 | 并发 | 进程内锁串行 | — |
+| 瞬时失败重试 | 3 次（含首次） | `EM_HTTP_RETRIES` |
+| 重试退避基数 | 0.5s（×2^(n-1)+抖动） | `EM_HTTP_RETRY_BACKOFF` |
 
 批量任务建议 `EM_MIN_INTERVAL=1.5`～`2`。
+
+`RemoteDisconnected` / `ConnectionError`（连接被对端关闭、代理 reset）会在同一 GET 内退避重试；**只有全部尝试失败**才计入熔断。成功清零失败计数。会话复用 Keep-Alive，且默认 `STOCK_PLATFORM_HTTP_TRUST_ENV=0`（忽略坏系统代理）。
 
 ## 熔断（M30）
 

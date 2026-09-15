@@ -28,7 +28,12 @@ from stock_platform_research import (
 from stock_platform_research.strategy_config import default_strategy_config_dir
 import pandas as pd
 
-from ..paper_ux import ensure_active_simulate_strategy, friendly_execution_detail
+from ..paper_ux import (
+    ensure_active_simulate_strategy,
+    friendly_execution_detail,
+    friendly_upstream_detail,
+    is_upstream_transport_error,
+)
 from ..state import CapabilityUnavailable
 
 router = APIRouter(prefix="/api/research", tags=["research"])
@@ -294,6 +299,21 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
             detail={"ok": False, "steps": steps, "error": detail, "liveTradingEnabled": False},
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        if is_upstream_transport_error(exc):
+            detail = friendly_upstream_detail(exc)
+            steps.append({"step": "brief", "ok": False, "error": detail})
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "ok": False,
+                    "steps": steps,
+                    "error": detail,
+                    "reason": "upstream_unavailable",
+                    "environment": "SIMULATE",
+                    "liveTradingEnabled": False,
+                    "tip": "STOCK_PLATFORM_PROVIDER_PRESET=replay",
+                },
+            ) from exc
         steps.append({"step": "brief", "ok": False, "error": f"{type(exc).__name__}: {exc}"})
         return {
             "ok": False,

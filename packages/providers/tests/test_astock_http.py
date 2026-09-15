@@ -571,3 +571,43 @@ def test_unlock_rejects_hk() -> None:
     provider = AStockHttpProvider(get_json=lambda *a, **k: {"result": {"data": []}})
     with pytest.raises(SymbolError):
         provider.get_unlock(["00700"], asof_date=date(2026, 5, 17))
+
+
+def test_get_daily_skips_one_symbol_on_connection_abort() -> None:
+    """Partial success: one symbol ConnectionError does not abort the whole batch."""
+    from http.client import RemoteDisconnected
+
+    import requests
+
+    def get_json(url, params=None):
+        secid = (params or {}).get("secid", "")
+        if secid.endswith("000001"):
+            raise requests.exceptions.ConnectionError(
+                "Connection aborted.",
+                RemoteDisconnected("Remote end closed connection without response"),
+            )
+        return {
+            "data": {
+                "klines": [
+                    "2026-09-02,1410.0,1425.0,1430.0,1408.0,28000,3980000000,1.56,1.0638,15.0,0.13",
+                ]
+            }
+        }
+
+    rows = AStockHttpProvider(get_json=get_json).get_daily(
+        ["600519", "000001"], start=date(2026, 9, 2), end=date(2026, 9, 2)
+    )
+    assert len(rows) == 1
+    assert rows[0]["symbol"] == "600519"
+
+
+def test_get_daily_all_symbols_fail_raises() -> None:
+    import requests
+
+    def get_json(url, params=None):
+        raise requests.exceptions.ConnectionError("Connection aborted.")
+
+    with pytest.raises(ConnectionError, match="all daily fetches failed"):
+        AStockHttpProvider(get_json=get_json).get_daily(
+            ["600519"], start=date(2026, 9, 2), end=date(2026, 9, 2)
+        )
