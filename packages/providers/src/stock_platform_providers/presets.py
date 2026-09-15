@@ -62,11 +62,28 @@ PREFERENCE_PRESETS: dict[str, dict[str, Any]] = {
             "(global_http has no fund_flow/lhb/…). Does not use em_get."
         ),
     },
+    "cn_tushare_http": {
+        "id": "cn_tushare_http",
+        "label": "CN daily via tushare_http (supplementary)",
+        "is_default": False,
+        "preferences": {
+            **{cap: "astock_http" for cap in _CN_LIVE_CAPABILITIES},
+            "daily": "tushare_http",
+        },
+        "note": (
+            "Supplementary: daily → tushare_http; other CN caps stay astock_http. "
+            "Requires STOCK_PLATFORM_TUSHARE_TOKEN. Does not replace production default "
+            "cn_astock_http. Never commit the token."
+        ),
+    },
 }
 
 
 def list_preference_presets() -> list[dict[str, Any]]:
-    return [dict(PREFERENCE_PRESETS[k]) for k in ("replay", "cn_astock_http", "us_hk_global_http")]
+    return [
+        dict(PREFERENCE_PRESETS[k])
+        for k in ("replay", "cn_astock_http", "us_hk_global_http", "cn_tushare_http")
+    ]
 
 
 def get_preference_preset(preset_id: str) -> dict[str, Any]:

@@ -8,6 +8,18 @@
 
 - （无）
 
+## [3.10.0] - 2026-09-15
+
+### Added
+
+- **Tushare 兼容 HTTP 补充源**（ADR 0048）：`TushareHttpProvider` / `tushare_http`
+  - 首切片矩阵能力：`daily`（`api_name=daily`，不复权；成交额千元→元）
+  - helper：`get_trade_cal`（`api_name=trade_cal`，不进矩阵）
+  - raw HTTP POST，无 `tushare` SDK / MCP 硬依赖；可注入 `post_json`（CI 零公网）
+  - 环境变量：`STOCK_PLATFORM_TUSHARE_TOKEN` / `STOCK_PLATFORM_TUSHARE_URL`（默认 `https://t.xiaodefa.top/`）
+  - 预设 `cn_tushare_http`（daily→tushare_http，其余 CN 仍 astock_http）；**生产默认仍为 `cn_astock_http`**
+  - **安全**：切勿把真实 token 提交进 git / CHANGELOG / ROADMAP；`.env.example` 仅占位符
+
 ## [3.9.5] - 2026-09-15
 
 ### Fixed

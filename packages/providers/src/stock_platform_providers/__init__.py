@@ -49,6 +49,15 @@ from .symbol import (
     normalize_sector_code,
     normalize_symbol,
 )
+from .tushare_http import (
+    DEFAULT_TUSHARE_URL,
+    ENV_TUSHARE_TOKEN,
+    ENV_TUSHARE_URL,
+    TushareHttpError,
+    TushareHttpProvider,
+    from_ts_code,
+    to_ts_code,
+)
 
 __all__ = [
     "AStockHttpProvider",
@@ -56,6 +65,9 @@ __all__ = [
     "CAPABILITY_IDS",
     "CAPABILITY_REGISTRY",
     "CircuitOpenError",
+    "DEFAULT_TUSHARE_URL",
+    "ENV_TUSHARE_TOKEN",
+    "ENV_TUSHARE_URL",
     "EastmoneyClient",
     "GlobalHttpProvider",
     "GlobalHttpRouter",
@@ -71,10 +83,13 @@ __all__ = [
     "SymbolError",
     "SymbolRef",
     "TradingCalendar",
+    "TushareHttpError",
+    "TushareHttpProvider",
     "build_capability_matrix",
     "em_board_secid",
     "em_get",
     "em_secid",
+    "from_ts_code",
     "http_trust_env",
     "is_transient_http_error",
     "DEFAULT_STARTUP_PRESET",
@@ -97,6 +112,7 @@ __all__ = [
     "register_builtin_providers",
     "reset_default_client",
     "reset_provider_registry",
+    "to_ts_code",
 ]
 
-__version__ = "3.9.5"
+__version__ = "3.10.0"

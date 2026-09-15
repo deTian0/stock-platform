@@ -67,6 +67,7 @@ $required = @(
   'docs/architecture/0045-llm-cost-quality.md',
   'docs/architecture/0046-workbench-ia-wizard.md',
   'docs/architecture/0047-workbench-ui-progressive.md',
+  'docs/architecture/0048-tushare-http-provider.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

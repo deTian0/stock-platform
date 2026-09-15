@@ -57,6 +57,7 @@ CapabilityStatus {
 |-------------|------|------|----------------|
 | `replay` | fixtures | **M1.2 已实现**；**M15–M23** + **M41**（含套价 `apply_adjust`） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock, sector_fund_flow, news（CN） |
 | `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M23** + **M41**（`full_minute`/板块资金流/新闻经 `em_get`；adj_factor/financial 新浪；套价纯函数） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock, sector_fund_flow, news |
+| `tushare_http` | Tushare 兼容 HTTP | **v3.10.0**（ADR 0048）；补充源，非生产默认 | daily（首切片）；`trade_cal` helper |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
 | `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现** | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |

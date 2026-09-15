@@ -12,6 +12,7 @@ from stock_platform_providers import (
     ProviderDeclaration,
     ReplayProvider,
     ReplayTransport,
+    TushareHttpProvider,
     build_capability_matrix,
     register_builtin_providers,
     reset_provider_registry,
@@ -122,6 +123,7 @@ def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None =
     # Live adapters are always constructible; network only happens on call.
     providers["astock_http"] = AStockHttpProvider()
     providers["global_http"] = GlobalHttpRouter()
+    providers["tushare_http"] = TushareHttpProvider()
     return WorkbenchState(
         fixtures_dir=fixtures_dir,
         preferences=prefs,

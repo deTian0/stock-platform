@@ -23,6 +23,7 @@
 | **M20.1 / v1.12.1** | CN 财务报表 `get_financial`（replay + 新浪三表；非 em_get） |
 | **M21.1 / v1.13.1** | CN 复权因子 `get_adj_factor`（replay + 新浪 qfq/hfq；非 em_get） |
 | **M23.1 / v1.15.1** | `apply_adjust` 确定性套价（qfq 除 / hfq 乘；非独立能力） |
+| **v3.10.0** | `TushareHttpProvider` 补充 CN daily（raw POST；预设 `cn_tushare_http`） |
 | 包版本随仓 | 与根 `VERSION` 对齐（当前随发版 bump） |
 
 ## 安装
@@ -50,10 +51,21 @@ python -m pip install -e ".[http]"
 | `GlobalReplayTransport` / `GlobalReplayProvider` | US/HK fixtures 回放 |
 | `AStockHttpProvider` | A 股 live（经 `em_get`） |
 | `GlobalHttpProvider` / `GlobalHttpRouter` | 美港 live（Yahoo + 新浪；不经 `em_get`） |
+| `TushareHttpProvider` | A 股补充日 K（Tushare 兼容 POST；token 环境变量） |
 | `em_get` / `EastmoneyClient` | **唯一**东财 HTTP 入口（节流 + 熔断） |
-| `PREFERENCE_PRESETS` / `list_preference_presets` | 文档化 live 偏好模板（非启动默认） |
+| `PREFERENCE_PRESETS` / `list_preference_presets` | 文档化偏好模板（含 `cn_tushare_http`） |
 | `build_capability_matrix` / `register_builtin_providers` | 能力路由 |
 | `apply_adjust` | 用 `adj_factor` 套不复权 OHLC（qfq 除 / hfq 乘） |
+
+## Tushare 补充源（可选）
+
+```powershell
+$env:STOCK_PLATFORM_TUSHARE_TOKEN = "<token>"   # 勿提交
+# $env:STOCK_PLATFORM_TUSHARE_URL = "https://t.xiaodefa.top/"
+# Workbench：应用预设 cn_tushare_http，或偏好 daily=tushare_http
+```
+
+详见 [`docs/architecture/0048-tushare-http-provider.md`](../../docs/architecture/0048-tushare-http-provider.md) 与 [`docs/ops/live-startup.md`](../../docs/ops/live-startup.md)。
 
 ## 硬约束
 
