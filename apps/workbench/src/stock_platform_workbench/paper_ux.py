@@ -14,9 +14,18 @@ from stock_platform_execution import (
 # Re-export for routes / tests
 __all__ = [
     "AUTO_ACTIVATED_STATUS_ZH",
+    "UPSTREAM_LIVE_TIP_ZH",
     "ensure_active_simulate_strategy",
     "friendly_execution_detail",
+    "friendly_upstream_detail",
+    "is_upstream_transport_error",
 ]
+
+UPSTREAM_LIVE_TIP_ZH = (
+    "上游行情连接失败（东财/网络已重试仍不可用）。"
+    "请稍后重试；离线演示可设 STOCK_PLATFORM_PROVIDER_PRESET=replay 后重启工作台"
+    "（不会静默用假数据替换 live）。"
+)
 
 
 def ensure_active_simulate_strategy(lifecycle: Any) -> dict[str, Any]:
@@ -39,6 +48,41 @@ def ensure_active_simulate_strategy(lifecycle: Any) -> dict[str, Any]:
         )
     except ActivationBlocked as exc:
         raise ActivationBlocked(friendly_execution_detail(exc)) from exc
+
+
+def is_upstream_transport_error(exc: BaseException) -> bool:
+    """Detect connection-reset / abort style upstream failures (incl. wrapped)."""
+    try:
+        from stock_platform_providers import CircuitOpenError, is_transient_http_error
+
+        if isinstance(exc, CircuitOpenError):
+            return True
+        if is_transient_http_error(exc):
+            return True
+    except ImportError:  # pragma: no cover
+        pass
+    text = f"{type(exc).__name__}: {exc}".lower()
+    markers = (
+        "connectionerror",
+        "remotedisconnected",
+        "connection aborted",
+        "connection reset",
+        "circuit open",
+        "all daily fetches failed",
+        "timeout",
+    )
+    return any(m in text for m in markers)
+
+
+def friendly_upstream_detail(exc: BaseException | None = None) -> str:
+    """Chinese tip when live market HTTP dies after retries (no silent fixture swap)."""
+    tip = UPSTREAM_LIVE_TIP_ZH
+    if exc is None:
+        return tip
+    raw = f"{type(exc).__name__}: {exc}"
+    if len(raw) > 180:
+        raw = raw[:177] + "..."
+    return f"{tip}（技术细节：{raw}）"
 
 
 def friendly_execution_detail(exc: BaseException) -> str:

@@ -9,7 +9,12 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from .base import AssetType
-from .eastmoney import EastmoneyClient, get_default_client
+from .eastmoney import (
+    CircuitOpenError,
+    EastmoneyClient,
+    get_default_client,
+    is_transient_http_error,
+)
 from .normalize import (
     normalize_adj_factor_row,
     normalize_daily_row,
@@ -211,21 +216,30 @@ class AStockHttpProvider:
         rows: list[dict[str, Any]] = []
         beg = (start or date(1990, 1, 1)).strftime("%Y%m%d")
         end_s = (end or date(2099, 12, 31)).strftime("%Y%m%d")
+        symbol_errors: list[str] = []
         for raw_sym in symbols:
             code = normalize_symbol(raw_sym, market="CN")
-            payload = self._fetch(
-                KLINE_URL,
-                {
-                    "secid": em_secid(code),
-                    "fields1": "f1,f2,f3,f4,f5,f6",
-                    "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-                    "klt": "101",
-                    "fqt": "0",
-                    "beg": beg,
-                    "end": end_s,
-                    "lmt": "1000000",
-                },
-            )
+            try:
+                payload = self._fetch(
+                    KLINE_URL,
+                    {
+                        "secid": em_secid(code),
+                        "fields1": "f1,f2,f3,f4,f5,f6",
+                        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+                        "klt": "101",
+                        "fqt": "0",
+                        "beg": beg,
+                        "end": end_s,
+                        "lmt": "1000000",
+                    },
+                )
+            except CircuitOpenError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — per-symbol recover when transient
+                if is_transient_http_error(exc):
+                    symbol_errors.append(f"{code}:{type(exc).__name__}")
+                    continue
+                raise
             data = payload.get("data") or {}
             klines = data.get("klines") or []
             for line in klines:
@@ -244,6 +258,10 @@ class AStockHttpProvider:
                 if end and d > end:
                     continue
                 rows.append(row)
+        if not rows and symbols and symbol_errors:
+            raise ConnectionError(
+                "all daily fetches failed after retries: " + "; ".join(symbol_errors)
+            )
         return rows
 
     def get_minute(

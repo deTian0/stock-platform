@@ -18,6 +18,7 @@ from .eastmoney import (
     em_get,
     http_trust_env,
     is_eastmoney_url,
+    is_transient_http_error,
     reset_default_client,
 )
 from .presets import (
@@ -75,6 +76,7 @@ __all__ = [
     "em_get",
     "em_secid",
     "http_trust_env",
+    "is_transient_http_error",
     "DEFAULT_STARTUP_PRESET",
     "ENV_PROVIDER_PRESET",
     "get_preference_preset",
@@ -97,4 +99,4 @@ __all__ = [
     "reset_provider_registry",
 ]
 
-__version__ = "3.9.4"
+__version__ = "3.9.5"

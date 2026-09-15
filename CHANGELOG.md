@@ -8,6 +8,12 @@
 
 - （无）
 
+## [3.9.5] - 2026-09-15
+
+### Fixed
+
+- **Workbench 向导 daily brief / 东财连接中断**：`em_get` 对 `RemoteDisconnected`/`ConnectionError` 退避重试（`EM_HTTP_RETRIES`）；会话复用并保持 `STOCK_PLATFORM_HTTP_TRUST_ENV=0`；`get_daily` 单标的失败可继续（全失败才报错）；向导返回 **503** 中文 tip（可设 `replay` 离线，不静默假数据）；交易仍 SIMULATE
+
 ## [3.9.4] - 2026-09-14
 
 ### Fixed

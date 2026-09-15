@@ -25,7 +25,11 @@ python -m stock_platform_workbench
 | （不设） | 启动偏好 = `cn_astock_http`（全 CN 能力走 live） |
 | `STOCK_PLATFORM_PROVIDER_PRESET=replay` | 强制 fixtures，**CI/pytest 用** |
 | `STOCK_PLATFORM_PROVIDER_PRESET=us_hk_global_http` | 美港 daily/realtime → `global_http` |
+| `STOCK_PLATFORM_PROVIDER_PRESET=cn_tushare_http` | CN daily → `tushare_http`；其余 CN 仍 `astock_http` |
+| `STOCK_PLATFORM_TUSHARE_URL` | Tushare 兼容基址（默认 `https://t.xiaodefa.top/`） |
+| `STOCK_PLATFORM_TUSHARE_TOKEN` | Tushare token（**仅本地/密钥库**；勿提交 git） |
 | `EM_MIN_INTERVAL` | 东财节流间隔（默认 1.0s） |
+| `EM_HTTP_RETRIES` / `EM_HTTP_RETRY_BACKOFF` | 连接中断重试次数（默认 3）与退避基数（默认 0.5s） |
 | `EM_CIRCUIT_FAILURES` / `EM_CIRCUIT_COOLDOWN` | 熔断阈值与冷却 |
 | `STOCK_PLATFORM_HTTP_TRUST_ENV` | 默认 `0`（忽略坏系统代理）；需代理时设 `1` |
 
@@ -36,6 +40,14 @@ python -m stock_platform_workbench
 Invoke-RestMethod -Method Post http://127.0.0.1:3018/api/settings/presets/us_hk_global_http/apply
 ```
 
+Tushare 日 K 补充（不改生产默认；**勿把 token 写入仓库**）：
+
+```powershell
+$env:STOCK_PLATFORM_TUSHARE_TOKEN = "<your token>"
+# 可选：$env:STOCK_PLATFORM_TUSHARE_URL = "https://t.xiaodefa.top/"
+Invoke-RestMethod -Method Post http://127.0.0.1:3018/api/settings/presets/cn_tushare_http/apply
+```
+
 ## 上游失败（fail-closed）
 
 | 情况 | HTTP |
@@ -44,6 +56,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:3018/api/settings/presets/us_hk_
 | 标的非法 | 400 |
 | 东财熔断 `CircuitOpenError` | 503 |
 | `requests` 上游错误 | 502 |
+| 向导 brief 连接中断且重试耗尽 | **503** + 中文 tip（可设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 离线；**不**静默换 fixtures） |
 | 超时 | 504 |
 | 有效 provider 缺方法 | 501（不返回假空 rows） |
 
