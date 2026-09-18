@@ -8,6 +8,8 @@ from typing import Any
 from .schemas import (
     ADJ_FACTOR_COLUMNS,
     ADJ_FACTOR_KINDS,
+    CONCEPT_BLOCK_COLUMNS,
+    CONCEPT_BLOCKS_TOP_KEYS,
     DAILY_COLUMNS,
     DEPTH5_COLUMNS,
     DEPTH5_LEVELS,
@@ -360,6 +362,70 @@ def normalize_news_row(
         "sentiment": sentiment_f,
     }
     return {k: row.get(k) for k in NEWS_COLUMNS}
+
+
+def normalize_concept_blocks_payload(
+    raw: dict[str, Any],
+    *,
+    source: str,
+    asset_type: str = "stock",
+    default_symbol: str | None = None,
+    market: str = "CN",
+) -> dict[str, Any]:
+    """Map EM slist / fixture concept-block membership into contract fields."""
+    sym_raw = raw.get("symbol") or default_symbol
+    if sym_raw in (None, ""):
+        raise ValueError("concept_blocks payload missing symbol")
+    symbol = normalize_symbol(str(sym_raw), market=market)
+
+    boards_in = raw.get("boards") or raw.get("items") or raw.get("diff") or []
+    if isinstance(boards_in, dict):
+        boards_in = list(boards_in.values())
+    if not isinstance(boards_in, list):
+        raise ValueError("concept_blocks boards must be a list")
+
+    boards: list[dict[str, Any]] = []
+    for item in boards_in:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name") or item.get("f14") or item.get("board_name")
+        code_raw = item.get("code") or item.get("f12") or item.get("sector_code")
+        if name in (None, "") and code_raw in (None, ""):
+            continue
+        code: str | None = None
+        if code_raw not in (None, ""):
+            try:
+                code = normalize_sector_code(str(code_raw))
+            except Exception:  # noqa: BLE001 — keep raw BK-like codes fail-soft
+                code = str(code_raw).strip().upper() or None
+        board = {
+            "name": str(name).strip() if name not in (None, "") else "",
+            "code": code or "",
+            "change_pct": _as_float(item.get("change_pct") or item.get("f3")),
+            "lead_stock": (
+                str(item.get("lead_stock") or item.get("f128") or "").strip() or None
+            ),
+        }
+        boards.append({k: board.get(k) for k in CONCEPT_BLOCK_COLUMNS})
+
+    tags_raw = raw.get("concept_tags")
+    if isinstance(tags_raw, list) and tags_raw:
+        concept_tags = [str(t).strip() for t in tags_raw if str(t).strip()]
+    else:
+        concept_tags = [b["name"] for b in boards if b.get("name")]
+
+    total = raw.get("total")
+    total_i = int(total) if total not in (None, "") else len(boards)
+
+    out = {
+        "symbol": symbol,
+        "asset_type": asset_type,
+        "source": source,
+        "total": total_i,
+        "boards": boards,
+        "concept_tags": concept_tags,
+    }
+    return {k: out.get(k) for k in CONCEPT_BLOCKS_TOP_KEYS}
 
 
 def normalize_adj_factor_row(

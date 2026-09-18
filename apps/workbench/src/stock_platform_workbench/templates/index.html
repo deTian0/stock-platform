@@ -14,9 +14,12 @@
     </div>
     <p class="tagline">研究与纸面工作台 · v{{ version }} · 默认 paper + 生产 live 行情（CI 用 replay）</p>
     <nav class="ia-nav" aria-label="主要分区">
-      <a href="#wizard">日用向导</a>
-      <a href="#recommend">今日推荐</a>
-      <a href="#paper">纸面</a>
+      <a href="#wizard" title="一键生成今日推荐">① 向导</a>
+      <a href="#recommend" title="读卡片、历史与复盘">② 推荐</a>
+      <a href="#paper" title="纸面草稿，始终 SIMULATE">③ 纸面</a>
+      <a href="#performance" title="direction_accuracy 绩效">绩效</a>
+      <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
+      <a href="#strategy-compare" title="策略配置对比">策略对比</a>
       <a href="#market-tools">行情工具</a>
       <a href="#ops">运维</a>
       <a href="#capability">能力矩阵</a>
@@ -25,30 +28,48 @@
   </header>
 
   <main>
-    <p class="flow-banner" role="note">日用路径：向导一键跑通 → 读推荐卡片 → 纸面草稿。原始 JSON 默认折叠。</p>
+    <p class="flow-banner" role="note">
+      日用三步：
+      <a href="#wizard">① 向导</a> 生成 →
+      <a href="#recommend">② 推荐</a> 读卡片 / 复盘 →
+      <a href="#paper">③ 纸面</a> 草稿（SIMULATE）。
+      原始 JSON 默认折叠；缺能力 / 无 token 会中文提示，不静默假数据。
+    </p>
 
     <section id="wizard" class="panel primary">
       <div class="panel-head">
         <h2>日用向导</h2>
-        <span class="pill">主流程</span>
+        <span class="pill">主流程 · 第 1 步</span>
       </div>
-      <p class="hint">一键生成今日推荐并可选纸面草稿。asof 默认最近交易日（replay 自动用样例日）；无激活策略时会自动创建默认 SIMULATE 策略；无实盘；非投资建议。</p>
+      <p class="hint">一键生成今日选股并跳转「今日推荐」；可选写入纸面草稿（始终 SIMULATE）。截面日默认最近完整交易日；宇宙层级默认 <strong>watch</strong>（可切 full，勿一次全市场）；无激活策略时自动创建默认纸面策略；无实盘；非投资建议。</p>
+      <ol class="wizard-checklist hint" aria-label="向导步骤说明">
+        <li>确认 asof（最近完整交易日）与宇宙层级</li>
+        <li>点「生成今日推荐」→ 自动落库并记入绩效 pending</li>
+        <li>在「今日推荐」读卡片；需要时再「写入纸面」</li>
+      </ol>
       <form id="wizard-form" class="row">
-        <label>asof
+        <label>截面日 asof
           <input id="wizard-asof" type="date" value="" />
         </label>
-        <label>symbols
-          <input id="wizard-symbols" value="600519,000001,510300" autocomplete="off" />
+        <label>宇宙层级
+          <select id="wizard-tier" name="universeTier" title="watch 默认；full 更大更慢">
+            <option value="core">core（最小）</option>
+            <option value="watch" selected>watch（默认）</option>
+            <option value="full">full（扩大，仍非全市场）</option>
+          </select>
         </label>
-        <label>topN
-          <input id="wizard-topn" type="number" min="1" max="50" value="5" />
+        <label>宇宙 symbols
+          <input id="wizard-symbols" value="" placeholder="加载 defaults…" autocomplete="off" />
+        </label>
+        <label>推荐数 topN
+          <input id="wizard-topn" type="number" min="1" max="50" value="10" />
         </label>
         <label class="check">
-          <input id="wizard-skip-refresh" type="checkbox" checked /> 跳过 refresh（本地 demo）
+          <input id="wizard-skip-refresh" type="checkbox" checked /> 跳过 refresh（仅研究 brief）
         </label>
         <button type="submit" id="btn-wizard-go">生成今日推荐</button>
       </form>
-      <p id="wizard-meta" class="status" aria-live="polite"></p>
+      <p id="wizard-meta" class="status" aria-live="polite">尚未运行。填好转截面日后点「生成今日推荐」；成功后会跳到下方「今日推荐」。</p>
       <pre id="wizard-error" class="error" hidden></pre>
       <div id="wizard-view" class="readable" hidden>
         <ol id="wizard-steps" class="steps"></ol>
@@ -62,27 +83,52 @@
 
     <section id="recommend" class="panel primary">
       <div class="panel-head">
-        <h2>今日推荐</h2>
-        <span class="pill">主流程</span>
+        <h2>今日选股结果</h2>
+        <span class="pill">主流程 · 第 2 步</span>
       </div>
-      <p class="hint">盘前简报 TopN（lvrev + 闸门）；卡片展示代码 / 分数 / 理由。可跳转 <a href="#daily">日 K</a> / <a href="#paper">纸面</a>。非投资建议。</p>
+      <p class="hint" id="recommend-hint">对 watch 宇宙在最近完整交易日截面打分（lvrev + 软闸门）。可切换宇宙层级（watch/full）；生成后<strong>自动落库</strong>（SQLite）。写入纸面始终 SIMULATE；非投资建议。也可从顶部「① 向导」一键生成。</p>
+      <div id="recommend-quick" class="rec-quick" aria-live="polite">
+        <div class="rec-quick-stats" id="recommend-perf-strip">
+          <span class="rec-chip">绩效摘要加载中…</span>
+        </div>
+        <div class="rec-quick-links">
+          <a href="#backtest">滚动回测</a>
+          <a href="#performance">推荐绩效</a>
+          <a href="#strategy-compare">策略对比</a>
+        </div>
+      </div>
       <form id="recommend-form" class="row">
-        <label>asof
+        <label>截面日 asof
           <input id="recommend-asof" name="asof" type="date" value="" />
         </label>
-        <label>symbols
-          <input id="recommend-symbols" name="symbols" value="600519,000001,510300" autocomplete="off" />
+        <label>宇宙层级
+          <select id="recommend-tier" name="universeTier" title="切换后会重载该层级默认 symbols">
+            <option value="core">core</option>
+            <option value="watch" selected>watch</option>
+            <option value="full">full</option>
+          </select>
         </label>
-        <label>topN
-          <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="5" />
+        <label>宇宙 symbols
+          <input id="recommend-symbols" name="symbols" value="" placeholder="加载 defaults…" autocomplete="off" />
+        </label>
+        <label>推荐数 topN
+          <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="10" />
         </label>
         <button type="submit" id="btn-recommend-go">生成今日推荐</button>
-        <button type="button" id="btn-recommend-paper" class="secondary">一键纸面草稿</button>
+        <button type="button" id="btn-recommend-paper" class="secondary" title="始终纸面 SIMULATE，无实盘">写入纸面（SIMULATE）</button>
         <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
       </form>
+      <p id="recommend-loading" class="status is-loading" hidden aria-live="polite">正在拉取日线并打分，watch≈30 只时可能需要数十秒…</p>
       <p id="recommend-meta" class="status" aria-live="polite"></p>
+      <dl id="recommend-kv" class="kv" hidden></dl>
       <pre id="recommend-error" class="error" hidden></pre>
-      <div id="recommend-cards" class="card-grid" aria-live="polite"></div>
+      <div id="recommend-cards" class="card-grid" aria-live="polite">
+        <p class="empty-hint" id="recommend-cards-empty">
+          空态：尚未生成推荐。<br/>
+          可点本页「生成今日推荐」，或回到 <a href="#wizard">① 向导</a>。<br/>
+          失败时见上方中文 tip（无 token / 无日线 / 缺能力 → fail-closed，不静默假数据）。
+        </p>
+      </div>
       <div class="table-wrap table-compact">
         <table id="recommend-table">
           <thead>
@@ -90,25 +136,90 @@
               <th>排名</th>
               <th>代码</th>
               <th class="num">综合分</th>
-              <th class="num">收盘</th>
-              <th>理由</th>
+              <th class="num">现价</th>
+              <th>关键理由</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody>
+            <tr class="empty-row"><td colspan="5">暂无推荐列表（生成成功后显示 TopN）</td></tr>
+          </tbody>
         </table>
       </div>
       <details class="raw-json">
         <summary>原始 JSON</summary>
         <pre id="recommend-json" class="code"></pre>
       </details>
+      <div class="history-block" id="recommend-history-block">
+        <div class="panel-head" style="margin-top:1rem">
+          <h3>历史推荐</h3>
+          <button type="button" id="btn-recommend-history" class="secondary">刷新列表</button>
+        </div>
+        <p class="hint">权威存档（SQLite）。生成成功后自动落库并记入绩效样本（pending）；同日重复生成会覆盖该日记录。点击「回看」看 picks；「复盘」看 T+1 方向对错。亦可从 <a href="#backtest">回测</a> 表点 asof 跳回此处。</p>
+        <p id="recommend-history-meta" class="status" aria-live="polite">正在加载历史…若为空，先生成一日推荐。</p>
+        <div class="table-wrap table-compact">
+          <table id="recommend-history-table">
+            <thead>
+              <tr>
+                <th>截面日</th>
+                <th>provider</th>
+                <th class="num">推荐数</th>
+                <th>生成时间</th>
+                <th>说明</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6">加载中…无记录时将显示「暂无历史推荐」</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="review-block" id="recommend-review-block">
+          <div class="panel-head" style="margin-top:1rem">
+            <h3>推荐复盘</h3>
+            <label class="inline-label">持有
+              <select id="recommend-review-holding">
+                <option value="1d" selected>T+1</option>
+                <option value="5d">T+5</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint">口径对齐 performance.<strong>direction_accuracy</strong>：看多 Buy 收益&gt;0 算对；缺行情为 pending，不填 0。非投资建议。绩效总览见 <a href="#performance">推荐绩效</a>。</p>
+          <p id="recommend-review-meta" class="status" aria-live="polite">空态：从上方历史表点「复盘」加载；未点选前不填假收益。</p>
+          <pre id="recommend-review-error" class="error" hidden></pre>
+          <dl id="recommend-review-kv" class="kv" hidden></dl>
+          <div class="table-wrap table-compact">
+            <table id="recommend-review-table">
+              <thead>
+                <tr>
+                  <th>排名</th>
+                  <th>代码</th>
+                  <th>状态</th>
+                  <th class="num">收益</th>
+                  <th>方向对错</th>
+                  <th>入场日</th>
+                  <th>出场日</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="empty-row"><td colspan="8">空态：请先从历史表点「复盘」；未加载前不填假收益</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <details class="raw-json">
+            <summary>复盘 JSON</summary>
+            <pre id="recommend-review-json" class="code"></pre>
+          </details>
+        </div>
+      </div>
     </section>
 
     <section id="paper" class="panel">
       <div class="panel-head">
         <h2>纸面状态</h2>
-        <span class="pill muted">只读</span>
+        <span class="pill">主流程 · 第 3 步</span>
       </div>
-      <p class="hint">只读；无实盘开关。</p>
+      <p class="hint">只读刷新；写入来自「今日推荐 → 写入纸面」。始终 SIMULATE，无实盘开关。日用路径见顶部 ①→②→③。</p>
       <button type="button" id="btn-paper">刷新纸面</button>
       <button type="button" id="btn-paper-ensure" class="secondary">激活默认策略</button>
       <pre id="paper-banner" class="banner" aria-live="polite"></pre>
@@ -650,7 +761,7 @@
 
     <section id="ops" class="panel">
       <h2>运维健康</h2>
-      <p class="hint">只读；观察 last_refresh / EM 限流；调度见 docs/ops/scheduler.md。</p>
+      <p class="hint">只读；观察 preset / BRIEF_FALLBACK / token 是否配置（布尔）/ last_refresh / EM 限流。调度见 docs/ops/scheduler.md。</p>
       <button type="button" id="btn-ops-health">刷新健康</button>
       <dl id="ops-kv" class="kv" hidden></dl>
       <details class="raw-json">
@@ -796,8 +907,12 @@
 
     <section id="performance" class="panel">
       <h2>推荐绩效</h2>
-      <p class="hint">已结算决策 JSONL；direction_accuracy 衡量判断对错；up_rate 只描述标的涨跌。非投资建议。</p>
-      <button type="button" id="btn-performance">刷新绩效</button>
+      <p class="hint">决策 JSONL；生成推荐落库后自动记入 pending。刷新时若后续行情足够会自动结算进 JSONL（优先 engine market.db）。direction_accuracy 衡量判断对错；up_rate 只描述标的涨跌。非投资建议。</p>
+      <div class="row">
+        <button type="button" id="btn-performance">刷新绩效</button>
+        <button type="button" id="btn-performance-settle" class="secondary" title="用日线结算 pending 写入 JSONL">结算 pending</button>
+        <button type="button" id="btn-performance-log-stored" class="secondary" title="将当前 asof 已存推荐记入绩效（幂等）">记入当前 asof</button>
+      </div>
       <p id="performance-meta" class="status" aria-live="polite"></p>
       <pre id="performance-error" class="error" hidden></pre>
       <div id="performance-view" class="stats" hidden></div>
@@ -807,15 +922,114 @@
       </details>
     </section>
 
+    <section id="backtest" class="panel">
+      <h2>回测（滚动推荐复盘）</h2>
+      <p class="hint">
+        轻量 U7：对 watch/full 宇宙，按最近 N 个交易日（或 asof 区间）逐日生成 TopN，再按
+        <code>review_stored_brief</code> 结算，汇总 <strong>direction_accuracy</strong> / 样本数。
+        优先只读 <code>STOCK_PLATFORM_ENGINE_MARKET_DB</code>（与 brief SQLite 分离）。
+        无 DB 时 fail-closed 中文提示；SIMULATE；非投资建议；不进每日推荐主路径。
+        点表中 asof → 跳转「今日推荐」加载该日 picks（已存则回看，否则按同宇宙重生成）。
+      </p>
+      <form id="backtest-form" class="row">
+        <label>最近 N 日
+          <input id="backtest-lastn" type="number" min="1" max="20" value="5" />
+        </label>
+        <label>宇宙层级
+          <select id="backtest-tier">
+            <option value="core">core</option>
+            <option value="watch" selected>watch</option>
+            <option value="full">full</option>
+          </select>
+        </label>
+        <label>持有期
+          <select id="backtest-holding">
+            <option value="1d" selected>1d</option>
+            <option value="5d">5d</option>
+          </select>
+        </label>
+        <label>TopN
+          <input id="backtest-topn" type="number" min="1" max="20" value="5" />
+        </label>
+        <button type="submit">运行回测</button>
+      </form>
+      <p id="backtest-meta" class="status" aria-live="polite"></p>
+      <pre id="backtest-error" class="error" hidden></pre>
+      <dl id="backtest-kv" class="kv" hidden></dl>
+      <div class="table-wrap">
+        <table id="backtest-table">
+          <thead>
+            <tr>
+              <th>asof</th>
+              <th>panel</th>
+              <th>picks</th>
+              <th>settled</th>
+              <th>pending</th>
+              <th>日 direction_accuracy</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="empty-row"><td colspan="7">尚未回测。无 engine DB 时会 fail-closed，不静默假数据。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="backtest-json" class="code"></pre>
+      </details>
+      <div class="wf-block" id="walkforward-block" style="margin-top:1rem">
+        <h3>Walk-forward 摘要（M-R2）</h3>
+        <p class="hint">
+          折切分 + IS/OOS 退化摘要；测试窗从训练末日<strong>次日</strong>起（防泄漏）。
+          可选粘贴有效折 <code>foldRecords</code>（含 is_score / oos_objective / oos_stats.total_return）；
+          无效折不得伪装成 0 收益。不进每日推荐主路径。
+        </p>
+        <form id="walkforward-form" class="row">
+          <label>start
+            <input id="wf-start" type="date" required />
+          </label>
+          <label>end
+            <input id="wf-end" type="date" required />
+          </label>
+          <label>trainDays
+            <input id="wf-train" type="number" min="1" value="60" />
+          </label>
+          <label>testDays
+            <input id="wf-test" type="number" min="1" value="20" />
+          </label>
+          <label>stepDays
+            <input id="wf-step" type="number" min="1" value="20" />
+          </label>
+          <button type="submit">生成折切分</button>
+        </form>
+        <p id="wf-meta" class="status" aria-live="polite"></p>
+        <pre id="wf-error" class="error" hidden></pre>
+        <pre id="wf-json" class="code"></pre>
+      </div>
+    </section>
+
     <section id="strategy-compare" class="panel">
       <h2>策略对比</h2>
-      <p class="hint">版本化策略 JSON × 轻量 PIT（fixture 面板）；SIMULATE；非投资建议。</p>
+      <p class="hint">版本化策略 JSON × 轻量 PIT。有 <code>STOCK_PLATFORM_ENGINE_MARKET_DB</code> 时默认用真日线面板；否则回退演示 fixture 并标注 <code>panelSource</code>（不冒充 live）。SIMULATE；非投资建议。</p>
       <form id="strategy-form" class="row">
         <label>configA
           <input id="strategy-a" value="lvrev-default-v1" autocomplete="off" />
         </label>
         <label>configB
           <input id="strategy-b" value="lvrev-rev-heavy-v1" autocomplete="off" />
+        </label>
+        <label>最近 N 日
+          <input id="strategy-lastn" type="number" min="2" max="20" value="8" />
+        </label>
+        <label>宇宙层级
+          <select id="strategy-tier">
+            <option value="core" selected>core</option>
+            <option value="watch">watch</option>
+          </select>
+        </label>
+        <label class="check">
+          <input id="strategy-require-engine" type="checkbox" /> 强制 engine（无则 503）
         </label>
         <button type="submit">对比</button>
         <button type="button" id="btn-strategy-list" class="secondary">列出配置</button>

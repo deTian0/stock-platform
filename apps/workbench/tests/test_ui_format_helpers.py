@@ -28,10 +28,39 @@ def test_format_helpers_defined() -> None:
         "setRawJson",
         "marketMeta",
         "formatErrorMessage",
+        "formatBriefError",
+        "setRecommendBusy",
         "renderRealtimeCards",
         "renderNewsList",
     ):
         assert f"function {name}" in js_text
+
+
+def test_recommend_ui_has_result_header_and_loading() -> None:
+    html = HTML.read_text(encoding="utf-8")
+    assert 'id="recommend-kv"' in html
+    assert 'id="recommend-loading"' in html
+    assert "今日选股结果" in html
+    assert "写入纸面（SIMULATE）" in html
+    assert "关键理由" in html
+    assert 'id="recommend-history-table"' in html
+    assert "历史推荐" in html
+    assert "wizard-checklist" in html
+    assert "主流程 · 第 1 步" in html
+    assert "主流程 · 第 2 步" in html
+    assert "主流程 · 第 3 步" in html
+    assert 'href="#wizard"' in html
+    assert "① 向导" in html
+    js = JS.read_text(encoding="utf-8")
+    assert "universeSize" in js
+    assert "gatesRelaxed" in js
+    assert "generatedAt" in js
+    assert "__recommendLoadingHint" in js
+    assert 'value || "10"' in js or '|| "10"' in js
+    assert "loadRecommendHistory" in js
+    assert "/api/research/briefs" in js
+    assert "暂无历史推荐" in js
+    assert "fail-closed" in js
 
 
 def test_format_money_uses_yi_wan() -> None:

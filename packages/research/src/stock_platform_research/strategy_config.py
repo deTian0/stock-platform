@@ -139,5 +139,8 @@ def compare_strategy_configs(
         ),
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
-        "disclaimer": "Light PIT compare on fixture/panel; not investment advice.",
+        "disclaimer": (
+            "轻量 PIT 策略对比（研究指标）；非投资建议；默认 SIMULATE；"
+            "面板来源见 panelSource。"
+        ),
     }

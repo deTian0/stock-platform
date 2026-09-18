@@ -7,6 +7,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from stock_platform_research.daily_cli import main as daily_main
 from stock_platform_research.daily_pipeline import run_daily_pipeline
 
@@ -89,6 +91,7 @@ def test_daily_pipeline_refresh_then_brief(tmp_path: Path) -> None:
         symbols=["600519", "000001"],
         datasets=["daily"],
         top_n=2,
+        db_url=str(tmp_path / "pipeline.db"),
     )
     assert report.ok
     assert report.brief_path
@@ -97,6 +100,11 @@ def test_daily_pipeline_refresh_then_brief(tmp_path: Path) -> None:
     assert brief["environment"] == "SIMULATE"
     assert (tmp_path / "briefs" / "latest.json").is_file()
     assert (tmp_path / "2026-09-02" / "daily_600519.json").is_file()
+    from stock_platform_research import SqliteBriefRepository
+
+    stored = SqliteBriefRepository(tmp_path / "pipeline.db").get_by_asof("2026-09-02")
+    assert stored is not None
+    assert stored.environment == "SIMULATE"
 
     # Idempotent overwrite
     report2 = run_daily_pipeline(
@@ -106,6 +114,7 @@ def test_daily_pipeline_refresh_then_brief(tmp_path: Path) -> None:
         symbols=["600519", "000001"],
         datasets=["daily"],
         top_n=1,
+        db_url=str(tmp_path / "pipeline.db"),
     )
     assert report2.ok
     brief2 = json.loads(Path(report2.brief_path).read_text(encoding="utf-8"))
@@ -133,6 +142,7 @@ def test_daily_pipeline_fail_closed(tmp_path: Path) -> None:
         symbols=["600519"],
         datasets=["daily"],
         max_attempts=1,
+        persist_db=False,
     )
     assert not report.ok
     assert (tmp_path / "briefs" / "2026-09-02" / "failure.json").is_file()
@@ -146,6 +156,14 @@ def test_daily_cli_requires_fixtures() -> None:
     except SystemExit as exc:
         code = int(exc.code or 1)
     assert code != 0
+
+
+def test_daily_cli_tushare_requires_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("STOCK_PLATFORM_TUSHARE_TOKEN", raising=False)
+    with pytest.raises(SystemExit) as exc:
+        daily_main(["--asof", "2026-09-02", "--provider", "tushare", "--skip-refresh"])
+    msg = str(exc.value)
+    assert "STOCK_PLATFORM_TUSHARE_TOKEN" in msg
 
 
 def test_daily_pipeline_repo_fixtures_nonempty_picks(tmp_path: Path) -> None:
@@ -163,6 +181,7 @@ def test_daily_pipeline_repo_fixtures_nonempty_picks(tmp_path: Path) -> None:
         out_dir=tmp_path,
         universe_path=default_universe_fixture_path(),
         top_n=10,
+        db_url=str(tmp_path / "pipeline.db"),
     )
     assert report.ok, report.error or report.failures
     assert report.brief_path
@@ -170,3 +189,38 @@ def test_daily_pipeline_repo_fixtures_nonempty_picks(tmp_path: Path) -> None:
     assert brief["environment"] == "SIMULATE"
     assert len(brief.get("picks") or []) >= 1
     assert (tmp_path / "briefs" / "latest.json").is_file()
+
+
+def test_daily_cli_settle_after_logs_performance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--settle-after logs brief into JSONL (replay fixtures; settle may stay pending)."""
+    from stock_platform_research import daily_cli as daily_cli_mod
+
+    repo = Path(__file__).resolve().parents[3]
+    fixtures = repo / "packages" / "providers" / "tests" / "fixtures"
+    log_path = tmp_path / "perf.jsonl"
+    monkeypatch.setenv("STOCK_PLATFORM_PERFORMANCE_LOG", str(log_path))
+    # Avoid engine settle path requiring real market.db in CI
+    monkeypatch.setattr(
+        "stock_platform_research.performance_cli._build_settle_get_daily",
+        lambda: (_ for _ in ()).throw(SystemExit("no engine in test")),
+    )
+    code = daily_cli_mod.main(
+        [
+            "--asof",
+            "2026-09-02",
+            "--provider",
+            "replay",
+            "--fixtures",
+            str(fixtures),
+            "--out",
+            str(tmp_path / "out"),
+            "--skip-refresh",
+            "--settle-after",
+        ]
+    )
+    assert code == 0
+    assert log_path.is_file()
+    lines = [ln for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(lines) >= 1

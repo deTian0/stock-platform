@@ -14,32 +14,29 @@
   Calendar market id (default CN).
 
 .PARAMETER Provider
-  stock-platform-daily --provider (default replay).
+  stock-platform-daily --provider. Default: env STOCK_PLATFORM_DAILY_PROVIDER
+  or 'replay' (CI / offline). Live day-use: tushare / cn_tushare_http
+  (requires STOCK_PLATFORM_TUSHARE_TOKEN; no silent fixture fallback).
 
-.PARAMETER Fixtures
-  Replay fixtures directory. Default: packages/providers/tests/fixtures
-  relative to repo root, or env STOCK_PLATFORM_FIXTURES.
+.PARAMETER LiveDay
+  One-shot day-use: Provider=tushare (unless already set), SkipRefresh, SettleAfter.
+  Does not change the script default for CI (still replay without this switch).
 
-.PARAMETER Out
-  Persist root for refresh/briefs. Default: env STOCK_PLATFORM_REFRESH_DIR
-  or %TEMP%\stock-platform-daily.
-
-.PARAMETER Universe
-  Optional universe JSON path.
-
-.PARAMETER SkipRefresh
-  Pass --skip-refresh to the CLI.
-
-.PARAMETER Force
-  Run even on non-trading days (still uses TradingCalendar only for logging).
-
-.EXAMPLE
-  .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2028-01-03
-  # skips (CN New Year observed) with exit 0
+.PARAMETER SettleAfter
+  After successful brief: log picks into performance JSONL and settle pending
+  (engine market.db preferred). Maps to stock-platform-daily --settle-after.
 
 .EXAMPLE
   .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02
   # replay demo against repo fixtures (default universe + fixtures path)
+
+.EXAMPLE
+  .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02 -Provider tushare -SkipRefresh
+  # live daily via Tushare (token from env); skip refresh persist
+
+.EXAMPLE
+  .\scripts\ops\Invoke-DailyPipeline.ps1 -LiveDay -Asof 2026-09-12
+  # 一键日用：tushare + 跳过 refresh + 落库 + 记入/结算绩效
 
 .EXAMPLE
   .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2028-01-05 -SkipRefresh
@@ -49,11 +46,13 @@ param(
   [string]$Asof = '',
   [ValidateSet('CN', 'US', 'HK')]
   [string]$Market = 'CN',
-  [string]$Provider = 'replay',
+  [string]$Provider = '',
   [string]$Fixtures = '',
   [string]$Out = '',
   [string]$Universe = '',
   [switch]$SkipRefresh,
+  [switch]$SettleAfter,
+  [switch]$LiveDay,
   [switch]$Force
 )
 
@@ -62,8 +61,25 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 Set-Location $repoRoot
 
+if ($LiveDay) {
+  if ([string]::IsNullOrWhiteSpace($Provider)) {
+    $Provider = 'tushare'
+  }
+  $SkipRefresh = $true
+  $SettleAfter = $true
+}
+
 if ([string]::IsNullOrWhiteSpace($Asof)) {
   $Asof = (Get-Date).ToString('yyyy-MM-dd')
+}
+
+if ([string]::IsNullOrWhiteSpace($Provider)) {
+  if (-not [string]::IsNullOrWhiteSpace($env:STOCK_PLATFORM_DAILY_PROVIDER)) {
+    $Provider = $env:STOCK_PLATFORM_DAILY_PROVIDER
+  }
+  else {
+    $Provider = 'replay'
+  }
 }
 
 if ([string]::IsNullOrWhiteSpace($Fixtures)) {
@@ -125,7 +141,11 @@ if ($SkipRefresh) {
   $cliArgs += '--skip-refresh'
 }
 
-Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out"
+if ($SettleAfter) {
+  $cliArgs += '--settle-after'
+}
+
+Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay"
 $cmd = Get-Command stock-platform-daily -ErrorAction SilentlyContinue
 if ($null -ne $cmd) {
   & stock-platform-daily @cliArgs

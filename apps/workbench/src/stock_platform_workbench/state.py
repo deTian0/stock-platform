@@ -8,6 +8,7 @@ from typing import Any
 
 from stock_platform_providers import (
     AStockHttpProvider,
+    EngineSqliteProvider,
     GlobalHttpRouter,
     ProviderDeclaration,
     ReplayProvider,
@@ -16,6 +17,7 @@ from stock_platform_providers import (
     build_capability_matrix,
     register_builtin_providers,
     reset_provider_registry,
+    resolve_engine_market_db,
     startup_preferences,
 )
 from stock_platform_providers.base import MarketDataProvider
@@ -68,6 +70,8 @@ class WorkbenchState:
     providers: dict[str, MarketDataProvider] = field(default_factory=dict)
     declarations: list[ProviderDeclaration] = field(default_factory=list)
     paper: PaperRuntime = field(default_factory=PaperRuntime)
+    # Optional U2 brief archive override (tests inject temp SqliteBriefRepository).
+    brief_repo: Any | None = None
 
     def matrix(self) -> list[dict[str, Any]]:
         return build_capability_matrix(self.preferences, self.declarations)
@@ -124,6 +128,9 @@ def build_default_state(fixtures_dir: Path, preferences: dict[str, str] | None =
     providers["astock_http"] = AStockHttpProvider()
     providers["global_http"] = GlobalHttpRouter()
     providers["tushare_http"] = TushareHttpProvider()
+    engine_db = resolve_engine_market_db()
+    if engine_db is not None:
+        providers["engine_sqlite"] = EngineSqliteProvider(engine_db)
     return WorkbenchState(
         fixtures_dir=fixtures_dir,
         preferences=prefs,

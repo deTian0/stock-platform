@@ -125,6 +125,26 @@ main {
   font-size: 0.92rem;
 }
 
+.flow-banner a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.flow-banner a:hover {
+  text-decoration: underline;
+}
+
+.wizard-checklist {
+  margin: 0.35rem 0 0.75rem;
+  padding-left: 1.25rem;
+  line-height: 1.55;
+}
+
+.wizard-checklist li {
+  margin: 0.15rem 0;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -228,6 +248,17 @@ button.secondary {
 
 button:hover {
   filter: brightness(1.06);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  filter: none;
+}
+
+.status.is-loading {
+  color: var(--muted);
+  font-style: italic;
 }
 
 button:focus-visible,
@@ -535,6 +566,20 @@ td.num {
   font-size: 0.88rem;
 }
 
+.inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.review-block {
+  margin-top: 0.5rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--line, #d0d7de);
+}
+
 .error {
   background: var(--danger-bg);
   color: var(--danger);
@@ -578,6 +623,65 @@ td.num {
 .empty-hint {
   margin: 0.35rem 0 0.75rem;
   text-align: left;
+}
+
+.rec-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.45rem 0.65rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.rec-quick-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.rec-chip {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: #f6f8fa;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.15rem 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rec-chip.muted {
+  color: var(--muted);
+}
+
+.rec-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.rec-quick-links a {
+  color: var(--accent);
+}
+
+button.linkish {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+}
+
+button.linkish:hover {
+  opacity: 0.85;
 }
 
 .pos {

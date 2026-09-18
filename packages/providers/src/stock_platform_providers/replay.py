@@ -11,6 +11,7 @@ from .base import AssetType
 from .errors import SymbolError
 from .normalize import (
     normalize_adj_factor_row,
+    normalize_concept_blocks_payload,
     normalize_daily_row,
     normalize_depth5_row,
     normalize_financial_payload,
@@ -110,6 +111,13 @@ class ReplayTransport:
         if isinstance(data, list):
             return data
         raise ValueError(f"unexpected news fixture shape in {path}")
+
+    def load_concept_blocks(self, symbol: str) -> dict[str, Any]:
+        path = self.fixtures_dir / f"concept_blocks_{symbol}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        raise ValueError(f"unexpected concept_blocks fixture shape in {path}")
 
     def load_lhb(self, symbol: str) -> dict[str, Any]:
         path = self.fixtures_dir / f"lhb_{symbol}.json"
@@ -368,6 +376,29 @@ class ReplayProvider:
                 sym_rows = sym_rows[:limit]
             rows.extend(sym_rows)
         return rows
+
+    def get_concept_blocks(
+        self,
+        symbols: list[str],
+        *,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            symbol = normalize_symbol(raw_sym)
+            try:
+                raw = self._transport.load_concept_blocks(symbol)
+            except FileNotFoundError as exc:
+                raise SymbolError(f"no concept_blocks fixture for {symbol}") from exc
+            items.append(
+                normalize_concept_blocks_payload(
+                    raw,
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=symbol,
+                )
+            )
+        return items
 
     def get_lhb(
         self,

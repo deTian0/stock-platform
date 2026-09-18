@@ -144,6 +144,23 @@ def get_news(
     }
 
 
+@router.get("/concept-blocks")
+def get_concept_blocks(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated tickers"),
+) -> dict[str, Any]:
+    state = request.app.state.workbench
+    provider = state.resolve("concept_blocks")
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    getter = _require_getter(provider, "get_concept_blocks", "concept_blocks")
+    items = getter(syms)
+    return {
+        "capability": "concept_blocks",
+        "provider": getattr(provider, "name", type(provider).__name__),
+        "items": items,
+    }
+
+
 @router.get("/lhb")
 def get_lhb(
     request: Request,

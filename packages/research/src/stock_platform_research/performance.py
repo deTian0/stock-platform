@@ -148,11 +148,34 @@ def log_brief_decisions(
     *,
     holding: str = "5d",
     rating: str = "Buy",
+    skip_existing: bool = True,
 ) -> list[dict[str, Any]]:
+    """Append pending TopN rows; optionally skip date+symbol already in the log.
+
+    ``skip_existing=True`` (default) keeps regenerating the same asof from
+    duplicating samples in ``#performance``.
+    """
     rows = brief_picks_to_pending(brief, holding=holding, rating=rating)
+    if not rows:
+        return []
+    existing: set[tuple[str, str]] = set()
+    if skip_existing:
+        log_path = Path(path)
+        if log_path.is_file():
+            for e in load_jsonl(log_path):
+                d = str(e.get("date") or "")[:10]
+                s = str(e.get("symbol") or e.get("ticker") or "").strip()
+                if d and s:
+                    existing.add((d, s))
+    appended: list[dict[str, Any]] = []
     for row in rows:
+        key = (str(row.get("date") or "")[:10], str(row.get("symbol") or "").strip())
+        if skip_existing and key in existing:
+            continue
         append_jsonl(path, row)
-    return rows
+        appended.append(row)
+        existing.add(key)
+    return appended
 
 
 def settled_records(entries: Sequence[Mapping[str, Any]]) -> list[DecisionRecord]:
@@ -217,12 +240,14 @@ def performance_summary(
     path: str | Path | None = None,
     *,
     entries: Sequence[Mapping[str, Any]] | None = None,
+    recent_days: int = 5,
 ) -> dict[str, Any]:
     rows = list(entries) if entries is not None else load_jsonl(path or "")
     pending = sum(1 for e in rows if e.get("pending"))
     records = settled_records(rows)
     stats = compute_performance(records)
     holdings = [r.holding_days for r in records if r.holding_days]
+    recent = _recent_direction_accuracy(records, recent_days=max(1, int(recent_days)))
     return {
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
@@ -232,6 +257,7 @@ def performance_summary(
         "settledCount": stats.count,
         "avgHoldingDays": statistics.fmean(holdings) if holdings else None,
         "metrics": stats.as_dict(),
+        "recentDays": recent,
         "metricDefinitions": {
             "direction_accuracy": (
                 "Share of directional ratings where sign(return)*direction > 0; "
@@ -240,9 +266,36 @@ def performance_summary(
             "avg_return": "Mean holding-period absolute return (raw).",
             "up_rate": "Share of positive raw returns (name path, not judgment quality).",
             "outperform_rate": "Share of positive alpha when alpha is present.",
+            "recentDays": (
+                "Per-day direction_accuracy for the latest N distinct settled dates "
+                "(same 口径 as metrics.direction_accuracy)."
+            ),
         },
         "disclaimer": "Research metrics only; not investment advice; overlapping windows; no costs.",
     }
+
+
+def _recent_direction_accuracy(
+    records: Sequence[DecisionRecord],
+    *,
+    recent_days: int = 5,
+) -> list[dict[str, Any]]:
+    """Latest N distinct decision dates with per-day direction_accuracy."""
+    by_date: dict[str, list[DecisionRecord]] = {}
+    for r in records:
+        by_date.setdefault(r.date, []).append(r)
+    dates = sorted(by_date.keys(), reverse=True)[:recent_days]
+    out: list[dict[str, Any]] = []
+    for d in sorted(dates):
+        day_stats = compute_performance(by_date[d])
+        out.append(
+            {
+                "date": d,
+                "settledCount": day_stats.count,
+                "direction_accuracy": day_stats.direction_accuracy,
+            }
+        )
+    return out
 
 
 GetDaily = Callable[..., list[dict[str, Any]]]
@@ -305,7 +358,11 @@ def settle_pending_entries(
             holding = parse_holding_days(row.get("holding")) or 5
             asof = date.fromisoformat(key[0])
             end = asof + timedelta(days=end_buffer_calendar_days)
-            bars = get_daily([key[1]], start=asof, end=end)
+            try:
+                bars = get_daily([key[1]], start=asof, end=end)
+            except Exception:  # noqa: BLE001 — missing bars / fixture → stay pending
+                out.append(row)
+                continue
             pair = _trading_closes(bars, start=asof, holding_days=holding)
             if pair is not None:
                 entry_c, exit_c, _ = pair
@@ -328,6 +385,43 @@ def rewrite_jsonl(path: str | Path, entries: Iterable[Mapping[str, Any]]) -> Pat
     text = "".join(json.dumps(dict(e), ensure_ascii=False) + "\n" for e in entries)
     out.write_text(text, encoding="utf-8")
     return out
+
+
+def settle_performance_log(
+    path: str | Path,
+    *,
+    get_daily: GetDaily | None = None,
+    returns: Mapping[tuple[str, str], float] | None = None,
+    alpha_returns: Mapping[tuple[str, str], float] | None = None,
+    end_buffer_calendar_days: int = 40,
+    recent_days: int = 5,
+) -> dict[str, Any]:
+    """Settle pending JSONL rows in-place when subsequent bars exist.
+
+    Reuses ``settle_pending_entries`` + ``direction_accuracy`` 口径; never invents
+    returns when bars are missing (rows stay pending).
+    """
+    log_path = Path(path)
+    entries = load_jsonl(log_path)
+    before_pending = sum(1 for e in entries if e.get("pending"))
+    settled = settle_pending_entries(
+        entries,
+        get_daily=get_daily,
+        returns=returns,
+        alpha_returns=alpha_returns,
+        end_buffer_calendar_days=end_buffer_calendar_days,
+    )
+    after_pending = sum(1 for e in settled if e.get("pending"))
+    newly = max(0, before_pending - after_pending)
+    if newly > 0:
+        rewrite_jsonl(log_path, settled)
+    summary = performance_summary(
+        log_path, entries=settled, recent_days=recent_days
+    )
+    summary["settledNewly"] = newly
+    summary["autoSettled"] = newly > 0
+    summary["pendingBefore"] = before_pending
+    return summary
 
 
 def default_performance_log_path() -> Path:

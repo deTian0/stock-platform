@@ -74,6 +74,7 @@ $required = @(
   'docs/ops/scheduler.md',
   'docs/ops/calendar-maintenance.md',
   'docs/ops/live-startup.md',
+  'docs/ops/engine-market-db.md',
   'docs/upstream-archive.md',
   'docs/release-checklist.md',
   'docs/contracts/datasets.md',

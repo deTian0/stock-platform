@@ -248,20 +248,29 @@ def _parse_llm_payload(text: str) -> dict[str, Any]:
             return data
     except json.JSONDecodeError:
         pass
-    # Loose fallback: treat whole text as judge thesis, Hold verdict.
+    # Loose fallback: parse free-text rating (boundary-aware); default Hold.
+    from .rating import parse_rating, to_ternary_verdict
+
+    verdict = to_ternary_verdict(parse_rating(raw, default="Hold"))
     return {
         "bull": "LLM bull thesis unavailable; see judge.",
         "bear": "LLM bear thesis unavailable; see judge.",
         "risk": "LLM risk thesis unavailable; see judge.",
-        "verdict": "Hold",
+        "verdict": verdict,
         "judge": raw[:2000],
     }
 
 
 def _normalize_verdict(value: Any) -> Verdict:
-    text = str(value or "Hold").strip().capitalize()
-    if text in {"Buy", "Hold", "Sell"}:
-        return text  # type: ignore[return-value]
+    from .rating import parse_rating, to_ternary_verdict
+
+    text = str(value or "").strip()
+    if not text:
+        return "Hold"
+    # Prefer 5-tier boundary-aware parser, then map to debate ternary.
+    parsed = parse_rating(text, default="")
+    if parsed:
+        return to_ternary_verdict(parsed)
     lower = text.lower()
     if lower in {"buy", "long", "overweight"}:
         return "Buy"

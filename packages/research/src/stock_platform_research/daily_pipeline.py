@@ -17,6 +17,7 @@ import pandas as pd
 
 from .brief import build_premarket_brief, write_brief_csv
 from .panel import build_cross_section_panel, panel_to_csv
+from .persistence import open_brief_repository
 from .refresh import RefreshReport, default_refresh_dir, run_refresh
 from .universe import default_universe_fixture_path, load_universe
 
@@ -56,10 +57,14 @@ def run_daily_pipeline(
     lookback_days: int = 120,
     skip_refresh: bool = False,
     max_attempts: int = 3,
+    persist_db: bool = True,
+    db_url: str | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
 
     Idempotent for the same ``asof``: overwrites brief/panel/manifest under briefs/.
+    When ``persist_db`` is True (default), also upserts into the SQLite brief
+    repository (``STOCK_PLATFORM_DB_URL`` / ADR 0049) — shared with Workbench.
     On failure writes ``failure.json`` and returns ``ok=False`` (fail-closed).
     """
     if isinstance(asof, str):
@@ -129,6 +134,10 @@ def run_daily_pipeline(
         brief_csv = day_dir / "brief.csv"
         brief_json.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         write_brief_csv(brief, brief_csv)
+
+        if persist_db:
+            # Authority archive (U2); JSON under briefs/ remains optional export.
+            open_brief_repository(db_url).save(brief, symbols=resolved)
 
         ok_report = DailyPipelineReport(
             asof=asof_s,

@@ -159,3 +159,24 @@ def test_panel_requires_daily_and_asof_bar() -> None:
         adjust_kind=None,
     )
     assert panel.empty
+
+
+def test_build_multi_day_pit_panel() -> None:
+    from stock_platform_research import build_multi_day_pit_panel
+
+    end = date(2026, 9, 2)
+    bars_a = _synth_bars("600519", end, n=80, base=1400.0)
+    bars_b = _synth_bars("000001", end, n=80, base=11.0)
+    provider = _FakeDaily({"600519": bars_a, "000001": bars_b})
+    # Three weekdays ending at asof
+    days = [date(2026, 8, 31), date(2026, 9, 1), date(2026, 9, 2)]
+    panel = build_multi_day_pit_panel(
+        asof_dates=days,
+        symbols=["600519", "000001"],
+        daily_provider=provider,
+    )
+    assert not panel.empty
+    assert set(panel["symbol"]) == {"600519", "000001"}
+    assert panel["trade_date"].nunique() >= 2
+    for col in ("vol20", "rev_chg", "ma20", "ma60", "open", "close"):
+        assert col in panel.columns

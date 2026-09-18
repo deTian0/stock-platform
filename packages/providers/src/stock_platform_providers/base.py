@@ -24,6 +24,7 @@ class MarketDataProvider(Protocol):
     - M17+ ``get_unlock`` → ``unlock`` (lockup expiry / 限售解禁)
     - M41+ ``get_sector_fund_flow`` → ``sector_fund_flow`` (board / sector day nets)
     - M41+ ``get_news`` → ``news`` (lightweight news features; not LLM summaries)
+    - M-D3+ ``get_concept_blocks`` → ``concept_blocks`` (board membership; BK codes)
     """
 
     name: str

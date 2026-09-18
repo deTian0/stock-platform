@@ -6,6 +6,10 @@
 
 状态图例：`planned` / `in_progress` / `done`
 
+> **当前产品焦点（M0–M47 / `v3.x` 已完成后）**：真实可用的「选股推荐 + 复盘」→ 执行计划 [`../.cursor/plans/usable-recommend-review-milestones.md`](../.cursor/plans/usable-recommend-review-milestones.md)（U1–U7；不改写本表已 done 叙事）。  
+> 多仓能力盘点（合并输入）：[`../.cursor/plans/workspace-projects-capability-inventory.md`](../.cursor/plans/workspace-projects-capability-inventory.md)。  
+> **按能力域合并**（非整仓）：[`../.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)（**Now 六项已 done**；Next：M-D3 / M-R2 / M-A2 / M-U2 / M-E1）。
+
 ---
 
 ## 总览

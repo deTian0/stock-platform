@@ -8,7 +8,94 @@
 
 - （无）
 
-## [3.10.1] - 2026-09-15
+## [3.11.0] - 2026-09-18
+
+### Added
+
+- **M-D3 `concept_blocks`**：能力矩阵第 13 项；`astock_http`（`slist`/`em_get`）+ `replay` fixtures；`GET /api/market/concept-blocks`；ADR 0051
+- **M-D4 engine PIT 只读**：`get_fundamentals_pit` / `get_daily_basic_pit`；`GET /api/research/pit/fundamentals`；无 DB/缺表 fail-closed 中文；ADR 0050 → Accepted
+- **M-R2 walk-forward 摘要**：`packages/research/walkforward.py` + `POST /api/research/backtest/walk-forward` + `#backtest` 折叠入口；契约 `docs/contracts/walk-forward-summary.md`
+- **M-A2 评级边界**：`packages/agents/rating.py`（5 档 + 词边界矩阵测）；LLM 自由文本回退接线；禁 dataflows
+- **M-U2**：绩效 `recentDays[]` 近 N 日 `direction_accuracy`；推荐页迷你 chips
+- **M-E1**：[`docs/ops/v2-safety-test-mapping.md`](docs/ops/v2-safety-test-mapping.md)（不恢复 Futu）
+
+### Changed
+
+- 能力域合并路线图 Next 批次收口勾选；版本 **3.11.0**
+
+## [3.10.7] - 2026-09-17
+
+### Added
+
+- **能力域合并 Now 批次（文档）**：M-D1 缺口对照表、M-D2 ADR 0050（engine PIT 只读草案）、M-R1 TSP 首刀选型（walk-forward 摘要）、M-A1 TA 可移植清单、M-S1 Skills 治理 SSOT（`docs/ops/skills-governance.md`）
+
+### Changed
+
+- **M-U1 Workbench 可读性**：导航 ①向导→②推荐→③纸面；向导步骤清单；推荐/历史/复盘空态与中文 tip；交叉锚点链接
+
+## [3.10.6] - 2026-09-15
+
+### Added
+
+- **回测 ↔ 今日推荐打通**：`#backtest` 逐日表「看推荐」→ 跳转 `#recommend` 加载该日 picks（已存 SQLite 则回看+复盘，否则按同宇宙重生成）；回测 `days[]` 带 `pickSymbols`
+- **推荐页绩效摘要条**：pending / settled / `direction_accuracy` + 回测/绩效/策略对比快捷链；空态/fail-closed 文案统一
+- **策略对比接 engine 真面板**：`POST /strategy/compare` 无 body.panel 时优先 `build_multi_day_pit_panel`（engine/daily）；标注 `panelSource`；`requireEngine` 时无源 503；否则回退 fixture 并写 `panelNote`
+- **日批一键 live+落库+结算**：`Invoke-DailyPipeline.ps1 -LiveDay`；CLI `--settle-after`（记入 JSONL + 结算）；`daily-pipeline.md` 更新
+
+### Changed
+
+- 里程碑计划：U8 联通切片收口；下一档见 Now/Next/Later
+
+## [3.10.5] - 2026-09-15
+
+### Added
+
+- **U7 最小切片（回测进 Workbench）**：`POST /api/research/backtest/rolling-review` + `#backtest` 区；对 watch/full 宇宙按最近 N 日滚动推荐并用 `review_stored_brief` 汇总 `direction_accuracy` / 样本数；优先只读 `STOCK_PLATFORM_ENGINE_MARKET_DB`；无日线 fail-closed 中文提示
+- **U6 轻量**：向导 / 今日推荐 / defaults 可选 `universeTier`（core|watch|full）；切层级重载 symbols；明示勿一次全市场
+- `.env.example` 强化 `STOCK_PLATFORM_ENGINE_MARKET_DB` 中文说明（与 brief SQLite 分离）
+
+### Changed
+
+- 里程碑：U6/U7 最小切片收口为 done（轻量）；完整策略 A/B 与全市场仍后置
+
+## [3.10.4] - 2026-09-15
+
+### Added
+
+- **pending 自动结算**：`GET /api/research/performance?autoSettle=true`（默认）与 `POST /performance/settle`；有足够后续日线时把 JSONL pending 结算进盘，`direction_accuracy` 反映每日推荐；CLI `--settle-daily`
+- **a-stock-engine 日线适配**：`engine_sqlite` + `STOCK_PLATFORM_ENGINE_MARKET_DB`（只读 `market.db`/`daily_price`）；预设 `cn_engine_sqlite`；结算优先用本地库；文档 `docs/ops/engine-market-db.md`
+- UI：`#performance` 显示本次新结算 / settle 源；「结算 pending」按钮
+
+### Changed
+
+- 里程碑 Next（pending 自动结算）收口为 done
+
+## [3.10.3] - 2026-09-15
+
+### Added
+
+- **U3 复盘 UI**：历史推荐「回看 / 复盘」→ T+1/T+5 明细表（pending / 收益 / 方向对错）；汇总 `direction_accuracy` 与 performance 口径对齐
+- **推荐 → 绩效闭环**：生成 brief 落库成功后自动 `log_brief_decisions`（同 asof+symbol 幂等跳过）；`#performance` 展示 pending；一键「记入当前 asof」；`POST /performance/log-brief` 支持 `fromStore`
+- **U5**：`/api/ops/health` 增加 `providerPreset` / `briefFallback` / `supplementTokenConfigured`（仅布尔）；运维面板可见
+- **U4**：`stock-platform-daily` / `Invoke-DailyPipeline.ps1` 支持 `-Provider tushare`（及别名）；`STOCK_PLATFORM_DAILY_PROVIDER`；缺 token fail-closed；`daily-pipeline.md`「真实日用」段
+- 文档：`live-startup.md` 日用最小步骤；`.env.example` 日批 / 绩效路径说明
+
+### Changed
+
+- 里程碑计划按「商用可用最短路径」重排 Now（U3 UI → 闭环 → U5 → U4 → U1 冒烟）
+
+## [3.10.2] - 2026-09-15
+
+### Added
+
+- **U2 每日 brief 持久化（SQLite）**：`STOCK_PLATFORM_DB_URL`（默认 `sqlite:///./data/stock_platform.db`）
+  - 薄 repository：`stock_platform_research.persistence`（业务不绑死 SQLite 方言；日后可换 PG）
+  - 权威存档字段：asof / provider / universe / picks / softGates / gatesRelaxed / dataNote / generatedAt / environment=SIMULATE
+  - 同日重复生成：**按 asof 幂等覆盖**
+  - Workbench：生成推荐默认自动落库；`GET /api/research/briefs` 历史列表；`GET /api/research/briefs/{asof}` 回看
+  - UI「今日推荐」历史表；日批 `run_daily_pipeline` 与 Workbench 共用同一 writer
+  - U3 雏形：`GET /api/research/briefs/{asof}/review`（T+1 收益 / pending；完整复盘后续）
+  - 文档：ADR 0049 实现节；`.env.example` 已有中文说明；`*.db` / `/data/` 已在 `.gitignore`
 
 ### Fixed
 

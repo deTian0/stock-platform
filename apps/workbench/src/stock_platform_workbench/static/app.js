@@ -47,9 +47,29 @@
     if (err.status) parts.push("HTTP " + err.status);
     if (!parts.length) return JSON.stringify(err, null, 2);
     var head = parts.join(" · ");
-    // Prefer short Chinese head when detail alone is enough
+    // Prefer Chinese / human tip; avoid dumping FastAPI envelope JSON
+    var nestedDetail =
+      err.detail && typeof err.detail === "object" && typeof err.detail.detail === "string"
+        ? err.detail.detail
+        : typeof err.detail === "string"
+          ? err.detail
+          : null;
+    if (nestedDetail && /[\u4e00-\u9fff]/.test(nestedDetail)) {
+      var prefix = [];
+      if (err.fail_closed) prefix.push("能力不可用（fail-closed）");
+      if (err.status) prefix.push("HTTP " + err.status);
+      return (prefix.length ? prefix.join(" · ") + "\n" : "") + nestedDetail;
+    }
     if (parts.length === 1 && err.detail && typeof err.detail === "string") return err.detail;
     return head + "\n" + JSON.stringify(err, null, 2);
+  }
+
+  function formatBriefError(err) {
+    var base = formatErrorMessage(err);
+    var tip =
+      "下一步：检查截面日 asof（最近完整交易日）、宇宙 symbols 是否非空、.env 中 Tushare Token 与 STOCK_PLATFORM_PROVIDER_PRESET；live 场景勿启用 STOCK_PLATFORM_BRIEF_FALLBACK=replay。";
+    if (base.indexOf("下一步：") >= 0) return base;
+    return base + "\n" + tip;
   }
 
   function formatScore(score) {
@@ -349,8 +369,8 @@
         '<div class="rec-score">' +
         formatScore(row.composite_score) +
         "</div></div>" +
-        '<div class="rec-meta"><span>收盘 <strong>' +
-        escapeHtml(row.close == null ? "—" : row.close) +
+        '<div class="rec-meta"><span>现价 <strong>' +
+        escapeHtml(row.close == null ? "—" : formatPrice(row.close)) +
         "</strong></span></div>" +
         '<p class="rec-summary">' +
         escapeHtml(row.reasonSummary || row.reason || "") +
@@ -1164,7 +1184,7 @@
     clearError(errEl);
     const asof = $("recommend-asof").value;
     const symbols = $("recommend-symbols").value.trim();
-    const topN = Number($("recommend-topn").value || "5");
+    const topN = Number($("recommend-topn").value || "10");
     const engine = ($("debate-engine") && $("debate-engine").value) || "deterministic";
     const body = {
       topN: topN,
@@ -1175,55 +1195,391 @@
     };
     if (asof) body.asof = asof;
     if (symbols) body.symbols = symbols;
+    setRecommendBusy(true, "正在生成推荐并辩论…");
     try {
       const data = await fetchJson("/api/research/brief/debate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      $("recommend-meta").textContent =
-        "brief/debate engine=" +
-        data.engine +
-        " · debates=" +
-        (data.debates ? data.debates.length : 0);
+      if (data.brief) applyBriefToRecommendPanel(data.brief, "辩论");
+      else {
+        $("recommend-meta").textContent =
+          "辩论完成 · engine=" + data.engine + " · 场次=" + (data.debates ? data.debates.length : 0);
+      }
       var firstDebate = data.debates && data.debates[0] && data.debates[0].debate;
       if (firstDebate) renderDebateView($("debate-view"), firstDebate);
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
+      if (data.brief && data.brief.asof && $("recommend-asof")) {
+        $("recommend-asof").value = data.brief.asof;
+      }
     } catch (e) {
-      showError(errEl, e.detail || String(e));
+      showError(errEl, formatBriefError(e.detail || e));
+    } finally {
+      setRecommendBusy(false);
     }
+  }
+
+  function setRecommendBusy(busy, loadingMsg) {
+    var ids = ["btn-recommend-go", "btn-recommend-paper", "btn-recommend-debate", "btn-wizard-go"];
+    for (var i = 0; i < ids.length; i++) {
+      var btn = $(ids[i]);
+      if (btn) btn.disabled = !!busy;
+    }
+    var loading = $("recommend-loading");
+    if (loading) {
+      if (busy) {
+        loading.hidden = false;
+        loading.textContent =
+          loadingMsg ||
+          window.__recommendLoadingHint ||
+          "正在拉取日线并打分，watch≈30 只时可能需要数十秒…";
+      } else {
+        loading.hidden = true;
+      }
+    }
+    var meta = $("recommend-meta");
+    if (meta) {
+      if (busy) meta.classList.add("is-loading");
+      else meta.classList.remove("is-loading");
+    }
+  }
+
+  function ynZh(flag) {
+    return flag ? "是" : "否";
   }
 
   function applyBriefToRecommendPanel(data, sourceLabel) {
     var picks = (data && data.picks) || [];
     var metaBits = [];
     if (sourceLabel) metaBits.push(sourceLabel);
-    metaBits.push("provider=" + ((data && data.provider) || ""));
-    metaBits.push("asof=" + ((data && data.asof) || ""));
-    metaBits.push("picks=" + picks.length);
-    metaBits.push("panel=" + ((data && data.panelSize) || 0));
+    metaBits.push("asof=" + ((data && data.asof) || "—"));
+    if (data && data.asofMode) metaBits.push("asofMode=" + data.asofMode);
+    metaBits.push("provider=" + ((data && data.provider) || "—"));
+    metaBits.push("推荐=" + picks.length);
+    metaBits.push("截面=" + ((data && data.panelSize) || 0));
     if (data && data.dataNote) metaBits.push(data.dataNote);
     if (data && data.gatesNote) metaBits.push(data.gatesNote);
     $("recommend-meta").textContent = metaBits.join(" · ");
+    renderKv($("recommend-kv"), [
+      ["截面日 asof", (data && data.asof) || "—"],
+      ["asof 模式", (data && data.asofMode) || "—"],
+      ["行情 provider", (data && data.provider) || "—"],
+      ["宇宙规模", data && data.universeSize != null ? String(data.universeSize) : "—"],
+      ["宇宙层级", (data && data.universeTier) || "—"],
+      ["有效截面 panel", data && data.panelSize != null ? String(data.panelSize) : "—"],
+      ["推荐数", String(picks.length)],
+      ["软闸门 softGates", ynZh(!!(data && data.softGates))],
+      ["闸门已放宽", ynZh(!!(data && data.gatesRelaxed))],
+      ["生成时间", (data && data.generatedAt) || "—"],
+      ["数据说明", (data && data.dataNote) || (data && data.gatesNote) || "—"],
+      ["已落库", data && data.persistOk ? "是" : data && data.persistError ? "失败" : "—"],
+      [
+        "绩效样本",
+        data && data.perfLogOk
+          ? "已记入 +" + String(data.perfLogAppended || 0)
+          : data && data.perfLogError
+            ? "失败"
+            : "—",
+      ],
+      ["环境", (data && data.environment) || "SIMULATE"],
+    ]);
     renderRecommendCards(picks, data || {});
     var tbody = $("recommend-table").querySelector("tbody");
     if (tbody) {
       tbody.innerHTML = "";
-      for (var i = 0; i < picks.length; i++) {
-        var row = picks[i];
-        var tr = document.createElement("tr");
-        tr.innerHTML =
-          td(row.rank) +
-          '<td><a href="#daily">' +
-          escapeHtml(row.symbol) +
-          "</a></td>" +
-          tdNum(formatScore(row.composite_score)) +
-          tdNum(formatPrice(row.close)) +
-          td(row.reasonSummary || row.reason || "");
-        tbody.appendChild(tr);
+      if (!picks.length) {
+        emptyTable(
+          tbody,
+          5,
+          (data && data.emptyPicksMessage) || "暂无推荐列表（可改 asof / 扩大宇宙 / 确认 Tushare）"
+        );
+      } else {
+        for (var i = 0; i < picks.length; i++) {
+          var row = picks[i];
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            td(row.rank) +
+            '<td><a href="#daily">' +
+            escapeHtml(row.symbol) +
+            "</a></td>" +
+            tdNum(formatScore(row.composite_score)) +
+            tdNum(formatPrice(row.close)) +
+            td(row.reasonSummary || row.reason || "");
+          tbody.appendChild(tr);
+        }
       }
     }
     $("recommend-json").textContent = JSON.stringify(data, null, 2);
+    if (data && data.persistOk) {
+      metaBits.push("已落库");
+      if (data.perfLogNote) metaBits.push(data.perfLogNote);
+      $("recommend-meta").textContent = metaBits.join(" · ");
+    } else if (data && data.persistError) {
+      metaBits.push(data.persistError);
+      $("recommend-meta").textContent = metaBits.join(" · ");
+    }
+  }
+
+  async function loadRecommendHistory() {
+    var errEl = $("recommend-error");
+    var meta = $("recommend-history-meta");
+    var tbody = $("recommend-history-table") && $("recommend-history-table").querySelector("tbody");
+    if (!tbody) return;
+    try {
+      var data = await fetchJson("/api/research/briefs?limit=30");
+      var items = (data && data.items) || [];
+      tbody.innerHTML = "";
+      if (!items.length) {
+        emptyTable(tbody, 6, (data && data.emptyMessage) || "暂无历史推荐 — 请先生成一日并落库");
+        if (meta) meta.textContent = "历史：0 条（空态；可从向导或本页生成）";
+        return;
+      }
+      if (meta) meta.textContent = "历史：" + items.length + " 条 · 点「回看」或「复盘」";
+      for (var i = 0; i < items.length; i++) {
+        (function (row) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            td(row.asof || "—") +
+            td(row.provider || "—") +
+            tdNum(row.pickCount != null ? String(row.pickCount) : "—") +
+            td(row.generatedAt || row.updatedAt || "—") +
+            td(row.dataNote || (row.gatesRelaxed ? "闸门已软化" : "—")) +
+            "<td></td>";
+          var actions = tr.lastElementChild;
+          var btnView = document.createElement("button");
+          btnView.type = "button";
+          btnView.className = "secondary";
+          btnView.textContent = "回看";
+          btnView.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            loadStoredBrief(row.asof);
+          });
+          var btnReview = document.createElement("button");
+          btnReview.type = "button";
+          btnReview.className = "secondary";
+          btnReview.textContent = "复盘";
+          btnReview.style.marginLeft = "0.35rem";
+          btnReview.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            loadBriefReview(row.asof);
+          });
+          actions.appendChild(btnView);
+          actions.appendChild(btnReview);
+          tr.style.cursor = "pointer";
+          tr.title = "点击回看 asof=" + (row.asof || "");
+          tr.addEventListener("click", function () {
+            loadStoredBrief(row.asof);
+          });
+          tbody.appendChild(tr);
+        })(items[i]);
+      }
+    } catch (e) {
+      emptyTable(tbody, 6, "历史列表加载失败");
+      if (meta) meta.textContent = "历史加载失败";
+      if (errEl) showError(errEl, formatErrorMessage(e.detail || e));
+    }
+  }
+
+  function directionOkZh(ok) {
+    if (ok === true) return "对";
+    if (ok === false) return "错";
+    return "—";
+  }
+
+  async function loadBriefReview(asof) {
+    var errEl = $("recommend-review-error");
+    var meta = $("recommend-review-meta");
+    var tbody = $("recommend-review-table") && $("recommend-review-table").querySelector("tbody");
+    if (!asof || !tbody) return;
+    clearError(errEl);
+    var holdingEl = $("recommend-review-holding");
+    var holding = holdingEl && holdingEl.value ? holdingEl.value : "1d";
+    if (meta) meta.textContent = "正在复盘 " + asof + "（" + holding + "）…";
+    try {
+      var data = await fetchJson(
+        "/api/research/briefs/" +
+          encodeURIComponent(asof) +
+          "/review?holding=" +
+          encodeURIComponent(holding)
+      );
+      var da =
+        data.direction_accuracy != null
+          ? data.direction_accuracy
+          : data.directionAccuracy;
+      if (meta) {
+        meta.textContent =
+          "asof=" +
+          (data.asof || asof) +
+          " · holding=" +
+          (data.holding || holding) +
+          " · settled=" +
+          (data.settledCount != null ? data.settledCount : "—") +
+          " · pending=" +
+          (data.pendingCount != null ? data.pendingCount : "—") +
+          " · direction_accuracy=" +
+          (da != null ? da : "—");
+      }
+      renderKv($("recommend-review-kv"), [
+        ["截面日", data.asof || asof],
+        ["持有期", data.holding || holding],
+        ["已结算", data.settledCount],
+        ["pending", data.pendingCount],
+        ["方向正确率", da != null ? da : "—"],
+        ["上涨占比 up_rate", data.upRate != null ? data.upRate : "—"],
+        ["口径", data.metricNote || "—"],
+      ]);
+      tbody.innerHTML = "";
+      var rows = data.rows || [];
+      if (!rows.length) {
+        emptyTable(tbody, 8, "复盘无行（可能仍为 pending，或缺后续日线）");
+      } else {
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            td(r.rank != null ? r.rank : "—") +
+            td(r.symbol || "—") +
+            td(r.pending ? "pending" : "已结算") +
+            tdNum(r.rawReturn != null ? r.rawReturn : "—") +
+            td(directionOkZh(r.directionOk)) +
+            td(r.entryDate || "—") +
+            td(r.exitDate || "—") +
+            td(r.note || "—");
+          tbody.appendChild(tr);
+        }
+      }
+      var jsonEl = $("recommend-review-json");
+      if (jsonEl) jsonEl.textContent = JSON.stringify(data, null, 2);
+      var block = $("recommend-review-block");
+      if (block && block.scrollIntoView) block.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (e) {
+      emptyTable(tbody, 8, "复盘加载失败");
+      if (meta) meta.textContent = "复盘失败";
+      showError(errEl, formatErrorMessage(e.detail || e));
+    }
+  }
+
+  async function loadStoredBrief(asof) {
+    var errEl = $("recommend-error");
+    clearError(errEl);
+    if (!asof) return;
+    setRecommendBusy(true, "正在读取已存推荐 " + asof + " …");
+    try {
+      var data = await fetchJson("/api/research/briefs/" + encodeURIComponent(asof));
+      applyBriefToRecommendPanel(data, "历史回看");
+      if (data.asof && $("recommend-asof")) $("recommend-asof").value = data.asof;
+      location.hash = "#recommend";
+      return true;
+    } catch (e) {
+      showError(errEl, formatBriefError(Object.assign({ status: e.status }, e.detail || {})));
+      return false;
+    } finally {
+      setRecommendBusy(false);
+    }
+  }
+
+  async function openBacktestDay(asof) {
+    if (!asof) return;
+    if ($("recommend-asof")) $("recommend-asof").value = asof;
+    if (window.__lastBacktest && window.__lastBacktest.universeTier && $("recommend-tier")) {
+      $("recommend-tier").value = window.__lastBacktest.universeTier;
+    }
+    if (
+      window.__lastBacktest &&
+      Array.isArray(window.__lastBacktest.symbols) &&
+      window.__lastBacktest.symbols.length &&
+      $("recommend-symbols")
+    ) {
+      $("recommend-symbols").value = window.__lastBacktest.symbols.join(",");
+    }
+    location.hash = "#recommend";
+    clearError($("recommend-error"));
+    setRecommendBusy(true, "正在加载回测日 " + asof + " 推荐…");
+    try {
+      var data = await fetchJson("/api/research/briefs/" + encodeURIComponent(asof));
+      applyBriefToRecommendPanel(data, "回测→回看");
+      if (data.asof && $("recommend-asof")) $("recommend-asof").value = data.asof;
+      loadBriefReview(asof);
+      loadRecommendHistory();
+      return;
+    } catch (e) {
+      if (e.status && e.status !== 404) {
+        showError(
+          $("recommend-error"),
+          formatBriefError(Object.assign({ status: e.status }, e.detail || {}))
+        );
+        return;
+      }
+    } finally {
+      setRecommendBusy(false);
+    }
+    await loadRecommend();
+    loadBriefReview(asof);
+  }
+
+  async function loadRecommendPerfStrip() {
+    var el = $("recommend-perf-strip");
+    if (!el) return;
+    try {
+      var data = await fetchJson("/api/research/performance?autoSettle=true");
+      var m = (data && data.metrics) || {};
+      var acc =
+        m.direction_accuracy != null
+          ? m.direction_accuracy
+          : data.direction_accuracy != null
+            ? data.direction_accuracy
+            : null;
+      var chips = [];
+      chips.push(
+        '<span class="rec-chip">pending ' +
+          (data.pendingCount != null ? data.pendingCount : "—") +
+          "</span>"
+      );
+      chips.push(
+        '<span class="rec-chip">settled ' +
+          (data.settledCount != null ? data.settledCount : "—") +
+          "</span>"
+      );
+      chips.push(
+        '<span class="rec-chip">direction_accuracy ' +
+          (acc != null ? acc : "—") +
+          "</span>"
+      );
+      var recent = (data && data.recentDays) || [];
+      if (recent.length) {
+        var mini = recent
+          .map(function (d) {
+            var v =
+              d.direction_accuracy != null ? d.direction_accuracy : "—";
+            return (
+              '<span class="rec-chip muted" title="settled ' +
+              (d.settledCount != null ? d.settledCount : "?") +
+              '">' +
+              escapeHtml(String(d.date || "").slice(5)) +
+              " " +
+              v +
+              "</span>"
+            );
+          })
+          .join("");
+        chips.push(
+          '<span class="rec-chip">近' +
+            recent.length +
+            "日</span>" +
+            mini
+        );
+      }
+      if (data.settleSource) {
+        chips.push(
+          '<span class="rec-chip muted">settle=' + escapeHtml(data.settleSource) + "</span>"
+        );
+      }
+      el.innerHTML = chips.join("");
+    } catch (_) {
+      el.innerHTML =
+        '<span class="rec-chip muted">绩效摘要暂不可用（无样本或未落库）</span>';
+    }
   }
 
   async function loadRecommend(event) {
@@ -1233,24 +1589,43 @@
     $("recommend-meta").textContent = "";
     const asof = $("recommend-asof").value;
     const symbols = $("recommend-symbols").value.trim();
-    const topN = $("recommend-topn").value || "5";
-    const params = new URLSearchParams({ topN: topN, adjust_kind: "none", softGates: "true" });
+    const topN = $("recommend-topn").value || "10";
+    const tier = ($("recommend-tier") && $("recommend-tier").value) || "watch";
+    const params = new URLSearchParams({
+      topN: topN,
+      adjust_kind: "none",
+      softGates: "true",
+      universeTier: tier,
+    });
     if (asof) params.set("asof", asof);
     if (symbols) params.set("symbols", symbols);
+    var nSym = symbols ? symbols.split(",").filter(Boolean).length : 0;
+    setRecommendBusy(
+      true,
+      nSym
+        ? "正在拉取日线并打分（约 " + nSym + " 只），请稍候…"
+        : null
+    );
     try {
       const data = await fetchJson("/api/research/brief?" + params.toString());
-      applyBriefToRecommendPanel(data, "recommend");
+      applyBriefToRecommendPanel(data, "今日选股");
       if (data.asof && $("recommend-asof")) $("recommend-asof").value = data.asof;
+      loadRecommendHistory();
+      loadRecommendPerfStrip();
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
-        showError(errEl, { fail_closed: true, ...detail });
+        showError(errEl, formatBriefError({ fail_closed: true, status: e.status, ...detail }));
       } else {
-        showError(errEl, detail);
+        showError(errEl, formatBriefError(Object.assign({ status: e.status }, detail)));
       }
-      $("recommend-table").querySelector("tbody").innerHTML = "";
-      $("recommend-cards").innerHTML = "";
+      emptyTable($("recommend-table").querySelector("tbody"), 5, "生成失败（fail-closed / 见上方 tip）");
+      $("recommend-cards").innerHTML =
+        '<p class="empty-hint">生成失败（fail-closed）。请根据上方中文 tip 检查 asof、宇宙、Token 与能力矩阵；未设 BRIEF_FALLBACK=replay 时不会静默用 fixtures。也可回 <a href="#wizard">① 向导</a> 重试。</p>';
       $("recommend-json").textContent = "";
+      renderKv($("recommend-kv"), []);
+    } finally {
+      setRecommendBusy(false);
     }
   }
 
@@ -1260,16 +1635,18 @@
     clearError(errEl);
     const asof = $("recommend-asof").value;
     const symbols = $("recommend-symbols").value.trim();
-    const topN = Number($("recommend-topn").value || "5");
+    const topN = Number($("recommend-topn").value || "10");
     const body = {
       topN: topN,
       adjust_kind: "none",
       softGates: true,
+      universeTier: ($("recommend-tier") && $("recommend-tier").value) || "watch",
       decision_only: true,
       market: "CN",
     };
     if (asof) body.asof = asof;
     if (symbols) body.symbols = symbols;
+    setRecommendBusy(true, "正在生成推荐并写入纸面草稿（SIMULATE）…");
     try {
       const data = await fetchJson("/api/research/brief/to-paper", {
         method: "POST",
@@ -1277,19 +1654,25 @@
         body: JSON.stringify(body),
       });
       var statusBits = [
-        "to-paper draftId=" + (data.draft && data.draft.draftId),
-        "liveTradingEnabled=" + String(data.liveTradingEnabled),
+        "已写入纸面 draftId=" + (data.draft && data.draft.draftId),
+        "环境=SIMULATE",
+        "实盘=" + (data.liveTradingEnabled ? "开（异常）" : "关"),
       ];
       if (data.strategyStatus) statusBits.push(data.strategyStatus);
       else if (data.strategyAutoActivated) statusBits.push("已自动激活默认纸面策略");
-      if (data.brief) applyBriefToRecommendPanel(data.brief, "to-paper");
+      if (data.brief) {
+        applyBriefToRecommendPanel(data.brief, "写入纸面");
+        if (data.brief.asof && $("recommend-asof")) $("recommend-asof").value = data.brief.asof;
+      }
       $("recommend-meta").textContent =
         ($("recommend-meta").textContent ? $("recommend-meta").textContent + " · " : "") +
         statusBits.join(" · ");
       $("recommend-json").textContent = JSON.stringify(data, null, 2);
       loadPaper();
     } catch (e) {
-      showError(errEl, e.detail || String(e));
+      showError(errEl, formatBriefError(e.detail || e));
+    } finally {
+      setRecommendBusy(false);
     }
   }
 
@@ -1298,17 +1681,32 @@
     clearError(errEl);
     $("performance-meta").textContent = "";
     try {
-      const data = await fetchJson("/api/research/performance");
+      const data = await fetchJson("/api/research/performance?autoSettle=true");
       const m = data.metrics || {};
+      var settleNote = "";
+      if (data.settledNewly) {
+        settleNote = " · 本次新结算=" + data.settledNewly;
+      }
+      if (data.settleSource) {
+        settleNote += " · settle=" + data.settleSource;
+      }
       $("performance-meta").textContent =
-        "settled=" +
+        "total=" +
+        (data.totalEntries != null ? data.totalEntries : "—") +
+        " · pending=" +
+        (data.pendingCount != null ? data.pendingCount : "—") +
+        " · settled=" +
         data.settledCount +
         " · direction_accuracy=" +
         m.direction_accuracy +
         " · avg_return=" +
-        m.avg_return;
+        m.avg_return +
+        settleNote;
       renderStats($("performance-view"), [
+        ["总条目", data.totalEntries],
+        ["pending", data.pendingCount],
         ["已结算", data.settledCount],
+        ["本次新结算", data.settledNewly],
         ["方向正确率", m.direction_accuracy],
         ["平均收益", m.avg_return],
         ["上涨占比", m.up_rate],
@@ -1321,6 +1719,56 @@
     }
   }
 
+  async function settlePerformancePending() {
+    const errEl = $("performance-error");
+    clearError(errEl);
+    try {
+      const data = await fetchJson("/api/research/performance/settle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      $("performance-meta").textContent =
+        "结算完成：新结算=" +
+        (data.settledNewly != null ? data.settledNewly : 0) +
+        " · pending=" +
+        data.pendingCount +
+        " · settled=" +
+        data.settledCount +
+        (data.settleSource ? " · source=" + data.settleSource : "");
+      await loadPerformance();
+    } catch (e) {
+      showError(errEl, e.detail || String(e));
+    }
+  }
+
+  async function logStoredBriefToPerformance() {
+    const errEl = $("performance-error");
+    clearError(errEl);
+    var asof = $("recommend-asof") && $("recommend-asof").value;
+    if (!asof) {
+      showError(errEl, "请先在「今日推荐」填写或回看一个 asof");
+      return;
+    }
+    try {
+      const data = await fetchJson("/api/research/performance/log-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asof: asof, fromStore: true, holding: "5d" }),
+      });
+      $("performance-meta").textContent =
+        "已从存档记入 asof=" +
+        (data.asof || asof) +
+        " · appended=" +
+        data.appended +
+        " · " +
+        (data.note || "");
+      await loadPerformance();
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+    }
+  }
+
   async function runWizard(event) {
     if (event) event.preventDefault();
     const errEl = $("wizard-error");
@@ -1329,15 +1777,17 @@
     const asof = $("wizard-asof").value;
     const body = {
       symbols: $("wizard-symbols").value.trim(),
-      topN: Number($("wizard-topn").value || "5"),
+      topN: Number($("wizard-topn").value || "10"),
       adjust_kind: "none",
       softGates: true,
+      universeTier: ($("wizard-tier") && $("wizard-tier").value) || "watch",
       decision_only: true,
       market: "CN",
       skipRefresh: $("wizard-skip-refresh").checked,
       toPaper: true,
     };
     if (asof) body.asof = asof;
+    setRecommendBusy(true, "向导运行中：拉取日线并生成今日推荐…");
     try {
       const data = await fetchJson("/api/research/wizard/daily", {
         method: "POST",
@@ -1350,11 +1800,11 @@
         })
         .join(" · ");
       $("wizard-meta").textContent =
-        (data.ok ? "ok" : "failed") +
+        (data.ok ? "成功" : "失败") +
         " · " +
         stepSummary +
-        " · liveTradingEnabled=" +
-        data.liveTradingEnabled;
+        " · 实盘=" +
+        (data.liveTradingEnabled ? "开（异常）" : "关");
       var view = $("wizard-view");
       if (view) view.hidden = false;
       renderSteps($("wizard-steps"), data.steps);
@@ -1384,32 +1834,232 @@
           if ($("wizard-asof")) $("wizard-asof").value = briefResult.asof;
           if ($("recommend-asof")) $("recommend-asof").value = briefResult.asof;
         }
-        applyBriefToRecommendPanel(briefResult, "from wizard");
+        applyBriefToRecommendPanel(briefResult, "来自向导");
         location.hash = "#recommend";
         revealHashTarget();
       }
       if (data.ok) loadPaper();
     } catch (e) {
-      showError(errEl, e.detail || String(e));
+      showError(errEl, formatBriefError(e.detail || e));
       $("wizard-json").textContent = "";
       var wv = $("wizard-view");
       if (wv) wv.hidden = true;
+    } finally {
+      setRecommendBusy(false);
     }
   }
 
-  async function loadRecommendDefaults() {
+  async function loadRecommendDefaults(tierOverride) {
     try {
-      const data = await fetchJson("/api/research/defaults");
+      var tier =
+        tierOverride ||
+        ($("recommend-tier") && $("recommend-tier").value) ||
+        "watch";
+      const data = await fetchJson(
+        "/api/research/defaults?universeTier=" + encodeURIComponent(tier)
+      );
+      if (data.loadingHint) window.__recommendLoadingHint = data.loadingHint;
+      if (data.hint && $("recommend-hint")) {
+        $("recommend-hint").textContent =
+          data.hint +
+          " 可跳转日 K / 纸面。写入纸面始终 SIMULATE；非投资建议。";
+      }
       if (data.asof) {
-        if ($("wizard-asof") && !$("wizard-asof").value) $("wizard-asof").value = data.asof;
-        if ($("recommend-asof") && !$("recommend-asof").value) $("recommend-asof").value = data.asof;
+        if ($("wizard-asof")) $("wizard-asof").value = data.asof;
+        if ($("recommend-asof")) $("recommend-asof").value = data.asof;
       }
       if (data.symbols) {
         if ($("wizard-symbols")) $("wizard-symbols").value = data.symbols;
         if ($("recommend-symbols")) $("recommend-symbols").value = data.symbols;
       }
+      if (data.universeTier) {
+        if ($("recommend-tier")) $("recommend-tier").value = data.universeTier;
+        if ($("wizard-tier")) $("wizard-tier").value = data.universeTier;
+        if ($("backtest-tier")) $("backtest-tier").value = data.universeTier;
+      }
+      if (data.topN != null) {
+        if ($("wizard-topn")) $("wizard-topn").value = String(data.topN);
+        if ($("recommend-topn")) $("recommend-topn").value = String(data.topN);
+      }
+      var meta = $("recommend-meta");
+      if (meta) {
+        meta.textContent =
+          "已加载 defaults · asof=" +
+          (data.asof || "—") +
+          " · provider=" +
+          (data.provider || "—") +
+          " · tier=" +
+          (data.universeTier || tier) +
+          " · 宇宙=" +
+          (data.symbolCount != null ? data.symbolCount : "—") +
+          " · topN=" +
+          (data.topN != null ? data.topN : "—") +
+          " · 环境=SIMULATE";
+      }
+      renderKv($("recommend-kv"), [
+        ["截面日 asof", data.asof || "—"],
+        ["asof 模式", data.asofMode || "—"],
+        ["行情 provider", data.provider || "—"],
+        ["宇宙规模", data.symbolCount != null ? String(data.symbolCount) : "—"],
+        ["宇宙层级", data.universeTier || "watch"],
+        ["推荐数 topN", data.topN != null ? String(data.topN) : "—"],
+        ["软闸门", ynZh(!!data.softGates)],
+        ["环境", data.environment || "SIMULATE"],
+        ["实盘", ynZh(!!data.liveTradingEnabled)],
+      ]);
     } catch (_) {
       /* keep HTML defaults */
+    }
+  }
+
+  async function runRollingBacktest(event) {
+    if (event) event.preventDefault();
+    const errEl = $("backtest-error");
+    clearError(errEl);
+    const lastN = Number(($("backtest-lastn") && $("backtest-lastn").value) || "5");
+    const tier = ($("backtest-tier") && $("backtest-tier").value) || "watch";
+    const holding = ($("backtest-holding") && $("backtest-holding").value) || "1d";
+    const topN = Number(($("backtest-topn") && $("backtest-topn").value) || "5");
+    if ($("backtest-meta")) {
+      $("backtest-meta").textContent =
+        "正在回测（tier=" + tier + " · lastN=" + lastN + "）…";
+    }
+    const tbody =
+      $("backtest-table") && $("backtest-table").querySelector("tbody");
+    try {
+      const data = await fetchJson("/api/research/backtest/rolling-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lastN: lastN,
+          universeTier: tier,
+          holding: holding,
+          topN: topN,
+          softGates: true,
+        }),
+      });
+      window.__lastBacktest = data;
+      var acc =
+        data.direction_accuracy != null
+          ? data.direction_accuracy
+          : data.directionAccuracy;
+      $("backtest-meta").textContent =
+        "ok · source=" +
+        (data.dailySource || "—") +
+        " · asof " +
+        (data.asofStart || "—") +
+        "～" +
+        (data.asofEnd || "—") +
+        " · 日数=" +
+        (data.asofCount != null ? data.asofCount : "—") +
+        " · settled=" +
+        (data.settledCount != null ? data.settledCount : "—") +
+        " · pending=" +
+        (data.pendingCount != null ? data.pendingCount : "—") +
+        " · direction_accuracy=" +
+        (acc != null ? acc : "—");
+      renderKv($("backtest-kv"), [
+        ["日线源", data.dailySource || "—"],
+        ["宇宙层级", data.universeTier || tier],
+        ["宇宙规模", data.universeSize != null ? String(data.universeSize) : "—"],
+        ["区间", (data.asofStart || "—") + " ～ " + (data.asofEnd || "—")],
+        ["交易日数", data.asofCount != null ? String(data.asofCount) : "—"],
+        ["已结算样本", data.settledCount != null ? String(data.settledCount) : "—"],
+        ["pending", data.pendingCount != null ? String(data.pendingCount) : "—"],
+        ["direction_accuracy", acc != null ? String(acc) : "—"],
+        ["环境", data.environment || "SIMULATE"],
+        ["实盘", ynZh(!!data.liveTradingEnabled)],
+      ]);
+      if (tbody) {
+        tbody.innerHTML = "";
+        var days = data.days || [];
+        if (!days.length) {
+          emptyTable(tbody, 7, "无逐日结果（空态；非假数据）");
+        } else {
+          for (var i = 0; i < days.length; i++) {
+            var d = days[i];
+            var tr = document.createElement("tr");
+            var da =
+              d.directionAccuracy != null ? d.directionAccuracy : "—";
+            var asof = d.asof || "";
+            tr.innerHTML =
+              td(asof || "—") +
+              td(d.panelSize != null ? d.panelSize : "—") +
+              td(d.pickCount != null ? d.pickCount : "—") +
+              td(d.settledCount != null ? d.settledCount : "—") +
+              td(d.pendingCount != null ? d.pendingCount : "—") +
+              td(da) +
+              "<td></td>";
+            var actionTd = tr.lastChild;
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "linkish";
+            btn.textContent = "看推荐";
+            btn.title = "加载该日 picks 到今日推荐";
+            btn.setAttribute("data-asof", asof);
+            btn.addEventListener("click", function (ev) {
+              var a = ev.currentTarget.getAttribute("data-asof");
+              openBacktestDay(a);
+            });
+            actionTd.appendChild(btn);
+            tbody.appendChild(tr);
+          }
+        }
+      }
+      if ($("backtest-json")) {
+        $("backtest-json").textContent = JSON.stringify(data, null, 2);
+      }
+      loadRecommendPerfStrip();
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if ($("backtest-meta")) $("backtest-meta").textContent = "回测失败（fail-closed）";
+      if (tbody) emptyTable(tbody, 7, "回测失败：无日线或不满足条件（不静默假数据）");
+      if ($("backtest-json")) $("backtest-json").textContent = "";
+      renderKv($("backtest-kv"), []);
+    }
+  }
+
+  async function runWalkForwardSummary(event) {
+    if (event) event.preventDefault();
+    const errEl = $("wf-error");
+    clearError(errEl);
+    const start = $("wf-start") && $("wf-start").value;
+    const end = $("wf-end") && $("wf-end").value;
+    if (!start || !end) {
+      showError(errEl, "请填写 start / end");
+      return;
+    }
+    try {
+      const data = await fetchJson("/api/research/backtest/walk-forward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start: start,
+          end: end,
+          trainDays: Number(($("wf-train") && $("wf-train").value) || 60),
+          testDays: Number(($("wf-test") && $("wf-test").value) || 20),
+          stepDays: Number(($("wf-step") && $("wf-step").value) || 20),
+        }),
+      });
+      var s = (data && data.summary) || {};
+      if ($("wf-meta")) {
+        $("wf-meta").textContent =
+          "计划折=" +
+          (data.n_planned_folds != null ? data.n_planned_folds : "—") +
+          " · 有效折=" +
+          (data.n_valid_folds != null ? data.n_valid_folds : "—") +
+          " · compounded_oos=" +
+          (s.compounded_oos_return != null ? s.compounded_oos_return : "—") +
+          " · degradation=" +
+          (s.degradation != null ? s.degradation : "—") +
+          " · consistency=" +
+          (s.consistency != null ? s.consistency : "—");
+      }
+      if ($("wf-json")) $("wf-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if ($("wf-meta")) $("wf-meta").textContent = "Walk-forward 失败";
+      if ($("wf-json")) $("wf-json").textContent = "";
     }
   }
 
@@ -1429,6 +2079,9 @@
         ["版本", data.version],
         ["执行", data.executionMode],
         ["实盘", String(data.liveTradingEnabled)],
+        ["启动预设 preset", data.providerPreset || "—"],
+        ["BRIEF_FALLBACK", data.briefFallback || "（未开启）"],
+        ["Tushare token 已配置", ynZh(!!data.supplementTokenConfigured)],
         ["默认 replay", String(data.defaultReplay)],
         ["EM 间隔", em.minInterval],
         ["熔断", em.circuitOpen ? "开" : "关"],
@@ -1469,30 +2122,52 @@
     clearError(errEl);
     const configA = $("strategy-a").value.trim();
     const configB = $("strategy-b").value.trim();
+    const lastN = Number(($("strategy-lastn") && $("strategy-lastn").value) || "8");
+    const tier = ($("strategy-tier") && $("strategy-tier").value) || "core";
+    const requireEngine = !!(
+      $("strategy-require-engine") && $("strategy-require-engine").checked
+    );
+    if ($("strategy-meta")) {
+      $("strategy-meta").textContent = "正在对比（panel 优先 engine）…";
+    }
     try {
       const data = await fetchJson("/api/research/strategy/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configA: configA, configB: configB }),
+        body: JSON.stringify({
+          configA: configA,
+          configB: configB,
+          lastN: lastN,
+          universeTier: tier,
+          requireEngine: requireEngine,
+        }),
       });
       $("strategy-meta").textContent =
         "winner=" +
         data.winner +
         " · deltaFinalEquity=" +
         data.deltaFinalEquity +
+        " · panelSource=" +
+        (data.panelSource || "—") +
         " · liveTradingEnabled=" +
         String(data.liveTradingEnabled);
       renderKv($("strategy-kv"), [
         ["胜出", data.winner],
         ["权益差", data.deltaFinalEquity],
+        ["面板来源", data.panelSource || "—"],
+        ["面板行数", data.panelRows != null ? data.panelRows : "—"],
+        ["交易日数", data.panelDates != null ? data.panelDates : "—"],
+        ["说明", data.panelNote || "—"],
         ["A 成交", data.a && data.a.tradeCount],
         ["B 成交", data.b && data.b.tradeCount],
         ["实盘", String(data.liveTradingEnabled)],
       ]);
       $("strategy-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
-      showError(errEl, e.detail || String(e));
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if ($("strategy-meta")) $("strategy-meta").textContent = "对比失败";
       $("strategy-json").textContent = "";
+      renderKv($("strategy-kv"), []);
     }
   }
 
@@ -1836,9 +2511,41 @@
     $("recommend-form").addEventListener("submit", loadRecommend);
     $("btn-recommend-paper").addEventListener("click", recommendToPaper);
     $("btn-recommend-debate").addEventListener("click", recommendDebate);
+    if ($("btn-recommend-history")) {
+      $("btn-recommend-history").addEventListener("click", loadRecommendHistory);
+    }
     $("btn-performance").addEventListener("click", loadPerformance);
+    if ($("btn-performance-settle")) {
+      $("btn-performance-settle").addEventListener("click", settlePerformancePending);
+    }
+    if ($("btn-performance-log-stored")) {
+      $("btn-performance-log-stored").addEventListener("click", logStoredBriefToPerformance);
+    }
+    if ($("recommend-review-holding")) {
+      $("recommend-review-holding").addEventListener("change", function () {
+        var meta = $("recommend-review-meta");
+        var asofMatch = meta && meta.textContent ? meta.textContent.match(/asof=(\d{4}-\d{2}-\d{2})/) : null;
+        if (asofMatch) loadBriefReview(asofMatch[1]);
+      });
+    }
     $("strategy-form").addEventListener("submit", compareStrategies);
     $("btn-strategy-list").addEventListener("click", listStrategies);
+    if ($("backtest-form")) {
+      $("backtest-form").addEventListener("submit", runRollingBacktest);
+    }
+    if ($("walkforward-form")) {
+      $("walkforward-form").addEventListener("submit", runWalkForwardSummary);
+    }
+    if ($("recommend-tier")) {
+      $("recommend-tier").addEventListener("change", function () {
+        loadRecommendDefaults($("recommend-tier").value);
+      });
+    }
+    if ($("wizard-tier")) {
+      $("wizard-tier").addEventListener("change", function () {
+        loadRecommendDefaults($("wizard-tier").value);
+      });
+    }
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
     window.addEventListener("hashchange", revealHashTarget);
@@ -1846,6 +2553,8 @@
     revealHashTarget();
     markNav();
     loadRecommendDefaults();
+    loadRecommendHistory();
+    loadRecommendPerfStrip();
     loadMatrix();
     loadPaper();
     loadBroker();

@@ -24,6 +24,8 @@ def test_cn_live_preset_is_default() -> None:
     assert presets["us_hk_global_http"]["preferences"]["news"] == "replay"
     assert presets["cn_astock_http"]["preferences"]["sector_fund_flow"] == "astock_http"
     assert presets["cn_astock_http"]["preferences"]["news"] == "astock_http"
+    assert presets["cn_astock_http"]["preferences"]["concept_blocks"] == "astock_http"
+    assert presets["us_hk_global_http"]["preferences"]["concept_blocks"] == "replay"
     assert "cn_tushare_http" in presets
     assert presets["cn_tushare_http"]["is_default"] is False
     assert presets["cn_tushare_http"]["preferences"]["daily"] == "tushare_http"
@@ -38,6 +40,7 @@ def test_startup_preferences_env_replay() -> None:
     assert prefs["news"] == "replay"
     live = startup_preferences(env={})
     assert live["daily"] == "astock_http"
+    assert live["concept_blocks"] == "astock_http"
     overlay = startup_preferences({"daily": "global_http"}, env={})
     assert overlay["daily"] == "global_http"
     assert overlay["fund_flow"] == "astock_http"
