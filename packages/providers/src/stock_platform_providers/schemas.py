@@ -101,6 +101,23 @@ NEWS_COLUMNS = [
     "sentiment",
 ]
 
+# CN concept / industry / region board membership (个股所属板块). M-D3 / ADR 0051.
+CONCEPT_BLOCKS_TOP_KEYS = [
+    "symbol",
+    "asset_type",
+    "source",
+    "total",
+    "boards",
+    "concept_tags",
+]
+
+CONCEPT_BLOCK_COLUMNS = [
+    "name",
+    "code",
+    "change_pct",
+    "lead_stock",
+]
+
 # CN dragon-tiger board (龙虎榜) aggregate payload keys (amounts in 元).
 LHB_TOP_KEYS = [
     "symbol",

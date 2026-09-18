@@ -32,6 +32,9 @@
 | **v3.9.3** | Workbench 行情查询结果可读性（表/卡片/万亿/五档着色） |
 | **v3.9.4** | 向导/一键纸面自动激活默认 SIMULATE 策略（幂等；状态文案） |
 | **v3.10.0** | Tushare 补充日 K + 东财瞬时断连重试 / 向导 503 tip（ADR 0048） |
+| **v3.10.1** | 今日推荐 live asof / 空态 / softGates / 回退 tip |
+| **v3.10.2** | **U2 brief SQLite 持久化** + 历史回看；U3 review API 雏形（ADR 0049） |
+| **v3.10.3** | **U3 复盘 UI** + 推荐→绩效闭环 + ops health 布尔字段 + 日批 `-Provider tushare` |
 
 ## 安装与运行
 
@@ -73,7 +76,14 @@ python -m stock_platform_workbench
 | GET | `/api/market/fund-flow?symbols=` | 经矩阵 resolve(`fund_flow`) |
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
-| GET | `/api/research/brief?asof=&symbols=&topN=` | 盘前 TopN 简报（矩阵 daily；生产默认 live） |
+| GET | `/api/research/brief?asof=&symbols=&topN=&persist=` | 盘前 TopN（默认自动落库 SQLite） |
+| GET | `/api/research/briefs?limit=` | 历史推荐列表（摘要） |
+| GET | `/api/research/briefs/{asof}` | 按日回看已存 brief（缺日 404 中文） |
+| GET | `/api/research/briefs/{asof}/review?holding=` | U3：T+N 复盘（pending / 方向对错；UI 已接） |
+| POST | `/api/research/performance/log-brief` | 记入绩效 JSONL（生成后自动；可 `fromStore`） |
+| GET | `/api/research/performance?autoSettle=` | 绩效汇总；默认自动结算 pending |
+| POST | `/api/research/performance/settle` | 显式结算 pending → JSONL |
+| POST | `/api/research/briefs` | 显式保存 brief（按 asof 幂等覆盖） |
 | POST | `/api/research/brief/to-paper` | TopN → 纸面草稿（SIMULATE；无激活时自动 ensure 默认策略） |
 | GET | `/api/research/report?symbol=&asof=` | 个股研报槽（agents） |
 | GET | `/api/review/report?symbol=&asof=` | 复盘槽（agents） |

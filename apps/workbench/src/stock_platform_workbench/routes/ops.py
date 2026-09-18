@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 
 from stock_platform_providers.eastmoney import get_default_client
 from stock_platform_workbench import __version__
+from stock_platform_workbench.brief_ux import ops_data_visibility
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 
@@ -51,6 +52,7 @@ def ops_health(request: Request) -> dict[str, Any]:
         status = "degraded"
     if last_refresh is not None and last_refresh.get("ok") is False:
         status = "degraded"
+    visibility = ops_data_visibility()
     return {
         "status": status,
         "service": "workbench",
@@ -58,6 +60,9 @@ def ops_health(request: Request) -> dict[str, Any]:
         "liveTradingEnabled": False,
         "executionMode": "SIMULATE",
         "defaultReplay": default_replay,
+        "providerPreset": visibility["providerPreset"],
+        "briefFallback": visibility["briefFallback"],
+        "supplementTokenConfigured": visibility["supplementTokenConfigured"],
         "preferences": prefs,
         "eastmoney": em,
         "lastRefresh": last_refresh,

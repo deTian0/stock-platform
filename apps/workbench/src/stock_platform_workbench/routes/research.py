@@ -16,13 +16,20 @@ from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_
 from stock_platform_research import (
     UniverseEmptyError,
     brief_to_orders,
+    build_multi_day_pit_panel,
     compare_strategy_configs,
     default_performance_log_path,
     list_strategy_configs,
     log_brief_decisions,
+    open_brief_repository,
     performance_summary,
+    review_stored_brief,
     run_refresh,
+    run_rolling_recommend_review,
+    settle_performance_log,
+    summarize_walk_forward,
 )
+from stock_platform_research.rolling_review import resolve_asof_window, resolve_universe_symbols
 from stock_platform_research.strategy_config import default_strategy_config_dir
 import pandas as pd
 
@@ -49,6 +56,58 @@ def _parse_symbols(raw: str | None) -> list[str] | None:
     return [s.strip() for s in str(raw).split(",") if s.strip()]
 
 
+def _brief_repo(request: Request):
+    """Resolve shared brief repository (tests may set state.brief_repo)."""
+    state = request.app.state.workbench
+    override = getattr(state, "brief_repo", None)
+    if override is not None:
+        return override
+    return open_brief_repository()
+
+
+def _log_brief_to_performance(brief: dict[str, Any], *, holding: str = "5d") -> None:
+    """Append pending decisions after persist; never raise into recommend path."""
+    try:
+        path = default_performance_log_path()
+        appended = log_brief_decisions(path, brief, holding=holding, skip_existing=True)
+        brief["perfLogOk"] = True
+        brief["perfLogAppended"] = len(appended)
+        brief["perfLogPath"] = str(path)
+        brief["perfLogHolding"] = holding
+        if appended:
+            brief["perfLogNote"] = f"已记入绩效样本 {len(appended)} 条（pending；同日同码跳过）"
+        else:
+            brief["perfLogNote"] = "绩效样本已存在或无 picks，未追加"
+    except Exception as exc:  # noqa: BLE001 — recommend must stay usable
+        brief["perfLogOk"] = False
+        brief["perfLogAppended"] = 0
+        brief["perfLogError"] = f"推荐已落库，但记入绩效失败：{type(exc).__name__}: {exc}"
+
+
+def _persist_brief(
+    request: Request,
+    brief: dict[str, Any],
+    *,
+    symbols: list[str] | None = None,
+    log_performance: bool = True,
+) -> dict[str, Any]:
+    """Upsert brief; annotate response with persistOk / Chinese errors."""
+    try:
+        record = _brief_repo(request).save(brief, symbols=symbols)
+        brief["persisted"] = True
+        brief["persistOk"] = True
+        brief["persistedAt"] = record.updated_at
+        brief["persistAsOf"] = record.asof
+        if log_performance and brief.get("picks"):
+            _log_brief_to_performance(brief)
+        return brief
+    except Exception as exc:  # noqa: BLE001 — keep recommend usable if DB fails
+        brief["persisted"] = False
+        brief["persistOk"] = False
+        brief["persistError"] = f"推荐已生成，但落库失败：{type(exc).__name__}: {exc}"
+        return brief
+
+
 def _resolve_asof(request: Request, asof: date | None) -> date:
     if asof is not None:
         return asof
@@ -65,6 +124,7 @@ def _build_brief_for_request(
     reversal_q: float,
     adjust_kind: str | None,
     soft_gates: bool = True,
+    universe_tier: str | None = None,
 ) -> dict[str, Any]:
     state = request.app.state.workbench
     try:
@@ -77,6 +137,7 @@ def _build_brief_for_request(
             reversal_q=reversal_q,
             adjust_kind=adjust_kind,
             soft_gates=soft_gates,
+            universe_tier=universe_tier,
         )
     except UniverseEmptyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -91,9 +152,16 @@ def _build_brief_for_request(
 
 
 @router.get("/defaults")
-def get_recommend_defaults(request: Request) -> dict[str, Any]:
+def get_recommend_defaults(
+    request: Request,
+    universe_tier: str | None = Query(
+        None,
+        alias="universeTier",
+        description="core|watch|full — default watch (not full market)",
+    ),
+) -> dict[str, Any]:
     """Default asof / symbols for wizard + recommend one-click path."""
-    return recommend_defaults(request.app.state.workbench)
+    return recommend_defaults(request.app.state.workbench, universe_tier=universe_tier)
 
 
 @router.get("/brief")
@@ -106,18 +174,127 @@ def get_brief(
     reversal_q: float = Query(0.30, alias="reversalQ"),
     adjust_kind: str | None = Query("qfq", description="qfq/hfq/none"),
     soft_gates: bool = Query(True, alias="softGates"),
+    persist: bool = Query(True, description="Auto-save to SQLite archive (U2)"),
+    universe_tier: str | None = Query(
+        "watch",
+        alias="universeTier",
+        description="When symbols empty: core|watch|full (default watch)",
+    ),
 ) -> dict[str, Any]:
     kind = None if (adjust_kind or "").lower() in {"", "none", "raw"} else adjust_kind
-    return _build_brief_for_request(
+    syms = _parse_symbols(symbols)
+    brief = _build_brief_for_request(
         request,
         asof=asof,
-        symbols=_parse_symbols(symbols),
+        symbols=syms,
         top_n=top_n,
         value_factor=value_factor,
         reversal_q=reversal_q,
         adjust_kind=kind,
         soft_gates=soft_gates,
+        universe_tier=universe_tier,
     )
+    if persist:
+        _persist_brief(request, brief, symbols=syms)
+    return brief
+
+
+@router.get("/briefs")
+def list_briefs(
+    request: Request,
+    limit: int = Query(30, ge=1, le=365),
+) -> dict[str, Any]:
+    """List recent persisted briefs (summary rows; Chinese UI)."""
+    rows = _brief_repo(request).list_recent(limit=limit)
+    return {
+        "items": [r.summary_dict() for r in rows],
+        "count": len(rows),
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+        "emptyMessage": None if rows else "暂无已保存的推荐。生成今日推荐后会自动落库。",
+    }
+
+
+@router.get("/briefs/{asof}")
+def get_stored_brief(request: Request, asof: date) -> dict[str, Any]:
+    """Load one archived brief by asof (404 + Chinese detail when missing)."""
+    record = _brief_repo(request).get_by_asof(asof.isoformat())
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到 asof={asof.isoformat()} 的已存推荐（请先生成并落库）",
+        )
+    body = record.to_dict()
+    # Prefer full payload for UI replay of cards/table.
+    if record.payload:
+        merged = dict(record.payload)
+        merged.update(
+            {
+                "persisted": True,
+                "persistOk": True,
+                "persistedAt": record.updated_at,
+                "persistAsOf": record.asof,
+                "stored": body,
+            }
+        )
+        return merged
+    return body
+
+
+@router.post("/briefs")
+def post_save_brief(request: Request, body: dict[str, Any]) -> dict[str, Any]:
+    """Explicit save of a brief payload (same upsert-by-asof semantics)."""
+    if not body.get("asof"):
+        raise HTTPException(status_code=400, detail="缺少 asof，无法保存推荐")
+    if "picks" not in body:
+        raise HTTPException(status_code=400, detail="缺少 picks，无法保存推荐")
+    if not body.get("environment"):
+        body = {**body, "environment": "SIMULATE"}
+    symbols = body.get("symbols")
+    sym_list: list[str] | None
+    if isinstance(symbols, str):
+        sym_list = _parse_symbols(symbols)
+    elif isinstance(symbols, list):
+        sym_list = [str(s).strip() for s in symbols if str(s).strip()]
+    else:
+        sym_list = None
+    record = _brief_repo(request).save(body, symbols=sym_list)
+    return {
+        "ok": True,
+        "asof": record.asof,
+        "updatedAt": record.updated_at,
+        "pickCount": len(record.picks),
+        "environment": record.environment,
+        "liveTradingEnabled": False,
+        "note": "同日重复保存会覆盖该 asof 的权威存档（幂等 upsert）。",
+    }
+
+
+@router.get("/briefs/{asof}/review")
+def review_brief(
+    request: Request,
+    asof: date,
+    holding: str = Query("1d", description="Holding window, e.g. 1d / 5d"),
+) -> dict[str, Any]:
+    """U3 skeleton: T+N mark for a stored brief (pending when bars missing)."""
+    record = _brief_repo(request).get_by_asof(asof.isoformat())
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到 asof={asof.isoformat()} 的已存推荐，无法复盘",
+        )
+    get_daily = None
+    try:
+        daily = request.app.state.workbench.resolve("daily")
+
+        def _gd(symbols: list[str], *, start: date, end: date) -> list[dict[str, Any]]:
+            return list(daily.get_daily(symbols, start=start, end=end) or [])
+
+        get_daily = _gd
+    except CapabilityUnavailable:
+        get_daily = None
+    payload = record.to_dict()
+    return review_stored_brief(payload, get_daily=get_daily, holding=holding)
 
 
 class BriefToPaperRequest(BaseModel):
@@ -130,6 +307,7 @@ class BriefToPaperRequest(BaseModel):
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
     soft_gates: bool = Field(True, alias="softGates")
+    universe_tier: str | None = Field("watch", alias="universeTier")
     qty: int = Field(100, ge=1, le=1_000_000)
     decision_only: bool = False
     now: str | None = None
@@ -157,7 +335,9 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
         reversal_q=body.reversal_q,
         adjust_kind=kind,
         soft_gates=body.soft_gates,
+        universe_tier=body.universe_tier,
     )
+    _persist_brief(request, brief, symbols=_parse_symbols(body.symbols))
     orders = brief_to_orders(brief, qty=body.qty)
     mid = get_market_strategy(body.market).market_id
     if body.now:
@@ -203,6 +383,7 @@ class WizardDailyRequest(BaseModel):
     top_n: int = Field(5, ge=1, le=100, alias="topN")
     adjust_kind: str | None = "none"
     soft_gates: bool = Field(True, alias="softGates")
+    universe_tier: str | None = Field("watch", alias="universeTier")
     qty: int = Field(100, ge=1, le=1_000_000)
     decision_only: bool = True
     now: str | None = None
@@ -282,6 +463,7 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
             reversal_q=0.30,
             adjust_kind=kind,
             soft_gates=body.soft_gates,
+            universe_tier=body.universe_tier,
         )
         steps.append(
             {
@@ -292,6 +474,7 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                 "gatesRelaxed": brief.get("gatesRelaxed"),
             }
         )
+        _persist_brief(request, brief, symbols=symbols)
     except HTTPException as exc:
         detail = exc.detail
         steps.append({"step": "brief", "ok": False, "error": detail})
@@ -344,6 +527,7 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
             topN=body.top_n,
             adjust_kind=body.adjust_kind,
             softGates=body.soft_gates,
+            universeTier=body.universe_tier,
             qty=body.qty,
             decision_only=body.decision_only,
             now=now_iso,
@@ -393,10 +577,43 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
     }
 
 
+def _settle_get_daily(request: Request):
+    """Prefer engine_sqlite (offline market.db) for settle; else active daily."""
+    state = request.app.state.workbench
+    engine = state.providers.get("engine_sqlite")
+    if engine is not None:
+
+        def _gd_engine(symbols: list[str], *, start: date, end: date) -> list[dict[str, Any]]:
+            return list(engine.get_daily(symbols, start=start, end=end) or [])
+
+        return _gd_engine, "engine_sqlite"
+    try:
+        daily = state.resolve("daily")
+
+        def _gd(symbols: list[str], *, start: date, end: date) -> list[dict[str, Any]]:
+            return list(daily.get_daily(symbols, start=start, end=end) or [])
+
+        return _gd, getattr(daily, "name", "daily")
+    except CapabilityUnavailable:
+        return None, None
+
+
 @router.get("/performance")
 def get_performance(
     request: Request,
     log: str | None = Query(None, description="Optional JSONL path override"),
+    auto_settle: bool = Query(
+        True,
+        alias="autoSettle",
+        description="When true, settle pending rows with enough subsequent bars into JSONL",
+    ),
+    recent_days: int = Query(
+        5,
+        ge=1,
+        le=30,
+        alias="recentDays",
+        description="How many latest settled dates to include in recentDays[]",
+    ),
 ) -> dict[str, Any]:
     """Summarize settled recommend decisions (SIMULATE research metrics)."""
     import stock_platform_research
@@ -410,7 +627,42 @@ def get_performance(
             path = packaged
         elif alt.is_file():
             path = alt
-    return performance_summary(path)
+
+    settle_source = None
+    if auto_settle and path.is_file():
+        get_daily, settle_source = _settle_get_daily(request)
+        if get_daily is not None:
+            summary = settle_performance_log(
+                path, get_daily=get_daily, recent_days=recent_days
+            )
+            summary["settleSource"] = settle_source
+            return summary
+
+    summary = performance_summary(path, recent_days=recent_days)
+    summary["settledNewly"] = 0
+    summary["autoSettled"] = False
+    summary["settleSource"] = settle_source
+    return summary
+
+
+@router.post("/performance/settle")
+def post_settle_performance(
+    request: Request,
+    log: str | None = Query(None, description="Optional JSONL path override"),
+) -> dict[str, Any]:
+    """Explicitly settle pending JSONL rows using engine_sqlite or active daily."""
+    path = Path(log) if log else default_performance_log_path()
+    get_daily, settle_source = _settle_get_daily(request)
+    if get_daily is None:
+        raise HTTPException(
+            status_code=503,
+            detail="无可用日线源，无法结算 pending（可配置 STOCK_PLATFORM_ENGINE_MARKET_DB）",
+        )
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"绩效日志不存在：{path}")
+    summary = settle_performance_log(path, get_daily=get_daily)
+    summary["settleSource"] = settle_source
+    return summary
 
 
 class LogBriefRequest(BaseModel):
@@ -425,30 +677,49 @@ class LogBriefRequest(BaseModel):
     soft_gates: bool = Field(True, alias="softGates")
     holding: str = "5d"
     log: str | None = None
+    from_store: bool = Field(
+        False,
+        alias="fromStore",
+        description="If true, load archived brief by asof instead of regenerating",
+    )
 
 
 @router.post("/performance/log-brief")
 def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
     """Append pending TopN decisions from a brief into the performance JSONL."""
-    kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
-    brief = _build_brief_for_request(
-        request,
-        asof=body.asof,
-        symbols=_parse_symbols(body.symbols),
-        top_n=body.top_n,
-        value_factor=body.value_factor,
-        reversal_q=body.reversal_q,
-        adjust_kind=kind,
-        soft_gates=body.soft_gates,
-    )
     path = Path(body.log) if body.log else default_performance_log_path()
-    rows = log_brief_decisions(path, brief, holding=body.holding)
+    if body.from_store:
+        if body.asof is None:
+            raise HTTPException(status_code=400, detail="fromStore 需要 asof")
+        record = _brief_repo(request).get_by_asof(body.asof.isoformat())
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到 asof={body.asof.isoformat()} 的已存推荐，无法记入绩效",
+            )
+        brief = record.to_dict()
+    else:
+        kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+        brief = _build_brief_for_request(
+            request,
+            asof=body.asof,
+            symbols=_parse_symbols(body.symbols),
+            top_n=body.top_n,
+            value_factor=body.value_factor,
+            reversal_q=body.reversal_q,
+            adjust_kind=kind,
+            soft_gates=body.soft_gates,
+        )
+    rows = log_brief_decisions(path, brief, holding=body.holding, skip_existing=True)
     return {
         "logPath": str(path),
         "appended": len(rows),
         "entries": rows,
+        "fromStore": bool(body.from_store),
+        "asof": brief.get("asof"),
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
+        "note": "同 asof+symbol 已存在则跳过（幂等）",
     }
 
 
@@ -462,6 +733,7 @@ class BriefDebateRequest(BaseModel):
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
     soft_gates: bool = Field(True, alias="softGates")
+    universe_tier: str | None = Field("watch", alias="universeTier")
     engine: str = "deterministic"
     max_picks: int | None = Field(None, ge=1, le=50, alias="maxPicks")
 
@@ -479,6 +751,7 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
         reversal_q=body.reversal_q,
         adjust_kind=kind,
         soft_gates=body.soft_gates,
+        universe_tier=body.universe_tier,
     )
     daily = request.app.state.workbench.resolve("daily")
     try:
@@ -533,6 +806,14 @@ class StrategyCompareRequest(BaseModel):
     config_a: str = Field(..., alias="configA", description="Config id or JSON path")
     config_b: str = Field(..., alias="configB")
     panel: list[dict[str, Any]] | None = None
+    last_n: int = Field(8, ge=2, le=20, alias="lastN")
+    universe_tier: str = Field("core", alias="universeTier")
+    symbols: str | None = None
+    require_engine: bool = Field(
+        False,
+        alias="requireEngine",
+        description="When true, fail-closed 503 if no engine/daily panel (no fixture)",
+    )
 
 
 def _resolve_config_ref(ref: str) -> Any:
@@ -550,14 +831,212 @@ def _resolve_config_ref(ref: str) -> Any:
     raise HTTPException(status_code=404, detail=f"unknown strategy config: {ref}")
 
 
-@router.post("/strategy/compare")
-def post_strategy_compare(body: StrategyCompareRequest) -> dict[str, Any]:
-    panel = pd.DataFrame(body.panel) if body.panel else _fixture_compare_panel()
+def _engine_compare_panel(
+    request: Request,
+    *,
+    last_n: int,
+    universe_tier: str,
+    symbols: list[str] | None,
+) -> tuple[pd.DataFrame | None, str | None, str | None]:
+    """Build multi-day PIT panel from engine/daily; return (panel, source, error)."""
+    get_daily, source = _settle_get_daily(request)
+    if get_daily is None:
+        return None, None, "无可用日线源（engine market.db / daily）"
     try:
-        return compare_strategy_configs(
+        univ, tier, _guidance = resolve_universe_symbols(
+            symbols=symbols,
+            universe_tier=universe_tier or "core",
+        )
+        # Soft cap for interactive compare (not full-market).
+        if len(univ) > 40:
+            univ = univ[:40]
+        asofs = resolve_asof_window(get_daily, last_n=last_n)
+        if len(asofs) < 2:
+            return None, source, "交易日不足 2 日，无法做 PIT 对比"
+        panel = build_multi_day_pit_panel(
+            asof_dates=asofs,
+            symbols=univ,
+            get_daily=get_daily,
+            lookback_calendar_days=120,
+        )
+        if panel.empty or panel["trade_date"].nunique() < 2:
+            return None, source, "engine 面板为空或交易日不足（检查 market.db 覆盖）"
+        return panel, source or "engine_sqlite", None
+    except (UniverseEmptyError, ValueError, FileNotFoundError, OSError, KeyError) as exc:
+        return None, source, str(exc)
+    except Exception as exc:  # noqa: BLE001 — compare must not 500; fall back fixture
+        return None, source, f"{type(exc).__name__}: {exc}"
+
+
+@router.post("/strategy/compare")
+def post_strategy_compare(request: Request, body: StrategyCompareRequest) -> dict[str, Any]:
+    panel_source = "body"
+    panel_note = None
+    if body.panel:
+        panel = pd.DataFrame(body.panel)
+    else:
+        panel, eng_source, eng_err = _engine_compare_panel(
+            request,
+            last_n=body.last_n,
+            universe_tier=body.universe_tier or "core",
+            symbols=_parse_symbols(body.symbols),
+        )
+        if panel is not None:
+            panel_source = eng_source or "engine_sqlite"
+        elif body.require_engine:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    (eng_err or "无法构建 engine 面板")
+                    + "。请配置 STOCK_PLATFORM_ENGINE_MARKET_DB（只读），"
+                    "或去掉 requireEngine 以使用演示 fixture（不冒充 live）。"
+                ),
+            )
+        else:
+            panel = _fixture_compare_panel()
+            panel_source = "fixture"
+            panel_note = (
+                (eng_err + "；") if eng_err else ""
+            ) + "已回退内置演示面板（非 live；研究对比用）"
+
+    try:
+        out = compare_strategy_configs(
             panel,
             _resolve_config_ref(body.config_a),
             _resolve_config_ref(body.config_b),
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    out["panelSource"] = panel_source
+    out["panelRows"] = int(len(panel))
+    out["panelDates"] = int(panel["trade_date"].nunique()) if "trade_date" in panel.columns else 0
+    out["lastN"] = body.last_n
+    out["universeTier"] = body.universe_tier
+    if panel_note:
+        out["panelNote"] = panel_note
+    return out
+
+
+class RollingBacktestRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    last_n: int | None = Field(5, ge=1, le=20, alias="lastN")
+    asof_start: date | None = Field(None, alias="asofStart")
+    asof_end: date | None = Field(None, alias="asofEnd")
+    symbols: str | None = None
+    universe_tier: str | None = Field("watch", alias="universeTier")
+    holding: str = "1d"
+    top_n: int = Field(5, ge=1, le=20, alias="topN")
+    soft_gates: bool = Field(True, alias="softGates")
+
+
+@router.post("/backtest/rolling-review")
+def post_rolling_backtest(request: Request, body: RollingBacktestRequest) -> dict[str, Any]:
+    """U7 light: roll recommend + review_stored_brief on engine/daily (SIMULATE)."""
+    get_daily, source = _settle_get_daily(request)
+    if get_daily is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "无可用日线源，无法回测。请配置 STOCK_PLATFORM_ENGINE_MARKET_DB "
+                "指向 a-stock-engine/data_cache/market.db（只读），或启用含 daily 的预设。"
+            ),
+        )
+    out = run_rolling_recommend_review(
+        get_daily=get_daily,
+        symbols=_parse_symbols(body.symbols),
+        universe_tier=body.universe_tier or "watch",
+        asof_start=body.asof_start,
+        asof_end=body.asof_end,
+        last_n=body.last_n if body.asof_start is None else None,
+        holding=body.holding,
+        top_n=body.top_n,
+        soft_gates=body.soft_gates,
+        daily_source=source,
+    )
+    if not out.get("ok"):
+        raise HTTPException(status_code=400, detail=out.get("error") or "回测失败")
+    return out
+
+
+class WalkForwardRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start: date
+    end: date
+    train_days: int = Field(60, ge=1, le=500, alias="trainDays")
+    test_days: int = Field(20, ge=1, le=120, alias="testDays")
+    step_days: int = Field(20, ge=1, le=120, alias="stepDays")
+    fold_records: list[dict[str, Any]] | None = Field(None, alias="foldRecords")
+    objective: str = "total_return"
+    direction: str = "max"
+
+
+@router.post("/backtest/walk-forward")
+def post_walk_forward(body: WalkForwardRequest) -> dict[str, Any]:
+    """M-R2: walk-forward fold plan + optional OOS summary (not daily brief path)."""
+    try:
+        return summarize_walk_forward(
+            start=body.start,
+            end=body.end,
+            train_days=body.train_days,
+            test_days=body.test_days,
+            step_days=body.step_days,
+            fold_records=body.fold_records,
+            objective=body.objective,
+            direction=body.direction,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/pit/fundamentals")
+def get_pit_fundamentals(
+    request: Request,
+    symbols: str = Query(..., description="Comma-separated CN tickers"),
+    asof: date = Query(..., description="PIT cutoff YYYY-MM-DD"),
+    kind: str = Query(
+        "fundamentals",
+        description="fundamentals (ann_date<=asof) or daily_basic (trade_date=asof)",
+    ),
+) -> dict[str, Any]:
+    """ADR 0050 offline PIT helpers via engine_sqlite (fail-closed; not live financial)."""
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        EngineSqliteProvider,
+        resolve_engine_market_db,
+    )
+
+    if resolve_engine_market_db() is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    try:
+        provider = EngineSqliteProvider()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    try:
+        if kind in {"daily_basic", "daily_basic_pit", "basic"}:
+            rows = provider.get_daily_basic_pit(syms, asof=asof)
+            table = "daily_basic_pit"
+        else:
+            rows = provider.get_fundamentals_pit(syms, asof=asof)
+            table = "fundamentals_pit"
+    except LookupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "offlinePit": True,
+        "dataNote": "offline_pit",
+        "table": table,
+        "asof": asof.isoformat(),
+        "provider": provider.name,
+        "rows": rows,
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+        "note": "非 live financial；与 brief SQLite 分离；禁止未来函数。",
+    }

@@ -20,10 +20,20 @@ FORBIDDEN_BRAND_TOKENS = ("tickflow", "tushare", "akshare", "eastmoney.com")
 
 
 @pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     # CI / unit tests stay offline — force replay regardless of production default.
     monkeypatch.setenv("STOCK_PLATFORM_PROVIDER_PRESET", "replay")
+    db_path = tmp_path / "test_briefs.db"
+    monkeypatch.setenv("STOCK_PLATFORM_DB_URL", f"sqlite:///{db_path.as_posix()}")
+    perf_log = tmp_path / "recommend_decisions.jsonl"
+    monkeypatch.setenv("STOCK_PLATFORM_PERFORMANCE_LOG", str(perf_log))
+    from stock_platform_research import reset_brief_repository_cache
+
+    reset_brief_repository_cache()
     state = build_default_state(FIXTURES)
+    from stock_platform_research import SqliteBriefRepository
+
+    state.brief_repo = SqliteBriefRepository(db_path)
     app = create_app(state=state)
     return TestClient(app)
 
@@ -41,6 +51,10 @@ def test_ops_health_default_replay(client: TestClient) -> None:
     assert body["liveTradingEnabled"] is False
     assert body["executionMode"] == "SIMULATE"
     assert body["defaultReplay"] is True
+    assert body["providerPreset"] == "replay"
+    assert body["briefFallback"] is None or isinstance(body["briefFallback"], str)
+    assert "supplementTokenConfigured" in body
+    assert isinstance(body["supplementTokenConfigured"], bool)
     assert body["eastmoney"]["minInterval"] >= 0
     assert "circuitOpen" in body["eastmoney"]
     assert body["lastRefresh"] is None
@@ -84,8 +98,21 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert "日用向导" in body
     assert "无实盘" in body or "SIMULATE" in body
     assert 'id="performance"' in body
+    assert 'id="backtest"' in body
+    assert 'id="backtest-form"' in body
+    assert 'id="walkforward-form"' in body
     assert 'id="strategy-compare"' in body
+    assert 'id="recommend-tier"' in body
+    assert 'id="recommend-perf-strip"' in body
+    assert "recentDays" in client.get("/static/app.js").text
+    assert "runWalkForwardSummary" in client.get("/static/app.js").text
     assert 'id="pref-preset"' in body
+    assert 'id="recommend-review-block"' in body
+    assert 'id="recommend-review-table"' in body
+    assert 'id="btn-performance-log-stored"' in body
+    assert 'id="btn-performance-settle"' in body
+    assert 'id="strategy-require-engine"' in body
+    assert "复盘" in body
     assert "/static/app.js" in body
     assert "/static/app.css" in body
 
@@ -94,6 +121,7 @@ def test_static_assets(client: TestClient) -> None:
     css = client.get("/static/app.css")
     assert css.status_code == 200
     assert "rec-card" in css.text
+    assert "rec-quick" in css.text
     assert "group-summary" in css.text
     assert ".kv" in css.text
     assert ".steps" in css.text
@@ -121,6 +149,7 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/market/fund-flow" in text
     assert "/api/market/sector-fund-flow" in text
     assert "/api/market/news" in text
+    assert "/api/research/backtest/walk-forward" in text
     assert "/api/market/lhb" in text
     assert "/api/market/unlock" in text
     assert "/api/market/adj-factor" in text
@@ -130,11 +159,15 @@ def test_static_assets(client: TestClient) -> None:
     assert "/api/broker/status" in text
     assert "/api/debate/report" in text
     assert "/api/research/brief" in text
+    assert "/api/research/briefs" in text
     assert "/api/research/brief/to-paper" in text
     assert "/api/research/brief/to-broker" in text
     assert "/api/research/brief/debate" in text
     assert "/api/research/performance" in text
     assert "/api/research/strategy/compare" in text
+    assert "/api/research/backtest/rolling-review" in text
+    assert "openBacktestDay" in text
+    assert "loadRecommendPerfStrip" in text
     assert "fail_closed" in text
     assert "/api/settings/preferences" in text
     assert "/api/settings/presets/" in text
@@ -165,13 +198,165 @@ def test_strategy_compare_api(client: TestClient) -> None:
     assert body["liveTradingEnabled"] is False
     assert "deltaFinalEquity" in body
     assert body["a"]["tradeCount"] >= 1
+    # No engine in default CI client → fixture fallback, never silent about source
+    assert body.get("panelSource") == "fixture"
+    assert "panelNote" in body
+
+
+def test_strategy_compare_require_engine_fail_closed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import stock_platform_workbench.routes.research as research_routes
+
+    monkeypatch.setattr(
+        research_routes,
+        "_settle_get_daily",
+        lambda request: (None, None),
+    )
+    r = client.post(
+        "/api/research/strategy/compare",
+        json={
+            "configA": "lvrev-default-v1",
+            "configB": "lvrev-rev-heavy-v1",
+            "requireEngine": True,
+        },
+    )
+    assert r.status_code == 503
+    assert "ENGINE_MARKET_DB" in (r.json().get("detail") or "")
+
+
+def test_strategy_compare_with_engine_sqlite(client: TestClient, tmp_path: Path) -> None:
+    import sqlite3
+    from datetime import date, timedelta
+
+    from stock_platform_providers.engine_sqlite import EngineSqliteProvider
+
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE daily_price (code TEXT, date TEXT, close REAL, pct_chg REAL, vol REAL, amount REAL, PRIMARY KEY(code,date))"
+    )
+    start = date(2026, 1, 5)
+    symbols = [("600519.SH", "600519"), ("000001.SZ", "000001")]
+    for i in range(100):
+        d = start + timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        for code, _bare in symbols:
+            close = 100.0 + i * 0.15
+            conn.execute(
+                "INSERT INTO daily_price VALUES (?,?,?,?,?,?)",
+                (code, d.isoformat(), close, 0.1, 1.0, 1.0),
+            )
+    conn.commit()
+    conn.close()
+
+    state = client.app.state.workbench
+    state.providers["engine_sqlite"] = EngineSqliteProvider(db)
+    r = client.post(
+        "/api/research/strategy/compare",
+        json={
+            "configA": "lvrev-default-v1",
+            "configB": "lvrev-rev-heavy-v1",
+            "lastN": 5,
+            "universeTier": "core",
+            "symbols": "600519,000001",
+            "requireEngine": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["panelSource"] == "engine_sqlite"
+    assert body["panelRows"] >= 2
+    assert body["liveTradingEnabled"] is False
+
+
+def test_rolling_backtest_fail_closed_without_engine(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No daily source → 503 Chinese fail-closed (not silent fixtures)."""
+    import stock_platform_workbench.routes.research as research_routes
+
+    monkeypatch.setattr(
+        research_routes,
+        "_settle_get_daily",
+        lambda request: (None, None),
+    )
+    r = client.post(
+        "/api/research/backtest/rolling-review",
+        json={"lastN": 3, "universeTier": "core", "topN": 2, "holding": "1d"},
+    )
+    assert r.status_code == 503
+    assert "日线" in (r.json().get("detail") or "")
+    assert "ENGINE_MARKET_DB" in (r.json().get("detail") or "")
+
+def test_rolling_backtest_with_engine_sqlite(client: TestClient, tmp_path: Path) -> None:
+    import sqlite3
+    from datetime import date, timedelta
+
+    from stock_platform_providers.engine_sqlite import EngineSqliteProvider
+
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE daily_price (code TEXT, date TEXT, close REAL, pct_chg REAL, vol REAL, amount REAL, PRIMARY KEY(code,date))"
+    )
+    start = date(2026, 1, 5)
+    symbols = [("600519.SH", "600519"), ("000001.SZ", "000001"), ("000858.SZ", "000858")]
+    for i in range(90):
+        d = start + timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        for code, _bare in symbols:
+            close = 100.0 + i * 0.1
+            conn.execute(
+                "INSERT INTO daily_price VALUES (?,?,?,?,?,?)",
+                (code, d.isoformat(), close, 0.1, 1.0, 1.0),
+            )
+    conn.commit()
+    conn.close()
+
+    state = client.app.state.workbench
+    state.providers["engine_sqlite"] = EngineSqliteProvider(db)
+    r = client.post(
+        "/api/research/backtest/rolling-review",
+        json={
+            "lastN": 3,
+            "universeTier": "core",
+            "symbols": "600519,000001,000858",
+            "topN": 2,
+            "holding": "1d",
+            "softGates": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["dailySource"] == "engine_sqlite"
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    assert body["asofCount"] == 3
+    assert "direction_accuracy" in body
+    assert body["settledCount"] >= 0
+
+
+def test_defaults_universe_tier(client: TestClient) -> None:
+    watch = client.get("/api/research/defaults", params={"universeTier": "watch"})
+    assert watch.status_code == 200
+    w = watch.json()
+    assert w["universeTier"] == "watch"
+    assert w["symbolCount"] >= 5
+    assert "universeTiers" in w
+    full = client.get("/api/research/defaults", params={"universeTier": "full"})
+    assert full.status_code == 200
+    f = full.json()
+    assert f["universeTier"] == "full"
+    assert f["symbolCount"] >= w["symbolCount"]
 
 
 def test_capability_matrix(client: TestClient) -> None:
     r = client.get("/api/settings/capability-matrix")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 12
+    assert len(rows) == 13
     by_id = {row["id"]: row for row in rows}
     assert by_id["daily"]["usable"] is True
     assert by_id["daily"]["effective"] == "replay"
@@ -181,6 +366,8 @@ def test_capability_matrix(client: TestClient) -> None:
     assert by_id["sector_fund_flow"]["effective"] == "replay"
     assert by_id["news"]["usable"] is True
     assert by_id["news"]["effective"] == "replay"
+    assert by_id["concept_blocks"]["usable"] is True
+    assert by_id["concept_blocks"]["effective"] == "replay"
     assert by_id["lhb"]["usable"] is True
     assert by_id["lhb"]["effective"] == "replay"
     assert by_id["unlock"]["usable"] is True
@@ -261,6 +448,54 @@ def test_news_replay(client: TestClient) -> None:
     assert len(body["rows"]) == 2
     assert body["rows"][0]["symbol"] == "600519"
     assert body["rows"][0]["title"].startswith("贵州茅台")
+
+
+def test_concept_blocks_replay(client: TestClient) -> None:
+    r = client.get("/api/market/concept-blocks", params={"symbols": "SH600519"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["capability"] == "concept_blocks"
+    assert body["provider"] == "replay"
+    assert body["items"][0]["symbol"] == "600519"
+    assert body["items"][0]["total"] == 3
+    assert "食品饮料" in body["items"][0]["concept_tags"]
+
+
+def test_walk_forward_summary_api(client: TestClient) -> None:
+    r = client.post(
+        "/api/research/backtest/walk-forward",
+        json={
+            "start": "2020-01-01",
+            "end": "2020-12-31",
+            "trainDays": 60,
+            "testDays": 20,
+            "stepDays": 20,
+            "foldRecords": [
+                {
+                    "index": 0,
+                    "test_end": "2020-05-01",
+                    "is_score": 0.1,
+                    "oos_objective": 0.05,
+                    "oos_stats": {"total_return": 0.05},
+                }
+            ],
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["n_valid_folds"] == 1
+    assert body["summary"]["compounded_oos_return"] == pytest.approx(0.05)
+    assert body["liveTradingEnabled"] is False
+
+
+def test_pit_fundamentals_fail_closed_without_db(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/pit/fundamentals",
+        params={"symbols": "600519", "asof": "2026-06-01"},
+    )
+    assert r.status_code == 503
+    assert "market.db" in str(r.json()["detail"])
 
 
 def test_can_prefer_sector_fund_flow_and_news_astock_http(client: TestClient) -> None:
@@ -681,6 +916,7 @@ def test_apply_live_preset_does_not_enable_trading(client: TestClient) -> None:
     assert listed.json()["default"] == "cn_astock_http"
     ids = {p["id"] for p in listed.json()["presets"]}
     assert "cn_tushare_http" in ids
+    assert "cn_engine_sqlite" in ids
     r = client.post("/api/settings/presets/cn_astock_http/apply")
     assert r.status_code == 200
     body = r.json()
@@ -792,9 +1028,167 @@ def test_research_brief_api(client: TestClient) -> None:
     assert body["provider"] == "replay"
     assert "picks" in body
     assert isinstance(body["picks"], list)
+    assert body.get("persistOk") is True
+    assert body.get("persisted") is True
+    assert body.get("perfLogOk") is True
+    assert body.get("perfLogAppended", 0) >= 1
+
+    # Idempotent: regenerating same asof should not duplicate performance rows
+    again = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 3,
+            "adjust_kind": "none",
+        },
+    )
+    assert again.status_code == 200
+    assert again.json().get("perfLogOk") is True
+    assert again.json().get("perfLogAppended") == 0
+
+    perf = client.get("/api/research/performance")
+    assert perf.status_code == 200
+    assert perf.json()["pendingCount"] >= 1
+    assert perf.json()["totalEntries"] >= 1
 
 
-def test_research_brief_to_paper(client: TestClient) -> None:
+def test_log_brief_from_store(client: TestClient) -> None:
+    client.get(
+        "/api/research/brief",
+        params={"asof": "2026-09-02", "symbols": "600519", "topN": 1, "adjust_kind": "none"},
+    )
+    r = client.post(
+        "/api/research/performance/log-brief",
+        json={"asof": "2026-09-02", "fromStore": True, "holding": "5d"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["fromStore"] is True
+    assert body["appended"] == 0  # already logged on generate
+    assert body["liveTradingEnabled"] is False
+
+
+def test_performance_auto_settle_keeps_pending_without_enough_bars(
+    client: TestClient,
+) -> None:
+    """Replay fixtures lack T+5 after 2026-09-02 → pending stays; API still 200."""
+    client.get(
+        "/api/research/brief",
+        params={"asof": "2026-09-02", "symbols": "600519", "topN": 1, "adjust_kind": "none"},
+    )
+    r = client.get("/api/research/performance", params={"autoSettle": True})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["pendingCount"] >= 1
+    assert body.get("settledNewly", 0) == 0
+    assert "direction_accuracy" in body["metrics"] or body["settledCount"] == 0
+
+
+def test_performance_settle_endpoint_with_injected_engine(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sqlite3
+
+    from stock_platform_providers import EngineSqliteProvider
+
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE daily_price (code TEXT, date TEXT, close REAL, pct_chg REAL, vol REAL, amount REAL, PRIMARY KEY(code,date))"
+    )
+    # Enough sessions after 2026-09-02 for holding=5d
+    dates = [
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-05",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+    ]
+    for i, d in enumerate(dates):
+        conn.execute(
+            "INSERT INTO daily_price VALUES (?,?,?,?,?,?)",
+            ("600519.SH", d, 100.0 + i, 0.0, 1.0, 1.0),
+        )
+    conn.commit()
+    conn.close()
+
+    # Log pending with 1d holding via brief then rewrite holding — use direct log
+    from stock_platform_research.performance import append_jsonl, default_performance_log_path
+
+    path = default_performance_log_path()
+    append_jsonl(
+        path,
+        {
+            "date": "2026-09-02",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "holding": "1d",
+            "pending": True,
+            "source": "test",
+        },
+    )
+    state = client.app.state.workbench
+    state.providers["engine_sqlite"] = EngineSqliteProvider(db)
+    r = client.post("/api/research/performance/settle")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["settleSource"] == "engine_sqlite"
+    assert body["settledNewly"] >= 1
+    assert body["pendingCount"] == 0
+    assert body["metrics"]["direction_accuracy"] == pytest.approx(1.0)
+
+
+def test_research_briefs_persist_list_and_get(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 3,
+            "adjust_kind": "none",
+        },
+    )
+    assert r.status_code == 200
+    brief = r.json()
+    assert brief["persistOk"] is True
+
+    listed = client.get("/api/research/briefs", params={"limit": 10})
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert any(i["asof"] == "2026-09-02" for i in items)
+
+    got = client.get("/api/research/briefs/2026-09-02")
+    assert got.status_code == 200
+    stored = got.json()
+    assert stored["asof"] == "2026-09-02"
+    assert stored["environment"] == "SIMULATE"
+    assert isinstance(stored.get("picks"), list)
+
+    missing = client.get("/api/research/briefs/2099-01-01")
+    assert missing.status_code == 404
+    assert "未找到" in str(missing.json()["detail"])
+
+
+def test_research_brief_review_skeleton(client: TestClient) -> None:
+    client.get(
+        "/api/research/brief",
+        params={"asof": "2026-09-02", "symbols": "600519", "topN": 1, "adjust_kind": "none"},
+    )
+    rev = client.get("/api/research/briefs/2026-09-02/review", params={"holding": "1d"})
+    assert rev.status_code == 200
+    body = rev.json()
+    assert body["asof"] == "2026-09-02"
+    assert body["environment"] == "SIMULATE"
+    assert "rows" in body
+    assert body["liveTradingEnabled"] is False
+    assert "direction_accuracy" in body
+    assert "directionAccuracy" in body
+    assert "todo" not in body
+
     # Daily path: no prior activate — auto-ensures default SIMULATE strategy
     ok = client.post(
         "/api/research/brief/to-paper",
@@ -1060,6 +1454,37 @@ def test_brief_fallback_to_supplementary_with_token(
     assert body["provider"] == "tushare_http"
 
 
+def test_brief_empty_panel_falls_back_to_replay_with_asof_align(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Primary daily returns empty for recent asof + BRIEF_FALLBACK=replay → fixture day."""
+    monkeypatch.setenv("STOCK_PLATFORM_BRIEF_FALLBACK", "replay")
+    state = client.app.state.workbench
+    state.preferences["daily"] = "tushare_http"
+
+    def empty_daily(*_a, **_k):
+        return []
+
+    monkeypatch.setattr(state.providers["tushare_http"], "get_daily", empty_daily)
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-15",
+            "symbols": "600519,000001,510300",
+            "topN": 5,
+            "adjust_kind": "none",
+            "softGates": "true",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["picks"]) >= 1
+    assert body["asof"] == "2026-09-02"
+    assert body.get("providerFallback") is True
+    assert body["provider"] == "replay"
+    assert "样例日" in (body.get("dataNote") or "")
+
+
 def test_brief_empty_picks_message_when_panel_empty(client: TestClient) -> None:
     r = client.get(
         "/api/research/brief",
@@ -1087,6 +1512,13 @@ def test_research_defaults_and_brief_without_asof(client: TestClient) -> None:
     assert body["asof"] == "2026-09-02"  # replay fixture horizon
     assert "600519" in body["symbols"]
     assert body["liveTradingEnabled"] is False
+    assert body.get("universeTier") == "watch"
+    assert int(body.get("topN") or 0) >= 5
+    assert int(body.get("symbolCount") or 0) >= 3
+    assert body.get("asofMode") in {"replay_fixture", "last_completed_cn_session"}
+    assert body.get("generatedAt")
+    assert body.get("loadingHint")
+    assert body.get("hint")
 
     r = client.get(
         "/api/research/brief",
@@ -1096,6 +1528,7 @@ def test_research_defaults_and_brief_without_asof(client: TestClient) -> None:
     brief = r.json()
     assert brief["asof"] == "2026-09-02"
     assert len(brief["picks"]) >= 1
+    assert brief.get("generatedAt")
     assert "生成今日推荐" in client.get("/").text
     assert "/api/research/defaults" in client.get("/static/app.js").text
 
@@ -1103,6 +1536,19 @@ def test_research_defaults_and_brief_without_asof(client: TestClient) -> None:
 def test_ui_shows_generate_cta(client: TestClient) -> None:
     body = client.get("/").text
     assert "生成今日推荐" in body
+    assert "今日选股结果" in body
+    assert 'id="recommend-kv"' in body
+    assert 'id="recommend-loading"' in body
+    assert "写入纸面（SIMULATE）" in body
+    assert "关键理由" in body
+    assert 'value="600519,000001,510300"' not in body
     js = client.get("/static/app.js").text
     assert "applyBriefToRecommendPanel" in js
     assert "loadRecommendDefaults" in js
+    assert "setRecommendBusy" in js
+    assert "formatBriefError" in js
+    assert "generatedAt" in js
+    assert "gatesRelaxed" in js
+    css = client.get("/static/app.css").text
+    assert "is-loading" in css
+    assert "button:disabled" in css

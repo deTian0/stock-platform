@@ -21,6 +21,11 @@ from .eastmoney import (
     is_transient_http_error,
     reset_default_client,
 )
+from .engine_sqlite import (
+    ENV_ENGINE_MARKET_DB,
+    EngineSqliteProvider,
+    resolve_engine_market_db,
+)
 from .presets import (
     DEFAULT_STARTUP_PRESET,
     ENV_PROVIDER_PRESET,
@@ -67,9 +72,11 @@ __all__ = [
     "CAPABILITY_REGISTRY",
     "CircuitOpenError",
     "DEFAULT_TUSHARE_URL",
+    "ENV_ENGINE_MARKET_DB",
     "ENV_TUSHARE_TOKEN",
     "ENV_TUSHARE_URL",
     "EastmoneyClient",
+    "EngineSqliteProvider",
     "GlobalHttpProvider",
     "GlobalHttpRouter",
     "GlobalReplayProvider",
@@ -114,8 +121,9 @@ __all__ = [
     "register_builtin_providers",
     "reset_default_client",
     "reset_provider_registry",
+    "resolve_engine_market_db",
     "resolve_tushare_token",
     "to_ts_code",
 ]
 
-__version__ = "3.10.1"
+__version__ = "3.11.0"

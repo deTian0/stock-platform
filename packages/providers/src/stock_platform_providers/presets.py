@@ -19,6 +19,7 @@ _CN_LIVE_CAPABILITIES: tuple[str, ...] = (
     "unlock",
     "sector_fund_flow",
     "news",
+    "concept_blocks",
 )
 
 _REPLAY_PREFS: dict[str, str] = {cap: "replay" for cap in _CN_LIVE_CAPABILITIES}
@@ -76,13 +77,32 @@ PREFERENCE_PRESETS: dict[str, dict[str, Any]] = {
             "cn_astock_http. Never commit the token."
         ),
     },
+    "cn_engine_sqlite": {
+        "id": "cn_engine_sqlite",
+        "label": "CN daily via a-stock-engine market.db (offline)",
+        "is_default": False,
+        "preferences": {
+            **_REPLAY_PREFS,
+            "daily": "engine_sqlite",
+        },
+        "note": (
+            "Offline: daily → engine_sqlite (STOCK_PLATFORM_ENGINE_MARKET_DB); "
+            "other caps stay replay. For PIT/settle/compare — not live trading."
+        ),
+    },
 }
 
 
 def list_preference_presets() -> list[dict[str, Any]]:
     return [
         dict(PREFERENCE_PRESETS[k])
-        for k in ("replay", "cn_astock_http", "us_hk_global_http", "cn_tushare_http")
+        for k in (
+            "replay",
+            "cn_astock_http",
+            "us_hk_global_http",
+            "cn_tushare_http",
+            "cn_engine_sqlite",
+        )
     ]
 
 

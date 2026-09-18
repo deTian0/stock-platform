@@ -1,0 +1,25 @@
+{
+  "symbol": "600519",
+  "total": 3,
+  "boards": [
+    {
+      "name": "食品饮料",
+      "code": "BK0481",
+      "change_pct": 0.85,
+      "lead_stock": "贵州茅台"
+    },
+    {
+      "name": "白酒概念",
+      "code": "BK0896",
+      "change_pct": 1.2,
+      "lead_stock": "贵州茅台"
+    },
+    {
+      "name": "贵州板块",
+      "code": "BK0552",
+      "change_pct": -0.3,
+      "lead_stock": "贵州茅台"
+    }
+  ],
+  "concept_tags": ["食品饮料", "白酒概念", "贵州板块"]
+}

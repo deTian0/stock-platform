@@ -1,7 +1,9 @@
 # 上游参考仓归档说明
 
 > 状态：**Accepted（M7）**  
-> `stock-platform` 是唯一产品仓。下列仓库仅作历史参考 / 配方来源，**不得**再作为并行运行时或第二数据主链。
+> `stock-platform` 是唯一产品仓。下列仓库仅作历史参考 / 配方来源，**不得**再作为并行运行时或第二数据主链。  
+> 工作区八仓能力盘点（合并输入，不实施）：[`.cursor/plans/workspace-projects-capability-inventory.md`](../.cursor/plans/workspace-projects-capability-inventory.md)。  
+> 按能力域合并路线图：[`.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)。
 
 ## 总表
 
@@ -13,7 +15,7 @@
 | a-stock-engine | `../a-stock-engine` | lvrev / 闸门 / PIT 口径 | `packages/research` | 引擎仓冻结新功能；缺陷优先修平台 |
 | TradingAgents-astock | `../TradingAgents-astock` | 多角色研报思路（去内嵌抓取） | `packages/agents` | 完整 LangGraph 可选参考；数据必须经 providers |
 | V2-code-review | `../V2-code-review-20260905` | 执行安全结论（新鲜度/事务/草稿激活/paper-only） | `packages/execution` | 审查快照只读；不吸收 Futu/凭据 |
-| finance-quant-skills | `../finance-quant-skills` | 技能文档 | （不进运行时） | 文档仓；不安装为依赖 |
+| finance-quant-skills | `../finance-quant-skills` | 技能文档 | （不进运行时） | 文档仓；不安装为依赖；软链见 [`docs/ops/skills-governance.md`](ops/skills-governance.md) |
 
 ## 红线（产品期仍生效）
 
@@ -21,7 +23,7 @@
 2. **能力矩阵权威**：缺能力 fail-closed（409），禁止静默降级到未知源。
 3. **市场策略分表**：CN / US / HK 不得混用 T+1 / 涨跌停假设。
 4. **执行默认纸面**：`SIMULATE` + `liveTradingEnabled=false`；无实盘开关。
-5. **上游只读**：新需求默认在本仓开里程碑；上游 PR 仅当「配方回馈」且需双写说明。
+5. **上游只读**：新需求默认在本仓开里程碑；上游 PR 仅当「配方回馈」且需双写说明。Skill 仓禁止 pip / 平行抓取：[`ops/skills-governance.md`](ops/skills-governance.md)。
 
 ## 未迁入（刻意延期）
 

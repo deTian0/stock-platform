@@ -7,7 +7,7 @@
 3. **口径不混用**：涨跌幅小数/百分数、复权/原始价、交易日/自然日、CN 手 vs US/HK 股。
 4. **小步提交**：小里程碑 patch tag；大里程碑 minor；**破坏契约自 1.0 起必须 major**。
 5. **不覆盖无关改动**：PR 只做一件事。
-6. **上游只读**：参考 [`docs/upstream-archive.md`](docs/upstream-archive.md)；禁止整仓拷贝。
+6. **上游只读**：参考 [`docs/upstream-archive.md`](docs/upstream-archive.md)；禁止整仓拷贝。Skill / 文档仓软链与禁止 pip 见 [`docs/ops/skills-governance.md`](docs/ops/skills-governance.md)。
 
 ## 开发流程
 

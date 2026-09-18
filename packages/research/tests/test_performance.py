@@ -89,6 +89,22 @@ def test_brief_to_pending_and_settle_map() -> None:
     assert settled[1]["raw"] == "-1.00%"
 
 
+def test_log_brief_decisions_skips_existing(tmp_path: Path) -> None:
+    from stock_platform_research.performance import log_brief_decisions
+
+    log = tmp_path / "decisions.jsonl"
+    brief = {
+        "asof": "2026-09-02",
+        "picks": [{"rank": 1, "symbol": "600519", "composite_score": 0.9}],
+    }
+    first = log_brief_decisions(log, brief, holding="5d")
+    assert len(first) == 1
+    second = log_brief_decisions(log, brief, holding="5d")
+    assert second == []
+    lines = log.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+
+
 def test_pending_skipped_in_metrics() -> None:
     entries = [
         {
@@ -159,3 +175,41 @@ def test_align_fills_duck_type_object(tmp_path: Path) -> None:
     rows = align_fills_to_performance([_Fill()], log_path=log)
     assert rows[0]["symbol"] == "600000"
     assert rows[0]["pending"] is True
+
+
+def test_settle_performance_log_rewrites_when_bars_ready(tmp_path: Path) -> None:
+    from stock_platform_research.performance import (
+        append_jsonl,
+        settle_performance_log,
+    )
+
+    log = tmp_path / "p.jsonl"
+    append_jsonl(
+        log,
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "holding": "1d",
+            "pending": True,
+            "source": "brief",
+        },
+    )
+
+    def get_daily(symbols, *, start, end):
+        assert symbols == ["600519"]
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 103.0},
+        ]
+
+    summary = settle_performance_log(log, get_daily=get_daily)
+    assert summary["settledNewly"] == 1
+    assert summary["autoSettled"] is True
+    assert summary["pendingCount"] == 0
+    assert summary["settledCount"] == 1
+    assert summary["metrics"]["direction_accuracy"] == pytest.approx(1.0)
+    rows = load_jsonl(log)
+    assert rows[0]["pending"] is False
+    assert rows[0]["raw"] == "+3.00%"

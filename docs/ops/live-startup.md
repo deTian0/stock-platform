@@ -62,6 +62,20 @@ Invoke-RestMethod -Method Post http://127.0.0.1:3018/api/settings/presets/cn_tus
 
 **不会**在 live 偏好下静默回退到 fixtures。
 
+## 日用最小步骤（商用可用最短路径）
+
+对应计划 DoD：`.cursor/plans/usable-recommend-review-milestones.md`。
+
+1. 复制 `.env.example` → `.env`，填入 `STOCK_PLATFORM_TUSHARE_TOKEN`（勿提交）。  
+2. 建议：`STOCK_PLATFORM_PROVIDER_PRESET=cn_tushare_http`（或 UI「偏好预设」切到同名）。  
+3. `.\start-workbench.bat` 或 `python -m stock_platform_workbench` → 打开 `#recommend`。  
+4. 点「生成今日推荐」→ 自动落库 + 记入绩效 pending；下方「历史推荐」可「回看 / 复盘」。  
+5. `#performance` 刷新可见样本；有后续行情时自动结算 pending（可配 `STOCK_PLATFORM_ENGINE_MARKET_DB` 用引擎本地日线，见 [`engine-market-db.md`](engine-market-db.md)）。  
+6. `/api/ops/health` 核对 `providerPreset` / `supplementTokenConfigured` / `briefFallback`（仅布尔，无 token 明文）。  
+7. **不要**设 `STOCK_PLATFORM_BRIEF_FALLBACK=replay` 冒充 live。
+
+日批 live：见 [`daily-pipeline.md`](daily-pipeline.md)「真实日用」；默认可仍 replay。
+
 ## CI / 测试强制 replay
 
 ```powershell

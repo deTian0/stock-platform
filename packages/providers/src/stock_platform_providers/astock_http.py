@@ -17,6 +17,7 @@ from .eastmoney import (
 )
 from .normalize import (
     normalize_adj_factor_row,
+    normalize_concept_blocks_payload,
     normalize_daily_row,
     normalize_depth5_row,
     normalize_financial_payload,
@@ -38,6 +39,7 @@ KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 NEWS_URL = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
+CONCEPT_BLOCKS_URL = "https://push2.eastmoney.com/api/qt/slist/get"
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 SINA_FINANCE_URL = (
     "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
@@ -531,6 +533,46 @@ class AStockHttpProvider:
                     break
             rows.extend(sym_rows)
         return rows
+
+    def get_concept_blocks(
+        self,
+        symbols: list[str],
+        *,
+        asset_type: AssetType = "stock",
+    ) -> list[dict[str, Any]]:
+        """Stock → board membership via push2 ``slist`` (spt=3), em_get.
+
+        Returns one aggregate payload per symbol (boards + concept_tags).
+        East Money mixes industry / concept / region in one list.
+        """
+        items: list[dict[str, Any]] = []
+        for raw_sym in symbols:
+            code = normalize_symbol(raw_sym, market="CN")
+            payload = self._fetch(
+                CONCEPT_BLOCKS_URL,
+                {
+                    "fltt": "2",
+                    "invt": "2",
+                    "secid": em_secid(code),
+                    "spt": "3",
+                    "pi": "0",
+                    "pz": "200",
+                    "po": "1",
+                    "fields": "f12,f14,f3,f128",
+                },
+            )
+            data = payload.get("data") or {}
+            diff = data.get("diff") or {}
+            items.append(
+                normalize_concept_blocks_payload(
+                    {"symbol": code, "boards": diff},
+                    source=self.name,
+                    asset_type=asset_type,
+                    default_symbol=code,
+                    market="CN",
+                )
+            )
+        return items
 
     def _datacenter(
         self,

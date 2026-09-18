@@ -19,6 +19,11 @@ CAPABILITY_REGISTRY: list[dict[str, str]] = [
     {"id": "unlock", "label": "限售解禁", "desc": "个股历史解禁 + 未来待解禁（万股）"},
     {"id": "sector_fund_flow", "label": "板块资金流", "desc": "板块/概念日级主力净流入（元）"},
     {"id": "news", "label": "轻量新闻", "desc": "个股/板块轻量新闻特征（非 LLM 摘要）"},
+    {
+        "id": "concept_blocks",
+        "label": "概念板块归属",
+        "desc": "个股所属行业/概念/地域板块列表（BK 码 + 涨跌幅）",
+    },
 ]
 
 CAPABILITY_IDS: tuple[str, ...] = tuple(item["id"] for item in CAPABILITY_REGISTRY)
@@ -92,6 +97,7 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "unlock",
                     "sector_fund_flow",
                     "news",
+                    "concept_blocks",
                 }
             ),
             available=True,
@@ -118,13 +124,14 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                     "unlock",
                     "sector_fund_flow",
                     "news",
+                    "concept_blocks",
                 }
             ),
             available=True,
             status="ok",
             note=(
                 "Live: East Money via em_get (incl. full_minute 1m batch, "
-                "sector_fund_flow, news); "
+                "sector_fund_flow, news, concept_blocks); "
                 "financial/adj_factor via Sina HTTP (not em_get); "
                 "production workbench default; set STOCK_PLATFORM_PROVIDER_PRESET=replay for CI"
             ),
@@ -165,6 +172,21 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
                 "token from STOCK_PLATFORM_TUSHARE_TOKEN; "
                 "URL STOCK_PLATFORM_TUSHARE_URL (default https://t.xiaodefa.top/); "
                 "not the production default — apply cn_tushare_http preset"
+            ),
+        )
+    )
+    reg.register(
+        ProviderDeclaration(
+            name="engine_sqlite",
+            display="a-stock-engine market.db (offline daily)",
+            kind="builtin",
+            datasets=frozenset({"daily"}),
+            available=True,
+            status="ok",
+            note=(
+                "Read-only daily_price from a-stock-engine data_cache/market.db; "
+                "path via STOCK_PLATFORM_ENGINE_MARKET_DB; "
+                "offline/replay/settle — not a live default"
             ),
         )
     )

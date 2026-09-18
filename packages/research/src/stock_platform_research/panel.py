@@ -242,6 +242,81 @@ def build_cross_section_panel(
     return panel.reset_index(drop=True)
 
 
+def build_multi_day_pit_panel(
+    *,
+    asof_dates: list[date] | list[str],
+    symbols: list[str] | None = None,
+    universe_path: str | Path | None = None,
+    daily_provider: DailyProvider | None = None,
+    get_daily: GetDaily | None = None,
+    lookback_calendar_days: int = 120,
+) -> pd.DataFrame:
+    """Stack single-day PIT cross-sections for a short asof window (strategy compare).
+
+    Fetches bars once for ``min(asof)-lookback`` … ``max(asof)``, then runs
+    ``_compute_features`` per signal day. Soft-capped by caller (keep windows small).
+    """
+    if not asof_dates:
+        return pd.DataFrame(
+            columns=[
+                "trade_date",
+                "symbol",
+                "open",
+                "close",
+                "vol20",
+                "rev_chg",
+                "ma20",
+                "ma60",
+            ]
+        )
+    days: list[date] = []
+    for raw in asof_dates:
+        if isinstance(raw, str):
+            days.append(date.fromisoformat(raw[:10]))
+        else:
+            days.append(raw)
+    days = sorted(set(days))
+
+    if symbols is not None:
+        univ = normalize_universe(symbols)
+        if not univ:
+            raise UniverseEmptyError("symbols list is empty after normalize")
+    else:
+        univ = load_universe(universe_path)
+
+    if daily_provider is None and get_daily is None:
+        raise ValueError("daily_provider or get_daily is required")
+
+    start = days[0] - timedelta(days=int(lookback_calendar_days))
+    end = days[-1]
+    if daily_provider is not None:
+        raw_bars = daily_provider.get_daily(univ, start=start, end=end)
+    else:
+        assert get_daily is not None
+        raw_bars = get_daily(univ, start=start, end=end)
+
+    hist = _bars_to_frame(list(raw_bars))
+    frames: list[pd.DataFrame] = []
+    for asof_d in days:
+        part = _compute_features(hist, asof_d)
+        if not part.empty:
+            frames.append(part)
+    if not frames:
+        return pd.DataFrame(
+            columns=[
+                "trade_date",
+                "symbol",
+                "open",
+                "close",
+                "vol20",
+                "rev_chg",
+                "ma20",
+                "ma60",
+            ]
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
 def panel_to_csv(panel: pd.DataFrame, path: str | Path) -> Path:
     """Persist panel as CSV (UTF-8, no index)."""
     out = Path(path)
