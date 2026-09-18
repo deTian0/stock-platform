@@ -752,6 +752,78 @@
       </details>
     </section>
 
+    <section id="concept-blocks" class="panel">
+      <h2>概念板块归属</h2>
+      <p class="hint">个股所属行业/概念/地域（BK）；默认 replay；可选 astock_http（em_get）。缺能力 409。</p>
+      <form id="concept-blocks-form" class="row">
+        <label>symbols
+          <input id="concept-blocks-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="concept-blocks-meta" class="status" aria-live="polite"></p>
+      <pre id="concept-blocks-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="concept-blocks-table">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>板块</th>
+              <th>BK</th>
+              <th class="num">涨跌%</th>
+              <th>领涨股</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="concept-blocks-json" class="code"></pre>
+      </details>
+    </section>
+
+    <section id="pit-fundamentals" class="panel">
+      <h2>离线 PIT 基本面</h2>
+      <p class="hint">ADR 0050：只读 engine <code>market.db</code>；非 live financial。无 DB → 503 fail-closed。SIMULATE。</p>
+      <form id="pit-fundamentals-form" class="row">
+        <label>symbols
+          <input id="pit-fundamentals-symbols" name="symbols" value="600519" autocomplete="off" />
+        </label>
+        <label>asof
+          <input id="pit-fundamentals-asof" name="asof" type="date" value="2026-06-01" />
+        </label>
+        <label>kind
+          <select id="pit-fundamentals-kind" name="kind">
+            <option value="fundamentals">fundamentals_pit</option>
+            <option value="daily_basic">daily_basic_pit</option>
+          </select>
+        </label>
+        <button type="submit">查询</button>
+      </form>
+      <p id="pit-fundamentals-meta" class="status" aria-live="polite"></p>
+      <pre id="pit-fundamentals-error" class="error" hidden></pre>
+      <div class="table-wrap">
+        <table id="pit-fundamentals-table">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>asof/公告</th>
+              <th class="num">ROE</th>
+              <th class="num">EPS</th>
+              <th class="num">PE</th>
+              <th class="num">PB</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="pit-fundamentals-json" class="code"></pre>
+      </details>
+    </section>
+
       </div>
     </details>
 
@@ -808,6 +880,12 @@
         </label>
         <label>unlock provider
           <select id="pref-unlock">
+            <option value="replay">replay</option>
+            <option value="astock_http">astock_http</option>
+          </select>
+        </label>
+        <label>concept_blocks provider
+          <select id="pref-concept-blocks">
             <option value="replay">replay</option>
             <option value="astock_http">astock_http</option>
           </select>

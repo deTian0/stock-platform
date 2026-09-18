@@ -474,6 +474,12 @@
       if (unlock && unlock.effective) {
         $("pref-unlock").value = unlock.effective;
       }
+      const conceptBlocks = rows.find(function (r) {
+        return r.id === "concept_blocks";
+      });
+      if (conceptBlocks && conceptBlocks.effective && $("pref-concept-blocks")) {
+        $("pref-concept-blocks").value = conceptBlocks.effective;
+      }
       const minute = rows.find(function (r) {
         return r.id === "minute";
       });
@@ -561,6 +567,9 @@
     const newsPref = $("pref-news").value;
     const lhb = $("pref-lhb").value;
     const unlock = $("pref-unlock").value;
+    const conceptBlocks = $("pref-concept-blocks")
+      ? $("pref-concept-blocks").value
+      : "replay";
     const minute = $("pref-minute").value;
     const depth5 = $("pref-depth5").value;
     const financial = $("pref-financial").value;
@@ -579,6 +588,7 @@
             news: newsPref,
             lhb: lhb,
             unlock: unlock,
+            concept_blocks: conceptBlocks,
             minute: minute,
             depth5: depth5,
             financial: financial,
@@ -2487,6 +2497,135 @@
     }
   }
 
+  async function loadConceptBlocks(event) {
+    if (event) event.preventDefault();
+    const errEl = $("concept-blocks-error");
+    clearError(errEl);
+    $("concept-blocks-meta").textContent = "";
+    setRawJson("concept-blocks-json", null);
+    const symbols = $("concept-blocks-symbols").value.trim();
+    const params = new URLSearchParams({ symbols: symbols });
+    const tbody = $("concept-blocks-table").querySelector("tbody");
+    try {
+      const data = await fetchJson("/api/market/concept-blocks?" + params.toString());
+      const items = data.items || [];
+      var boardCount = 0;
+      for (var i = 0; i < items.length; i++) {
+        boardCount += (items[i].boards || []).length;
+      }
+      $("concept-blocks-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · 标的=" +
+        items.length +
+        " · 板块=" +
+        boardCount;
+      setRawJson("concept-blocks-json", data);
+      tbody.innerHTML = "";
+      if (!items.length) {
+        emptyTable(tbody, 5, "暂无概念板块");
+        return;
+      }
+      for (const item of items) {
+        const boards = item.boards || [];
+        if (!boards.length) {
+          const tr = document.createElement("tr");
+          tr.className = "empty-row";
+          tr.innerHTML = td(item.symbol) + '<td colspan="4">无板块归属</td>';
+          tbody.appendChild(tr);
+          continue;
+        }
+        for (const row of boards) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            td(item.symbol) +
+            td(row.name || "") +
+            td(row.code || "") +
+            tdNum(
+              row.change_pct != null && row.change_pct !== ""
+                ? (Number(row.change_pct) > 0 ? "+" : "") +
+                    Number(row.change_pct).toFixed(2) +
+                    "%"
+                : "—",
+              signedClass(row.change_pct)
+            ) +
+            td(row.lead_stock || "");
+          tbody.appendChild(tr);
+        }
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      emptyTable(tbody, 5, "查询失败");
+      setRawJson("concept-blocks-json", null);
+    }
+  }
+
+  async function loadPitFundamentals(event) {
+    if (event) event.preventDefault();
+    const errEl = $("pit-fundamentals-error");
+    clearError(errEl);
+    $("pit-fundamentals-meta").textContent = "";
+    setRawJson("pit-fundamentals-json", null);
+    const symbols = $("pit-fundamentals-symbols").value.trim();
+    const asof = $("pit-fundamentals-asof").value;
+    const kind = $("pit-fundamentals-kind").value;
+    const params = new URLSearchParams({
+      symbols: symbols,
+      asof: asof,
+      kind: kind,
+    });
+    const tbody = $("pit-fundamentals-table").querySelector("tbody");
+    try {
+      const data = await fetchJson(
+        "/api/research/pit/fundamentals?" + params.toString()
+      );
+      const rows = data.rows || [];
+      $("pit-fundamentals-meta").textContent =
+        "provider=" +
+        data.provider +
+        " · table=" +
+        (data.table || "") +
+        " · asof=" +
+        (data.asof || asof) +
+        " · rows=" +
+        rows.length +
+        " · offlinePit";
+      setRawJson("pit-fundamentals-json", data);
+      tbody.innerHTML = "";
+      if (!rows.length) {
+        emptyTable(tbody, 6, "无 PIT 行（或表空）");
+        return;
+      }
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        const when =
+          row.ann_date || row.trade_date || row.asof || data.asof || "";
+        tr.innerHTML =
+          td(row.symbol || row.code || "") +
+          td(when) +
+          tdNum(row.roe != null ? row.roe : "—") +
+          tdNum(row.eps != null ? row.eps : row.eps_ttm != null ? row.eps_ttm : "—") +
+          tdNum(row.pe != null ? row.pe : row.pe_ttm != null ? row.pe_ttm : "—") +
+          tdNum(row.pb != null ? row.pb : "—");
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      const detail = e.detail || { message: String(e) };
+      if (e.status === 503 || e.status === 409) {
+        showError(errEl, { fail_closed: true, ...detail });
+      } else {
+        showError(errEl, detail);
+      }
+      emptyTable(tbody, 6, "查询失败（无 DB 时预期 503）");
+      setRawJson("pit-fundamentals-json", null);
+    }
+  }
+
   function boot() {
     $("btn-matrix").addEventListener("click", loadMatrix);
     $("btn-preset").addEventListener("click", applyPreset);
@@ -2507,6 +2646,12 @@
     $("news-form").addEventListener("submit", loadNews);
     $("lhb-form").addEventListener("submit", loadLhb);
     $("unlock-form").addEventListener("submit", loadUnlock);
+    if ($("concept-blocks-form")) {
+      $("concept-blocks-form").addEventListener("submit", loadConceptBlocks);
+    }
+    if ($("pit-fundamentals-form")) {
+      $("pit-fundamentals-form").addEventListener("submit", loadPitFundamentals);
+    }
     $("debate-form").addEventListener("submit", loadDebate);
     $("recommend-form").addEventListener("submit", loadRecommend);
     $("btn-recommend-paper").addEventListener("click", recommendToPaper);

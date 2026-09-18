@@ -36,6 +36,6 @@
 
 ## 下一步（M-E2）
 
-1. P1：错哈希 / 错 strategyHash 阻断的轻量回归用例（若尚未覆盖边角）。  
-2. P2：费用门槛与 pause 语义补测（仍 SIMULATE）。  
+1. P1：错哈希 / 错 strategyHash 阻断的轻量回归用例（若尚未覆盖边角）。**done** → `packages/execution/tests/test_me2_safety_gaps.py`  
+2. P2：费用门槛与 pause 语义补测（仍 SIMULATE）— order_guards fail-closed 已补；全局 pause 仍 P2 余量。  
 3. 保持 `docs/ops` 诚实：experimental ≠ 生产。

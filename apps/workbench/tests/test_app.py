@@ -79,6 +79,12 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="news"' in body
     assert 'id="lhb"' in body
     assert 'id="unlock"' in body
+    assert 'id="concept-blocks"' in body
+    assert 'id="pit-fundamentals"' in body
+    assert 'id="concept-blocks-form"' in body
+    assert 'id="pit-fundamentals-form"' in body
+    assert "loadConceptBlocks" in client.get("/static/app.js").text
+    assert "loadPitFundamentals" in client.get("/static/app.js").text
     assert 'id="adj-factor"' in body
     assert 'id="daily-adjusted"' in body
     assert 'id="full-minute"' in body

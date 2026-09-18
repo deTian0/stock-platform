@@ -56,6 +56,8 @@ from .walkforward import (
     generate_folds,
     summarize_walk_forward,
 )
+from .empirical_compare import compare_empirical_baseline, extract_engine_fold_returns
+from .factor_ic import spearman_rank_ic, summarize_factor_ic
 
 __all__ = [
     "W_DEFAULT",
@@ -77,12 +79,14 @@ __all__ = [
     "build_multi_day_pit_panel",
     "build_premarket_brief",
     "build_reasons_for_row",
+    "compare_empirical_baseline",
     "compare_strategy_configs",
     "compute_performance",
     "default_daily_universe_path",
     "default_db_url",
     "default_performance_log_path",
     "default_universe_fixture_path",
+    "extract_engine_fold_returns",
     "factor_scores",
     "generate_folds",
     "list_strategy_configs",
@@ -111,9 +115,11 @@ __all__ = [
     "score_lvrev",
     "settle_performance_log",
     "settled_records",
+    "spearman_rank_ic",
+    "summarize_factor_ic",
     "summarize_walk_forward",
     "universe_size_guidance",
     "write_brief_csv",
 ]
 
-__version__ = "3.11.0"
+__version__ = "3.11.1"

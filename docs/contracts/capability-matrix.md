@@ -60,7 +60,7 @@ CapabilityStatus {
 | `astock_http` | a-stock-data 配方 | **M8.1 已实现**；**M15–M23** + **M41** + **M-D3**（`full_minute`/板块资金流/新闻/概念板块经 `em_get`；adj_factor/financial 新浪；套价纯函数） | daily, realtime, adj_factor, minute, depth5, financial, full_minute, fund_flow, lhb, unlock, sector_fund_flow, news, concept_blocks |
 | `tushare_http` | Tushare 兼容 HTTP | **v3.10.0**（ADR 0048）；补充源，非生产默认 | daily（首切片）；`trade_cal` helper |
 | `global_replay` | fixtures | **M5.3 已实现** | daily, realtime（US/HK） |
-| `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现** | daily, realtime（US/HK） |
+| `global_http` | Yahoo + 新浪（Skill 配方） | **M9.1 已实现**；美港 `financial` 等见 [M-D5](../ops/m-d5-global-thin-gap.md)（暂缓） | daily, realtime（US/HK） |
 | `tickflow` | TSP 内置 | M2 | 按档位 |
 | `yaml_custom` | 用户 YAML | M2 | 声明集 |
 
