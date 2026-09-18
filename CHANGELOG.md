@@ -8,6 +8,22 @@
 
 - （无）
 
+## [3.11.1] - 2026-09-18
+
+### Added
+
+- **M-R3**：[`docs/ops/empirical-baseline-compare.md`](docs/ops/empirical-baseline-compare.md) + `compare_empirical_baseline`（只读对照，无双调度）
+- **M-R4 薄刀**：`summarize_factor_ic` / Spearman rank IC（不进 brief 主路径）
+- **M-A3**：`role_prompts`（政策/游资/解禁等）+ 所需 capabilities fail-closed
+- **M-E2**：错哈希 / admission / order_guards 安全缺口回归测（SIMULATE）
+- **M-D5**：[`docs/ops/m-d5-global-thin-gap.md`](docs/ops/m-d5-global-thin-gap.md)（美港薄缺口；不接期权/SEC）
+- **M-S2**：[`docs/ops/skill-recipe-feedback-checklist.md`](docs/ops/skill-recipe-feedback-checklist.md)
+- **Workbench**：`#concept-blocks` / `#pit-fundamentals` 只读面板
+
+### Changed
+
+- 能力域路线图 Later 首批收口；版本 **3.11.1**
+
 ## [3.11.0] - 2026-09-18
 
 ### Added

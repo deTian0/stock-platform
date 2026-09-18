@@ -126,4 +126,4 @@ __all__ = [
     "to_ts_code",
 ]
 
-__version__ = "3.11.0"
+__version__ = "3.11.1"
