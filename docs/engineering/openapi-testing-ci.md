@@ -14,6 +14,8 @@
 
 契约测：`apps/workbench/tests/test_openapi_contract.py`（路径存在 + 成功响应 schema 非空 object）。
 
+全量 endpoint smoke：`apps/workbench/tests/test_all_api_endpoints.py`（OpenAPI 每个 path+method 至少一击 + 目录与 openapi 对齐门禁；`STOCK_PLATFORM_PROVIDER_PRESET=replay`）。
+
 ## 测试分层
 
 `apps/workbench` 注册 markers：
