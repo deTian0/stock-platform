@@ -12,6 +12,7 @@ from fastapi import APIRouter, Request
 from stock_platform_providers.eastmoney import get_default_client
 from stock_platform_workbench import __version__
 from stock_platform_workbench.brief_ux import ops_data_visibility
+from stock_platform_workbench.openapi_models import OpsHealthResponse, RESP_503, ok200
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 
@@ -39,7 +40,12 @@ def _load_last_refresh() -> dict[str, Any] | None:
     }
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="运维健康快照",
+    response_model=OpsHealthResponse,
+    responses={**ok200(OpsHealthResponse, "Prefs + EM circuit + optional last refresh"), **RESP_503},
+)
 def ops_health(request: Request) -> dict[str, Any]:
     """Deeper than GET /health: prefs + EM circuit + optional last refresh."""
     state = request.app.state.workbench

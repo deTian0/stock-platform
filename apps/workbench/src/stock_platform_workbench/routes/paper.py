@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 
 from stock_platform_execution import (
@@ -19,6 +19,14 @@ from stock_platform_execution import (
 from stock_platform_execution.timing import market_now
 from stock_platform_providers import get_market_strategy
 
+from ..openapi_models import (
+    RESP_400,
+    PaperDraftResponse,
+    PaperExecuteResponse,
+    PaperStatusResponse,
+    StrategyEnsureDefaultResponse,
+    ok200,
+)
 from ..paper_ux import ensure_active_simulate_strategy, friendly_execution_detail
 
 router = APIRouter(tags=["paper"])
@@ -34,20 +42,28 @@ def _parse_now(raw: str | None, market: str = "CN") -> datetime | None:
 
 
 class DraftRequest(BaseModel):
-    signal_trade_date: str
-    orders: list[dict[str, Any]] = Field(default_factory=list)
-    decision_only: bool = False
-    now: str | None = None
-    market: str = "CN"
+    signal_trade_date: str = Field(..., description="Signal trade date YYYY-MM-DD")
+    orders: list[dict[str, Any]] = Field(default_factory=list, description="Order intents")
+    decision_only: bool = Field(False, description="If true, draft is decision-only (no fill path)")
+    now: str | None = Field(None, description="Clock override ISO-8601")
+    market: str = Field("CN", description="Market id (CN/US/HK)")
 
 
 class ActivateRequest(BaseModel):
-    strategy_hash: str
-    universe: list[str] = Field(default_factory=lambda: ["510300"])
+    strategy_hash: str = Field(..., description="Strategy hash from draft/validate")
+    universe: list[str] = Field(
+        default_factory=lambda: ["510300"],
+        description="Universe symbols for new draft specs",
+    )
 
 
-@router.get("/api/paper/status")
+@router.get(
+    "/api/paper/status",
+    summary="纸面状态",
+    responses=ok200(PaperStatusResponse),
+)
 def paper_status(request: Request) -> dict[str, Any]:
+    """Paper broker + lifecycle snapshot; live trading always off."""
     paper = request.app.state.workbench.paper
     snap = paper.lifecycle.snapshot()
     admission = evaluate_admission(
@@ -66,8 +82,13 @@ def paper_status(request: Request) -> dict[str, Any]:
     }
 
 
-@router.post("/api/paper/strategies/draft")
+@router.post(
+    "/api/paper/strategies/draft",
+    summary="保存策略草稿",
+    responses={**ok200(PaperDraftResponse), **RESP_400},
+)
 def save_draft(request: Request, body: ActivateRequest) -> dict[str, Any]:
+    """Create a SIMULATE strategy draft (hash derived from spec)."""
     paper = request.app.state.workbench.paper
     spec = build_strategy_spec(universe=body.universe or ["510300"])
     # Allow client to pin hash via rebuilding — always hash from spec
@@ -75,8 +96,13 @@ def save_draft(request: Request, body: ActivateRequest) -> dict[str, Any]:
     return saved
 
 
-@router.post("/api/paper/strategies/validate")
+@router.post(
+    "/api/paper/strategies/validate",
+    summary="校验策略",
+    responses={**ok200(PaperDraftResponse), **RESP_400},
+)
 def validate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]:
+    """Mark a draft strategy as validated."""
     paper = request.app.state.workbench.paper
     try:
         return paper.lifecycle.mark_validated(body.strategy_hash)
@@ -84,8 +110,13 @@ def validate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]
         raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
 
 
-@router.post("/api/paper/strategies/activate")
+@router.post(
+    "/api/paper/strategies/activate",
+    summary="激活策略",
+    responses={**ok200(PaperDraftResponse), **RESP_400},
+)
 def activate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]:
+    """Explicitly activate a validated SIMULATE strategy."""
     paper = request.app.state.workbench.paper
     admission = evaluate_admission(
         data_ok=True,
@@ -105,7 +136,11 @@ def activate_strategy(request: Request, body: ActivateRequest) -> dict[str, Any]
         raise HTTPException(status_code=400, detail=friendly_execution_detail(exc)) from exc
 
 
-@router.post("/api/paper/strategies/ensure-default")
+@router.post(
+    "/api/paper/strategies/ensure-default",
+    summary="确保默认 SIMULATE 策略已激活",
+    responses={**ok200(StrategyEnsureDefaultResponse), **RESP_400},
+)
 def ensure_default_strategy(request: Request) -> dict[str, Any]:
     """One-click / idempotent: create+activate default SIMULATE strategy if none active."""
     paper = request.app.state.workbench.paper
@@ -123,8 +158,13 @@ def ensure_default_strategy(request: Request) -> dict[str, Any]:
     }
 
 
-@router.post("/api/paper/drafts")
+@router.post(
+    "/api/paper/drafts",
+    summary="创建纸面订单草稿",
+    responses={**ok200(PaperDraftResponse), **RESP_400},
+)
 def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
+    """Build a paper order draft; auto-ensures default strategy when none active."""
     paper = request.app.state.workbench.paper
     try:
         ensured = ensure_active_simulate_strategy(paper.lifecycle)
@@ -151,13 +191,18 @@ def create_draft(request: Request, body: DraftRequest) -> dict[str, Any]:
     }
 
 
-@router.post("/api/paper/drafts/{draft_id}/execute")
+@router.post(
+    "/api/paper/drafts/{draft_id}/execute",
+    summary="执行纸面草稿（幂等）",
+    responses={**ok200(PaperExecuteResponse), **RESP_400},
+)
 def execute_draft(
     request: Request,
-    draft_id: str,
-    now: str | None = None,
-    market: str = "CN",
+    draft_id: str = Path(..., description="Draft id from POST /api/paper/drafts"),
+    now: str | None = Query(None, description="Clock override ISO-8601"),
+    market: str = Query("CN", description="Market id"),
 ) -> dict[str, Any]:
+    """Submit a draft; idempotent replay returns accepted=true without double-fill."""
     paper = request.app.state.workbench.paper
     try:
         mid = get_market_strategy(market).market_id

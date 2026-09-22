@@ -131,13 +131,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install providers, agents, execution, then workbench
+      - name: Install providers, agents, execution, research, then workbench
         run: |
           python -m pip install -e "./packages/providers[dev]"
+          python -m pip install -e "./packages/research[dev]"
           python -m pip install -e "./packages/agents[dev]"
           python -m pip install -e "./packages/execution[dev]"
           python -m pip install -e "./apps/workbench[dev]"
-      - name: Pytest workbench
+      - name: Pytest workbench (incl. OpenAPI contract)
         working-directory: apps/workbench
         env:
           STOCK_PLATFORM_PROVIDER_PRESET: replay
@@ -148,3 +149,23 @@ jobs:
           root_ver=$(tr -d '[:space:]' < VERSION)
           pkg_ver=$(python -c "import tomllib; print(tomllib.load(open('apps/workbench/pyproject.toml','rb'))['project']['version'])")
           test "$root_ver" = "$pkg_ver"
+
+  # CONTRIBUTING merge gate: single command covering packages + apps (zero public net).
+  monorepo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install all packages editable
+        run: |
+          python -m pip install -e "./packages/providers[dev]"
+          python -m pip install -e "./packages/research[dev]"
+          python -m pip install -e "./packages/agents[dev]"
+          python -m pip install -e "./packages/execution[dev]"
+          python -m pip install -e "./apps/workbench[dev]"
+      - name: Pytest packages apps
+        env:
+          STOCK_PLATFORM_PROVIDER_PRESET: replay
+        run: python -m pytest packages apps -q

@@ -8,12 +8,18 @@ from fastapi import APIRouter, Request
 
 from stock_platform_execution import evaluate_admission
 from stock_platform_execution.gated import GatedBroker
+from stock_platform_workbench.openapi_models import BrokerStatusResponse, ok200
 
 router = APIRouter(tags=["broker"])
 
 
-@router.get("/api/broker/status")
+@router.get(
+    "/api/broker/status",
+    summary="纸面/模拟券商只读状态",
+    responses=ok200(BrokerStatusResponse),
+)
 def broker_status(request: Request) -> dict[str, Any]:
+    """Positions + account + admission; never enables live trading."""
     paper = request.app.state.workbench.paper
     broker = paper.broker
     snap = broker.status()

@@ -19,15 +19,28 @@ from stock_platform_agents import (
 )
 from stock_platform_providers import SymbolError
 
+from stock_platform_workbench.openapi_models import (
+    RESP_400,
+    RESP_409,
+    AgentReportResponse,
+    DebateStatusResponse,
+    ok200,
+)
+
 router = APIRouter(tags=["agents"])
 
 
-@router.get("/api/research/report")
+@router.get(
+    "/api/research/report",
+    summary="个股研报槽",
+    responses={**ok200(AgentReportResponse), **RESP_400, **RESP_409},
+)
 def research_report(
     request: Request,
-    symbol: str = Query(...),
+    symbol: str = Query(..., description="CN ticker, e.g. 600519"),
     asof: str | None = Query(None, description="YYYY-MM-DD; historical skips realtime"),
 ) -> dict[str, Any]:
+    """Research agent slot — daily via capability matrix resolve only."""
     state = request.app.state.workbench
     provider = state.resolve("daily")
     try:
@@ -36,12 +49,17 @@ def research_report(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/api/review/report")
+@router.get(
+    "/api/review/report",
+    summary="复盘报告槽",
+    responses={**ok200(AgentReportResponse), **RESP_400, **RESP_409},
+)
 def review_report(
     request: Request,
-    symbol: str = Query(...),
-    asof: str | None = Query(None),
+    symbol: str = Query(..., description="CN ticker"),
+    asof: str | None = Query(None, description="YYYY-MM-DD"),
 ) -> dict[str, Any]:
+    """Review agent slot — daily via capability matrix resolve only."""
     state = request.app.state.workbench
     provider = state.resolve("daily")
     try:
@@ -50,23 +68,33 @@ def review_report(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/api/debate/status")
+@router.get(
+    "/api/debate/status",
+    summary="辩论引擎状态",
+    responses=ok200(DebateStatusResponse),
+)
 def debate_status() -> dict[str, Any]:
+    """LLM debate availability + deep-graph status (default off)."""
     out = llm_debate_status()
     out["deepGraph"] = deep_llm_graph_status()
     return out
 
 
-@router.get("/api/debate/report")
+@router.get(
+    "/api/debate/report",
+    summary="Bull/Bear/Risk 辩论报告",
+    responses={**ok200(AgentReportResponse), **RESP_400, **RESP_409},
+)
 def debate_report(
     request: Request,
-    symbol: str = Query(...),
+    symbol: str = Query(..., description="CN ticker"),
     asof: str | None = Query(None, description="YYYY-MM-DD; historical skips realtime"),
     engine: str = Query(
         "deterministic",
         description="deterministic (default) | llm (optional; fail-closed)",
     ),
 ) -> dict[str, Any]:
+    """Deterministic (default) or optional LLM debate; LLM fail-closed without env."""
     state = request.app.state.workbench
     provider = state.resolve("daily")
     try:
@@ -80,19 +108,27 @@ def debate_report(
 class DeepGraphRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    symbol: str
-    asof: str | None = None
-    roles: list[str] | None = None
-    lookback_days: int = Field(60, ge=5, le=250, alias="lookbackDays")
+    symbol: str = Field(..., description="CN ticker")
+    asof: str | None = Field(None, description="YYYY-MM-DD")
+    roles: list[str] | None = Field(None, description="Optional role subset")
+    lookback_days: int = Field(60, ge=5, le=250, alias="lookbackDays", description="Lookback calendar days")
 
 
-@router.get("/api/debate/deep-graph/status")
+@router.get(
+    "/api/debate/deep-graph/status",
+    summary="深度多角色 LLM 图状态",
+    responses=ok200(DebateStatusResponse),
+)
 def deep_graph_status() -> dict[str, Any]:
     """M-A4: deeper multi-role LLM graph status (default off)."""
     return deep_llm_graph_status()
 
 
-@router.post("/api/debate/deep-graph")
+@router.post(
+    "/api/debate/deep-graph",
+    summary="运行深度多角色 LLM 图",
+    responses={**ok200(AgentReportResponse), **RESP_400, **RESP_409},
+)
 def deep_graph(request: Request, body: DeepGraphRequest) -> dict[str, Any]:
     """M-A4 optional deeper LLM graph — non-default; fail-closed; no dataflows."""
     state = request.app.state.workbench

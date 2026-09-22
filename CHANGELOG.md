@@ -8,6 +8,19 @@
 
 - （无）
 
+## [3.12.1] - 2026-09-22
+
+### Added
+
+- **Workbench OpenAPI**：全部 HTTP 路由补齐 `summary` / docstring、响应 envelope（`openapi_models.py`）、常见错误码；`/docs` `/redoc` `/openapi.json` 可用
+- **OpenAPI 契约测**：`tests/test_openapi_contract.py`（路径存在 + 200 schema 非空 object）
+- **测试分层**：pytest markers `unit` / `integration`；wizard / brief→paper→broker 标 integration
+- **CI**：`monorepo` job 跑 `pytest packages apps`（`STOCK_PLATFORM_PROVIDER_PRESET=replay`）；CONTRIBUTING 对齐
+
+### Changed
+
+- 文档：CONTRIBUTING / workbench README 写明分层命令与 `/docs` 入口；版本 **3.12.1**
+
 ## [3.12.0] - 2026-09-22
 
 ### Added

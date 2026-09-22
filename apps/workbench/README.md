@@ -49,14 +49,24 @@ python -m pip install -e ".\apps\workbench[dev]"
 cd apps\workbench
 $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 python -m pytest -q
+# 分层（可选）：python -m pytest -m unit -q
+#               python -m pytest -m integration -q
 Remove-Item Env:STOCK_PLATFORM_PROVIDER_PRESET
 python -m stock_platform_workbench
 # → http://127.0.0.1:3018/  （UI；行情默认 live）
+# → http://127.0.0.1:3018/docs  （Swagger OpenAPI）
+# → http://127.0.0.1:3018/redoc
+# → http://127.0.0.1:3018/openapi.json
 # → http://127.0.0.1:3018/health
 # → http://127.0.0.1:3018/api/ops/health
 ```
 
 生产 live 说明：[`docs/ops/live-startup.md`](../../docs/ops/live-startup.md)。
+
+## OpenAPI 与测试
+
+- 交互文档：`/docs`、`/redoc`、机器可读 `/openapi.json`（契约测见 `tests/test_openapi_contract.py`）。
+- Markers：`unit`（契约/静态）、`integration`（wizard / brief→paper→broker）。默认全跑；见根 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)。
 
 ## API（当前）
 

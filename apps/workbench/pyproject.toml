@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-workbench"
-version = "3.12.0"
+version = "3.12.1"
 description = "Minimal research workbench shell for stock-platform."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,3 +35,7 @@ stock_platform_workbench = ["py.typed", "templates/*", "static/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "unit: fast isolated checks (OpenAPI contract, pure helpers, static UI)",
+  "integration: multi-route / cross-layer flows (wizard, brief→paper→broker)",
+]
