@@ -8,6 +8,12 @@
 
 - （无）
 
+## [3.12.3] - 2026-09-22
+
+### Added
+
+- **Workbench 全量 API 自动化测**：`apps/workbench/tests/test_all_api_endpoints.py` — OpenAPI 56 个 path+method 参数化「每接口至少一击」+ 覆盖门禁；`/docs` `/redoc` `/openapi.json` 额外 smoke；replay 零公网；fail-closed 路径有意识断言 4xx/5xx
+
 ## [3.12.2] - 2026-09-22
 
 ### Changed
