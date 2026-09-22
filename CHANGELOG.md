@@ -8,6 +8,12 @@
 
 - （无）
 
+## [3.12.2] - 2026-09-22
+
+### Changed
+
+- **文档整理**：`.cursor/plans` 正式正文迁入 `docs/plans/`（能力盘点 / 合并路线图 / U 线 / M-D1·R1·A1）；新增 `docs/README.md`、`docs/engineering/`、`docs/upstream/` 配方摘要；plans 目录仅留索引指针；交叉链接与 `check_docs` 路径列表同步；版本 **3.12.2**
+
 ## [3.12.1] - 2026-09-22
 
 ### Added

@@ -34,4 +34,4 @@ Usable 线（U2 brief 落库、U3 复盘等）需要**真实可用**的持久化
 
 - U2/U3 实现与验收以 SQLite + repository 为准；单测用临时库/内存库。
 - 将来切 PG 时优先替换适配层与连接串，业务语义与 schema 文档保持连续。
-- 计划真相源：`.cursor/plans/usable-recommend-review-milestones.md` §2.1。
+- 计划真相源：[`docs/plans/usable-recommend-review-milestones.md`](../plans/usable-recommend-review-milestones.md) §2.1。

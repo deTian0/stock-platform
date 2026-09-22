@@ -26,5 +26,5 @@
 
 ## 4. 交叉链
 
-- [m-d1-capability-gap-matrix.md](../../.cursor/plans/m-d1-capability-gap-matrix.md)  
+- [m-d1-capability-gap-matrix.md](../plans/m-d1-capability-gap-matrix.md)  
 - [ADR 0014](../architecture/0014-global-http-live.md) · [capability-matrix](../contracts/capability-matrix.md)

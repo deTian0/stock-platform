@@ -6,9 +6,10 @@
 
 状态图例：`planned` / `in_progress` / `done`
 
-> **当前产品焦点（M0–M47 / `v3.x` 已完成后）**：真实可用的「选股推荐 + 复盘」→ 执行计划 [`../.cursor/plans/usable-recommend-review-milestones.md`](../.cursor/plans/usable-recommend-review-milestones.md)（U1–U7；不改写本表已 done 叙事）。  
-> 多仓能力盘点（合并输入）：[`../.cursor/plans/workspace-projects-capability-inventory.md`](../.cursor/plans/workspace-projects-capability-inventory.md)。  
-> **按能力域合并**（非整仓）：[`../.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)（**Now / Next / Later 余量已 done**；**M-E4 实盘仍门禁**；见 v3.12.0）。
+> **当前产品焦点（M0–M47 / `v3.x` 已完成后）**：真实可用的「选股推荐 + 复盘」→ 执行计划 [`plans/usable-recommend-review-milestones.md`](plans/usable-recommend-review-milestones.md)（U1–U7；不改写本表已 done 叙事）。  
+> 多仓能力盘点（合并输入）：[`plans/workspace-projects-capability-inventory.md`](plans/workspace-projects-capability-inventory.md)。  
+> **按能力域合并**（非整仓）：[`plans/capability-domain-merge-roadmap.md`](plans/capability-domain-merge-roadmap.md)（**Now / Next / Later 余量已 done**；**M-E4 实盘仍门禁**；见 v3.12.0）。  
+> 文档总索引：[`README.md`](README.md)。
 
 ---
 
