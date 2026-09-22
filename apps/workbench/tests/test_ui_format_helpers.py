@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 JS = ROOT / "src" / "stock_platform_workbench" / "static" / "app.js"
 HTML = ROOT / "src" / "stock_platform_workbench" / "templates" / "index.html"
 
 
+@pytest.mark.unit
 def test_format_helpers_defined() -> None:
     js_text = JS.read_text(encoding="utf-8")
     for name in (
@@ -36,6 +39,7 @@ def test_format_helpers_defined() -> None:
         assert f"function {name}" in js_text
 
 
+@pytest.mark.unit
 def test_recommend_ui_has_result_header_and_loading() -> None:
     html = HTML.read_text(encoding="utf-8")
     assert 'id="recommend-kv"' in html
@@ -63,16 +67,19 @@ def test_recommend_ui_has_result_header_and_loading() -> None:
     assert "fail-closed" in js
 
 
+@pytest.mark.unit
 def test_format_money_uses_yi_wan() -> None:
     js_text = JS.read_text(encoding="utf-8")
     assert '+"亿"' in js_text or '+ "亿"' in js_text
     assert '+"万"' in js_text or '+ "万"' in js_text
 
 
+@pytest.mark.unit
 def test_format_pct_multiplies_decimal() -> None:
     assert "n * 100" in JS.read_text(encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_realtime_and_news_wired() -> None:
     html = HTML.read_text(encoding="utf-8")
     assert 'id="realtime-form"' in html

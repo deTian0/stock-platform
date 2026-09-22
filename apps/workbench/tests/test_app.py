@@ -1056,6 +1056,7 @@ def test_can_prefer_global_http_without_calling_network(client: TestClient) -> N
     assert by_id["realtime"]["effective"] == "global_http"
 
 
+@pytest.mark.integration
 def test_paper_status_and_activate_flow(client: TestClient) -> None:
     st = client.get("/api/paper/status")
     assert st.status_code == 200
@@ -1095,6 +1096,7 @@ def test_paper_status_and_activate_flow(client: TestClient) -> None:
     assert again.json().get("idempotentReplay") is True
 
 
+@pytest.mark.integration
 def test_research_brief_api(client: TestClient) -> None:
     r = client.get(
         "/api/research/brief",
@@ -1227,6 +1229,7 @@ def test_performance_settle_endpoint_with_injected_engine(
     assert body["metrics"]["direction_accuracy"] == pytest.approx(1.0)
 
 
+@pytest.mark.integration
 def test_research_briefs_persist_list_and_get(client: TestClient) -> None:
     r = client.get(
         "/api/research/brief",
@@ -1258,6 +1261,7 @@ def test_research_briefs_persist_list_and_get(client: TestClient) -> None:
     assert "未找到" in str(missing.json()["detail"])
 
 
+@pytest.mark.integration
 def test_research_brief_review_skeleton(client: TestClient) -> None:
     client.get(
         "/api/research/brief",
@@ -1314,6 +1318,7 @@ def test_research_brief_review_skeleton(client: TestClient) -> None:
     assert again.json()["strategyStatus"] is None
 
 
+@pytest.mark.integration
 def test_paper_ensure_default_and_draft_auto_activate(client: TestClient) -> None:
     ensured = client.post("/api/paper/strategies/ensure-default")
     assert ensured.status_code == 200
@@ -1348,6 +1353,7 @@ def test_broker_status_readonly(client: TestClient) -> None:
     assert "hint" in body
 
 
+@pytest.mark.integration
 def test_brief_to_broker_alias(client: TestClient) -> None:
     draft = client.post("/api/paper/strategies/draft", json={"strategy_hash": "x", "universe": ["600519"]})
     h = draft.json()["strategyHash"]
@@ -1383,6 +1389,7 @@ def test_ops_health_last_refresh_manifest(tmp_path: Path, monkeypatch: pytest.Mo
     assert body["liveTradingEnabled"] is False
 
 
+@pytest.mark.integration
 def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
     # No manual draft/validate/activate — wizard auto-ensures default SIMULATE strategy
     r = client.post(
@@ -1415,6 +1422,7 @@ def test_wizard_daily_replay_to_paper(client: TestClient) -> None:
     assert "/api/paper/strategies/ensure-default" in client.get("/static/app.js").text
 
 
+@pytest.mark.integration
 def test_wizard_brief_connection_abort_returns_503_zh(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

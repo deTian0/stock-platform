@@ -45,6 +45,29 @@ from ..brief_ux import (
     paper_now_iso_for_asof,
     recommend_defaults,
 )
+from ..openapi_models import (
+    RESP_400,
+    RESP_404,
+    RESP_RESEARCH,
+    RESP_503,
+    BriefListResponse,
+    BriefResponse,
+    BriefReviewResponse,
+    BriefSaveResponse,
+    BriefToPaperResponse,
+    FactorIcResponse,
+    LogBriefResponse,
+    PerformanceSummaryResponse,
+    PitFundamentalsResponse,
+    RecommendDefaultsResponse,
+    RollingBacktestResponse,
+    StrategyAbStatusResponse,
+    StrategyCompareResponse,
+    StrategyConfigsResponse,
+    WalkForwardResponse,
+    WizardDailyResponse,
+    ok200,
+)
 from ..paper_ux import (
     ensure_active_simulate_strategy,
     friendly_execution_detail,
@@ -156,7 +179,11 @@ def _build_brief_for_request(
         raise
 
 
-@router.get("/defaults")
+@router.get(
+    "/defaults",
+    summary="推荐默认参数",
+    responses=ok200(RecommendDefaultsResponse),
+)
 def get_recommend_defaults(
     request: Request,
     universe_tier: str | None = Query(
@@ -215,16 +242,20 @@ def _maybe_attach_strategy_ab(
     )
 
 
-@router.get("/brief")
+@router.get(
+    "/brief",
+    summary="盘前 TopN 推荐",
+    responses={**ok200(BriefResponse), **RESP_RESEARCH},
+)
 def get_brief(
     request: Request,
     asof: date | None = Query(None, description="Signal trade date; default last CN / fixture"),
     symbols: str | None = Query(None, description="Comma-separated; default sample universe"),
-    top_n: int = Query(10, ge=1, le=100, alias="topN"),
-    value_factor: bool = Query(False, alias="valueFactor"),
-    reversal_q: float = Query(0.30, alias="reversalQ"),
+    top_n: int = Query(10, ge=1, le=100, alias="topN", description="Top N picks"),
+    value_factor: bool = Query(False, alias="valueFactor", description="Enable value factor"),
+    reversal_q: float = Query(0.30, alias="reversalQ", description="Reversal quantile"),
     adjust_kind: str | None = Query("qfq", description="qfq/hfq/none"),
-    soft_gates: bool = Query(True, alias="softGates"),
+    soft_gates: bool = Query(True, alias="softGates", description="Relax hard gates when needed"),
     persist: bool = Query(True, description="Auto-save to SQLite archive (U2)"),
     universe_tier: str | None = Query(
         "watch",
@@ -237,6 +268,7 @@ def get_brief(
         description="Opt-in A/B sidecar (or set STOCK_PLATFORM_STRATEGY_AB=1); default off",
     ),
 ) -> dict[str, Any]:
+    """Build premarket brief; default auto-persists to SQLite and logs pending performance."""
     kind = None if (adjust_kind or "").lower() in {"", "none", "raw"} else adjust_kind
     syms = _parse_symbols(symbols)
     brief = _build_brief_for_request(
@@ -262,10 +294,14 @@ def get_brief(
     return brief
 
 
-@router.get("/briefs")
+@router.get(
+    "/briefs",
+    summary="历史推荐列表",
+    responses=ok200(BriefListResponse),
+)
 def list_briefs(
     request: Request,
-    limit: int = Query(30, ge=1, le=365),
+    limit: int = Query(30, ge=1, le=365, description="Max recent rows"),
 ) -> dict[str, Any]:
     """List recent persisted briefs (summary rows; Chinese UI)."""
     rows = _brief_repo(request).list_recent(limit=limit)
@@ -278,7 +314,11 @@ def list_briefs(
     }
 
 
-@router.get("/briefs/{asof}")
+@router.get(
+    "/briefs/{asof}",
+    summary="按日回看已存推荐",
+    responses={**ok200(BriefResponse), **RESP_404},
+)
 def get_stored_brief(request: Request, asof: date) -> dict[str, Any]:
     """Load one archived brief by asof (404 + Chinese detail when missing)."""
     record = _brief_repo(request).get_by_asof(asof.isoformat())
@@ -304,7 +344,11 @@ def get_stored_brief(request: Request, asof: date) -> dict[str, Any]:
     return body
 
 
-@router.post("/briefs")
+@router.post(
+    "/briefs",
+    summary="显式保存推荐",
+    responses={**ok200(BriefSaveResponse), **RESP_400},
+)
 def post_save_brief(request: Request, body: dict[str, Any]) -> dict[str, Any]:
     """Explicit save of a brief payload (same upsert-by-asof semantics)."""
     if not body.get("asof"):
@@ -333,7 +377,11 @@ def post_save_brief(request: Request, body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@router.get("/briefs/{asof}/review")
+@router.get(
+    "/briefs/{asof}/review",
+    summary="已存推荐 T+N 复盘",
+    responses={**ok200(BriefReviewResponse), **RESP_404},
+)
 def review_brief(
     request: Request,
     asof: date,
@@ -363,21 +411,25 @@ def review_brief(
 class BriefToPaperRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date | None = None
-    symbols: str | None = None
-    top_n: int = Field(10, ge=1, le=100, alias="topN")
+    asof: date | None = Field(None, description="Signal trade date")
+    symbols: str | None = Field(None, description="Comma-separated tickers")
+    top_n: int = Field(10, ge=1, le=100, alias="topN", description="Top N picks")
     value_factor: bool = Field(False, alias="valueFactor")
     reversal_q: float = Field(0.30, alias="reversalQ")
-    adjust_kind: str | None = "qfq"
+    adjust_kind: str | None = Field("qfq", description="qfq/hfq/none")
     soft_gates: bool = Field(True, alias="softGates")
     universe_tier: str | None = Field("watch", alias="universeTier")
-    qty: int = Field(100, ge=1, le=1_000_000)
-    decision_only: bool = False
-    now: str | None = None
-    market: str = "CN"
+    qty: int = Field(100, ge=1, le=1_000_000, description="Order qty per pick")
+    decision_only: bool = Field(False, description="Decision-only draft (no fill)")
+    now: str | None = Field(None, description="Clock override ISO-8601")
+    market: str = Field("CN", description="Market id")
 
 
-@router.post("/brief/to-paper")
+@router.post(
+    "/brief/to-paper",
+    summary="推荐 → 纸面草稿",
+    responses={**ok200(BriefToPaperResponse), **RESP_RESEARCH},
+)
 def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
     """Create a SIMULATE paper draft from brief TopN (auto-ensures default strategy)."""
     paper = request.app.state.workbench.paper
@@ -432,7 +484,11 @@ def brief_to_paper(request: Request, body: BriefToPaperRequest) -> dict[str, Any
     }
 
 
-@router.post("/brief/to-broker")
+@router.post(
+    "/brief/to-broker",
+    summary="推荐 → 券商草稿（别名）",
+    responses={**ok200(BriefToPaperResponse), **RESP_RESEARCH},
+)
 def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, Any]:
     """Alias of to-paper routed through resolve_broker (paper or ths_sim)."""
     return brief_to_paper(request, body)
@@ -441,21 +497,25 @@ def brief_to_broker(request: Request, body: BriefToPaperRequest) -> dict[str, An
 class WizardDailyRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date | None = None
-    symbols: str | None = None
+    asof: date | None = Field(None, description="Signal trade date")
+    symbols: str | None = Field(None, description="Comma-separated tickers")
     top_n: int = Field(5, ge=1, le=100, alias="topN")
-    adjust_kind: str | None = "none"
+    adjust_kind: str | None = Field("none", description="qfq/hfq/none")
     soft_gates: bool = Field(True, alias="softGates")
     universe_tier: str | None = Field("watch", alias="universeTier")
     qty: int = Field(100, ge=1, le=1_000_000)
-    decision_only: bool = True
+    decision_only: bool = Field(True, description="Default decision-only for wizard")
     now: str | None = None
     market: str = "CN"
-    skip_refresh: bool = Field(True, alias="skipRefresh")
-    to_paper: bool = Field(True, alias="toPaper")
+    skip_refresh: bool = Field(True, alias="skipRefresh", description="Skip refresh step")
+    to_paper: bool = Field(True, alias="toPaper", description="Create paper draft after brief")
 
 
-@router.post("/wizard/daily")
+@router.post(
+    "/wizard/daily",
+    summary="日用向导（refresh→brief→paper）",
+    responses={**ok200(WizardDailyResponse), **RESP_RESEARCH},
+)
 def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
     """One-click daily path: optional refresh → brief → paper draft (SIMULATE).
 
@@ -668,7 +728,11 @@ def _settle_get_daily(request: Request):
         return None, None
 
 
-@router.get("/performance")
+@router.get(
+    "/performance",
+    summary="绩效汇总",
+    responses=ok200(PerformanceSummaryResponse),
+)
 def get_performance(
     request: Request,
     log: str | None = Query(None, description="Optional JSONL path override"),
@@ -715,7 +779,11 @@ def get_performance(
     return summary
 
 
-@router.post("/performance/settle")
+@router.post(
+    "/performance/settle",
+    summary="显式结算 pending 绩效",
+    responses={**ok200(PerformanceSummaryResponse), **RESP_404, **RESP_503},
+)
 def post_settle_performance(
     request: Request,
     log: str | None = Query(None, description="Optional JSONL path override"),
@@ -738,15 +806,15 @@ def post_settle_performance(
 class LogBriefRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    asof: date | None = None
+    asof: date | None = Field(None, description="Signal date")
     symbols: str | None = None
     top_n: int = Field(10, ge=1, le=100, alias="topN")
     value_factor: bool = Field(False, alias="valueFactor")
     reversal_q: float = Field(0.30, alias="reversalQ")
     adjust_kind: str | None = "qfq"
     soft_gates: bool = Field(True, alias="softGates")
-    holding: str = "5d"
-    log: str | None = None
+    holding: str = Field("5d", description="Holding window label")
+    log: str | None = Field(None, description="JSONL path override")
     from_store: bool = Field(
         False,
         alias="fromStore",
@@ -754,7 +822,11 @@ class LogBriefRequest(BaseModel):
     )
 
 
-@router.post("/performance/log-brief")
+@router.post(
+    "/performance/log-brief",
+    summary="将推荐记入绩效 JSONL",
+    responses={**ok200(LogBriefResponse), **RESP_400, **RESP_404},
+)
 def post_log_brief(request: Request, body: LogBriefRequest) -> dict[str, Any]:
     """Append pending TopN decisions from a brief into the performance JSONL."""
     path = Path(body.log) if body.log else default_performance_log_path()
@@ -804,11 +876,15 @@ class BriefDebateRequest(BaseModel):
     adjust_kind: str | None = "qfq"
     soft_gates: bool = Field(True, alias="softGates")
     universe_tier: str | None = Field("watch", alias="universeTier")
-    engine: str = "deterministic"
+    engine: str = Field("deterministic", description="deterministic | llm")
     max_picks: int | None = Field(None, ge=1, le=50, alias="maxPicks")
 
 
-@router.post("/brief/debate")
+@router.post(
+    "/brief/debate",
+    summary="推荐 picks 辩论",
+    responses={**ok200(BriefResponse), **RESP_RESEARCH},
+)
 def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
     """Build TopN brief then run debate on picks (default deterministic; llm fail-closed)."""
     kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
@@ -860,8 +936,13 @@ def _fixture_compare_panel() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-@router.get("/strategy/configs")
+@router.get(
+    "/strategy/configs",
+    summary="策略配置列表",
+    responses=ok200(StrategyConfigsResponse),
+)
 def get_strategy_configs() -> dict[str, Any]:
+    """List packaged strategy JSON configs for A/B compare."""
     return {
         "configs": list_strategy_configs(),
         "directory": str(default_strategy_config_dir()),
@@ -870,7 +951,11 @@ def get_strategy_configs() -> dict[str, Any]:
     }
 
 
-@router.get("/strategy/ab-status")
+@router.get(
+    "/strategy/ab-status",
+    summary="策略 A/B 旁路状态",
+    responses=ok200(StrategyAbStatusResponse),
+)
 def get_strategy_ab_status() -> dict[str, Any]:
     """M-R5: whether daily-path A/B sidecar is opted in (default off)."""
     return strategy_ab_status()
@@ -880,8 +965,8 @@ class StrategyCompareRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     config_a: str = Field(..., alias="configA", description="Config id or JSON path")
-    config_b: str = Field(..., alias="configB")
-    panel: list[dict[str, Any]] | None = None
+    config_b: str = Field(..., alias="configB", description="Config id or JSON path")
+    panel: list[dict[str, Any]] | None = Field(None, description="Optional PIT panel rows")
     last_n: int = Field(8, ge=2, le=20, alias="lastN")
     universe_tier: str = Field("core", alias="universeTier")
     symbols: str | None = None
@@ -944,8 +1029,13 @@ def _engine_compare_panel(
         return None, source, f"{type(exc).__name__}: {exc}"
 
 
-@router.post("/strategy/compare")
+@router.post(
+    "/strategy/compare",
+    summary="策略配置对比",
+    responses={**ok200(StrategyCompareResponse), **RESP_400, **RESP_404, **RESP_503},
+)
 def post_strategy_compare(request: Request, body: StrategyCompareRequest) -> dict[str, Any]:
+    """Compare two strategy configs on engine/daily panel or fixture."""
     panel_source = "body"
     panel_note = None
     if body.panel:
@@ -1002,12 +1092,16 @@ class RollingBacktestRequest(BaseModel):
     asof_end: date | None = Field(None, alias="asofEnd")
     symbols: str | None = None
     universe_tier: str | None = Field("watch", alias="universeTier")
-    holding: str = "1d"
+    holding: str = Field("1d", description="Holding window")
     top_n: int = Field(5, ge=1, le=20, alias="topN")
     soft_gates: bool = Field(True, alias="softGates")
 
 
-@router.post("/backtest/rolling-review")
+@router.post(
+    "/backtest/rolling-review",
+    summary="滚动推荐复盘回测",
+    responses={**ok200(RollingBacktestResponse), **RESP_400, **RESP_503},
+)
 def post_rolling_backtest(request: Request, body: RollingBacktestRequest) -> dict[str, Any]:
     """U7 light: roll recommend + review_stored_brief on engine/daily (SIMULATE)."""
     get_daily, source = _settle_get_daily(request)
@@ -1039,17 +1133,21 @@ def post_rolling_backtest(request: Request, body: RollingBacktestRequest) -> dic
 class WalkForwardRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    start: date
-    end: date
+    start: date = Field(..., description="Window start YYYY-MM-DD")
+    end: date = Field(..., description="Window end YYYY-MM-DD")
     train_days: int = Field(60, ge=1, le=500, alias="trainDays")
     test_days: int = Field(20, ge=1, le=120, alias="testDays")
     step_days: int = Field(20, ge=1, le=120, alias="stepDays")
     fold_records: list[dict[str, Any]] | None = Field(None, alias="foldRecords")
-    objective: str = "total_return"
-    direction: str = "max"
+    objective: str = Field("total_return", description="OOS objective key")
+    direction: str = Field("max", description="max | min")
 
 
-@router.post("/backtest/walk-forward")
+@router.post(
+    "/backtest/walk-forward",
+    summary="Walk-forward 折叠摘要",
+    responses={**ok200(WalkForwardResponse), **RESP_400},
+)
 def post_walk_forward(body: WalkForwardRequest) -> dict[str, Any]:
     """M-R2: walk-forward fold plan + optional OOS summary (not daily brief path)."""
     try:
@@ -1070,13 +1168,17 @@ def post_walk_forward(body: WalkForwardRequest) -> dict[str, Any]:
 class FactorIcRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    observations: list[dict[str, Any]] | None = None
-    rows: list[dict[str, Any]] | None = None
+    observations: list[dict[str, Any]] | None = Field(None, description="Pre-aggregated IC observations")
+    rows: list[dict[str, Any]] | None = Field(None, description="Raw factor/return rows")
     factor_key: str = Field("factor", alias="factorKey")
     return_key: str = Field("forward_return", alias="returnKey")
 
 
-@router.post("/backtest/factor-ic")
+@router.post(
+    "/backtest/factor-ic",
+    summary="因子 Rank IC / ICIR",
+    responses={**ok200(FactorIcResponse), **RESP_400},
+)
 def post_factor_ic(body: FactorIcRequest) -> dict[str, Any]:
     """M-R4 deep: rank IC / ICIR summary (not on lvrev / brief path)."""
     if body.observations:
@@ -1094,7 +1196,11 @@ def post_factor_ic(body: FactorIcRequest) -> dict[str, Any]:
     raise HTTPException(status_code=400, detail="需要 observations 或 rows")
 
 
-@router.get("/pit/fundamentals")
+@router.get(
+    "/pit/fundamentals",
+    summary="离线 PIT 基本面",
+    responses={**ok200(PitFundamentalsResponse), **RESP_400, **RESP_503},
+)
 def get_pit_fundamentals(
     request: Request,
     symbols: str = Query(..., description="Comma-separated CN tickers"),
