@@ -1,12 +1,12 @@
-"""Cross-sectional rank IC helper (M-R4 thin slice).
+"""Cross-sectional rank IC helper (M-R4 thin + deep slice).
 
 Pure in-memory Spearman IC (no scipy); no HTTP / no dual pipeline.
-Not on the daily brief path.
+Not on the daily brief / lvrev path.
 """
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 
 def _rankdata(values: Sequence[float]) -> list[float]:
@@ -112,6 +112,8 @@ def summarize_factor_ic(
             "n_dates": 0,
             "mean_ic": None,
             "mean_abs_ic": None,
+            "std_ic": None,
+            "icir": None,
             "positive_ic_rate": None,
             "dates": [],
             "environment": "SIMULATE",
@@ -123,15 +125,53 @@ def summarize_factor_ic(
     mean_ic = round(sum(ic_vals) / len(ic_vals), 6)
     mean_abs = round(sum(abs(x) for x in ic_vals) / len(ic_vals), 6)
     pos_rate = round(sum(1 for x in ic_vals if x > 0) / len(ic_vals), 4)
+    std_ic = None
+    icir = None
+    if len(ic_vals) >= 2:
+        mu = sum(ic_vals) / len(ic_vals)
+        var = sum((x - mu) ** 2 for x in ic_vals) / (len(ic_vals) - 1)
+        std_ic = round(var**0.5, 6)
+        if std_ic > 0:
+            icir = round(mu / std_ic, 6)
     return {
         "ok": True,
         "n_dates": len(ics),
         "mean_ic": mean_ic,
         "mean_abs_ic": mean_abs,
+        "std_ic": std_ic,
+        "icir": icir,
         "positive_ic_rate": pos_rate,
         "dates": ics,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
-        "note": "Rank IC 摘要（M-R4）；数据由调用方注入；非投资建议。",
+        "note": "Rank IC / ICIR 摘要（M-R4）；数据由调用方注入；不进 lvrev 主路径；非投资建议。",
         "disclaimer": "Research only; not investment advice.",
     }
+
+
+def summarize_factor_ic_from_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    asof_key: str = "asof",
+    factor_key: str = "factor",
+    return_key: str = "forward_return",
+) -> dict[str, Any]:
+    """Convenience: flat rows ``{asof, factor, forward_return}`` → ``summarize_factor_ic``.
+
+    Deep-knife helper for Workbench / scripts; still off the daily brief path.
+    """
+    flat: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        asof = str(row.get(asof_key) or "")
+        if not asof:
+            continue
+        flat.append(
+            {
+                "asof": asof,
+                factor_key: row.get(factor_key),
+                return_key: row.get(return_key),
+            }
+        )
+    return summarize_factor_ic(flat, factor_key=factor_key, return_key=return_key)

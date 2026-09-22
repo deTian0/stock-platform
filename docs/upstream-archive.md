@@ -30,13 +30,13 @@
 | 能力 | 原因 |
 |------|------|
 | live HTTP 默认开启 | `astock_http`（M8）与 `global_http`（M9）均已接线；**CI / 默认偏好仍 replay** |
-| TradingAgents 完整 LLM 辩论图 | M12 已提供确定性轻量辩论；完整 LangGraph/LLM 仍可选后续 |
+| TradingAgents 完整 LLM 辩论图 | M12 确定性辩论 + 可选 LLM（ADR 0034）；更深多角色图见 M-A4（`STOCK_PLATFORM_DEEP_LLM_GRAPH`，默认关） |
 | 券商实盘 / OpenD | M6 明确不吸收 |
 | US/HK 官方假日 API 运行时拉取 | M13 已固化静态表（2024–2027）；不拉 NYSE/HKEX API |
 | 半日市 / 多市场纸面默认非 CN | M14 已接 CN/US/HK timing（默认仍 CN）；半日市不建模 |
-| UI SPA / 完整前端 | M11 已提供最小单页操作台；React/图表库仍延期 |
+| UI SPA / 完整前端 | M11 最小单页；TSP UI **子集**见 ADR 0052（accuracy sparkline）；完整 React 仍延期 |
 | 分钟/板块资金流、全市场龙虎榜/全市场解禁、后台 `minute_refresh` 落盘 | M29 已交付 CLI `stock-platform-refresh`（个股 daily/adj_factor/fund_flow/full_minute 落盘，非常驻后台）。板块资金流、全市场龙虎榜/解禁、`get_intraday_latest` 仍延期 |
-| 同花顺 / 实盘券商适配 | Phase A（`v2.0.0`）仍纸面 SIMULATE；实盘开关与同花顺适配刻意延期 |
+| 同花顺 / 实盘券商适配 | Phase D：`ths_sim` **mock** + experimental 扩展点；真实零售 HTTP **未接**；实盘见 M-E4 门禁（[`ops/broker-port-honesty.md`](ops/broker-port-honesty.md)） |
 | 全市场自动宇宙扩容 | M24 以 config/fixtures 宇宙为先；空宇宙 fail-closed；全市场扫描延期 |
 
 ## 维护动作（可选，人工）

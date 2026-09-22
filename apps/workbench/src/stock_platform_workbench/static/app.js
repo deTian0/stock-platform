@@ -1329,6 +1329,108 @@
       metaBits.push(data.persistError);
       $("recommend-meta").textContent = metaBits.join(" · ");
     }
+    renderStrategyAb(data && data.strategyAb);
+  }
+
+  function renderStrategyAb(ab) {
+    var block = $("recommend-strategy-ab-block");
+    var meta = $("recommend-strategy-ab-meta");
+    var kv = $("recommend-strategy-ab-kv");
+    if (!block || !meta) return;
+    if (!ab || ab.enabled === false) {
+      block.hidden = true;
+      return;
+    }
+    block.hidden = false;
+    if (ab.ok === false) {
+      meta.textContent = "策略 A/B 旁路失败：" + (ab.error || ab.note || "见 JSON");
+      renderKv(kv, []);
+      return;
+    }
+    meta.textContent =
+      "策略 A/B（不替换 picks）· winner=" +
+      (ab.winner || "—") +
+      " · Δequity=" +
+      (ab.deltaFinalEquity != null ? ab.deltaFinalEquity : "—") +
+      " · panel=" +
+      (ab.panelSource || "—");
+    renderKv(kv, [
+      ["configA", ab.configA || (ab.a && ab.a.configId) || "—"],
+      ["configB", ab.configB || (ab.b && ab.b.configId) || "—"],
+      ["A finalEquity", ab.a && ab.a.finalEquity != null ? String(ab.a.finalEquity) : "—"],
+      ["B finalEquity", ab.b && ab.b.finalEquity != null ? String(ab.b.finalEquity) : "—"],
+      ["winner", ab.winner || "—"],
+      ["panelSource", ab.panelSource || "—"],
+      ["panelNote", ab.panelNote || "—"],
+    ]);
+  }
+
+  function renderAccuracySparkline(recentDays) {
+    var svg = $("tsp-accuracy-spark");
+    var meta = $("tsp-accuracy-meta");
+    if (!svg) return;
+    var days = Array.isArray(recentDays) ? recentDays : [];
+    var vals = days
+      .map(function (d) {
+        var v = d && d.direction_accuracy;
+        return v == null || v === "" ? null : Number(v);
+      })
+      .filter(function (v) {
+        return v != null && !isNaN(v);
+      });
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (!vals.length) {
+      if (meta) meta.textContent = "暂无 recentDays（需已结算绩效样本）";
+      return;
+    }
+    var w = 320;
+    var h = 64;
+    var pad = 6;
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    if (min === max) {
+      min -= 0.05;
+      max += 0.05;
+    }
+    var pts = vals.map(function (v, i) {
+      var x = pad + (i * (w - 2 * pad)) / Math.max(vals.length - 1, 1);
+      var y = h - pad - ((v - min) / (max - min)) * (h - 2 * pad);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke", "#0f5f52");
+    poly.setAttribute("stroke-width", "2");
+    poly.setAttribute("points", pts.join(" "));
+    svg.appendChild(poly);
+    vals.forEach(function (v, i) {
+      var x = pad + (i * (w - 2 * pad)) / Math.max(vals.length - 1, 1);
+      var y = h - pad - ((v - min) / (max - min)) * (h - 2 * pad);
+      var c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", x.toFixed(1));
+      c.setAttribute("cy", y.toFixed(1));
+      c.setAttribute("r", "2.5");
+      c.setAttribute("fill", "#0f5f52");
+      svg.appendChild(c);
+    });
+    if (meta) {
+      meta.textContent =
+        "近 " +
+        vals.length +
+        " 日 direction_accuracy（TSP 子集首刀 · ADR 0052）· 最新=" +
+        vals[vals.length - 1];
+    }
+  }
+
+  async function loadTspAccuracySpark() {
+    try {
+      var data = await fetchJson("/api/research/performance?autoSettle=true");
+      renderAccuracySparkline((data && data.recentDays) || []);
+    } catch (_) {
+      var meta = $("tsp-accuracy-meta");
+      if (meta) meta.textContent = "绩效暂不可用（无样本或未落库）";
+      renderAccuracySparkline([]);
+    }
   }
 
   async function loadRecommendHistory() {
@@ -1579,6 +1681,7 @@
             "日</span>" +
             mini
         );
+        renderAccuracySparkline(recent);
       }
       if (data.settleSource) {
         chips.push(
@@ -1609,6 +1712,9 @@
     });
     if (asof) params.set("asof", asof);
     if (symbols) params.set("symbols", symbols);
+    if ($("recommend-strategy-ab") && $("recommend-strategy-ab").checked) {
+      params.set("strategyAb", "true");
+    }
     var nSym = symbols ? symbols.split(",").filter(Boolean).length : 0;
     setRecommendBusy(
       true,
@@ -1622,6 +1728,7 @@
       if (data.asof && $("recommend-asof")) $("recommend-asof").value = data.asof;
       loadRecommendHistory();
       loadRecommendPerfStrip();
+      loadTspAccuracySpark();
     } catch (e) {
       const detail = e.detail || { message: String(e) };
       if (e.status === 409) {
@@ -2691,6 +2798,9 @@
         loadRecommendDefaults($("wizard-tier").value);
       });
     }
+    if ($("btn-tsp-refresh")) {
+      $("btn-tsp-refresh").addEventListener("click", loadTspAccuracySpark);
+    }
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
     window.addEventListener("hashchange", revealHashTarget);
@@ -2700,6 +2810,7 @@
     loadRecommendDefaults();
     loadRecommendHistory();
     loadRecommendPerfStrip();
+    loadTspAccuracySpark();
     loadMatrix();
     loadPaper();
     loadBroker();

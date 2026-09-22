@@ -37,5 +37,23 @@ def test_summarize_factor_ic_dates() -> None:
     assert out["ok"] is True
     assert out["n_dates"] == 2
     assert out["mean_ic"] is not None
+    assert out["std_ic"] is not None
+    assert out["icir"] is not None
     assert out["liveTradingEnabled"] is False
     assert out["environment"] == "SIMULATE"
+
+
+def test_summarize_factor_ic_from_rows() -> None:
+    from stock_platform_research.factor_ic import summarize_factor_ic_from_rows
+
+    rows = [
+        {"asof": "2026-01-02", "factor": 1, "forward_return": 0.01},
+        {"asof": "2026-01-02", "factor": 2, "forward_return": 0.02},
+        {"asof": "2026-01-02", "factor": 3, "forward_return": 0.03},
+        {"asof": "2026-01-03", "factor": 3, "forward_return": -0.01},
+        {"asof": "2026-01-03", "factor": 2, "forward_return": 0.0},
+        {"asof": "2026-01-03", "factor": 1, "forward_return": 0.02},
+    ]
+    out = summarize_factor_ic_from_rows(rows)
+    assert out["n_dates"] == 2
+    assert out["icir"] is not None

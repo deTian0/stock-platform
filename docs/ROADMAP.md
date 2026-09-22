@@ -8,7 +8,7 @@
 
 > **当前产品焦点（M0–M47 / `v3.x` 已完成后）**：真实可用的「选股推荐 + 复盘」→ 执行计划 [`../.cursor/plans/usable-recommend-review-milestones.md`](../.cursor/plans/usable-recommend-review-milestones.md)（U1–U7；不改写本表已 done 叙事）。  
 > 多仓能力盘点（合并输入）：[`../.cursor/plans/workspace-projects-capability-inventory.md`](../.cursor/plans/workspace-projects-capability-inventory.md)。  
-> **按能力域合并**（非整仓）：[`../.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)（**Now / Next 已 done**；Later 首批见 v3.11.1：M-R3/R4 薄刀 / M-A3 / M-E2 / M-D5 / M-S2 + Workbench 面板）。
+> **按能力域合并**（非整仓）：[`../.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)（**Now / Next / Later 余量已 done**；**M-E4 实盘仍门禁**；见 v3.12.0）。
 
 ---
 

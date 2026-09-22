@@ -20,6 +20,7 @@
       <a href="#performance" title="direction_accuracy 绩效">绩效</a>
       <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
+      <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
       <a href="#market-tools">行情工具</a>
       <a href="#ops">运维</a>
       <a href="#capability">能力矩阵</a>
@@ -95,6 +96,7 @@
           <a href="#backtest">滚动回测</a>
           <a href="#performance">推荐绩效</a>
           <a href="#strategy-compare">策略对比</a>
+          <a href="#tsp-subset">accuracy 图</a>
         </div>
       </div>
       <form id="recommend-form" class="row">
@@ -114,10 +116,17 @@
         <label>推荐数 topN
           <input id="recommend-topn" name="topN" type="number" min="1" max="50" value="10" />
         </label>
+        <label class="check" title="默认关闭；或设 STOCK_PLATFORM_STRATEGY_AB=1">
+          <input id="recommend-strategy-ab" type="checkbox" /> 策略 A/B 旁路
+        </label>
         <button type="submit" id="btn-recommend-go">生成今日推荐</button>
         <button type="button" id="btn-recommend-paper" class="secondary" title="始终纸面 SIMULATE，无实盘">写入纸面（SIMULATE）</button>
         <button type="button" id="btn-recommend-debate" class="secondary">TopN 辩论</button>
       </form>
+      <div id="recommend-strategy-ab-block" class="ab-block" hidden>
+        <p id="recommend-strategy-ab-meta" class="status" aria-live="polite"></p>
+        <dl id="recommend-strategy-ab-kv" class="kv" hidden></dl>
+      </div>
       <p id="recommend-loading" class="status is-loading" hidden aria-live="polite">正在拉取日线并打分，watch≈30 只时可能需要数十秒…</p>
       <p id="recommend-meta" class="status" aria-live="polite"></p>
       <dl id="recommend-kv" class="kv" hidden></dl>
@@ -1085,6 +1094,23 @@
         <pre id="wf-error" class="error" hidden></pre>
         <pre id="wf-json" class="code"></pre>
       </div>
+    </section>
+
+    <section id="tsp-subset" class="panel">
+      <div class="panel-head">
+        <h2>TSP UI 子集 · accuracy 迷你图</h2>
+        <span class="pill">M-U4 首刀</span>
+      </div>
+      <p class="hint">
+        按 <a href="/docs" title="见 ADR 0052">ADR 0052</a> 白名单：近 N 日
+        <code>direction_accuracy</code> SVG sparkline（监控语义）。
+        数据经 <code>/api/research/performance</code>；非整仓 React/ECharts；单一 Workbench 入口。
+      </p>
+      <div class="tsp-spark-wrap">
+        <svg id="tsp-accuracy-spark" class="tsp-spark" viewBox="0 0 320 64" role="img" aria-label="近 N 日 direction_accuracy 趋势"></svg>
+        <p id="tsp-accuracy-meta" class="status" aria-live="polite">加载绩效 recentDays…</p>
+      </div>
+      <button type="button" id="btn-tsp-refresh" class="secondary">刷新迷你图</button>
     </section>
 
     <section id="strategy-compare" class="panel">

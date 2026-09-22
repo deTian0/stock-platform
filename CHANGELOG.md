@@ -8,6 +8,22 @@
 
 - （无）
 
+## [3.12.0] - 2026-09-22
+
+### Added
+
+- **M-R5**：策略 A/B 进日用主路径旁路（`STOCK_PLATFORM_STRATEGY_AB` / `strategyAb`；**默认关闭**；不替换 picks）
+- **M-U3**：ADR 0052 TSP UI 子集范围 **Accepted**
+- **M-U4**：`#tsp-subset` 近 N 日 `direction_accuracy` SVG sparkline（零新前端依赖）
+- **M-A4**：可选更深多角色 LLM 图（`STOCK_PLATFORM_DEEP_LLM_GRAPH`；非默认；fail-closed；禁 dataflows）
+- **M-D6**：[`docs/ops/m-d6-batch-recipe-upstream-feedback.md`](docs/ops/m-d6-batch-recipe-upstream-feedback.md)
+- **M-E3**：[`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md)（mock / experimental / 未接真实）
+- **M-R4 深刀**：ICIR / `std_ic` / `summarize_factor_ic_from_rows` + `POST /api/research/backtest/factor-ic`
+
+### Changed
+
+- 能力域路线图 Later 余量收口（**M-E4 实盘仍门禁未开工**）；版本 **3.12.0**
+
 ## [3.11.1] - 2026-09-18
 
 ### Added
