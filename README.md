@@ -2,7 +2,7 @@
 
 可发布的量化**研究与纸面决策**平台：统一 Vendor、选股/PIT、工作台 API、投研 Agent 槽位、纸面执行安全模型，收敛在单一产品仓。
 
-> 当前版本见 [`VERSION`](VERSION)。路线图 [`docs/ROADMAP.md`](docs/ROADMAP.md)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
+> 当前版本见 [`VERSION`](VERSION)。文档索引 [`docs/README.md`](docs/README.md)；路线图 [`docs/ROADMAP.md`](docs/ROADMAP.md)；计划 [`docs/plans/`](docs/plans/)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
 
 ## v1.0 交付面
 
@@ -84,13 +84,17 @@ stock-platform/
 ├── apps/workbench/
 ├── packages/{providers,research,agents,execution}/
 ├── docs/
+│   ├── README.md              # 文档分类索引
 │   ├── ROADMAP.md
 │   ├── upstream-archive.md
 │   ├── release-checklist.md
 │   ├── versioning.md
-│   ├── architecture/          # ADR 0001–0032
-│   ├── ops/                   # 刷新 / fixture 录制
-│   └── contracts/
+│   ├── architecture/          # ADR
+│   ├── contracts/
+│   ├── ops/
+│   ├── plans/                 # 能力盘点 / 合并 / U 线（SSOT）
+│   ├── engineering/           # OpenAPI / 测试 / CI
+│   └── upstream/              # 上游配方只读摘要
 └── scripts/{check_docs,check_versions,release_tag}.ps1
 ```
 
@@ -114,7 +118,7 @@ stock-platform/
 
 ## 上游参考（只读）
 
-见 [`docs/upstream-archive.md`](docs/upstream-archive.md)。新功能只进本仓。
+见 [`docs/upstream-archive.md`](docs/upstream-archive.md) 与配方摘要 [`docs/upstream/`](docs/upstream/)。新功能只进本仓。
 
 ## 许可
 

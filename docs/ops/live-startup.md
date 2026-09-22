@@ -64,7 +64,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:3018/api/settings/presets/cn_tus
 
 ## 日用最小步骤（商用可用最短路径）
 
-对应计划 DoD：`.cursor/plans/usable-recommend-review-milestones.md`。
+对应计划 DoD：[`docs/plans/usable-recommend-review-milestones.md`](../plans/usable-recommend-review-milestones.md)。
 
 1. 复制 `.env.example` → `.env`，填入 `STOCK_PLATFORM_TUSHARE_TOKEN`（勿提交）。  
 2. 建议：`STOCK_PLATFORM_PROVIDER_PRESET=cn_tushare_http`（或 UI「偏好预设」切到同名）。  

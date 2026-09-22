@@ -1,7 +1,7 @@
 # Skills 软链与非运行时治理
 
 > **SSOT**：本文说明 Skill / 文档仓如何被本仓引用。  
-> **相关**：[upstream-archive.md](../upstream-archive.md) · [capability-domain-merge-roadmap.md](../../.cursor/plans/capability-domain-merge-roadmap.md) M-S1 · [workspace-projects-capability-inventory.md](../../.cursor/plans/workspace-projects-capability-inventory.md)
+> **相关**：[upstream-archive.md](../upstream-archive.md) · [capability-domain-merge-roadmap.md](../plans/capability-domain-merge-roadmap.md) M-S1 · [workspace-projects-capability-inventory.md](../plans/workspace-projects-capability-inventory.md)
 
 ## 原则
 
@@ -66,7 +66,7 @@ Skill / 盘点缺口 →（M-D1）对照表 → 契约/ADR → 扩能力矩阵 �
 ## 与能力矩阵的关系
 
 - Skill 端点清单 ≠ 矩阵已声明能力。  
-- 缺口对照见 [`.cursor/plans/m-d1-capability-gap-matrix.md`](../../.cursor/plans/m-d1-capability-gap-matrix.md)。  
+- 缺口对照见 [`plans/m-d1-capability-gap-matrix.md`](../plans/m-d1-capability-gap-matrix.md)。  
 - 未进矩阵的端点：产品路径必须 fail-closed，不得「临时调一下 Skill 函数」。
 
 ## 检查清单（PR 自检）

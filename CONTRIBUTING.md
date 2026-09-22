@@ -30,12 +30,19 @@ CI 对齐：`.github/workflows/ci.yml` 的 `monorepo` job 跑同一条 pytest；
 
 | 路径 | 用途 |
 |------|------|
+| `docs/README.md` | 文档分类索引（SSOT 入口） |
 | `docs/contracts/` | 对外契约；破坏性变更必须记 ADR |
 | `docs/architecture/` | ADR，编号递增 |
+| `docs/plans/` | 能力盘点、合并路线图、U 线与选型清单 |
+| `docs/ops/` | 运维与诚实性说明 |
+| `docs/engineering/` | OpenAPI / 测试分层 / CI |
+| `docs/upstream/` | 上游配方只读摘要 |
 | `docs/upstream-archive.md` | 上游归档权威清单 |
 | `packages/` | 可安装库 |
 | `apps/` | 可运行应用 |
 | `scripts/` | 工程脚本 |
+
+OpenAPI / 分层测 / CI 短文：[`docs/engineering/openapi-testing-ci.md`](docs/engineering/openapi-testing-ci.md)。
 
 ## Workbench 测试分层
 

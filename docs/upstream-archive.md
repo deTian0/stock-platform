@@ -2,8 +2,9 @@
 
 > 状态：**Accepted（M7）**  
 > `stock-platform` 是唯一产品仓。下列仓库仅作历史参考 / 配方来源，**不得**再作为并行运行时或第二数据主链。  
-> 工作区八仓能力盘点（合并输入，不实施）：[`.cursor/plans/workspace-projects-capability-inventory.md`](../.cursor/plans/workspace-projects-capability-inventory.md)。  
-> 按能力域合并路线图：[`.cursor/plans/capability-domain-merge-roadmap.md`](../.cursor/plans/capability-domain-merge-roadmap.md)。
+> 工作区八仓能力盘点（合并输入，不实施）：[`plans/workspace-projects-capability-inventory.md`](plans/workspace-projects-capability-inventory.md)。  
+> 按能力域合并路线图：[`plans/capability-domain-merge-roadmap.md`](plans/capability-domain-merge-roadmap.md)。  
+> 上游配方只读摘要：[`upstream/`](upstream/)。
 
 ## 总表
 

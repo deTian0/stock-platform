@@ -3,12 +3,15 @@
 修改本仓库前先读：
 
 1. [`CONTRIBUTING.md`](CONTRIBUTING.md)
-2. [`docs/ROADMAP.md`](docs/ROADMAP.md)
-3. [`docs/versioning.md`](docs/versioning.md)
-4. [`docs/upstream-archive.md`](docs/upstream-archive.md)
-5. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
-6. [`docs/architecture/0012-v1-product-boundary.md`](docs/architecture/0012-v1-product-boundary.md)
-7. [`docs/contracts/`](docs/contracts/)（改口径先写 ADR）
+2. [`docs/README.md`](docs/README.md)（文档分类索引）
+3. [`docs/ROADMAP.md`](docs/ROADMAP.md)
+4. [`docs/plans/`](docs/plans/)（能力盘点 / 合并路线图 / U 线里程碑）
+5. [`docs/versioning.md`](docs/versioning.md)
+6. [`docs/upstream-archive.md`](docs/upstream-archive.md) · [`docs/upstream/`](docs/upstream/)
+7. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
+8. [`docs/architecture/0012-v1-product-boundary.md`](docs/architecture/0012-v1-product-boundary.md)
+9. [`docs/contracts/`](docs/contracts/)（改口径先写 ADR）
+10. [`docs/engineering/`](docs/engineering/)（OpenAPI / 测试 / CI）
 
 ## 硬性规则
 
@@ -18,6 +21,7 @@
 - 执行层默认 SIMULATE；禁止引入 live 券商开关。
 - 不提交密钥、行情缓存、SQLite 大数据。
 - 保持改动最小；不处理无关问题。
+- **文档 SSOT**：正式正文在 `docs/`；`.cursor/plans` 仅索引指针。
 
 ## 完成标准
 
