@@ -41,6 +41,12 @@ from .strategy_config import (
     load_strategy_config,
     run_strategy_pit,
 )
+from .strategy_ab import (
+    attach_strategy_ab,
+    run_strategy_ab_sidecar,
+    strategy_ab_enabled,
+    strategy_ab_status,
+)
 from .universe import (
     UniverseEmptyError,
     default_daily_universe_path,
@@ -57,7 +63,11 @@ from .walkforward import (
     summarize_walk_forward,
 )
 from .empirical_compare import compare_empirical_baseline, extract_engine_fold_returns
-from .factor_ic import spearman_rank_ic, summarize_factor_ic
+from .factor_ic import (
+    spearman_rank_ic,
+    summarize_factor_ic,
+    summarize_factor_ic_from_rows,
+)
 
 __all__ = [
     "W_DEFAULT",
@@ -74,6 +84,7 @@ __all__ = [
     "apply_entry_gates",
     "apply_risk_gates",
     "assert_no_lookahead_columns",
+    "attach_strategy_ab",
     "brief_to_orders",
     "build_cross_section_panel",
     "build_multi_day_pit_panel",
@@ -109,6 +120,7 @@ __all__ = [
     "run_refresh",
     "run_pit_long_only",
     "run_rolling_recommend_review",
+    "run_strategy_ab_sidecar",
     "run_strategy_pit",
     "score_cross_section",
     "score_cross_section_csv",
@@ -116,10 +128,13 @@ __all__ = [
     "settle_performance_log",
     "settled_records",
     "spearman_rank_ic",
+    "strategy_ab_enabled",
+    "strategy_ab_status",
     "summarize_factor_ic",
+    "summarize_factor_ic_from_rows",
     "summarize_walk_forward",
     "universe_size_guidance",
     "write_brief_csv",
 ]
 
-__version__ = "3.11.1"
+__version__ = "3.12.0"

@@ -1,6 +1,11 @@
 """Thin agent plugins  - data only via stock_platform_providers."""
 
 from .debate import DebateReport, build_debate_report
+from .deep_llm_graph import (
+    deep_llm_graph_enabled,
+    deep_llm_graph_status,
+    run_deep_llm_graph,
+)
 from .errors import AgentError
 from .llm_debate import (
     LlmBudgetExceeded,
@@ -38,12 +43,15 @@ __all__ = [
     "build_research_report",
     "build_review_report",
     "debate_brief_picks",
+    "deep_llm_graph_enabled",
+    "deep_llm_graph_status",
     "get_role_prompt",
     "list_role_prompts",
     "llm_debate_status",
     "parse_rating",
     "run_debate",
+    "run_deep_llm_graph",
     "to_ternary_verdict",
     "warn_if_truncated",
 ]
-__version__ = "3.11.1"
+__version__ = "3.12.0"

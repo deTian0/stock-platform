@@ -11,6 +11,7 @@
 | **M12 / v1.5.0** | 确定性辩论 `build_debate_report` |
 | **M33 / v2.5.0** | 可选 LLM 辩论（`[llm]` extra；默认仍 deterministic） |
 | **M44** | LLM 预算 / 截断告警 / `STOCK_PLATFORM_LLM_FALLBACK`（默认降级确定性） |
+| **M-A4 / v3.12+** | 可选更深多角色图（`STOCK_PLATFORM_DEEP_LLM_GRAPH`；默认关；禁 dataflows） |
 
 ## 硬规则
 

@@ -108,10 +108,16 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="backtest-form"' in body
     assert 'id="walkforward-form"' in body
     assert 'id="strategy-compare"' in body
+    assert 'id="tsp-subset"' in body
+    assert 'id="tsp-accuracy-spark"' in body
+    assert 'id="recommend-strategy-ab"' in body
     assert 'id="recommend-tier"' in body
     assert 'id="recommend-perf-strip"' in body
     assert "recentDays" in client.get("/static/app.js").text
+    assert "renderAccuracySparkline" in client.get("/static/app.js").text
     assert "runWalkForwardSummary" in client.get("/static/app.js").text
+    assert "strategyAb" in client.get("/static/app.js").text
+    assert "tsp-spark" in client.get("/static/app.css").text
     assert 'id="pref-preset"' in body
     assert 'id="recommend-review-block"' in body
     assert 'id="recommend-review-table"' in body
@@ -207,6 +213,79 @@ def test_strategy_compare_api(client: TestClient) -> None:
     # No engine in default CI client → fixture fallback, never silent about source
     assert body.get("panelSource") == "fixture"
     assert "panelNote" in body
+
+
+def test_strategy_ab_default_off_on_brief(client: TestClient) -> None:
+    st = client.get("/api/research/strategy/ab-status")
+    assert st.status_code == 200
+    assert st.json()["enabled"] is False
+    assert st.json()["defaultOnDailyPath"] is False
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 3,
+            "adjust_kind": "none",
+            "persist": "false",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    ab = body.get("strategyAb") or {}
+    assert ab.get("enabled") is False
+    assert ab.get("replacesPicks") is False
+
+
+def test_strategy_ab_opt_in_query(client: TestClient) -> None:
+    r = client.get(
+        "/api/research/brief",
+        params={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 3,
+            "adjust_kind": "none",
+            "persist": "false",
+            "strategyAb": "true",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    ab = body["strategyAb"]
+    assert ab.get("enabled") is True
+    assert ab.get("replacesPicks") is False
+    assert ab.get("ok") is True
+    assert "picks" in body
+
+
+def test_factor_ic_api(client: TestClient) -> None:
+    r = client.post(
+        "/api/research/backtest/factor-ic",
+        json={
+            "rows": [
+                {"asof": "2026-01-02", "factor": 1, "forward_return": 0.01},
+                {"asof": "2026-01-02", "factor": 2, "forward_return": 0.02},
+                {"asof": "2026-01-02", "factor": 3, "forward_return": 0.03},
+                {"asof": "2026-01-03", "factor": 3, "forward_return": -0.01},
+                {"asof": "2026-01-03", "factor": 2, "forward_return": 0.0},
+                {"asof": "2026-01-03", "factor": 1, "forward_return": 0.02},
+            ]
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["n_dates"] == 2
+    assert body["icir"] is not None
+    assert body["liveTradingEnabled"] is False
+
+
+def test_deep_graph_status_default_off(client: TestClient) -> None:
+    r = client.get("/api/debate/deep-graph/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["enabled"] is False
+    assert body["defaultEngine"] == "deterministic"
 
 
 def test_strategy_compare_require_engine_fail_closed(

@@ -17,7 +17,7 @@
 **默认运行时（v3.9+）**：行情偏好默认 **CN live**（`astock_http` / `em_get`）；美港可切 `global_http`。  
 CI / 本地测试设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 保持零公网。详见 [`docs/ops/live-startup.md`](docs/ops/live-startup.md)。  
 **明确不做**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、同花顺真实 HTTP（backlog）。  
-**同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。
+**同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。分档说明见 [`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md)。**M-E4 实盘仍门禁，未开工。**
 **交易**：始终 paper / SIMULATE（`liveTradingEnabled=false`）——「真实」仅指行情 API。
 
 ## 日用路径（Phase E）

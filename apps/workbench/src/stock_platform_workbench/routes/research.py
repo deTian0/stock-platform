@@ -15,6 +15,7 @@ from stock_platform_providers import get_market_strategy
 from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
 from stock_platform_research import (
     UniverseEmptyError,
+    attach_strategy_ab,
     brief_to_orders,
     build_multi_day_pit_panel,
     compare_strategy_configs,
@@ -27,6 +28,10 @@ from stock_platform_research import (
     run_refresh,
     run_rolling_recommend_review,
     settle_performance_log,
+    strategy_ab_enabled,
+    strategy_ab_status,
+    summarize_factor_ic,
+    summarize_factor_ic_from_rows,
     summarize_walk_forward,
 )
 from stock_platform_research.rolling_review import resolve_asof_window, resolve_universe_symbols
@@ -161,7 +166,53 @@ def get_recommend_defaults(
     ),
 ) -> dict[str, Any]:
     """Default asof / symbols for wizard + recommend one-click path."""
-    return recommend_defaults(request.app.state.workbench, universe_tier=universe_tier)
+    out = recommend_defaults(request.app.state.workbench, universe_tier=universe_tier)
+    out["strategyAb"] = strategy_ab_status()
+    return out
+
+
+def _maybe_attach_strategy_ab(
+    request: Request,
+    brief: dict[str, Any],
+    *,
+    request_flag: bool,
+    symbols: list[str] | None,
+    universe_tier: str | None,
+) -> dict[str, Any]:
+    """Attach A/B sidecar when env or request flag opts in (never replaces picks)."""
+    if not strategy_ab_enabled(request_flag=request_flag):
+        brief.setdefault(
+            "strategyAb",
+            {
+                "ok": True,
+                "enabled": False,
+                "replacesPicks": False,
+                "note": strategy_ab_status()["note"],
+                "environment": "SIMULATE",
+                "liveTradingEnabled": False,
+            },
+        )
+        return brief
+    panel, eng_source, eng_err = _engine_compare_panel(
+        request,
+        last_n=8,
+        universe_tier=universe_tier or "core",
+        symbols=symbols,
+    )
+    if panel is None:
+        panel = _fixture_compare_panel()
+        return attach_strategy_ab(
+            brief,
+            panel,
+            panel_source="fixture",
+            panel_note=eng_err or "无 engine/daily 面板，回退演示 fixture（不冒充 live）",
+        )
+    return attach_strategy_ab(
+        brief,
+        panel,
+        panel_source=eng_source or "engine_sqlite",
+        panel_note=None,
+    )
 
 
 @router.get("/brief")
@@ -180,6 +231,11 @@ def get_brief(
         alias="universeTier",
         description="When symbols empty: core|watch|full (default watch)",
     ),
+    strategy_ab: bool = Query(
+        False,
+        alias="strategyAb",
+        description="Opt-in A/B sidecar (or set STOCK_PLATFORM_STRATEGY_AB=1); default off",
+    ),
 ) -> dict[str, Any]:
     kind = None if (adjust_kind or "").lower() in {"", "none", "raw"} else adjust_kind
     syms = _parse_symbols(symbols)
@@ -192,6 +248,13 @@ def get_brief(
         reversal_q=reversal_q,
         adjust_kind=kind,
         soft_gates=soft_gates,
+        universe_tier=universe_tier,
+    )
+    _maybe_attach_strategy_ab(
+        request,
+        brief,
+        request_flag=strategy_ab,
+        symbols=syms,
         universe_tier=universe_tier,
     )
     if persist:
@@ -473,6 +536,13 @@ def wizard_daily(request: Request, body: WizardDailyRequest) -> dict[str, Any]:
                 "dataNote": brief.get("dataNote"),
                 "gatesRelaxed": brief.get("gatesRelaxed"),
             }
+        )
+        _maybe_attach_strategy_ab(
+            request,
+            brief,
+            request_flag=False,
+            symbols=symbols,
+            universe_tier=body.universe_tier,
         )
         _persist_brief(request, brief, symbols=symbols)
     except HTTPException as exc:
@@ -800,6 +870,12 @@ def get_strategy_configs() -> dict[str, Any]:
     }
 
 
+@router.get("/strategy/ab-status")
+def get_strategy_ab_status() -> dict[str, Any]:
+    """M-R5: whether daily-path A/B sidecar is opted in (default off)."""
+    return strategy_ab_status()
+
+
 class StrategyCompareRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -989,6 +1065,33 @@ def post_walk_forward(body: WalkForwardRequest) -> dict[str, Any]:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class FactorIcRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    observations: list[dict[str, Any]] | None = None
+    rows: list[dict[str, Any]] | None = None
+    factor_key: str = Field("factor", alias="factorKey")
+    return_key: str = Field("forward_return", alias="returnKey")
+
+
+@router.post("/backtest/factor-ic")
+def post_factor_ic(body: FactorIcRequest) -> dict[str, Any]:
+    """M-R4 deep: rank IC / ICIR summary (not on lvrev / brief path)."""
+    if body.observations:
+        return summarize_factor_ic(
+            body.observations,
+            factor_key=body.factor_key,
+            return_key=body.return_key,
+        )
+    if body.rows:
+        return summarize_factor_ic_from_rows(
+            body.rows,
+            factor_key=body.factor_key,
+            return_key=body.return_key,
+        )
+    raise HTTPException(status_code=400, detail="需要 observations 或 rows")
 
 
 @router.get("/pit/fundamentals")

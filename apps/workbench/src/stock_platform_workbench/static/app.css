@@ -851,3 +851,25 @@ footer a {
     margin-top: 0.35rem;
   }
 }
+
+/* M-U4 TSP UI subset ¡ª accuracy sparkline */
+.tsp-spark-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 0.75rem 0;
+}
+.tsp-spark {
+  width: min(100%, 320px);
+  height: 64px;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.ab-block {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+}

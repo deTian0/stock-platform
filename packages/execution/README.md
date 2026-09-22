@@ -22,7 +22,10 @@ STOCK_PLATFORM_THS_MODE=mock         # 默认：内存/fixtures，CI 零公网
 STOCK_PLATFORM_THS_MODE=experimental # 需 STOCK_PLATFORM_THS_BASE_URL + TOKEN；非生产就绪
 ```
 
-真实同花顺零售模拟盘 **无稳定公开 HTTP API**；experimental 仅为扩展点（ADR 0037）。
+真同花顺零售模拟盘 **无稳定公开 HTTP API**；experimental 仅为扩展点（ADR 0037）。
+
+诚实性分档见 [`docs/ops/broker-port-honesty.md`](../../docs/ops/broker-port-honesty.md)
+（mock ≠ experimental ≠ 未接真实；**M-E4 实盘门禁未立项**）。
 
 ## 硬规则
 
