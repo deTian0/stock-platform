@@ -1979,11 +1979,13 @@
       if (data.hint && $("recommend-hint")) {
         $("recommend-hint").textContent =
           data.hint +
-          " 可跳转日 K / 纸面。写入纸面始终 SIMULATE；非投资建议。";
+          " 可跳转日 K / 纸面。写入纸面始终 SIMULATE；非投资建议。" +
+          " 盘前情报对照见「情报报告」（同 asof；禁止 WebSearch 写入本库）。";
       }
       if (data.asof) {
         if ($("wizard-asof")) $("wizard-asof").value = data.asof;
         if ($("recommend-asof")) $("recommend-asof").value = data.asof;
+        if ($("intel-asof")) $("intel-asof").value = data.asof;
       }
       if (data.symbols) {
         if ($("wizard-symbols")) $("wizard-symbols").value = data.symbols;
@@ -2208,6 +2210,115 @@
       $("ops-json").textContent = JSON.stringify(data, null, 2);
     } catch (e) {
       $("ops-json").textContent = String(e);
+    }
+  }
+
+  async function loadIntelCrosswalk() {
+    var strip = $("intel-crosswalk-strip");
+    if (!strip) return;
+    var asofEl = $("intel-asof");
+    var asof = asofEl && asofEl.value ? asofEl.value : "";
+    var q = asof ? "?asof=" + encodeURIComponent(asof) : "";
+    try {
+      var data = await fetchJson("/api/research/intel-report/crosswalk" + q);
+      if (asofEl && data.asof && !asofEl.value) asofEl.value = data.asof;
+      var bits = [
+        "asof=" + dash(data.asof),
+        data.briefPresent ? "brief 已存" : "brief 空态",
+        "tier=" + dash(data.universeTier),
+        "宇宙=" + (data.universeSize != null ? data.universeSize : "—"),
+        "picks=" + (data.pickCount != null ? data.pickCount : 0),
+      ];
+      strip.innerHTML = bits
+        .map(function (b) {
+          return '<span class="rec-chip">' + b + "</span>";
+        })
+        .join("");
+      if ($("intel-report-meta") && data.note) {
+        $("intel-report-meta").textContent =
+          data.note + " · writesBriefSqlite=" + String(!!data.writesBriefSqlite);
+      }
+    } catch (e) {
+      strip.innerHTML =
+        '<span class="rec-chip">对照加载失败（fail-closed）</span>';
+    }
+  }
+
+  async function runIntelPrefill(event) {
+    if (event) event.preventDefault();
+    var errEl = $("intel-prefill-error");
+    var meta = $("intel-prefill-meta");
+    var list = $("intel-missing-list");
+    clearError(errEl);
+    if (list) list.innerHTML = "";
+    var asof = ($("intel-asof") && $("intel-asof").value) || "";
+    var kind = ($("intel-kind") && $("intel-kind").value) || "a-share-preopen";
+    var params = new URLSearchParams();
+    params.set("kind", kind);
+    if (asof) params.set("asof", asof);
+    params.set("format", "json");
+    if (meta) meta.textContent = "正在用平台数据部分预填…";
+    try {
+      var data = await fetchJson(
+        "/api/research/intel-report/prefill?" + params.toString()
+      );
+      if ($("intel-prefill-json")) {
+        $("intel-prefill-json").textContent = JSON.stringify(
+          {
+            kind: data.kind,
+            asof: data.asof,
+            filled: data.filled,
+            missing: data.missing,
+            remainingCount: data.remainingCount,
+            crossWalk: data.crossWalk,
+            writesBriefSqlite: data.writesBriefSqlite,
+            disclaimer: data.disclaimer,
+          },
+          null,
+          2
+        );
+      }
+      if (list && data.missing) {
+        list.innerHTML = data.missing
+          .map(function (m) {
+            return (
+              "<li><strong>" +
+              (m.field || "") +
+              "</strong> — " +
+              (m.reason || "") +
+              "</li>"
+            );
+          })
+          .join("");
+      }
+      var htmlLink = $("intel-prefill-html-link");
+      if (htmlLink) {
+        var htmlParams = new URLSearchParams();
+        htmlParams.set("kind", kind);
+        if (asof) htmlParams.set("asof", asof);
+        htmlParams.set("format", "html");
+        htmlLink.href =
+          "/api/research/intel-report/prefill?" + htmlParams.toString();
+        htmlLink.hidden = false;
+      }
+      if (data.html) {
+        var blob = new Blob([data.html], { type: "text/html;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener");
+      }
+      if (meta) {
+        meta.textContent =
+          "预填完成 · filled=" +
+          ((data.filled && data.filled.length) || 0) +
+          " · remaining={{}}×" +
+          (data.remainingCount || 0) +
+          " · writesBriefSqlite=false · " +
+          (data.disclaimer || "");
+      }
+      loadIntelCrosswalk();
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if (meta) meta.textContent = "预填失败（fail-closed，未写 brief 库）";
     }
   }
 
@@ -2803,6 +2914,12 @@
     }
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
+    if ($("intel-prefill-form")) {
+      $("intel-prefill-form").addEventListener("submit", runIntelPrefill);
+    }
+    if ($("btn-intel-crosswalk")) {
+      $("btn-intel-crosswalk").addEventListener("click", loadIntelCrosswalk);
+    }
     window.addEventListener("hashchange", revealHashTarget);
     window.addEventListener("scroll", markNav, { passive: true });
     revealHashTarget();
@@ -2811,6 +2928,7 @@
     loadRecommendHistory();
     loadRecommendPerfStrip();
     loadTspAccuracySpark();
+    loadIntelCrosswalk();
     loadMatrix();
     loadPaper();
     loadBroker();

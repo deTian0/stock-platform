@@ -407,6 +407,42 @@ class PitFundamentalsResponse(ExtraAllowModel):
     note: str | None = None
 
 
+class IntelReportPrefillResponse(ExtraAllowModel):
+    """MR-5: partial HTML prefill from platform data (never writes brief SQLite)."""
+
+    kind: str
+    label: str | None = None
+    template: str | None = None
+    asof: str | None = None
+    html: str | None = None
+    filled: list[dict[str, Any]] = Field(default_factory=list)
+    missing: list[dict[str, Any]] = Field(default_factory=list)
+    remainingPlaceholders: list[str] = Field(default_factory=list)
+    remainingCount: int = 0
+    crossWalk: dict[str, Any] = Field(default_factory=dict)
+    writesBriefSqlite: bool = False
+    liveTradingEnabled: bool = False
+    environment: str = "SIMULATE"
+    disclaimer: str | None = None
+
+
+class IntelReportCrosswalkResponse(ExtraAllowModel):
+    """MR-3: asof / universe对照 between intel report and brief."""
+
+    asof: str | None = None
+    briefPresent: bool = False
+    universeTier: str | None = None
+    universeSize: int | None = None
+    pickCount: int = 0
+    provider: str | None = None
+    note: str | None = None
+    links: dict[str, str] = Field(default_factory=dict)
+    kinds: list[dict[str, str]] = Field(default_factory=list)
+    writesBriefSqlite: bool = False
+    liveTradingEnabled: bool = False
+    environment: str = "SIMULATE"
+
+
 def ok200(model: type[BaseModel], description: str = "OK") -> dict[int | str, dict[str, Any]]:
     """Build a 200 response entry for OpenAPI."""
     return {200: {"model": model, "description": description}}

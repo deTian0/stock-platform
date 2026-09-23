@@ -54,6 +54,15 @@ def _ok_live_off(body: Any, status: int) -> None:
         assert body["liveTradingEnabled"] is False
 
 
+def _ok_intel_prefill(body: Any, status: int) -> None:
+    assert status == 200
+    assert isinstance(body, dict)
+    assert body.get("writesBriefSqlite") is False
+    assert body.get("liveTradingEnabled") is False
+    assert isinstance(body.get("html"), str) and "platform-crosswalk" in body["html"]
+    assert isinstance(body.get("missing"), list) and body["missing"]
+
+
 def _ok_health(body: Any, status: int) -> None:
     assert status == 200
     assert body["status"] == "ok"
@@ -458,6 +467,22 @@ _reg(EndpointHit("GET", "/api/research/defaults", assert_body=_ok_defaults))
 _reg(
     EndpointHit(
         "GET",
+        "/api/research/intel-report/crosswalk",
+        params={"asof": "2026-09-02"},
+        assert_body=_ok_live_off,
+    )
+)
+_reg(
+    EndpointHit(
+        "GET",
+        "/api/research/intel-report/prefill",
+        params={"kind": "a-share-preopen", "asof": "2026-09-02", "format": "json"},
+        assert_body=_ok_intel_prefill,
+    )
+)
+_reg(
+    EndpointHit(
+        "GET",
         "/api/research/brief",
         params={
             "asof": "2026-09-02",
@@ -738,7 +763,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 56
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 58
 
 
 @pytest.mark.unit
@@ -786,4 +811,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 59
+    assert n_ops + n_extra == 61

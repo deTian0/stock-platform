@@ -186,7 +186,7 @@
 - **技术栈 / 入口**：仅 `SKILL.md` + `references/` + `templates/`（7 文件）；无 pip/HTTP/DB/git（扫描时）。
 - **模块**：编排红线、数据清单、搜索句式、视觉规范、三份 HTML 模板（`{{占位符}}`）。
 - **交易策略**：**未发现**（叙事研判模板 ≠ 可编程策略）。
-- **与 stock-platform**：**已挂接（配方）** — 模板副本 [`../upstream/market-report-templates/`](../upstream/market-report-templates/) + Workbench `#intel-report`；里程碑 [`market-report-dashboard-merge-milestones.md`](market-report-dashboard-merge-milestones.md)。**未接**：providers 填模板运行时、与 brief 自动联动（MR-3/MR-5）。详档 [`../upstream/market-report-dashboard-capability-report.md`](../upstream/market-report-dashboard-capability-report.md)。
+- **与 stock-platform**：**已挂接** — 模板副本 [`../upstream/market-report-templates/`](../upstream/market-report-templates/) + Workbench `#intel-report`；ADR 0053 对照 + `intel-report/crosswalk|prefill`（MR-3/MR-5，v3.12.5）。**刻意不做**：Skill 运行时 import、WebSearch 主链、M-E4 实盘。详档 [`../upstream/market-report-dashboard-capability-report.md`](../upstream/market-report-dashboard-capability-report.md)。
 - **合并候选价值**：**中（UI/内容配方）/ 低（代码）** — 软链只读；禁止当第二数据主链。
 
 ### V2-code-review-20260905

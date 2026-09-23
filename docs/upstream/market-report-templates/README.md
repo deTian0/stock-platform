@@ -26,7 +26,9 @@
 ## 与 brief 的关系
 
 - 平台 `build_premarket_brief` / 今日推荐 = **lvrev 截面 + 闸门 TopN**（结构化）。  
-- 本模板 = **情报看板叙事**（机会/风险 HTML）。同属「盘前」语义，**产物与数据链不同**；联动见里程碑 MR-3（可选，未强制本轮）。
+- 本模板 = **情报看板叙事**（机会/风险 HTML）。同属「盘前」语义，**产物与数据链不同**。  
+- 对照 ADR：[../../architecture/0053-intel-report-brief-crosswalk.md](../../architecture/0053-intel-report-brief-crosswalk.md)；Workbench `#intel-report` 可互跳并对同日 asof/宇宙做只读对照。  
+- 平台「用平台数据预填预览」仅填能填字段；**禁止** WebSearch / 预填结果写入 brief SQLite。
 
 ## 禁止
 

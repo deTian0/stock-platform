@@ -8,6 +8,18 @@
 
 - （无）
 
+## [3.12.5] - 2026-09-23
+
+### Added
+
+- **MR-3 情报 ↔ brief 对照**：ADR [`docs/architecture/0053-intel-report-brief-crosswalk.md`](docs/architecture/0053-intel-report-brief-crosswalk.md)；Workbench `#intel-report` 与向导/今日推荐互跳；`GET /api/research/intel-report/crosswalk`（asof/宇宙只读对照）
+- **MR-5 平台数据部分预填**：`GET /api/research/intel-report/prefill`（json/html）+「用平台数据预填预览」；填日历 / 已存 brief picks / 可选 concept_blocks / ops；缺能力进 `missing` 中文说明，保留 `{{占位符}}`；**不写** brief SQLite
+- Workbench 测：`tests/test_intel_report.py` + OpenAPI / 全量 endpoint 注册（现 **58** 个 path+method）
+
+### Changed
+
+- 里程碑 MR-3/MR-5 → done；版本 **3.12.5**；**未**引入 WebSearch 主链 / Skill 运行时 import / M-E4 实盘
+
 ## [3.12.4] - 2026-09-23
 
 ### Added

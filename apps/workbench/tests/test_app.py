@@ -112,8 +112,14 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="tsp-accuracy-spark"' in body
     assert 'id="intel-report"' in body
     assert 'id="intel-report-table"' in body
+    assert 'id="btn-intel-prefill"' in body
+    assert 'id="intel-crosswalk"' in body
     assert "情报报告" in body
     assert "/static/report-templates/a-share-preopen.html" in body
+    _js = client.get("/static/app.js").text
+    assert "/api/research/intel-report/prefill" in _js
+    assert "/api/research/intel-report/crosswalk" in _js
+    assert "runIntelPrefill" in _js
     assert 'id="recommend-strategy-ab"' in body
     assert 'id="recommend-tier"' in body
     assert 'id="recommend-perf-strip"' in body
