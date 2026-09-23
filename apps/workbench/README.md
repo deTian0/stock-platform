@@ -35,6 +35,7 @@
 | **v3.10.1** | 今日推荐 live asof / 空态 / softGates / 回退 tip |
 | **v3.10.2** | **U2 brief SQLite 持久化** + 历史回看；U3 review API 雏形（ADR 0049） |
 | **v3.10.3** | **U3 复盘 UI** + 推荐→绩效闭环 + ops health 布尔字段 + 日批 `-Provider tushare` |
+| **v3.12.4** | **情报报告** `#intel-report`：market-report-dashboard 三类模板只读预览（非 Skill 运行时） |
 
 ## 安装与运行
 

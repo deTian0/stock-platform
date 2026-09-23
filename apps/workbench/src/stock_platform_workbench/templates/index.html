@@ -21,6 +21,7 @@
       <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
       <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
+      <a href="#intel-report" title="情报报告模板（只读配方）">情报报告</a>
       <a href="#market-tools">行情工具</a>
       <a href="#ops">运维</a>
       <a href="#capability">能力矩阵</a>
@@ -266,6 +267,57 @@
         <summary>原始 JSON</summary>
         <pre id="broker-json" class="code"></pre>
       </details>
+    </section>
+
+    <section id="intel-report" class="panel">
+      <div class="panel-head">
+        <h2>情报报告</h2>
+        <span class="pill">只读配方 · 非运行时</span>
+      </div>
+      <p class="hint">
+        来源 Skill 仓 <code>market-report-dashboard</code>（典型路径
+        <code>D:\workspace\git\market-report-dashboard</code>）。
+        本区仅展示三类 HTML 看板<strong>模板说明与预览链接</strong>；
+        <strong>不是</strong>已接入 Skill 运行时，也<strong>不会</strong>用 WebSearch 当第二行情主链。
+        产品数据仍走 <code>packages/providers</code> + 能力矩阵。
+        与「今日推荐」lvrev brief 语义可对照、产物不同——见
+        <code>docs/plans/market-report-dashboard-merge-milestones.md</code>。
+      </p>
+      <div class="table-wrap table-compact">
+        <table id="intel-report-table">
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>模板</th>
+              <th>预览</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A 股盘前</td>
+              <td><code>a-share-preopen.html</code></td>
+              <td><a href="/static/report-templates/a-share-preopen.html" target="_blank" rel="noopener">打开模板</a></td>
+            </tr>
+            <tr>
+              <td>A 股盘中</td>
+              <td><code>a-share-intraday.html</code></td>
+              <td><a href="/static/report-templates/a-share-intraday.html" target="_blank" rel="noopener">打开模板</a></td>
+            </tr>
+            <tr>
+              <td>美股盘前</td>
+              <td><code>us-preopen.html</code></td>
+              <td><a href="/static/report-templates/us-preopen.html" target="_blank" rel="noopener">打开模板</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ol class="wizard-checklist hint" aria-label="Skill 生成步骤">
+        <li>软链源仓到 Cursor / Claude skills，或工作区只读打开 <code>SKILL.md</code>（见 <code>docs/ops/skills-governance.md</code>）</li>
+        <li>助手侧触发：「生成今天的 A 股盘前 / 盘中 / 美股盘前报告」</li>
+        <li>填充 <code>{{占位符}}</code> 后得到单文件 HTML；预览链接处为<strong>未填充</strong>布局配方</li>
+        <li>文档副本：<code>docs/upstream/market-report-templates/</code></li>
+      </ol>
+      <p class="status" id="intel-report-meta">非投资建议 · 禁止 pip 依赖本 Skill · 禁止平行抓取主链</p>
     </section>
 
     <details id="market-tools" class="group">

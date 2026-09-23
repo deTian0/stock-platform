@@ -24,11 +24,12 @@
 | TradingAgents-astock | 有 | 部分 | 部分 | 有 | 有 | 部分 | 部分 |
 | finance-quant-skills | 部分* | 部分* | 部分* | 部分* | 无 | 部分* | 无 |
 | V2-code-review-20260905 | 有† | 有† | 有† | 无 | 有† | 有† | 部分† |
+| market-report-dashboard | 部分* | 无 | 无 | 部分* | 部分* | 无 | 无 |
 
 ### 总表结论（一句话）
 
 - **收敛终点**：`stock-platform` 已覆盖数据主链 + 选股简报 + 轻量回测/绩效 + 薄 Agent + 纸面执行 + 运维调度；缺口主要在 **完整 UI/回测引擎（TSP）**、**完整多 Agent LLM 图（TA）**、**引擎离线大库/实证**、**Skill 端点配方增量吸收**。
-- **勿整仓并入**：三个 Skill/文档仓（a-stock-data / global-stock-data / finance-quant-skills）与 V2 审查快照；价值在配方、语义、测试用例，不是 pip 依赖。
+- **勿整仓并入**：Skill/文档仓（a-stock-data / global-stock-data / finance-quant-skills / **market-report-dashboard**）与 V2 审查快照；价值在配方、语义、测试用例，不是 pip 依赖。`market-report-dashboard` 已配方挂接见 MR 里程碑（v3.12.4）。
 - **分阶段高价值**：`tick-stock-panel`（契约已接，SPA/回测/监控未接）；`a-stock-engine`（`market.db` + 实证基线）；`TradingAgents-astock`（角色/评级口径，禁并 dataflows）。
 
 ---
@@ -179,6 +180,15 @@
 
 ---
 
+### market-report-dashboard
+
+- **定位一句话**：AI Skill——用 WebSearch 填三类深色终端 HTML 看板（A股盘前 / A股盘中 / 美股盘前），强制机会与风险可证伪表述。
+- **技术栈 / 入口**：仅 `SKILL.md` + `references/` + `templates/`（7 文件）；无 pip/HTTP/DB/git（扫描时）。
+- **模块**：编排红线、数据清单、搜索句式、视觉规范、三份 HTML 模板（`{{占位符}}`）。
+- **交易策略**：**未发现**（叙事研判模板 ≠ 可编程策略）。
+- **与 stock-platform**：**已挂接（配方）** — 模板副本 [`../upstream/market-report-templates/`](../upstream/market-report-templates/) + Workbench `#intel-report`；里程碑 [`market-report-dashboard-merge-milestones.md`](market-report-dashboard-merge-milestones.md)。**未接**：providers 填模板运行时、与 brief 自动联动（MR-3/MR-5）。详档 [`../upstream/market-report-dashboard-capability-report.md`](../upstream/market-report-dashboard-capability-report.md)。
+- **合并候选价值**：**中（UI/内容配方）/ 低（代码）** — 软链只读；禁止当第二数据主链。
+
 ### V2-code-review-20260905
 
 - **定位一句话**：**2026-09-05 采集的 A 股行业 ETF 策略工作台代码审阅快照**（`MANIFEST.json`：`development_review_snapshot_not_release`）。**不是**可部署发行版；无完整 git 历史、真实 `data/`、账户与凭据。
@@ -254,3 +264,5 @@
 |------|------|
 | 2026-09-15 | 初版：八仓统一模板盘点 + 能力域总表 + 下一步建议 |
 | 2026-09-15 | 文末短链指向能力域合并路线图 |
+| 2026-09-23 | 增补 `market-report-dashboard`（Skill HTML 看板；见 upstream 能力报告） |
+| 2026-09-23 | v3.12.4：模板入库 + Workbench 情报报告入口 + MR 里程碑（非整仓） |

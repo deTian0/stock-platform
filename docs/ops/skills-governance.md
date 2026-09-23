@@ -16,6 +16,7 @@
 | `finance-quant-skills` | Agent Skills 文档 + 示例脚本 | `../finance-quant-skills` |
 | `a-stock-data` | 自包含 `SKILL.md` | `../a-stock-data` |
 | `global-stock-data` | 自包含 `SKILL.md` | `../global-stock-data` |
+| `market-report-dashboard` | 情报 HTML 看板 Skill（三类模板） | `../market-report-dashboard` |
 
 ## 如何软链 / 只读引用（本机）
 
@@ -35,11 +36,17 @@ New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.claude\skills\global-stock-data" `
   -Target "D:\workspace\git\global-stock-data"
 
+New-Item -ItemType SymbolicLink `
+  -Path "$env:USERPROFILE\.claude\skills\market-report-dashboard" `
+  -Target "D:\workspace\git\market-report-dashboard"
+
 # finance-quant-skills：按该仓 README / marketplace 指引链到 skills 子目录
 # 或使用 npx skills add <repo> —— 仍属助手侧，非 stock-platform 运行时
 ```
 
 无符号链接权限时：复制 `SKILL.md` 到 skills 目录亦可，但易漂移；优先软链。
+
+平台侧只读配方副本（非运行时）：[`docs/upstream/market-report-templates/`](../upstream/market-report-templates/)；Workbench 入口见 `#intel-report`。合并里程碑：[`plans/market-report-dashboard-merge-milestones.md`](../plans/market-report-dashboard-merge-milestones.md)。
 
 ### B. 工作区只读打开
 
@@ -57,7 +64,7 @@ Skill / 盘点缺口 →（M-D1）对照表 → 契约/ADR → 扩能力矩阵 �
 
 | 禁止 | 说明 |
 |------|------|
-| `pip install` / path 依赖写入产品 `pyproject.toml` | finance-quant-skills、a-stock-data、global-stock-data 均不得进入发行依赖 |
+| `pip install` / path 依赖写入产品 `pyproject.toml` | finance-quant-skills、a-stock-data、global-stock-data、market-report-dashboard 均不得进入发行依赖 |
 | 平行抓取主链 | 禁止在 agents/research/workbench 内再 exec Skill 内嵌 HTTP 当第二数据源 |
 | 东财裸 `requests.get` | 一律 `em_get` |
 | UI/文档宣称「已接入某某 Skill 运行时」 | 仅可写「配方来源 / 只读参考」 |

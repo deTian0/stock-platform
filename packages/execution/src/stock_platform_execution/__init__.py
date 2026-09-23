@@ -82,4 +82,4 @@ __all__ = [
     "validate_simulation_profile",
 ]
 
-__version__ = "3.12.3"
+__version__ = "3.12.4"

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美股盘前情报日报 {{MMDD}}</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#131823; --panel-2:#1a2130; --border:#232c3d;
+  --text:#e6edf7; --text-dim:#8b96ab; --accent:#4d8dff;
+  --gold:#f5c451; --warn:#ff9c2e;
+  --up:#17b978;   /* 美股：绿涨 */
+  --down:#ff4d4f; /* 美股：红跌 */
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums;line-height:1.7;-webkit-font-smoothing:antialiased;padding:24px 16px}
+.wrap{max-width:1080px;margin:0 auto}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--text-dim)}
+.hero{background:linear-gradient(135deg,#0f1a2b 0%,#0d1220 100%);border:1px solid var(--border);
+  border-radius:16px;padding:26px 24px;margin-bottom:22px;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,var(--up),transparent)}
+.hero-tag{display:inline-block;font-size:12px;letter-spacing:2px;color:var(--up);
+  border:1px solid rgba(23,185,120,.4);border-radius:20px;padding:2px 12px;margin-bottom:12px}
+.hero h1{font-size:27px;font-weight:700;letter-spacing:1px;margin-bottom:6px}
+.hero-date{font-size:13px;color:var(--text-dim);margin-bottom:16px}
+.verdict{background:rgba(23,185,120,.07);border-left:3px solid var(--up);
+  border-radius:0 8px 8px 0;padding:12px 16px;font-size:15px}
+.verdict b{color:var(--up)}
+.block{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px}
+.block-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.bar{width:3px;height:15px;background:var(--accent);border-radius:2px;display:inline-block}
+.bar.up{background:var(--up)} .bar.gold{background:var(--gold)} .bar.warn{background:var(--warn)}
+.tagline{font-size:12px;color:var(--text-dim);margin:14px 0 10px;letter-spacing:1px}
+.tagline:first-of-type{margin-top:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px}
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 15px}
+.card-label{font-size:13px;color:var(--text-dim);margin-bottom:7px;display:flex;align-items:center;gap:7px}
+.mini-tag{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(23,185,120,.15);color:var(--up)}
+.card-value{font-size:25px;font-weight:700;margin-bottom:3px}
+.card-change{font-size:15px;font-weight:600}
+.card-note{font-size:12px;color:var(--text-dim);margin-top:6px}
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+table.tbl th{text-align:left;font-weight:500;color:var(--text-dim);font-size:12px;
+  padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+table.tbl td{padding:9px 10px;border-bottom:1px solid rgba(35,44,61,.6)}
+table.tbl tr:last-child td{border-bottom:none}
+.reason-txt{color:var(--text-dim);font-size:13px}
+ul.list{list-style:none}
+ul.list li{padding:9px 0;border-bottom:1px solid rgba(35,44,61,.6);font-size:14px}
+ul.list li:last-child{border-bottom:none}
+ul.list li .name{font-weight:600;margin-right:8px}
+.time-chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:5px;
+  background:rgba(77,141,255,.14);color:var(--accent);margin-right:8px}
+.meter-row{display:flex;gap:12px;flex-wrap:wrap}
+.chip{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 15px;flex:1;min-width:130px}
+.chip .k{font-size:12px;color:var(--text-dim)}
+.chip .v{font-size:19px;font-weight:700;margin-top:1px}
+/* 资讯影响 */
+.news-item{border-left:2px solid var(--up);padding:2px 0 2px 13px;margin-bottom:13px}
+.news-item.bear{border-left-color:var(--down)}
+.news-item.neutral{border-left-color:var(--text-dim)}
+.news-item:last-child{margin-bottom:0}
+.news-cat{font-size:11.5px;color:var(--text-dim);margin-bottom:3px}
+.news-t{font-size:14.5px;font-weight:600;margin-bottom:4px}
+.news-impact{font-size:13px;color:var(--text-dim)}
+/* 机会卡片 */
+.opp{background:linear-gradient(135deg,rgba(245,196,81,.07),rgba(245,196,81,.02));
+  border:1px solid rgba(245,196,81,.28);border-left:3px solid var(--gold);
+  border-radius:11px;padding:15px 17px;margin-bottom:13px}
+.opp:last-child{margin-bottom:0}
+.opp-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.opp-head .idx{font-size:12px;font-weight:700;color:var(--gold);
+  border:1px solid rgba(245,196,81,.4);border-radius:6px;padding:1px 7px}
+.opp-head h3{font-size:16px;font-weight:600}
+.pill{font-size:11px;padding:2px 9px;border-radius:20px;margin-left:auto}
+.pill.bull{background:rgba(23,185,120,.14);color:var(--up);border:1px solid rgba(23,185,120,.32)}
+.pill.neutral{background:rgba(139,150,171,.14);color:var(--text-dim);border:1px solid rgba(139,150,171,.3)}
+.opp-body p{font-size:13.5px;margin-bottom:5px}
+.opp-body p:last-child{margin-bottom:0}
+.opp-body b{color:var(--gold)}
+.trigger{color:var(--text-dim);font-size:12.5px}
+/* 风险卡片 */
+.risk{background:linear-gradient(135deg,rgba(255,156,46,.07),rgba(255,156,46,.02));
+  border:1px solid rgba(255,156,46,.26);border-left:3px solid var(--warn);
+  border-radius:11px;padding:14px 17px;margin-bottom:12px}
+.risk:last-child{margin-bottom:0}
+.risk-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.risk-head h3{font-size:15.5px;font-weight:600}
+.pill.bear{background:rgba(255,156,46,.14);color:var(--warn);border:1px solid rgba(255,156,46,.3)}
+.risk-body p{font-size:13.5px;margin-bottom:4px}
+.risk-body p:last-child{margin-bottom:0}
+.risk-body b{color:var(--warn)}
+footer{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);text-align:center}
+footer .src{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+footer .disclaimer{font-size:12px;color:#6b7689}
+@media(max-width:640px){
+  body{padding:14px 10px} .hero{padding:20px 16px} .hero h1{font-size:22px}
+  .cards{grid-template-columns:1fr 1fr} .card-value{font-size:21px}
+}
+@media print{body{background:#fff;color:#111} .hero{background:#f3f5f9} .block{background:#fff;border:1px solid #ddd}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ========== 顶部标题栏 ========== -->
+  <header class="hero">
+    <div class="hero-tag">US PRE-MARKET BRIEF</div>
+    <h1>美股盘前情报日报</h1>
+    <div class="hero-date">{{YYYY年M月D日}} {{星期X}} · 美股开盘 {{21:30 夏令时 / 22:30 冬令时}}（北京时间） · 生成时间 {{HH:MM}}</div>
+    <div class="verdict"><b>今日美股展望：</b>{{一句话定性今日基调，如"CPI公布前市场观望，纳指期货小幅走弱，开盘或延续震荡，业绩驱动个股分化加剧"}}</div>
+  </header>
+
+  <!-- ========== 指数期货 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar up"></span>盘前期货</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-label"><span class="mini-tag">期货</span>道指期货</div>
+        <div class="card-value {{up/down}}">{{点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div class="card-note">{{备注}}</div>
+      </div>
+      <div class="card">
+        <div class="card-label"><span class="mini-tag">期货</span>标普500期货</div>
+        <div class="card-value {{up/down}}">{{点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div class="card-note">{{备注}}</div>
+      </div>
+      <div class="card">
+        <div class="card-label"><span class="mini-tag">期货</span>纳斯达克100期货</div>
+        <div class="card-value {{up/down}}">{{点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div class="card-note">{{备注}}</div>
+      </div>
+    </div>
+    <div class="tagline">盘前异动个股</div>
+    <ul class="list">
+      <li><span class="name">{{个股}}</span><span class="reason-txt">{{盘前涨跌幅 + 异动原因}}</span></li>
+    </ul>
+  </section>
+
+  <!-- ========== 经济日历 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>今日经济日历</h2>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>时间（北京时间）</th><th>数据 / 事件</th><th>预期值</th><th>实际值</th><th>关注点</th></tr></thead>
+        <tbody>
+          <!-- 按需复制行；未公布的实际值填"待公布" -->
+          <tr>
+            <td><span class="time-chip">{{20:30}}</span></td>
+            <td>{{美国 X月 CPI 同比}}</td>
+            <td>{{+X.X%}}</td>
+            <td class="{{up/down}}">{{+X.X% / 待公布}}</td>
+            <td class="reason-txt">{{对美股的影响：高于预期→XX板块承压}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tagline">美联储动态</div>
+    <ul class="list">
+      <li><span class="name">{{官员 / 会议}}</span><span class="reason-txt">{{时间与表态倾向：鹰派 / 鸽派 / 中性 + 市场影响}}</span></li>
+    </ul>
+  </section>
+
+  <!-- ========== 财报日历 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>财报日历</h2>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>公司</th><th>时点</th><th>市场预期</th><th>已公布结果</th><th>股价反应</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>{{公司名 (TICKER)}}</td>
+            <td>{{盘前 / 盘后}}</td>
+            <td class="reason-txt">{{市场预期 EPS / 营收}}</td>
+            <td>{{实际 EPS / 营收 / 待公布}}</td>
+            <td class="{{up/down}}">{{±X.XX%}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== 资讯汇总（六类） ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar gold"></span>公开资讯汇总</h2>
+    <!-- 按需复制 .news-item；class 可选 bull(利好) / bear(利空) / neutral(中性) -->
+    <div class="news-item">
+      <div class="news-cat">① 经济事件与政策</div>
+      <div class="news-t">{{标题}}</div>
+      <div class="news-impact">{{内容摘要 + 对美股的影响方向}}</div>
+    </div>
+    <div class="news-item">
+      <div class="news-cat">② 金融交易（并购 / 回购 / 增减持）</div>
+      <div class="news-t">{{标题}}</div>
+      <div class="news-impact">{{内容摘要 + 影响}}</div>
+    </div>
+    <div class="news-item">
+      <div class="news-cat">③ 金融会议</div>
+      <div class="news-t">{{标题}}</div>
+      <div class="news-impact">{{内容摘要 + 影响}}</div>
+    </div>
+    <div class="news-item">
+      <div class="news-cat">④ 突发事件</div>
+      <div class="news-t">{{标题}}</div>
+      <div class="news-impact">{{内容摘要 + 影响}}</div>
+    </div>
+    <div class="news-item">
+      <div class="news-cat">⑤ 重要讲话</div>
+      <div class="news-t">{{发言人 + 场合}}</div>
+      <div class="news-impact">{{核心表态 + 影响}}</div>
+    </div>
+  </section>
+
+  <!-- ========== 盘前机会（重点区） ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar gold"></span>今日盘前机会</h2>
+    <!-- 按需复制 .opp 卡片，建议 2~4 条 -->
+    <div class="opp">
+      <div class="opp-head">
+        <span class="idx">01</span>
+        <h3>{{板块 / 个股方向}}</h3>
+        <span class="pill bull">偏多</span>
+      </div>
+      <div class="opp-body">
+        <p class="conclusion">{{结论：明确的方向性判断}}</p>
+        <p class="reason"><b>原因：</b>{{经济数据催化 / 财报预期 / 事件驱动 / 资金动向 / 期货映射}}</p>
+        <p class="trigger"><b>失效信号：</b>{{什么情况说明该判断不成立}}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 风险提示 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar warn"></span>风险提示</h2>
+    <!-- 按需复制 .risk 卡片，建议 2~3 条 -->
+    <div class="risk">
+      <div class="risk-head"><h3>{{风险点}}</h3><span class="pill bear">警惕</span></div>
+      <div class="risk-body">
+        <p><b>原因：</b>{{成因：数据不及预期 / 财报暴雷 / 地缘因素 / 获利回吐}}</p>
+        <p><b>影响：</b>{{影响范围与应对思路}}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 关键时点提醒 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>今夜关键时点（北京时间）</h2>
+    <div class="meter-row">
+      <div class="chip"><div class="k">{{20:30}}</div><div class="v" style="font-size:15px">{{经济数据名}}</div></div>
+      <div class="chip"><div class="k">{{21:30}}</div><div class="v" style="font-size:15px">{{美股开盘}}</div></div>
+      <div class="chip"><div class="k">{{盘后}}</div><div class="v" style="font-size:15px">{{公司}} 财报</div></div>
+    </div>
+  </section>
+
+  <!-- ========== A股收盘参考 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>A股收盘参考（全球情绪联动）</h2>
+    <div class="meter-row">
+      <div class="chip"><div class="k">上证指数</div><div class="v {{up/down}}">{{±X.XX%}}</div></div>
+      <div class="chip"><div class="k">深证成指</div><div class="v {{up/down}}">{{±X.XX%}}</div></div>
+      <div class="chip"><div class="k">创业板指</div><div class="v {{up/down}}">{{±X.XX%}}</div></div>
+    </div>
+    <ul class="list">
+      <li><span class="name">联动提示</span><span class="reason-txt">{{A股表现对今晚美股的映射提示，尤其是中概股与出口链}}</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <p class="src">数据来源：{{金十数据 / 新浪美股 / 富途 等}} · 更新时间：{{YYYY-MM-DD HH:MM}}</p>
+    <p class="disclaimer">本报告仅供参考，不构成投资建议，美股投资需注意汇率与时差风险，投资需谨慎。</p>
+  </footer>
+
+</div>
+</body>
+</html>

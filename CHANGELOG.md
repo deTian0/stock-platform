@@ -8,6 +8,17 @@
 
 - （无）
 
+## [3.12.4] - 2026-09-23
+
+### Added
+
+- **market-report-dashboard 配方吸收（MR-1/2/4）**：三类 HTML 模板只读归档至 `docs/upstream/market-report-templates/`；Workbench `#intel-report` 入口 + `static/report-templates/` 预览；Skills 治理挂接；里程碑 [`docs/plans/market-report-dashboard-merge-milestones.md`](docs/plans/market-report-dashboard-merge-milestones.md)
+- **小测**：Workbench UI / 静态模板可访问断言
+
+### Changed
+
+- 上游 README / 能力盘点 / AGENTS / ROADMAP / `check_docs` 短链同步；**未**引入 WebSearch 第二数据主链；版本 **3.12.4**
+
 ## [3.12.3] - 2026-09-22
 
 ### Added
