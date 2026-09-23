@@ -17,6 +17,7 @@
 | TradingAgents-astock | `../TradingAgents-astock` | 多角色研报思路（去内嵌抓取） | `packages/agents` | 完整 LangGraph 可选参考；数据必须经 providers |
 | V2-code-review | `../V2-code-review-20260905` | 执行安全结论（新鲜度/事务/草稿激活/paper-only） | `packages/execution` | 审查快照只读；不吸收 Futu/凭据 |
 | finance-quant-skills | `../finance-quant-skills` | 技能文档 | （不进运行时） | 文档仓；不安装为依赖；软链见 [`docs/ops/skills-governance.md`](ops/skills-governance.md) |
+| market-report-dashboard | `../market-report-dashboard` | A股盘前/盘中、美股盘前 HTML 看板模板与研判规范（Skill） | 模板副本 `docs/upstream/market-report-templates/`；Workbench `#intel-report`；里程碑 [`plans/market-report-dashboard-merge-milestones.md`](plans/market-report-dashboard-merge-milestones.md) | Skill 只读；禁止 WebSearch 平行数据主链 |
 
 ## 红线（产品期仍生效）
 

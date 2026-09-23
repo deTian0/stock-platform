@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-workbench"
-version = "3.12.3"
+version = "3.12.4"
 description = "Minimal research workbench shell for stock-platform."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,7 +30,12 @@ stock-platform-workbench = "stock_platform_workbench.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-stock_platform_workbench = ["py.typed", "templates/*", "static/*"]
+stock_platform_workbench = [
+  "py.typed",
+  "templates/*",
+  "static/*",
+  "static/report-templates/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

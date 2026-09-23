@@ -15,5 +15,8 @@
 | [tick-stock-panel-notes.md](tick-stock-panel-notes.md) | `../tick-stock-panel/CONTRIBUTING.md` 等 | Provider/能力矩阵语义、回测边界 |
 | [tradingagents-roles-notes.md](tradingagents-roles-notes.md) | `../TradingAgents-astock/CLAUDE.md` | 多角色研报思路（禁 dataflows） |
 | [v2-execution-safety-notes.md](v2-execution-safety-notes.md) | `../V2-code-review-20260905/README.md` | 纸面执行安全结论（无 Futu） |
+| [market-report-dashboard-capability-report.md](market-report-dashboard-capability-report.md) | `../market-report-dashboard/SKILL.md` | 三类 HTML 情报看板 Skill（WebSearch；非运行时） |
+| [market-report-templates/](market-report-templates/) | 同上 `templates/` | 三类 HTML **只读配方副本**（Workbench `#intel-report` 可预览） |
 
-Skills 软链治理见 [`../ops/skills-governance.md`](../ops/skills-governance.md)。
+Skills 软链治理见 [`../ops/skills-governance.md`](../ops/skills-governance.md)。  
+合并里程碑：[`../plans/market-report-dashboard-merge-milestones.md`](../plans/market-report-dashboard-merge-milestones.md)。

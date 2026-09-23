@@ -110,6 +110,10 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="strategy-compare"' in body
     assert 'id="tsp-subset"' in body
     assert 'id="tsp-accuracy-spark"' in body
+    assert 'id="intel-report"' in body
+    assert 'id="intel-report-table"' in body
+    assert "情报报告" in body
+    assert "/static/report-templates/a-share-preopen.html" in body
     assert 'id="recommend-strategy-ab"' in body
     assert 'id="recommend-tier"' in body
     assert 'id="recommend-perf-strip"' in body
@@ -141,6 +145,14 @@ def test_static_assets(client: TestClient) -> None:
     assert ".news-item" in css.text
     assert ".pos" in css.text
     assert ".neg" in css.text
+    for name in (
+        "a-share-preopen.html",
+        "a-share-intraday.html",
+        "us-preopen.html",
+    ):
+        tpl = client.get(f"/static/report-templates/{name}")
+        assert tpl.status_code == 200, name
+        assert "{{" in tpl.text or "html" in tpl.text.lower()
     js = client.get("/static/app.js")
     assert js.status_code == 200
     # M11.2: UI must call existing APIs (fail-closed path included).

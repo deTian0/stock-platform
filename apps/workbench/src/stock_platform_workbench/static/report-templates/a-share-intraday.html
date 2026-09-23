@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A股盘中速报 {{MMDD}} {{HH:MM}}</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#131823; --panel-2:#1a2130; --border:#232c3d;
+  --text:#e6edf7; --text-dim:#8b96ab; --accent:#4d8dff;
+  --gold:#f5c451; --warn:#ff9c2e; --up:#ff4d4f; --down:#00b578;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  font-variant-numeric:tabular-nums;line-height:1.7;-webkit-font-smoothing:antialiased;padding:24px 16px}
+.wrap{max-width:1080px;margin:0 auto}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--text-dim)}
+.hero{background:linear-gradient(135deg,#131c2e 0%,#0d1220 100%);border:1px solid var(--border);
+  border-radius:16px;padding:24px;margin-bottom:22px;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,var(--gold),transparent)}
+.hero-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.hero-tag{display:inline-block;font-size:12px;letter-spacing:2px;color:var(--gold);
+  border:1px solid rgba(245,196,81,.35);border-radius:20px;padding:2px 12px;margin-bottom:11px}
+.hero h1{font-size:26px;font-weight:700;letter-spacing:1px;margin-bottom:5px}
+.hero-date{font-size:13px;color:var(--text-dim)}
+/* 情绪指示器 */
+.mood{text-align:right;min-width:132px}
+.mood-label{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+.mood-bars{display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px}
+.mood-bars i{width:22px;height:7px;border-radius:3px;background:var(--panel-2);display:block}
+.mood-bars i.on{background:var(--up)}
+.mood-txt{font-size:14px;font-weight:700;color:var(--up)}
+.verdict{background:rgba(77,141,255,.08);border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;padding:12px 16px;font-size:15px;margin-top:16px}
+.verdict b{color:var(--accent)}
+.block{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px}
+.block-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.bar{width:3px;height:15px;background:var(--accent);border-radius:2px;display:inline-block}
+.bar.gold{background:var(--gold)} .bar.warn{background:var(--warn)}
+.tagline{font-size:12px;color:var(--text-dim);margin:14px 0 10px;letter-spacing:1px}
+.tagline:first-of-type{margin-top:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px}
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 15px}
+.card-label{font-size:13px;color:var(--text-dim);margin-bottom:7px}
+.card-value{font-size:25px;font-weight:700;margin-bottom:3px}
+.card-change{font-size:15px;font-weight:600}
+.card-note{font-size:12px;color:var(--text-dim);margin-top:6px}
+.shape-tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:5px;
+  background:rgba(77,141,255,.13);color:var(--accent);margin-top:6px}
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+table.tbl th{text-align:left;font-weight:500;color:var(--text-dim);font-size:12px;
+  padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+table.tbl td{padding:9px 10px;border-bottom:1px solid rgba(35,44,61,.6)}
+table.tbl tr:last-child td{border-bottom:none}
+.reason-txt{color:var(--text-dim);font-size:13px}
+ul.list{list-style:none}
+ul.list li{padding:9px 0;border-bottom:1px solid rgba(35,44,61,.6);font-size:14px}
+ul.list li:last-child{border-bottom:none}
+ul.list li .name{font-weight:600;margin-right:8px}
+.meter-row{display:flex;gap:12px;flex-wrap:wrap}
+.chip{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 15px;flex:1;min-width:106px}
+.chip .k{font-size:12px;color:var(--text-dim)}
+.chip .v{font-size:20px;font-weight:700;margin-top:1px}
+/* 量能条 */
+.volbar{height:9px;background:var(--panel-2);border-radius:5px;overflow:hidden;margin-top:9px}
+.volbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold))}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+/* 资讯影响 */
+.news-item{border-left:2px solid var(--accent);padding:2px 0 2px 13px;margin-bottom:14px}
+.news-item.bull{border-left-color:var(--up)}
+.news-item.bear{border-left-color:var(--down)}
+.news-item:last-child{margin-bottom:0}
+.news-src{font-size:11.5px;color:var(--text-dim);margin-bottom:3px}
+.news-t{font-size:14.5px;font-weight:600;margin-bottom:4px}
+.news-impact{font-size:13px;color:var(--text-dim)}
+.impact-badge{font-size:11px;padding:1px 8px;border-radius:5px;margin-right:7px}
+.ib-bull{background:rgba(255,77,79,.14);color:var(--up)}
+.ib-bear{background:rgba(0,181,120,.14);color:var(--down)}
+/* 机会卡片 */
+.opp{background:linear-gradient(135deg,rgba(245,196,81,.07),rgba(245,196,81,.02));
+  border:1px solid rgba(245,196,81,.28);border-left:3px solid var(--gold);
+  border-radius:11px;padding:15px 17px;margin-bottom:13px}
+.opp:last-child{margin-bottom:0}
+.opp-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.opp-head .idx{font-size:12px;font-weight:700;color:var(--gold);
+  border:1px solid rgba(245,196,81,.4);border-radius:6px;padding:1px 7px}
+.opp-head h3{font-size:16px;font-weight:600}
+.pill{font-size:11px;padding:2px 9px;border-radius:20px;margin-left:auto}
+.pill.bull{background:rgba(255,77,79,.14);color:var(--up);border:1px solid rgba(255,77,79,.3)}
+.opp-body p{font-size:13.5px;margin-bottom:5px}
+.opp-body p:last-child{margin-bottom:0}
+.opp-body b{color:var(--gold)}
+.trigger{color:var(--text-dim);font-size:12.5px}
+/* 风险卡片 */
+.risk{background:linear-gradient(135deg,rgba(255,156,46,.07),rgba(255,156,46,.02));
+  border:1px solid rgba(255,156,46,.26);border-left:3px solid var(--warn);
+  border-radius:11px;padding:14px 17px;margin-bottom:12px}
+.risk:last-child{margin-bottom:0}
+.risk-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.risk-head h3{font-size:15.5px;font-weight:600}
+.pill.bear{background:rgba(255,156,46,.14);color:var(--warn);border:1px solid rgba(255,156,46,.3)}
+.risk-body p{font-size:13.5px;margin-bottom:4px}
+.risk-body p:last-child{margin-bottom:0}
+.risk-body b{color:var(--warn)}
+/* 节奏建议 */
+.rhythm{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:16px 18px}
+.rhythm p{font-size:14px;margin-bottom:7px}
+.rhythm p:last-child{margin-bottom:0}
+footer{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);text-align:center}
+footer .src{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+footer .disclaimer{font-size:12px;color:#6b7689}
+@media(max-width:640px){
+  body{padding:14px 10px} .hero{padding:20px 16px} .hero h1{font-size:21px}
+  .cards{grid-template-columns:1fr 1fr} .cols2{grid-template-columns:1fr}
+  .mood{text-align:left;width:100%} .mood-bars{justify-content:flex-start}
+}
+@media print{body{background:#fff;color:#111} .hero{background:#f3f5f9} .block{background:#fff;border:1px solid #ddd}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ========== 顶部标题栏 ========== -->
+  <header class="hero">
+    <div class="hero-row">
+      <div>
+        <div class="hero-tag">INTRADAY PULSE</div>
+        <h1>A股盘中速报 · {{HH:MM}}</h1>
+        <div class="hero-date">{{YYYY年M月D日}} {{星期X}} · 数据截至 {{HH:MM}}</div>
+      </div>
+      <div class="mood">
+        <div class="mood-label">市场情绪</div>
+        <!-- .on 数量表示情绪强度 1~5：冰点=1 回暖=2~3 亢奋=4~5 -->
+        <div class="mood-bars">
+          <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i>
+        </div>
+        <div class="mood-txt">{{情绪阶段：冰点 / 回暖 / 亢奋 / 退潮}}</div>
+      </div>
+    </div>
+    <div class="verdict"><b>盘面快照：</b>{{一句话描述当前状态，如"指数低开高走，量能较昨日同期放大12%，题材接力尚可，情绪处于回暖中段"}}</div>
+  </header>
+
+  <!-- ========== 实时指数 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>实时指数</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">上证指数</div>
+        <div class="card-value {{up/down}}">{{当前点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div><span class="shape-tag">{{分时特征：冲高回落 / 低开高走 / 窄幅震荡}}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-label">深证成指</div>
+        <div class="card-value {{up/down}}">{{当前点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div><span class="shape-tag">{{分时特征}}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-label">创业板指</div>
+        <div class="card-value {{up/down}}">{{当前点位}}</div>
+        <div class="card-change {{up/down}}">{{涨跌幅}}</div>
+        <div><span class="shape-tag">{{分时特征}}</span></div>
+      </div>
+    </div>
+
+    <div class="tagline">量能</div>
+    <div class="meter-row">
+      <div class="chip"><div class="k">当前成交额</div><div class="v">{{X,XXX亿}}</div></div>
+      <div class="chip"><div class="k">预估全天</div><div class="v">{{X,XXX亿}}</div></div>
+      <div class="chip"><div class="k">较昨日同期</div><div class="v {{up/down}}">{{±XX%}}</div></div>
+      <div class="chip"><div class="k">量价配合</div><div class="v" style="font-size:16px">{{健康 / 背离}}</div></div>
+    </div>
+    <div class="volbar"><i style="width:{{XX}}%"></i></div>
+  </section>
+
+  <!-- ========== 板块表现 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>板块与资金</h2>
+    <div class="cols2">
+      <div>
+        <div class="tagline">领涨板块</div>
+        <table class="tbl">
+          <thead><tr><th>板块</th><th>涨幅</th></tr></thead>
+          <tbody>
+            <tr><td>{{板块名}}</td><td class="up">{{+X.XX%}}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="tagline">领跌板块</div>
+        <table class="tbl">
+          <thead><tr><th>板块</th><th>跌幅</th></tr></thead>
+          <tbody>
+            <tr><td>{{板块名}}</td><td class="down">{{-X.XX%}}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tagline">主力资金动向</div>
+    <ul class="list">
+      <li><span class="name">净流入</span><span class="reason-txt">{{板块 + 金额，取前3}}</span></li>
+      <li><span class="name">净流出</span><span class="reason-txt">{{板块 + 金额，取前3}}</span></li>
+    </ul>
+  </section>
+
+  <!-- ========== 情绪仪表盘 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>情绪仪表盘</h2>
+    <div class="meter-row">
+      <div class="chip"><div class="k">上涨家数</div><div class="v up">{{X,XXX}}</div></div>
+      <div class="chip"><div class="k">下跌家数</div><div class="v down">{{X,XXX}}</div></div>
+      <div class="chip"><div class="k">涨停家数</div><div class="v up">{{XX}}</div></div>
+      <div class="chip"><div class="k">跌停家数</div><div class="v down">{{X}}</div></div>
+      <div class="chip"><div class="k">炸板率</div><div class="v">{{XX%}}</div></div>
+      <div class="chip"><div class="k">最高连板</div><div class="v">{{X板 · 个股名}}</div></div>
+    </div>
+  </section>
+
+  <!-- ========== 资讯影响（重点） ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar gold"></span>会议讲话与突发事件</h2>
+    <!-- 按需复制 .news-item；bull=利好边框，bear=利空边框 -->
+    <div class="news-item bull">
+      <div class="news-src">{{来源 · HH:MM}}</div>
+      <div class="news-t">{{会议 / 讲话 / 事件标题}}</div>
+      <div class="news-impact">
+        <span class="impact-badge ib-bull">利好</span>{{影响的板块 / 个股 + 影响程度与持续性判断}}
+      </div>
+    </div>
+    <div class="news-item bear">
+      <div class="news-src">{{来源 · HH:MM}}</div>
+      <div class="news-t">{{事件标题}}</div>
+      <div class="news-impact">
+        <span class="impact-badge ib-bear">利空</span>{{影响的板块 / 个股 + 影响程度与持续性判断}}
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 盘中机会（重点区） ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar gold"></span>当前盘中机会</h2>
+    <!-- 按需复制 .opp 卡片，建议 2~3 条 -->
+    <div class="opp">
+      <div class="opp-head">
+        <span class="idx">01</span>
+        <h3>{{板块 / 主题方向}}</h3>
+        <span class="pill bull">偏多</span>
+      </div>
+      <div class="opp-body">
+        <p class="conclusion">{{结论：当前处于什么位置，适合什么参与方式}}</p>
+        <p class="reason"><b>原因：</b>{{消息催化 / 资金流向 / 板块轮动接力 / 情绪修复节奏}}</p>
+        <p class="trigger"><b>失效信号：</b>{{什么信号出现说明机会结束}}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 节奏建议 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar"></span>情绪研判与操作节奏</h2>
+    <div class="rhythm">
+      <p><b>情绪阶段：</b>{{当前处于什么阶段 + 判断依据}}</p>
+      <p><b>节奏建议：</b>{{如"情绪回暖但涨停梯队不完整，宜低吸不宜追高"}}</p>
+      <p><b>较上次推送变化：</b>{{情绪升温/退潮、资金切换到了哪个板块}}</p>
+    </div>
+  </section>
+
+  <!-- ========== 风险提示 ========== -->
+  <section class="block">
+    <h2 class="block-title"><span class="bar warn"></span>风险提示</h2>
+    <!-- 按需复制 .risk 卡片，建议 2~3 条 -->
+    <div class="risk">
+      <div class="risk-head"><h3>{{风险点}}</h3><span class="pill bear">警惕</span></div>
+      <div class="risk-body">
+        <p><b>原因：</b>{{成因}}</p>
+        <p><b>影响：</b>{{影响范围与应对思路}}</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="src">数据来源：{{东方财富 / 财联社 / 同花顺 等}} · 数据截至 {{YYYY-MM-DD HH:MM}}</p>
+    <p class="disclaimer">本报告仅供参考，不构成投资建议，股市有风险，投资需谨慎。</p>
+  </footer>
+
+</div>
+</body>
+</html>
