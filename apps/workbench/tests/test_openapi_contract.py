@@ -31,6 +31,8 @@ REQUIRED_PATHS: dict[str, set[str]] = {
         "/api/research/briefs",
         "/api/research/performance",
         "/api/research/defaults",
+        "/api/research/intel-report/crosswalk",
+        "/api/research/intel-report/prefill",
         "/api/research/report",
         "/api/review/report",
         "/api/debate/report",

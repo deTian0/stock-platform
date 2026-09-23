@@ -43,7 +43,9 @@
         <h2>日用向导</h2>
         <span class="pill">主流程 · 第 1 步</span>
       </div>
-      <p class="hint">一键生成今日选股并跳转「今日推荐」；可选写入纸面草稿（始终 SIMULATE）。截面日默认最近完整交易日；宇宙层级默认 <strong>watch</strong>（可切 full，勿一次全市场）；无激活策略时自动创建默认纸面策略；无实盘；非投资建议。</p>
+      <p class="hint">一键生成今日选股并跳转「今日推荐」；可选写入纸面草稿（始终 SIMULATE）。截面日默认最近完整交易日；宇宙层级默认 <strong>watch</strong>（可切 full，勿一次全市场）；无激活策略时自动创建默认纸面策略；无实盘；非投资建议。
+        同日情报看板对照见 <a href="#intel-report">情报报告</a>（asof/宇宙并列提示；非替换 brief）。
+      </p>
       <ol class="wizard-checklist hint" aria-label="向导步骤说明">
         <li>确认 asof（最近完整交易日）与宇宙层级</li>
         <li>点「生成今日推荐」→ 自动落库并记入绩效 pending</li>
@@ -88,7 +90,9 @@
         <h2>今日选股结果</h2>
         <span class="pill">主流程 · 第 2 步</span>
       </div>
-      <p class="hint" id="recommend-hint">对 watch 宇宙在最近完整交易日截面打分（lvrev + 软闸门）。可切换宇宙层级（watch/full）；生成后<strong>自动落库</strong>（SQLite）。写入纸面始终 SIMULATE；非投资建议。也可从顶部「① 向导」一键生成。</p>
+      <p class="hint" id="recommend-hint">对 watch 宇宙在最近完整交易日截面打分（lvrev + 软闸门）。可切换宇宙层级（watch/full）；生成后<strong>自动落库</strong>（SQLite）。写入纸面始终 SIMULATE；非投资建议。也可从顶部「① 向导」一键生成。
+        盘前情报 HTML 配方对照：<a href="#intel-report">情报报告</a>（同 asof 宇宙对照；禁止 WebSearch 写入本库）。
+      </p>
       <div id="recommend-quick" class="rec-quick" aria-live="polite">
         <div class="rec-quick-stats" id="recommend-perf-strip">
           <span class="rec-chip">绩效摘要加载中…</span>
@@ -277,12 +281,39 @@
       <p class="hint">
         来源 Skill 仓 <code>market-report-dashboard</code>（典型路径
         <code>D:\workspace\git\market-report-dashboard</code>）。
-        本区仅展示三类 HTML 看板<strong>模板说明与预览链接</strong>；
+        本区展示三类 HTML 看板<strong>模板说明、与 brief 对照、平台数据部分预填</strong>；
         <strong>不是</strong>已接入 Skill 运行时，也<strong>不会</strong>用 WebSearch 当第二行情主链。
         产品数据仍走 <code>packages/providers</code> + 能力矩阵。
-        与「今日推荐」lvrev brief 语义可对照、产物不同——见
-        <code>docs/plans/market-report-dashboard-merge-milestones.md</code>。
+        对照 ADR：<code>docs/architecture/0053-intel-report-brief-crosswalk.md</code>。
       </p>
+      <div id="intel-crosswalk" class="rec-quick" aria-live="polite">
+        <div class="rec-quick-stats" id="intel-crosswalk-strip">
+          <span class="rec-chip">asof / 宇宙对照加载中…</span>
+        </div>
+        <div class="rec-quick-links">
+          <a href="#wizard">① 向导</a>
+          <a href="#recommend">② 今日推荐</a>
+          <a href="/api/research/intel-report/crosswalk" target="_blank" rel="noopener">对照 API</a>
+        </div>
+      </div>
+      <form id="intel-prefill-form" class="row">
+        <label>对照截面日 asof
+          <input id="intel-asof" type="date" value="" />
+        </label>
+        <label>模板类型
+          <select id="intel-kind" title="预填用哪一类模板">
+            <option value="a-share-preopen" selected>A股盘前</option>
+            <option value="a-share-intraday">A股盘中</option>
+            <option value="us-preopen">美股盘前</option>
+          </select>
+        </label>
+        <button type="submit" id="btn-intel-prefill">用平台数据预填预览</button>
+        <button type="button" id="btn-intel-crosswalk" class="secondary">刷新对照</button>
+        <a id="intel-prefill-html-link" class="secondary" href="#" target="_blank" rel="noopener" hidden>打开 HTML 预览</a>
+      </form>
+      <p id="intel-prefill-meta" class="status" aria-live="polite">选择 asof 与模板后点「用平台数据预填预览」；仅填能填的字段，缺能力中文列出，不写 brief SQLite。</p>
+      <pre id="intel-prefill-error" class="error" hidden></pre>
+      <ul id="intel-missing-list" class="wizard-checklist hint" aria-label="缺能力说明"></ul>
       <div class="table-wrap table-compact">
         <table id="intel-report-table">
           <thead>
@@ -314,10 +345,14 @@
       <ol class="wizard-checklist hint" aria-label="Skill 生成步骤">
         <li>软链源仓到 Cursor / Claude skills，或工作区只读打开 <code>SKILL.md</code>（见 <code>docs/ops/skills-governance.md</code>）</li>
         <li>助手侧触发：「生成今天的 A 股盘前 / 盘中 / 美股盘前报告」</li>
-        <li>填充 <code>{{占位符}}</code> 后得到单文件 HTML；预览链接处为<strong>未填充</strong>布局配方</li>
+        <li>填充 <code>{{占位符}}</code> 后得到单文件 HTML；上方预填为<strong>平台部分填充</strong>，其余占位保留</li>
         <li>文档副本：<code>docs/upstream/market-report-templates/</code></li>
       </ol>
-      <p class="status" id="intel-report-meta">非投资建议 · 禁止 pip 依赖本 Skill · 禁止平行抓取主链</p>
+      <details class="raw-json">
+        <summary>预填 JSON</summary>
+        <pre id="intel-prefill-json" class="code"></pre>
+      </details>
+      <p class="status" id="intel-report-meta">非投资建议 · 禁止 pip 依赖本 Skill · 禁止平行抓取主链 · 禁止 WebSearch 写入 brief SQLite</p>
     </section>
 
     <details id="market-tools" class="group">

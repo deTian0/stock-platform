@@ -36,6 +36,7 @@
 | **v3.10.2** | **U2 brief SQLite 持久化** + 历史回看；U3 review API 雏形（ADR 0049） |
 | **v3.10.3** | **U3 复盘 UI** + 推荐→绩效闭环 + ops health 布尔字段 + 日批 `-Provider tushare` |
 | **v3.12.4** | **情报报告** `#intel-report`：market-report-dashboard 三类模板只读预览（非 Skill 运行时） |
+| **v3.12.5** | **MR-3/MR-5**：brief 对照 + 平台数据部分预填预览（`/api/research/intel-report/*`） |
 
 ## 安装与运行
 
@@ -88,6 +89,8 @@ python -m stock_platform_workbench
 | GET | `/api/market/lhb?symbols=&asof_date=` | 经矩阵 resolve(`lhb`) |
 | GET | `/api/market/unlock?symbols=&asof_date=` | 经矩阵 resolve(`unlock`) |
 | GET | `/api/research/brief?asof=&symbols=&topN=&persist=` | 盘前 TopN（默认自动落库 SQLite） |
+| GET | `/api/research/intel-report/crosswalk?asof=` | MR-3：情报 ↔ brief asof/宇宙对照（只读） |
+| GET | `/api/research/intel-report/prefill?kind=&asof=&format=` | MR-5：平台数据部分预填预览（不写 brief 库） |
 | GET | `/api/research/briefs?limit=` | 历史推荐列表（摘要） |
 | GET | `/api/research/briefs/{asof}` | 按日回看已存 brief（缺日 404 中文） |
 | GET | `/api/research/briefs/{asof}/review?holding=` | U3：T+N 复盘（pending / 方向对错；UI 已接） |

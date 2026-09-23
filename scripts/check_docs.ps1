@@ -71,6 +71,7 @@ $required = @(
   'docs/architecture/0050-engine-pit-fundamentals-readonly.md',
   'docs/architecture/0051-concept-blocks.md',
   'docs/architecture/0052-tsp-ui-subset.md',
+  'docs/architecture/0053-intel-report-brief-crosswalk.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

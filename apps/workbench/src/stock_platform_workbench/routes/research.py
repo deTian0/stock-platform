@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from stock_platform_execution import ActivationBlocked, DraftBlocked, ProfileBlocked
@@ -45,6 +46,11 @@ from ..brief_ux import (
     paper_now_iso_for_asof,
     recommend_defaults,
 )
+from ..intel_report_ux import (
+    build_crosswalk,
+    list_kinds,
+    prefill_intel_report,
+)
 from ..openapi_models import (
     RESP_400,
     RESP_404,
@@ -56,6 +62,8 @@ from ..openapi_models import (
     BriefSaveResponse,
     BriefToPaperResponse,
     FactorIcResponse,
+    IntelReportCrosswalkResponse,
+    IntelReportPrefillResponse,
     LogBriefResponse,
     PerformanceSummaryResponse,
     PitFundamentalsResponse,
@@ -342,6 +350,121 @@ def get_stored_brief(request: Request, asof: date) -> dict[str, Any]:
         )
         return merged
     return body
+
+
+def _load_brief_readonly(request: Request, asof: date | None) -> dict[str, Any] | None:
+    """Read archived brief only — never persist / never write WebSearch into SQLite."""
+    if asof is None:
+        return None
+    record = _brief_repo(request).get_by_asof(asof.isoformat())
+    if record is None:
+        return None
+    if record.payload and isinstance(record.payload, dict):
+        return dict(record.payload)
+    return record.to_dict()
+
+
+def _ops_snapshot_for_intel(request: Request) -> dict[str, Any]:
+    from stock_platform_workbench import __version__
+    from stock_platform_workbench.brief_ux import ops_data_visibility
+
+    vis = ops_data_visibility()
+    return {
+        "status": "ok",
+        "version": __version__,
+        "providerPreset": vis.get("providerPreset"),
+        "briefFallback": vis.get("briefFallback"),
+        "liveTradingEnabled": False,
+        "executionMode": "SIMULATE",
+    }
+
+
+def _try_concept_items(request: Request, symbols: list[str]) -> list[dict[str, Any]] | None:
+    if not symbols:
+        return None
+    state = request.app.state.workbench
+    try:
+        provider = state.resolve("concept_blocks")
+    except CapabilityUnavailable:
+        return None
+    getter = getattr(provider, "get_concept_blocks", None)
+    if getter is None:
+        return None
+    try:
+        items = getter(symbols[:8])
+    except Exception:  # noqa: BLE001 — prefill stays usable without concepts
+        return None
+    return items if isinstance(items, list) else None
+
+
+@router.get(
+    "/intel-report/crosswalk",
+    summary="情报报告 ↔ brief 对照（只读）",
+    responses={**ok200(IntelReportCrosswalkResponse), **RESP_400},
+)
+def intel_report_crosswalk(
+    request: Request,
+    asof: date | None = Query(None, description="截面日；默认取最近默认 asof"),
+) -> dict[str, Any]:
+    """MR-3: asof/宇宙对照；不写 brief SQLite；不跑 Skill。"""
+    asof_d = asof or default_brief_asof()
+    brief = _load_brief_readonly(request, asof_d)
+    walk = build_crosswalk(asof=asof_d, brief=brief)
+    walk.update(
+        {
+            "kinds": list_kinds(),
+            "writesBriefSqlite": False,
+            "liveTradingEnabled": False,
+            "environment": "SIMULATE",
+            "emptyMessage": None
+            if brief
+            else f"同日 asof={asof_d.isoformat()} 无已存 brief；请先在今日推荐/向导生成（对照空态，不造假）",
+        }
+    )
+    return walk
+
+
+@router.get(
+    "/intel-report/prefill",
+    summary="用平台数据预填情报模板预览",
+    responses={**ok200(IntelReportPrefillResponse), **RESP_400, **RESP_404},
+)
+def intel_report_prefill(
+    request: Request,
+    kind: str = Query(
+        "a-share-preopen",
+        description="a-share-preopen | a-share-intraday | us-preopen",
+    ),
+    asof: date | None = Query(None, description="截面日；用于日历与 brief 对照"),
+    fmt: str = Query("json", alias="format", description="json | html（html 直接预览）"),
+) -> Any:
+    """MR-5: partial fill from brief/ops/concept_blocks; never writes brief SQLite."""
+    asof_d = asof or default_brief_asof()
+    brief = _load_brief_readonly(request, asof_d)
+    picks = (brief or {}).get("picks") or []
+    symbols = [
+        str(p.get("symbol"))
+        for p in picks
+        if isinstance(p, dict) and p.get("symbol")
+    ]
+    concept_items = _try_concept_items(request, symbols)
+    ops = _ops_snapshot_for_intel(request)
+    try:
+        payload = prefill_intel_report(
+            kind=kind,
+            asof=asof_d,
+            brief=brief,
+            ops_health=ops,
+            concept_items=concept_items,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if (fmt or "json").lower() == "html":
+        return HTMLResponse(content=payload["html"], media_type="text/html; charset=utf-8")
+    return payload
 
 
 @router.post(
