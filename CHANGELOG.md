@@ -8,6 +8,31 @@
 
 - （无）
 
+## [3.13.1] - 2026-10-09
+
+### Changed
+
+- **行情库加载器提速 4.4×**：`backtest_cli.load_engine_bars` 原用 `WHERE date BETWEEN ? AND ? ORDER BY code,date`，全周期窗口需 **54.9 s**。同一窗口实测：`ORDER BY date`（命中 `idx_dp_date`）50.6 s、不排序 + pandas 排序 52.8 s、**全表流式 `SELECT` + 内存过滤仅 12.5 s** —— 该表只有 `idx_dp_date`，投影列迫使回表，`WHERE` 与索引均无收益。改为全表读取后在 pandas 内过滤 / 排序。**全周期回测 106 s → 65 s**（加载 11.5 s + 回测 48.6 s）
+
+### Added
+
+- `packages/research/tests/test_backtest_cli.py`：锁定加载器的日期窗口 / 代码过滤 / 排序 / 只读语义与 BSE 过滤（**8 passed**）
+
+### Fixed
+
+- 修正 `[3.13.0]` 条目中的测试计数笔误（**556 → 543**，实测；该版发布时全量为 543 passed）
+
+### Verified
+
+- 性能改动**零行为变化**：全周期指标逐位不变（`total_return` 0.902353、`cagr` 0.105348、`mdd` -0.171435、`sharpe` 0.7511、`n_trades` 630、`win_rate` 0.4619、`avg_hold_days` 35.41），分年收益与卖出原因分布全同
+- 全量 `pytest packages apps`（`replay`）= **551 passed**
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.1）
+
+### Docs
+
+- `docs/ops/backtest-baseline.md` §5 新增加载器问题条目、§6 更新耗时
+- `docs/ops/workbuddy-runtime-limits.md` §9 补充"提速后回到默认档"说明
+
 ## [3.13.0] - 2026-10-09
 
 ### Added
@@ -25,7 +50,7 @@
 ### Verified
 
 - `pytest packages/research/tests/test_backtest.py packages/research/tests/test_gates.py` = **17 passed**
-- 全量 `pytest packages apps`（`replay`）= **556 passed**
+- 全量 `pytest packages apps`（`replay`）= **543 passed**（2026-10-09 实测更正，原记 556 有误）
 - `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.0）
 
 ### Baseline
