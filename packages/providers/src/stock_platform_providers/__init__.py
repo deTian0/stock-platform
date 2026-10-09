@@ -64,6 +64,21 @@ from .tushare_http import (
     resolve_tushare_token,
     to_ts_code,
 )
+from .workbuddy import (
+    ENV_WORKBUDDY_CACHE_DIR,
+    WorkbuddyProvider,
+    resolve_workbuddy_cache_dir,
+    write_daily_cache,
+    write_realtime_cache,
+)
+from .tdx import ENV_TDX_ROOT, TdxProvider, parse_day_file, resolve_tdx_root
+from .futu import (
+    DEFAULT_FUTU_HOST,
+    DEFAULT_FUTU_PORT,
+    ENV_FUTU_HOST,
+    ENV_FUTU_PORT,
+    FutuProvider,
+)
 
 __all__ = [
     "AStockHttpProvider",
@@ -75,8 +90,15 @@ __all__ = [
     "ENV_ENGINE_MARKET_DB",
     "ENV_TUSHARE_TOKEN",
     "ENV_TUSHARE_URL",
+    "DEFAULT_FUTU_HOST",
+    "DEFAULT_FUTU_PORT",
+    "ENV_FUTU_HOST",
+    "ENV_FUTU_PORT",
+    "ENV_TDX_ROOT",
+    "ENV_WORKBUDDY_CACHE_DIR",
     "EastmoneyClient",
     "EngineSqliteProvider",
+    "FutuProvider",
     "GlobalHttpProvider",
     "GlobalHttpRouter",
     "GlobalReplayProvider",
@@ -93,6 +115,7 @@ __all__ = [
     "TradingCalendar",
     "TushareHttpError",
     "TushareHttpProvider",
+    "WorkbuddyProvider",
     "build_capability_matrix",
     "em_board_secid",
     "em_get",
@@ -122,8 +145,13 @@ __all__ = [
     "reset_default_client",
     "reset_provider_registry",
     "resolve_engine_market_db",
+    "resolve_tdx_root",
     "resolve_tushare_token",
+    "resolve_workbuddy_cache_dir",
     "to_ts_code",
+    "parse_day_file",
+    "write_daily_cache",
+    "write_realtime_cache",
 ]
 
-__version__ = "3.13.8"
+__version__ = "3.13.9"

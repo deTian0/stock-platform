@@ -8,6 +8,28 @@
 
 - （无）
 
+## [3.13.9] - 2026-10-10
+
+### Added
+
+- **数据源适配层**：新增三个 provider（均实现 `MarketDataProvider`，缺源 fail-closed 中文报错），统一接入非默认数据源（详见 [`docs/contracts/data-source-adapters.md`](docs/contracts/data-source-adapters.md)、[`docs/architecture/0054-data-source-adapters.md`](docs/architecture/0054-data-source-adapters.md)）：
+  - **`workbuddy`**（`daily`+`realtime`）：WorkBuddy MCP 数据能力（`westock-data` / `neodata-financial-search`）的 **JSON 缓存适配器** —— 读 `STOCK_PLATFORM_WORKBUDDY_CACHE_DIR` 下 `daily_{code}.json` / `realtime_{code}.json`（与 `replay` fixture 同构）；`write_daily_cache` / `write_realtime_cache` 是 schema 唯一生产点
+  - **`tdx`**（`daily`）：读通达信本地 `vipdoc/{sh,sz,bj}/lday/*.day`（32 字节定长记录，`struct` 零依赖）；`STOCK_PLATFORM_TDX_ROOT` 或自动探测；实时未映射（fail-closed）
+  - **`futu`**（`daily`+`realtime`）：懒加载 `futu-api` 连 OpenD（默认 `127.0.0.1:11111`）；`request_history_kline` / `get_market_snapshot`；缺包/无网关 fail-closed
+- 新增预设 `workbuddy` / `cn_tdx` / `cn_futu`（均 `is_default=False`），能力矩阵各声明对应数据集
+- 新增测试 `test_workbuddy.py` / `test_tdx.py` / `test_futu.py`（合成 JSON / `struct.pack` 二进制 / fake module+context，**零网络**）
+
+### Verified
+
+- 新增适配器 + 既有 preset/capability 测试 **26 passed**
+- 全量 `pytest packages apps`（`replay`）= 见下方 Notes 之最新计数
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.9）
+
+### Notes
+
+- 生产默认仍 `cn_astock_http`；三新源均不触碰 `liveTradingEnabled`，仅数据读路径
+- `workbuddy` 的「MCP 兼容」= MCP 桥接方落 JSON 缓存 → provider 只读消费（刻意不直连 Markdown/自然语言，避免解析脆弱性）
+
 ## [3.13.8] - 2026-10-10
 
 ### Fixed
