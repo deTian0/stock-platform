@@ -179,3 +179,39 @@ def test_backtest_empty_range_is_fail_closed():
     assert res["ok"] is False
     assert "no bars" in res["reason"]
     assert res["metrics"]["n_days"] == 0
+
+
+# ---------- B2: concentration scalars + notional turnover ----------
+
+def test_backtest_curve_carries_concentration_scalars():
+    series = {
+        "600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)],
+        "000001.SZ": [8.0 * (1.0 + 0.001 * i) for i in range(200)],
+    }
+    bars = _make_bars(series)
+    res = run_portfolio_backtest(
+        bars, min_pick_score=0.0, min_hold=5, max_positions=5, max_picks_per_day=2
+    )
+    for point in res["equity_curve"]:
+        assert 0.0 <= point["hhi"] <= 1.0
+        assert 0.0 <= point["top_weight"] <= 1.0
+        assert 0.0 <= point["invested_ratio"] <= 1.0
+    holding_days = [p for p in res["equity_curve"] if p["n_positions"] >= 1]
+    assert holding_days, "expected at least one holding day"
+    assert any(p["hhi"] > 0 for p in holding_days)
+    # metrics pick the fields up from the curve
+    assert res["metrics"]["max_positions"] >= 1
+    assert res["metrics"]["avg_hhi"] is not None
+
+
+def test_backtest_trades_carry_notional():
+    series = {"600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)]}
+    bars = _make_bars(series)
+    res = run_portfolio_backtest(
+        bars, min_pick_score=0.0, min_hold=5, max_positions=3, max_picks_per_day=1
+    )
+    assert res["trades"], "expected at least one round trip"
+    for t in res["trades"]:
+        assert t["entry_value"] > 0
+        assert t["exit_value"] > 0
+    assert res["metrics"]["turnover_notional_per_year"] is not None

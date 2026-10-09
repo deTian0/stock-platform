@@ -49,7 +49,7 @@ import pandas as pd
 
 from .gates import apply_entry_gates
 from .lvrev import score_lvrev
-from .portfolio import max_drawdown_from_curve
+from .portfolio import compute_metrics, hhi, max_drawdown_from_curve  # noqa: F401 (re-export)
 
 # --- cost model: aligned with a-stock-engine/local_backtest.py (v4.31) ---
 DEFAULT_COMMISSION_RATE = 0.0000854  # 万0.854, 免5 (both sides)
@@ -300,6 +300,8 @@ def run_portfolio_backtest(
                         "held_days": held,
                         "entry_price": pos.entry_price,
                         "exit_price": px,
+                        "entry_value": round(pos.shares * pos.entry_price, 2),
+                        "exit_value": round(pos.shares * px, 2),
                         "gross_ret": round(ret_pct, 4),
                         "net_ret": round((proceeds / cost_basis - 1.0) * 100.0, 4)
                         if cost_basis
@@ -312,12 +314,27 @@ def run_portfolio_backtest(
         for code in to_close:
             del positions[code]
 
-        # --- 2. mark to market ---
+        # --- 2. mark to market (+ same-day concentration scalars) ---
         total = cash
+        holdings: list[float] = []
         for pos in positions.values():
             px = px_by_code.get(pos.code)
-            total += pos.shares * (float(px) if px and not pd.isna(px) else pos.entry_price)
-        equity_curve.append({"date": day_str, "equity": round(total, 2), "n_positions": len(positions)})
+            mv = pos.shares * (float(px) if px and not pd.isna(px) else pos.entry_price)
+            total += mv
+            holdings.append(mv)
+        held_value = sum(holdings)
+        equity_curve.append(
+            {
+                "date": day_str,
+                "equity": round(total, 2),
+                "n_positions": len(positions),
+                # B2: same-day concentration (HHI over holding market values,
+                # cash excluded) + how much equity was actually deployed.
+                "hhi": round(hhi(holdings), 6),
+                "top_weight": round(max(holdings) / held_value, 6) if held_value > 0 else 0.0,
+                "invested_ratio": round(held_value / total, 6) if total > 0 else 0.0,
+            }
+        )
 
         # --- 3. entries at today's close ---
         tradable = True if regime is None else bool(regime.get(day_str, True))
@@ -392,78 +409,6 @@ def run_portfolio_backtest(
     }
 
 
-def compute_metrics(
-    equity_curve: Sequence[Mapping[str, Any]],
-    trades: Sequence[Mapping[str, Any]],
-    *,
-    initial_capital: float = 50000.0,
-    periods_per_year: int = TRADING_DAYS_PER_YEAR,
-) -> dict[str, Any]:
-    """Portfolio metrics from an equity curve + trade log.
-
-    ``total_return`` / ``cagr`` are fractions; ``max_drawdown`` is ≤ 0 fraction.
-    Sharpe / Sortino are annualised (rf = 0). No metric is faked when inputs are
-    empty — all zeros, with ``n_days=0``.
-    """
-    curve = [float(p.get("equity") or 0.0) for p in equity_curve]
-    n_days = len(curve)
-    if n_days == 0 or initial_capital <= 0:
-        return {
-            "n_days": 0,
-            "total_return": 0.0,
-            "cagr": 0.0,
-            "max_drawdown": 0.0,
-            "sharpe": 0.0,
-            "sortino": 0.0,
-            "calmar": 0.0,
-            "n_trades": 0,
-            "win_rate": 0.0,
-            "avg_hold_days": 0.0,
-            "turnover_per_year": 0.0,
-            "final_equity": float(initial_capital),
-        }
-
-    final = curve[-1]
-    total_return = final / initial_capital - 1.0
-    years = n_days / float(periods_per_year)
-    cagr = (final / initial_capital) ** (1.0 / years) - 1.0 if years > 0 and final > 0 else -1.0
-
-    rets = [curve[i] / curve[i - 1] - 1.0 for i in range(1, n_days) if curve[i - 1] > 0]
-    mean_r = sum(rets) / len(rets) if rets else 0.0
-    var = sum((r - mean_r) ** 2 for r in rets) / len(rets) if rets else 0.0
-    sd = math.sqrt(var)
-    sharpe = (mean_r / sd) * math.sqrt(periods_per_year) if sd > 0 else 0.0
-
-    downside = [r for r in rets if r < 0]
-    dvar = sum(r * r for r in downside) / len(downside) if downside else 0.0
-    dsd = math.sqrt(dvar)
-    sortino = (mean_r / dsd) * math.sqrt(periods_per_year) if dsd > 0 else 0.0
-
-    mdd = max_drawdown_from_curve(equity_curve)
-    calmar = cagr / abs(mdd) if mdd < 0 else 0.0
-
-    trade_rows = list(trades)
-    n_trades = len(trade_rows)
-    wins = sum(1 for t in trade_rows if float(t.get("net_ret") or 0.0) > 0)
-    win_rate = wins / n_trades if n_trades else 0.0
-    avg_hold = (
-        sum(float(t.get("held_days") or 0.0) for t in trade_rows) / n_trades
-        if n_trades
-        else 0.0
-    )
-    turnover_per_year = n_trades / years if years > 0 else 0.0
-
-    return {
-        "n_days": n_days,
-        "total_return": round(total_return, 6),
-        "cagr": round(cagr, 6),
-        "max_drawdown": round(mdd, 6),
-        "sharpe": round(sharpe, 4),
-        "sortino": round(sortino, 4),
-        "calmar": round(calmar, 4),
-        "n_trades": n_trades,
-        "win_rate": round(win_rate, 4),
-        "avg_hold_days": round(avg_hold, 2),
-        "turnover_per_year": round(turnover_per_year, 1),
-        "final_equity": round(final, 2),
-    }
+# ``compute_metrics`` now lives in ``portfolio.py`` — the single source of truth
+# for metric conventions (milestone B2) — and is re-exported at the top of this
+# module so existing ``from .backtest import compute_metrics`` callers keep working.

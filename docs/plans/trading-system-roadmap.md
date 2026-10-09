@@ -86,11 +86,11 @@
 | ID | 名称 | 量级 | 目标 tag | 验收标准 |
 |----|------|------|----------|----------|
 | **B1** | 回测基线与复现报告 | M | `v3.13.0` | **done（2026-10-09）** `backtest.py` 组合引擎 + `stock-platform-backtest` CLI；全周期（2020-01～2026-09，**1618 交易日 / 6964 码**）基线：**+90.24% / CAGR 10.53% / MDD -17.14% / 夏普 0.751 / 胜率 46.2% / 630 笔 / 平均持有 35.4 天**；与引擎对照差异逐条归因（持有期 / 区间 / L0 闸门 / ST·生存者 / 复权）；报告 `docs/ops/backtest-baseline.md`。**加载器优化（`v3.13.1`）后全周期 106 s → 65 s** |
-| **B2** | 组合级指标补全 | M | `v3.13.1` | `research/portfolio.py` 扩展：年化收益、最大回撤、Calmar、夏普、索提诺、换手率、持仓集中度；口径文档化并入 `docs/contracts/` |
-| **B3** | 费用与摩擦模型对齐 | S | `v3.13.2` | 佣金万 0.854 免 5 + 卖出印花税万 5 + 滑点，做成配置项（非硬编码）；与 `local_backtest.py` 常量对齐并互测 |
-| **B4** | ETF 与资产类型支持 | M | `v3.13.3` | 回测支持 ETF（免印花税）与股票混池；`_is_etf` 判定规则与上游一致；含 ETF 的净值报告 |
-| **B5** | 回测↔在线规则统一层 | M | `v3.13.4` | **吸收 V2 审查第 5 条教训**：冷静期 / 退出条件 / 持仓偏差的判断函数在回测与在线路径中共用同一实现（单点定义 + 双路调用），并有断言测试证明两侧参数一致 |
-| **B6** | 回测可视化扩展 | M | `v3.13.5` | `#backtest` 面板扩展：净值曲线 + 回撤带 + 逐日表联动；仍 Jinja + static，不引入新前端依赖 |
+| **B2** | 组合级指标补全 | M | `v3.13.2` | **done（2026-10-09）** `portfolio.py` 升级为指标**权威层**：新增成交额换手（`turnover_notional_per_year`）/ HHI 集中度（`avg_hhi`·`avg_top_weight`）/ 暴露（`avg_invested_ratio`）/ 持仓数；`compute_metrics` **单点定义**（`backtest.py` re-export，`backtest.compute_metrics is portfolio.compute_metrics`）；口径契约 `docs/contracts/portfolio-metrics.md`。全周期旧指标**逐位不变**，耗时 61.8 s |
+| **B3** | 费用与摩擦模型对齐 | S | `v3.13.3` | 佣金万 0.854 免 5 + 卖出印花税万 5 + 滑点，做成配置项（非硬编码）；与 `local_backtest.py` 常量对齐并互测 |
+| **B4** | ETF 与资产类型支持 | M | `v3.13.4` | 回测支持 ETF（免印花税）与股票混池；`_is_etf` 判定规则与上游一致；含 ETF 的净值报告 |
+| **B5** | 回测↔在线规则统一层 | M | `v3.13.5` | **吸收 V2 审查第 5 条教训**：冷静期 / 退出条件 / 持仓偏差的判断函数在回测与在线路径中共用同一实现（单点定义 + 双路调用），并有断言测试证明两侧参数一致 |
+| **B6** | 回测可视化扩展 | M | `v3.13.6` | `#backtest` 面板扩展：净值曲线 + 回撤带 + 逐日表联动；仍 Jinja + static，不引入新前端依赖 |
 
 ---
 
@@ -183,7 +183,7 @@ C2 ← B1；C3 ← S1
 | 阶段 | 范围 | 建议 tag | 类型 |
 |------|------|----------|------|
 | G | G1–G3 | `v3.12.6`（G1+G2 合并） → `v3.12.7`（G3） | patch |
-| B | B1–B6 | `v3.13.0` → `v3.13.5` | minor |
+| B | B1–B6 | `v3.13.0` → `v3.13.6` | minor |
 | S | S1–S5 | `v3.14.0` → `v3.14.4` | minor |
 | X | X1–X4 | `v4.0.0` → `v4.0.3` | **major**（能力边界从 watch 扩到全市场） |
 | L | L1–L3 | `v5.0.0` → `v5.0.2` | **major**（解禁实盘红线） |
@@ -225,6 +225,7 @@ C2 ← B1；C3 ← S1
 | `.venv` 依赖 | **不可用** | 5 个 `stock_platform_*` 包未安装；`fastapi`/`uvicorn`/`pytest`/`pandas`/`numpy`/`mootdx`/`tushare` 全 Missing；仅 `pydantic`/`jinja2`/`httpx`/`requests` 可用（conda base `--system-site-packages`） |
 | **G1 执行结果** | **已恢复** | 5 个包 editable install 成功；`pytest packages apps` = **526 passed / 0 failed / 1 warning / 14.88s**（warning 为 fastapi testclient 的 httpx 弃用提示，非阻塞） |
 | **B1 执行结果** | **已完成** | 全周期 2020-01-02～2026-09-03（1618 交易日 / 6964 码）**+90.24%**，CAGR 10.53%，MDD -17.14%，夏普 0.751，胜率 46.2%，630 笔，平均持有 35.4 天；加载 **11.5 s** + 回测 **48.6 s**（2026-10-09 加载器优化后；此前为加载 53.7 s + 回测 47.2 s）；报告 `docs/ops/backtest-baseline.md` |
+| **B2 执行结果** | **已完成** | `portfolio.compute_metrics` 单点定义（`backtest.py` re-export，`is` 同一对象）；新增成交额换手 **11.28 倍/年**、平均 HHI **0.0865**、平均最大单票权重 **10.17%**、平均仓位 **80.0%**、平均持仓 **13.6 只**；口径契约 `docs/contracts/portfolio-metrics.md`；旧指标逐位不变，全周期耗时 **61.8 s** |
 | **G2 执行结果** | **已完成** | 仓根路径全仓迁移 14 文件；`market.db` 冒烟：`resolve_engine_market_db()` → `D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`，`get_daily(['600519'])` = **406 行**（2025-01-02～2026-09-03），`get_fundamentals_pit` 正常；`check_docs`（112 required / 139 md）+ `check_versions`（5 pkg）双绿；全量测试 **526 passed / 14.14s** |
 
 ### 7.1 G1 安装明细（2026-10-09）
@@ -252,3 +253,4 @@ C2 ← B1；C3 ← S1
 | 2026-10-09 | `B1` 完成：组合回测引擎 + CLI + 基线报告；`apply_entry_gates` 向量化（200 s→106 s）；修 `close` 未复权导致假亏损；发布 `v3.13.0` |
 | 2026-10-09 | `B1` 补强：行情库加载器 54.9 s → 12.5 s，全周期回测 106 s → 65 s（指标逐位不变）；新增 `test_backtest_cli.py` 锁定加载语义（8 passed）；发布 `v3.13.1` |
 | 2026-10-09 | `G2` 完成：全仓仓根路径迁移 + 计划任务 XML 修正 + `market.db` 挂载冒烟通过；`G1`+`G2` 合并发布 `v3.12.6` |
+| 2026-10-09 | `B2` 完成：指标单点化（`portfolio.py` 权威层 + `backtest.py` re-export）+ 成交额换手 / HHI 集中度 / 暴露；口径契约 `docs/contracts/portfolio-metrics.md`；发布 `v3.13.2`；`B3`–`B6` 目标 tag 顺延（`v3.13.3`–`v3.13.6`） |
