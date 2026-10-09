@@ -8,6 +8,28 @@
 
 - （无）
 
+## [3.13.7] - 2026-10-09
+
+### Fixed
+
+- **修复 `GET /api/research/intel-report/crosswalk` 与 `GET /api/research/intel-report/prefill` 在**不带 `asof`** 参数时的 500**：`TypeError: default_brief_asof() missing 1 required positional argument: 'state'`。`default_brief_asof` 在 `v3.10.1`（`c640b5c`）改为必需 `state`，而 `v3.12.5`（`0da5f2d`）新增的这两个调用点仍按**旧签名**写成 `default_brief_asof()` —— 该缺陷**自 `v3.12.5` 起潜伏五个版本**（`v3.12.5` → `v3.13.6`）。现两处统一走既有的 `_resolve_asof(request, asof)`，重复的兜底逻辑一并消除
+- 复现条件恰是 UI 默认行为：`loadIntelCrosswalk()` 在 asof 输入框为空时**不发 query string**，故该端点在浏览器首屏必崩。此前全部用例都显式传 `asof`，**兜底分支零覆盖**，CI 与真实路径脱节
+
+### Added
+
+- 新增静态守卫 `apps/workbench/tests/test_signature_call_guard.py`：AST 扫描包内所有「模块级唯一定义函数」的调用点，**位置实参 + 关键字实参少于必填参数即失败**（`*args` / `**kwargs` / 重名函数一律跳过，以杜绝误报）。自带「有牙齿」用例，能复现并捕获本次这处历史缺陷。全包扫描当前**零违规** —— 说明该 bug 仅此一处且已清
+- 行为端回归：`test_intel_crosswalk_default_asof` / `test_intel_prefill_default_asof` 覆盖**不带 `asof`** 的真实调用路径
+
+### Verified
+
+- 真机端到端（`D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`，只读；实例起在 `3021` 以避开占用中的 `3018`）：两条**裸调用**均 **HTTP 200** · `asof=2026-09-02`（replay 夹具日）· `writesBriefSqlite=false`
+- 全量 `pytest packages apps`（`replay`）= **648 passed / 0 failed / 38.00 s**（`643` → `648`，+5）
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.7）
+
+### Notes
+
+- 纯缺陷修复：无指标 / 口径变化，**回测基线逐位不变**
+
 ## [3.13.6] - 2026-10-09
 
 ### Added

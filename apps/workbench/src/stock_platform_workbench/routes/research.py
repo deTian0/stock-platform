@@ -408,7 +408,7 @@ def intel_report_crosswalk(
     asof: date | None = Query(None, description="截面日；默认取最近默认 asof"),
 ) -> dict[str, Any]:
     """MR-3: asof/宇宙对照；不写 brief SQLite；不跑 Skill。"""
-    asof_d = asof or default_brief_asof()
+    asof_d = _resolve_asof(request, asof)
     brief = _load_brief_readonly(request, asof_d)
     walk = build_crosswalk(asof=asof_d, brief=brief)
     walk.update(
@@ -440,7 +440,7 @@ def intel_report_prefill(
     fmt: str = Query("json", alias="format", description="json | html（html 直接预览）"),
 ) -> Any:
     """MR-5: partial fill from brief/ops/concept_blocks; never writes brief SQLite."""
-    asof_d = asof or default_brief_asof()
+    asof_d = _resolve_asof(request, asof)
     brief = _load_brief_readonly(request, asof_d)
     picks = (brief or {}).get("picks") or []
     symbols = [
