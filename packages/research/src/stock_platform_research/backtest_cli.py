@@ -34,28 +34,36 @@ def load_engine_bars(
 ) -> pd.DataFrame:
     """Bulk, read-only load of ``daily_price`` into a bars DataFrame.
 
-    The DB has only an ``idx_dp_date`` index, so range-filter by ``date`` (fast)
-    and do any code filtering in memory afterwards.
+    The engine DB holds ~8.8M rows with only ``idx_dp_date``, so a
+    ``WHERE date BETWEEN ? AND ?`` clause is *slower* than a plain scan: the
+    projected columns force a table walk and the index buys nothing.
+    Measured 2026-10-09 on the full-period window:
+
+    ======================================  =======
+    ``... WHERE date>=? AND date<=?``        54.9 s
+    ``ORDER BY date`` (hits the index)       50.6 s
+    no ORDER BY, sort in pandas              52.8 s
+    **plain full SELECT, filter in pandas**  **12.5 s**
+    ======================================  =======
+
+    So we always stream the whole column set and filter/sort in memory.
     """
-    sql = "SELECT code, date, close, pct_chg FROM daily_price WHERE 1=1"
-    params: list[object] = []
-    if start:
-        sql += " AND date >= ?"
-        params.append(start)
-    if end:
-        sql += " AND date <= ?"
-        params.append(end)
-    if codes:
-        sql += " AND code IN (%s)" % ",".join("?" * len(codes))
-        params.extend(codes)
-    sql += " ORDER BY code, date"
+    sql = "SELECT code, date, close, pct_chg FROM daily_price"
 
     uri = "file:%s?mode=ro" % str(db_path).replace("\\", "/")
     con = sqlite3.connect(uri, uri=True)
     try:
-        return pd.read_sql_query(sql, con, params=params)
+        df = pd.read_sql_query(sql, con)
     finally:
         con.close()
+
+    if start:
+        df = df[df["date"] >= start]
+    if end:
+        df = df[df["date"] <= end]
+    if codes:
+        df = df[df["code"].isin(list(codes))]
+    return df.sort_values(["code", "date"], ignore_index=True)
 
 
 def filter_universe(df: pd.DataFrame, *, exclude_bse: bool = True) -> pd.DataFrame:

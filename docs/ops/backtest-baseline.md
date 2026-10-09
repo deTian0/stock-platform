@@ -5,6 +5,7 @@
 > **数据**：`a-stock-engine/data_cache/market.db`（只读，3.14 GB）
 > **命令**：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --out curve.csv`
 > **口径**：SIMULATE｜`liveTradingEnabled=false`｜非投资建议
+> **性能补强（2026-10-09）**：加载器优化，全周期 **106 s → 65 s**，指标逐位不变（见 §5 #5）
 
 ---
 
@@ -118,6 +119,7 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 | 2 | **`pct_chg` 标度混用** | 主流记录为小数（`0.1006` = 10.06%），异常记录为百分数（`99.SZ` = `-1.37`） | 按中位数量级自动判标度；`|pct|` 截断 ±60% |
 | 3 | **闸门 `iterrows` 过慢** | 全市场 1621 天 × ~5400 码 ≈ **880 万次** `iterrows`，全周期回测 >120 s 被命令超时 kill | `apply_entry_gates` **向量化**（逐行循环每个分支都是"拒绝"，等价于"任一条件命中即拒绝"）；全周期回测 **200 s → 106 s** |
 | 4 | **脏 code** | 6974 个 code 中 **1520 个**非标准（`159001`、`99.SZ`、`1.SZ`） | 基金/ETF 前缀（1/5）过滤；BSE（`.BJ` / 4/8 前缀）过滤 |
+| 5 | **加载器 `WHERE date BETWEEN` 反而更慢** | 同一全周期窗口实测：`WHERE` + `ORDER BY code,date` **54.9 s**；`ORDER BY date`（走索引）50.6 s；不排序 + pandas 排序 52.8 s；**全表流式读 + 内存过滤仅 12.5 s** | `load_engine_bars` 改为**全表 `SELECT` + 内存内过滤/排序**（表只有 `idx_dp_date`，投影列迫使回表，索引帮不上忙）。全周期回测 **106 s → 65 s**（load 11.5 s + 回测 48.6 s），指标逐位不变；语义由 `tests/test_backtest_cli.py` 锁定 |
 
 **向量化等价性**由 `packages/research/tests/test_gates.py` 用原逐行实现作为 oracle 证明（12 组随机数据 + 缺列场景，逐一比对）。
 
@@ -129,7 +131,7 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 - **未启用 L0 熊市闸门**：需要宽基指数序列 + 估值分位，`regime` 参数已预留（调用方可注入）。
 - **无 ST / 退市黑名单**：`fundamentals.name` 未接入。
 - **无生存者偏差校正**：未按"上市满 1 年"过滤。
-- **单进程 Python 循环**：1618 天 106 s；若扩到分钟级或参数扫描需再优化。
+- **单进程 Python 循环**：1618 天 **65 s**（加载 11.5 s + 回测 48.6 s，2026-10-09 优化后）；扩到分钟级或大批量参数扫描仍需再优化或拆批。
 
 ---
 
