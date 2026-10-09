@@ -1,5 +1,16 @@
 """Research kernels: lvrev scoring, entry gates, PIT backtest helpers."""
 
+from .backtest import (
+    DEFAULT_COMMISSION_RATE,
+    DEFAULT_STAMP_SELL_RATE,
+    compute_features,
+    compute_metrics,
+    is_etf,
+    is_fund,
+    norm_code,
+    run_portfolio_backtest,
+    trade_cost,
+)
 from .batch import score_cross_section, score_cross_section_csv
 from .brief import (
     brief_to_orders,
@@ -85,6 +96,15 @@ __all__ = [
     "apply_risk_gates",
     "assert_no_lookahead_columns",
     "attach_strategy_ab",
+    "compute_features",
+    "compute_metrics",
+    "DEFAULT_COMMISSION_RATE",
+    "DEFAULT_STAMP_SELL_RATE",
+    "is_etf",
+    "is_fund",
+    "norm_code",
+    "run_portfolio_backtest",
+    "trade_cost",
     "brief_to_orders",
     "build_cross_section_panel",
     "build_multi_day_pit_panel",
@@ -137,4 +157,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.12.6"
+__version__ = "3.13.0"

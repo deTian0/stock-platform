@@ -6,11 +6,27 @@ import pandas as pd
 
 
 def apply_entry_gates(df: pd.DataFrame, reversal_q: float = 0.30) -> pd.Series:
-    """Boolean mask: True = pass (buyable). Ported from a-stock-engine lvrev_scorer."""
+    """Boolean mask: True = pass (buyable). Ported from a-stock-engine lvrev_scorer.
+
+    Vectorised (B1). The original row-wise loop cost ~8.8M ``iterrows`` calls on
+    a full-market backtest (1621 sessions × ~5400 codes). Every branch of that
+    loop **rejects** the row, so it is exactly equivalent to "reject if ANY
+    condition holds" — which broadcasts over the frame. Semantics are unchanged;
+    ``tests/test_gates.py`` proves equivalence against a reference loop.
+    """
     if len(df) == 0:
         return pd.Series([], dtype=bool)
 
-    keep = pd.Series(True, index=df.index)
+    nan = pd.Series(float("nan"), index=df.index)
+
+    def col(name: str) -> pd.Series:
+        return df[name] if name in df.columns else nan
+
+    close = col("close")
+    ma20 = col("ma20")
+    ma60 = col("ma60")
+    vol = col("vol20")
+    rev = col("rev_chg")
 
     vol_med = (
         float(df["vol20"].median())
@@ -23,33 +39,18 @@ def apply_entry_gates(df: pd.DataFrame, reversal_q: float = 0.30) -> pd.Series:
         else -0.05
     )
 
-    for idx, row in df.iterrows():
-        close = row.get("close")
-        ma20 = row.get("ma20")
-        ma60 = row.get("ma60")
-        vol = row.get("vol20")
-        rev = row.get("rev_chg")
-
-        if ma20 is not None and ma60 is not None and not pd.isna(ma20) and not pd.isna(ma60):
-            if ma20 <= ma60:
-                keep[idx] = False
-                continue
-        if ma20 is not None and close is not None and not pd.isna(ma20) and ma20 > 0:
-            if close < ma20 * 0.93:
-                keep[idx] = False
-                continue
-        if rev is not None and not pd.isna(rev) and rev > chg_q:
-            keep[idx] = False
-            continue
-        if ma60 is not None and close is not None and not pd.isna(ma60) and ma60 > 0:
-            if close < ma60 * 0.93:
-                keep[idx] = False
-                continue
-        if vol is not None and not pd.isna(vol) and vol_med != float("inf"):
-            if vol > vol_med:
-                keep[idx] = False
-                continue
-
+    keep = pd.Series(True, index=df.index)
+    # 1. downtrend: MA20 below MA60
+    keep &= ~(ma20.notna() & ma60.notna() & (ma20 <= ma60))
+    # 2. price too far below MA20
+    keep &= ~(ma20.notna() & close.notna() & (ma20 > 0) & (close < ma20 * 0.93))
+    # 3. not oversold enough on the cross-section
+    keep &= ~(rev.notna() & (rev > chg_q))
+    # 4. price too far below MA60
+    keep &= ~(ma60.notna() & close.notna() & (ma60 > 0) & (close < ma60 * 0.93))
+    # 5. noisier than the market median
+    if vol_med != float("inf"):
+        keep &= ~(vol.notna() & (vol > vol_med))
     return keep
 
 

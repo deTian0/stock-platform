@@ -8,6 +8,31 @@
 
 - （无）
 
+## [3.13.0] - 2026-10-09
+
+### Added
+
+- **`B1` 组合级回测引擎**：`packages/research/src/stock_platform_research/backtest.py`——在 `lvrev` + `apply_entry_gates` 同一内核之上补齐持仓层（entry/peak/shares）、持有期（`min_hold` 45）、硬止损 / 目标止盈 / 趋势破位 / 移动止损、并发上限与 100 股取整、**跌停顺延 / 涨停跳过**，以及对齐 `local_backtest.py` 的费用模型（佣金万0.854 双边、印花税万5 仅卖出、ETF 免）
+- **指标层**：年化 / 最大回撤 / 夏普 / 索提诺 / Calmar / 换手 / 胜率 / 平均持有
+- **`stock-platform-backtest` CLI**：只读挂载 `STOCK_PLATFORM_ENGINE_MARKET_DB`，批量加载 `daily_price` 并输出净值曲线 CSV
+- **回测基线报告**：`docs/ops/backtest-baseline.md`——2020-01～2026-09 全市场（1618 交易日 / 6964 码）
+
+### Changed
+
+- **`gates.apply_entry_gates` 向量化**：原逐行 `iterrows` 在全市场回测中达 ~880 万次调用，导致全周期回测超命令超时；每个分支均为"拒绝"，等价改写为"任一条件命中即拒绝"。**全周期回测 200 s → 106 s**。等价性由 `packages/research/tests/test_gates.py` 以原逐行实现为 oracle 证明（12 组随机数据 + 缺列场景）
+- **复权修正**：引擎库 `close` 为未复权价而 `pct_chg` 为真实涨跌幅（复现：`600551.SH` 单日 close 跳变 -32.6% 而当日 `pct_chg` 仅 -10%）。`compute_features` 改用 `pct_chg`（混用标度自动判定）重建复权价，修复后极值交易归零（最差 -15.2%，无 <-20%）
+
+### Verified
+
+- `pytest packages/research/tests/test_backtest.py packages/research/tests/test_gates.py` = **17 passed**
+- 全量 `pytest packages apps`（`replay`）= **556 passed**
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.0）
+
+### Baseline
+
+- 总收益 **+90.24%**｜CAGR **+10.53%**｜最大回撤 **-17.14%**｜夏普 **0.751**｜胜率 **46.2%**｜630 笔｜平均持有 35.4 天
+- 与 `a-stock-engine` 差异全部归因于口径（持有期 / 区间 / L0 闸门 / ST 与生存者过滤 / 复权），**不宣称复现引擎数字**（遵循 `empirical/BASELINE.md` §5 铁律）
+
 ## [3.12.6] - 2026-10-09
 
 ### Added
