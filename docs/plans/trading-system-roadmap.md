@@ -89,7 +89,7 @@
 | **B2** | 组合级指标补全 | M | `v3.13.2` | **done（2026-10-09）** `portfolio.py` 升级为指标**权威层**：新增成交额换手（`turnover_notional_per_year`）/ HHI 集中度（`avg_hhi`·`avg_top_weight`）/ 暴露（`avg_invested_ratio`）/ 持仓数；`compute_metrics` **单点定义**（`backtest.py` re-export，`backtest.compute_metrics is portfolio.compute_metrics`）；口径契约 `docs/contracts/portfolio-metrics.md`。全周期旧指标**逐位不变**，耗时 61.8 s |
 | **B3** | 费用与摩擦模型对齐 | S | `v3.13.3` | **done（2026-10-09）** `portfolio.CostModel` **单点定义**（`commission_rate` / `stamp_sell_rate` / `slippage_bps` / `min_commission` / `etf_stamp_exempt`）；**新增滑点**（仅改成交价、不改信号）；CLI 四参数 + `--zero-cost`；**修买入侧计费不对称**（建仓与 `cost_basis` 原绕过 `trade_cost()`）；与 `local_backtest.py` 常量 + ETF 前缀表（30 项）**跨线互测**；契约 `docs/contracts/cost-model.md`。默认档指标**逐位不变** |
 | **B4** | ETF 与资产类型支持 | M | `v3.13.4` | **done（2026-10-09）** `portfolio.asset_class` **单点定义**（`stock`/`etf`/`fund`，与印花税豁免同源前缀表）；`universe` 三档（`stock` 默认等价旧行为 · `etf` · `all` 混池）+ CLI `--universe`；`compute_metrics["by_asset"]` 分资产报告 + `trades.asset_class`；免税贯通实测（ETF 卖出仅佣金）；契约 `docs/contracts/asset-classes.md`。默认档逐位不变。**发现**：默认门槛下 ETF 全被挡（合成分 0.50 vs 0.86）→ 混池 ≠ ETF 配置；混池经截面分位改变股票入选**不可横比**；原始 ETF 池含脏数据 |
-| **B5** | 回测↔在线规则统一层 | M | `v3.13.5` | **吸收 V2 审查第 5 条教训**：冷静期 / 退出条件 / 持仓偏差的判断函数在回测与在线路径中共用同一实现（单点定义 + 双路调用），并有断言测试证明两侧参数一致 |
+| **B5** | 回测↔在线规则统一层 | M | `v3.13.5` | **done（2026-10-09）** 新增 `rules.py` **单点定义**（`ExitPolicy` / `CooldownPolicy` / `DriftPolicy` + `evaluate_exit` / `advance_peak` / `evaluate_drift` / `limit_pct` / `is_limit_up` / `is_limit_down`）；回测委派全部交易判断（删内联退出逻辑）、**在线路径** `position_review.review_positions` + CLI `stock-platform-position-review` 调**同一批函数**；契约 `docs/contracts/trading-rules.md`；**默认档逐位不变** |
 | **B6** | 回测可视化扩展 | M | `v3.13.6` | `#backtest` 面板扩展：净值曲线 + 回撤带 + 逐日表联动；仍 Jinja + static，不引入新前端依赖 |
 
 ---
@@ -206,7 +206,7 @@ C2 ← B1；C3 ← S1
 **本路线图新增**：
 
 7. **`L1` 未立项前，任何人不得用「完善」为由触碰 `liveTradingEnabled` 与实盘券商代码。**
-8. **B 域回测结果在 `B5` 完成前，不得作为策略取舍的唯一依据**——因为此时回测与在线规则尚未共用同一实现。
+8. ~~**B 域回测结果在 `B5` 完成前，不得作为策略取舍的唯一依据**——因为此时回测与在线规则尚未共用同一实现。~~ **已于 `B5`（`v3.13.5`）解除**：回测与在线路径共用 `rules.py` 单点定义（退出 / 冷静期 / 持仓偏差 / 涨跌停），并由断言测试锁定两侧一致。后续任何数字比较仍须遵守 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md) §9 的不可横比铁律（须声明 `exit_policy` / `cooldown_days` / `drift_band`）。
 9. **C 域不执行为收敛而做的批量删除**；只定边界、列清单，代码收敛按里程碑渐进。
 
 ---
@@ -228,6 +228,7 @@ C2 ← B1；C3 ← S1
 | **B2 执行结果** | **已完成** | `portfolio.compute_metrics` 单点定义（`backtest.py` re-export，`is` 同一对象）；新增成交额换手 **11.28 倍/年**、平均 HHI **0.0865**、平均最大单票权重 **10.17%**、平均仓位 **80.0%**、平均持仓 **13.6 只**；口径契约 `docs/contracts/portfolio-metrics.md`；旧指标逐位不变，全周期耗时 **61.8 s** |
 | **B3 执行结果** | **已完成** | `CostModel` 费用**单点定义**（`portfolio.py`，`backtest.py` re-export）＋**新增滑点**（仅改成交价）＋**修买入侧计费不对称**；CLI `--commission-rate` / `--stamp-sell-rate` / `--slippage-bps` / `--zero-cost`；**跨线互测**（静态解析 `local_backtest.py`：常量 + 30 项 ETF 前缀，四象限比对）通过；契约 `docs/contracts/cost-model.md`；默认档全周期**逐位不变**，敏感性 零成本 **+1226.93** / 滑点 5bps **−411.45** / 滑点 10bps **−1442.73**；耗时 **63.3 s** |
 | **B4 执行结果** | **已完成** | `asset_class` 单点定义 + `universe`（`stock`/`etf`/`all`）+ CLI `--universe` + `by_asset` 分资产报告 + ETF 卖免印花税贯通；跨线互测 `_is_fund`/`_is_etf` 前缀表；契约 `docs/contracts/asset-classes.md`。默认档（`stock`）全周期**逐位不变**；宇宙对照 `stock` +90.24% / `all` +102.58%（ETF 0 笔）/ `etf` -16.31%；免税实测 `515250` 卖出 8.54e-05 vs 股票 5.854e-04；research **138 passed**、全量 **592 passed** |
+| **B5 执行结果** | **已完成** | `rules.py` 单点定义（退出 / 冷静期 / 持仓偏差 / 涨跌停），回测与在线**双路调用同一函数**；单点定义断言（`backtest.evaluate_exit is rules.evaluate_exit` 等全为真）+ 差分一致断言（同状态同 `reason`）；新增 `cooldown_days`（默认 0）/ `drift_band`（默认 None）；冷静期对照 `cooldown_days=10` → `total_return` 0.898259（−0.41 pp）/ 终值 94912.95（**−204.69**）；契约 `docs/contracts/trading-rules.md`；默认档全周期**逐位不变**（0.902353 / 0.105348 / −0.171435 / 0.7511 / 630 / 0.4619）；research **179 passed**、全量 **633 passed** |
 | **G2 执行结果** | **已完成** | 仓根路径全仓迁移 14 文件；`market.db` 冒烟：`resolve_engine_market_db()` → `D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`，`get_daily(['600519'])` = **406 行**（2025-01-02～2026-09-03），`get_fundamentals_pit` 正常；`check_docs`（112 required / 139 md）+ `check_versions`（5 pkg）双绿；全量测试 **526 passed / 14.14s** |
 
 ### 7.1 G1 安装明细（2026-10-09）
@@ -259,3 +260,4 @@ C2 ← B1；C3 ← S1
 | 2026-10-09 | `B3` 完成：费用与摩擦单点化（`CostModel`）+ **新增滑点** + 修买入侧计费不对称 + CLI 四参数；跨线互测（静态解析引擎常量与前缀表）；契约 `docs/contracts/cost-model.md`；里程碑方案 `docs/plans/b3-cost-model-milestone.md`；默认档逐位不变，发布 `v3.13.3` |
 | 2026-10-09 | `B4` 完成：资产类型单点化（`asset_class`）+ `universe`（`stock`/`etf`/`all`）+ CLI `--universe` + 分资产 `by_asset` 报告 + ETF 免税贯通；跨线互测 `_is_fund`/`_is_etf`；契约 `docs/contracts/asset-classes.md`；默认档逐位不变，发布 `v3.13.4` |
 | 2026-10-09 | `B4` 实测三条发现回填：默认门槛下 ETF 全被 `min_pick_score=0.80` 挡下（合成分 0.50 vs 0.86）；混池经截面分位改变股票入选 → **不可与 `stock` 横比**；原始 ETF 池含脏数据需先清洗（X 域议题）。`docs/contracts/asset-classes.md` §6 + `backtest-baseline.md` §3.2 |
+| 2026-10-09 | `B5` 完成：`rules.py` 交易规则**单点定义**（退出 / 冷静期 / 持仓偏差 / 涨跌停）+ 在线路径 `position_review` + CLI；回测委派全部交易判断（删内联退出逻辑）；单点定义与差分一致断言齐备；契约 `docs/contracts/trading-rules.md`；默认档逐位不变，发布 `v3.13.5`；**红线 8 随之解除**（关键路径 `G1 → B1 → B5 → X4 → L1` 推进至 `X4` 前置就绪） |

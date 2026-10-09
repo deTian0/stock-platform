@@ -24,6 +24,11 @@ This module adds the missing layer on top of the **same** kernels
 - a selectable ``universe`` (``stock`` / ``etf`` / ``all``) so the book can be
   stocks-only (baseline), ETFs-only, or a mixed pool; classification and the ETF
   stamp exemption share one definition (:func:`portfolio.asset_class`)
+- **every trading decision** delegates to :mod:`stock_platform_research.rules`
+  (milestone ``B5``): the exit call (:func:`rules.evaluate_exit`), the peak
+  advance and the price-limit checks are the *same* functions the online book
+  review (:func:`position_review.review_positions`) calls — one definition, two
+  call paths, no room for the two to drift
 
 Data source is injected as a plain ``bars`` DataFrame (``code`` / ``date`` /
 ``close``, optional ``pct_chg``). This module never opens SQLite and never
@@ -48,7 +53,6 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
@@ -68,19 +72,27 @@ from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + 
     norm_code,
     trade_cost,
 )
+from .rules import (  # noqa: F401 (re-export: B5 trading-rule single definition)
+    CooldownPolicy,
+    DriftPolicy,
+    ExitDecision,
+    ExitPolicy,
+    PositionState,
+    advance_peak,
+    evaluate_exit,
+    is_limit_down,
+    is_limit_up,
+    limit_pct,
+)
 
 TRADING_DAYS_PER_YEAR = 252
 
 # Valid ``universe`` selectors (B4). ``stock`` reproduces the B1/B2/B3 baseline.
 UNIVERSES = ("stock", "etf", "all")
 
-
-def limit_pct(code: Any, *, is_st: bool = False) -> float:
-    """Daily price limit: ST ±5% / STAR+ChiNext (30/68) ±20% / main board ±10%."""
-    c = norm_code(code)
-    if is_st:
-        return 0.05
-    return 0.20 if c.startswith(("30", "68")) else 0.10
+# ``B5``: ``PositionState`` (in ``rules``) is the shared position record; the old
+# private name is kept as an alias so the rest of this module reads unchanged.
+_Position = PositionState
 
 
 def compute_features(bars: pd.DataFrame) -> pd.DataFrame:
@@ -148,16 +160,6 @@ def compute_features(bars: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-@dataclass
-class _Position:
-    code: str
-    entry_price: float
-    shares: float
-    entry_idx: int
-    target: float
-    peak: float
-
-
 def _empty_result(initial_capital: float, reason: str) -> dict[str, Any]:
     return {
         "ok": False,
@@ -195,6 +197,8 @@ def run_portfolio_backtest(
     weights: Mapping[str, float] | None = None,
     universe: str = "stock",
     exclude_funds: bool | None = None,
+    cooldown_days: int = 0,
+    drift_band: float | None = None,
     regime: Mapping[str, bool] | None = None,
     start: str | None = None,
     end: str | None = None,
@@ -216,12 +220,35 @@ def run_portfolio_backtest(
     ``min_commission``. Slippage moves the **fill price** only — every signal and
     every stop / target / trailing trigger still reads the reference close — so
     the defaults (0 slippage, no floor) reproduce the B1 / B2 baseline exactly.
+
+    ``B5``: **every** trading decision here is delegated to
+    :mod:`stock_platform_research.rules` — the exit call is
+    :func:`rules.evaluate_exit`, the peak is advanced by :func:`rules.advance_peak`
+    and the price-limit checks are :func:`rules.is_limit_up` /
+    :func:`rules.is_limit_down` — the *same* functions
+    :func:`position_review.review_positions` calls on the online path. The new
+    ``B5`` knobs default to *off*: ``cooldown_days = 0`` (no 冷静期) and
+    ``drift_band = None`` (no 持仓偏差 rule), so the default run stays
+    bit-for-bit the ``B1``–``B4`` baseline.
     """
     if exclude_funds is not None:
         universe = "stock" if exclude_funds else "all"
     universe = str(universe).strip().lower()
     if universe not in UNIVERSES:
         raise ValueError(f"universe must be one of {UNIVERSES}, got {universe!r}")
+
+    # B5: one policy object, one evaluation call — shared with the online path.
+    exit_policy = ExitPolicy(
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        target_base=target_base,
+        trail_stop_pct=trail_stop_pct,
+        trail_min_peak_ret=trail_min_peak_ret,
+        min_hold=min_hold,
+        max_hold_days=max_hold_days,
+    )
+    cooldown_policy = CooldownPolicy(cooldown_days=int(cooldown_days))
+    drift_policy = DriftPolicy(band=drift_band)
 
     cost_model = CostModel(
         commission_rate=commission_rate,
@@ -243,6 +270,7 @@ def run_portfolio_backtest(
 
     cash = float(initial_capital)
     positions: dict[str, _Position] = {}
+    last_exit_idx: dict[str, int] = {}  # B5 冷静期 bookkeeping (no-op at default)
     equity_curve: list[dict[str, Any]] = []
     trades: list[dict[str, Any]] = []
 
@@ -261,41 +289,31 @@ def run_portfolio_backtest(
                 continue  # suspended / no bar: hold, retry next session
             px = float(px)
             # limit-down: sell order sealed, cannot fill today -> roll to next session
-            dpct = pct_by_code.get(code)
-            if dpct is not None and not pd.isna(dpct) and float(dpct) <= -limit_pct(code) * 100.0 + 0.01:
+            if is_limit_down(code, pct_by_code.get(code)):
                 continue
-            if px > pos.peak:
-                pos.peak = px
+            # B5: peak advance + the exit decision itself come from the shared
+            # rules layer — the online review calls the very same functions.
+            pos.peak = advance_peak(pos.peak, px)
             held = di - pos.entry_idx
-            ret_pct = (px / pos.entry_price - 1.0) * 100.0
-            peak_ret = (pos.peak / pos.entry_price - 1.0) * 100.0
 
             row_ma20 = frame.loc[frame["code"] == code, "ma20"]
             row_ma60 = frame.loc[frame["code"] == code, "ma60"]
-            ma20 = float(row_ma20.iloc[0]) if len(row_ma20) else float("nan")
-            ma60 = float(row_ma60.iloc[0]) if len(row_ma60) else float("nan")
+            ma20 = float(row_ma20.iloc[0]) if len(row_ma20) else None
+            ma60 = float(row_ma60.iloc[0]) if len(row_ma60) else None
 
-            reason = None
-            if ret_pct <= -stop_loss:
-                reason = f"stop_loss({ret_pct:+.1f}%)"
-            elif take_profit > 0 and ret_pct >= take_profit:
-                reason = f"take_profit({ret_pct:+.1f}%)"
-            elif held >= min_hold:
-                if px >= pos.target:
-                    reason = f"target({ret_pct:+.1f}%)"
-                elif not pd.isna(ma20) and not pd.isna(ma60) and ma20 <= ma60:
-                    reason = f"trend_break({ret_pct:+.1f}%)"
-                elif (
-                    held > 3
-                    and peak_ret >= trail_min_peak_ret
-                    and pos.peak > 0
-                    and (pos.peak - px) / pos.peak >= trail_stop_pct / 100.0
-                ):
-                    reason = f"trail_stop({ret_pct:+.1f}%)"
-                elif held >= max_hold_days:
-                    reason = f"max_hold({held}d)"
+            decision = evaluate_exit(
+                px=px,
+                entry_price=pos.entry_price,
+                target=pos.target,
+                peak=pos.peak,
+                held_days=held,
+                ma20=ma20,
+                ma60=ma60,
+                policy=exit_policy,
+            )
 
-            if reason:
+            if decision is not None:
+                reason = decision.reason
                 # Fill at the slipped price; both legs price through the shared
                 # CostModel so the basis is symmetric with the buy side.
                 sell_fill = cost_model.fill_price(px, is_buy=False)
@@ -325,6 +343,7 @@ def run_portfolio_backtest(
                         "exit_date": day_str,
                     }
                 )
+                last_exit_idx[code] = di
                 to_close.append(code)
         for code in to_close:
             del positions[code]
@@ -372,9 +391,12 @@ def run_portfolio_backtest(
             px = float(row["close"])  # reference close — signal / limit checks only
             if px <= 0 or pd.isna(px):
                 continue
-            # limit-up: cannot fill a buy at the sealed price
-            upct = row.get("pct_chg")
-            if upct is not None and not pd.isna(upct) and float(upct) >= limit_pct(code) * 100.0 - 0.01:
+            # limit-up: cannot fill a buy at the sealed price (shared rule)
+            if is_limit_up(code, row.get("pct_chg")):
+                continue
+            # B5 冷静期: skip a code still inside its post-exit cooldown window
+            # (no-op at the default ``cooldown_days = 0``).
+            if cooldown_policy.blocks(last_exit_idx=last_exit_idx.get(code), current_idx=di):
                 continue
             fill = cost_model.fill_price(px, is_buy=True)
             budget = min(cash, slot_value)
@@ -391,7 +413,7 @@ def run_portfolio_backtest(
                 entry_price=fill,
                 shares=float(shares),
                 entry_idx=di,
-                target=fill * (1.0 + target_base / 100.0),
+                target=exit_policy.target_price(fill),
                 peak=fill,
             )
 
@@ -422,6 +444,20 @@ def run_portfolio_backtest(
             "min_commission": min_commission,
             "value_factor": value_factor,
             "universe": universe,
+            # B5: policy echo so an online review can be proven to run the same
+            # parameters the backtest did (asserted in tests/test_rules.py).
+            "cooldown_days": cooldown_policy.cooldown_days,
+            "drift_band": drift_policy.band,
+            "exit_policy": {
+                "stop_loss": exit_policy.stop_loss,
+                "take_profit": exit_policy.take_profit,
+                "target_base": exit_policy.target_base,
+                "trail_stop_pct": exit_policy.trail_stop_pct,
+                "trail_min_peak_ret": exit_policy.trail_min_peak_ret,
+                "min_hold": exit_policy.min_hold,
+                "max_hold_days": exit_policy.max_hold_days,
+                "trail_min_held": exit_policy.trail_min_held,
+            },
         },
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
