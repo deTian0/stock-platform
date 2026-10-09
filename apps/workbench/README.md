@@ -41,7 +41,7 @@
 ## 安装与运行
 
 ```powershell
-cd <legacy-git-root>/stock-platform
+cd <repo-root>
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\research[dev]"

@@ -30,15 +30,15 @@ PowerShell 示例（管理员或开发者模式允许符号链接时）：
 # Claude Code skills（按本机实际 skills 根目录调整）
 New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.claude\skills\a-stock-data" `
-  -Target "<legacy-git-root>/a-stock-data"
+  -Target "<a-stock-data>"
 
 New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.claude\skills\global-stock-data" `
-  -Target "<legacy-git-root>/global-stock-data"
+  -Target "<global-stock-data>"
 
 New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.claude\skills\market-report-dashboard" `
-  -Target "<legacy-git-root>/market-report-dashboard"
+  -Target "<market-report-dashboard>"
 
 # finance-quant-skills：按该仓 README / marketplace 指引链到 skills 子目录
 # 或使用 npx skills add <repo> —— 仍属助手侧，非 stock-platform 运行时

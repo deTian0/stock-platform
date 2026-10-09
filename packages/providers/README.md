@@ -29,7 +29,7 @@
 ## 安装
 
 ```powershell
-cd <legacy-git-root>/stock-platform\packages\providers
+cd <repo-root>\packages\providers
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```

@@ -20,7 +20,7 @@
 ## 安装
 
 ```powershell
-cd <legacy-git-root>/stock-platform\packages\research
+cd <repo-root>\packages\research
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```
