@@ -3,6 +3,8 @@
 from .backtest import (
     DEFAULT_COMMISSION_RATE,
     DEFAULT_STAMP_SELL_RATE,
+    UNIVERSES,
+    asset_class,
     compute_features,
     compute_metrics,
     is_etf,
@@ -100,6 +102,8 @@ __all__ = [
     "compute_metrics",
     "DEFAULT_COMMISSION_RATE",
     "DEFAULT_STAMP_SELL_RATE",
+    "UNIVERSES",
+    "asset_class",
     "is_etf",
     "is_fund",
     "norm_code",
@@ -157,4 +161,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.13.3"
+__version__ = "3.13.4"

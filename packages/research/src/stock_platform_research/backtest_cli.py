@@ -6,6 +6,10 @@ Reads ``daily_price`` (code / date / close / pct_chg) from the path in
 ``STOCK_PLATFORM_ENGINE_MARKET_DB`` (or ``--db``), runs
 ``backtest.run_portfolio_backtest`` and prints a JSON metric block.
 
+``--universe {stock|etf|all}`` selects the tradable set (milestone ``B4``);
+``stock`` is the engine-aligned baseline default, ``all`` is a mixed stock + ETF
+book and the metric block then carries a per-class ``by_asset`` breakdown.
+
 The DB is opened read-only (``mode=ro``) and is never written. SIMULATE only.
 """
 
@@ -20,7 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .backtest import run_portfolio_backtest
+from .backtest import UNIVERSES, run_portfolio_backtest
 from .portfolio import DEFAULT_COMMISSION_RATE, DEFAULT_STAMP_SELL_RATE
 
 ENV_DB = "STOCK_PLATFORM_ENGINE_MARKET_DB"
@@ -92,6 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--stop-loss", type=float, default=8.0)
     p.add_argument("--min-pick-score", type=float, default=0.80)
     p.add_argument(
+        "--universe",
+        choices=list(UNIVERSES),
+        default="stock",
+        help="tradable set: stock (default) | etf | all (mixed stock+ETF)",
+    )
+    p.add_argument(
         "--commission-rate",
         type=float,
         default=DEFAULT_COMMISSION_RATE,
@@ -134,6 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[load] rows={len(bars)} codes={bars['code'].nunique()}", file=sys.stderr)
     bars = filter_universe(bars)
     print(f"[filter] rows={len(bars)} codes={bars['code'].nunique()}", file=sys.stderr)
+    print(
+        "[universe] {} rows={} codes={}".format(
+            args.universe, len(bars), bars["code"].nunique()
+        ),
+        file=sys.stderr,
+    )
 
     commission_rate = 0.0 if args.zero_cost else args.commission_rate
     stamp_sell_rate = 0.0 if args.zero_cost else args.stamp_sell_rate
@@ -156,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         commission_rate=commission_rate,
         stamp_sell_rate=stamp_sell_rate,
         slippage_bps=slippage_bps,
+        universe=args.universe,
         start=args.start,
         end=args.end,
     )
