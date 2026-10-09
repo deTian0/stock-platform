@@ -107,6 +107,7 @@ $required = @(
   'docs/contracts/capability-matrix.md',
   'docs/contracts/market-strategy.md',
   'docs/contracts/eastmoney-http.md',
+  'docs/contracts/portfolio-metrics.md',
   'scripts/release_tag.ps1',
   'scripts/check_docs.ps1',
   'scripts/check_versions.ps1',

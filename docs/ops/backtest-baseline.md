@@ -6,6 +6,7 @@
 > **命令**：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --out curve.csv`
 > **口径**：SIMULATE｜`liveTradingEnabled=false`｜非投资建议
 > **性能补强（2026-10-09）**：加载器优化，全周期 **106 s → 65 s**，指标逐位不变（见 §5 #5）
+> **指标补强 B2（2026-10-09，`v3.13.2`）**：指标单点化（`portfolio.py` 权威层）+ 成交额换手 / HHI 集中度，口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 
 ---
 
@@ -52,6 +53,11 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 | 胜率 | **46.2%** |
 | 平均持有 | 35.4 天 |
 | 年换手（笔/年） | 98.1 |
+| 成交额换手（倍/年） | **11.28** |
+| 平均持仓集中度（HHI） | 0.0865 |
+| 平均最大单票权重 | 10.17% |
+| 平均仓位（invested ratio） | 80.0% |
+| 平均持仓数 / 最大并发 | 13.6 / 15 |
 
 ### 分年收益
 
@@ -153,7 +159,7 @@ $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 
 ## 8. 下一步
 
-- **B2 组合指标补全**：`research/portfolio.py` 扩展口径文档化并入 `docs/contracts/`
+- ~~**B2 组合指标补全**~~：**done（`v3.13.2`，2026-10-09）** —— 指标单点化（`portfolio.py` 权威 + `backtest.py` re-export）+ 成交额换手 / HHI 集中度 / 暴露；口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 - **B3 费用模型配置化**：佣金/印花税/滑点做成配置项并与 `local_backtest.py` 互测
 - **B4 ETF 支持**：混池净值报告
 - **B5 回测↔在线规则统一层**：冷静期 / 退出条件 / 持仓偏差单点定义 + 双路调用（承接本报告 §3 的卖出原因表）

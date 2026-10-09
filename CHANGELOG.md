@@ -8,6 +8,33 @@
 
 - （无）
 
+## [3.13.2] - 2026-10-09
+
+### Added
+
+- **`B2` 组合级指标补全**：`portfolio.compute_metrics` 新增 —— 成交额口径换手 `turnover_notional_per_year`（`Σ(entry_value+exit_value) / mean(equity) / years`）、持仓集中度 `avg_hhi` / `avg_top_weight`、真实暴露 `avg_invested_ratio`、持仓数 `avg_positions` / `max_positions`。缺失输入一律 `None`，**不编造**
+- **`hhi()` 工具**：赫芬达尔-赫希曼指数，先归一化再平方求和（scale-free，对原始市值与权重同值；单票 = 1.0，n 只等权 = 1/n，空仓 = 0.0）
+- 组合引擎净值曲线点新增 `hhi` / `top_weight` / `invested_ratio` **标量**（不引入 dict 列，CSV / JSON 输出不受影响）；`trades` 新增 `entry_value` / `exit_value` 成交额
+- **口径契约**：`docs/contracts/portfolio-metrics.md` —— 固化年化基数（252）/ 无风险利率（0）/ 回撤符号 / 换手双口径 / 集中度口径 / 「不可横比」铁律
+- 测试：`test_portfolio.py` 增补 HHI 与 B2 字段用例；`test_backtest.py` 增补曲线集中度与成交额用例
+
+### Changed
+
+- **指标实现单点化**：`compute_metrics` 移入 `portfolio.py` 作为唯一权威定义；`backtest.py` 改为顶部 `from .portfolio import compute_metrics` **re-export**（`backtest.compute_metrics is portfolio.compute_metrics` 为真），旧调用点 `from .backtest import compute_metrics` 不变。这是 `B5`（回测↔在线规则统一层）的铺路砖
+
+### Verified
+
+- `pytest packages/research` = **104 passed**（B2 新增 7 个用例）；全量 `pytest packages apps`（`replay`）= **558 passed / 0 failed / 19.00s**
+- 全周期指标**逐位不变**：`total_return` 0.902353 / `cagr` 0.105348 / `mdd` -0.171435 / `sharpe` 0.7511 / `n_trades` 630 / `win_rate` 0.4619 / `avg_hold_days` 35.41 / `final_equity` 95117.64 —— **仅新增字段，旧口径未动**
+- 全周期耗时 **61.8 s**（加载 11.5 s + 回测约 50 s），新增逐日 HHI 计算**无感**
+- 新口径实测（2020-01～2026-09，1618 日 / 6964 码）：成交额换手 **11.28 倍/年**、平均 HHI **0.0865**、平均最大单票权重 **10.17%**、平均仓位 **80.0%**、平均持仓 **13.6 只**、最大并发 **15**
+
+### Docs
+
+- 新增 `docs/contracts/portfolio-metrics.md` 并登记进 `scripts/check_docs.ps1` required
+- `docs/plans/trading-system-roadmap.md`：`B2` 标 done
+- `docs/ops/backtest-baseline.md` §3 回填集中度 / 成交额换手
+
 ## [3.13.1] - 2026-10-09
 
 ### Changed
