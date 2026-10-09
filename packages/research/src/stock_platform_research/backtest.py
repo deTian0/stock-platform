@@ -73,6 +73,7 @@ from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + 
     norm_code,
     trade_cost,
 )
+from .pct_scale import normalize_pct_chg
 from .rules import (  # noqa: F401 (re-export: B5 trading-rule single definition)
     CooldownPolicy,
     DriftPolicy,
@@ -96,12 +97,18 @@ UNIVERSES = ("stock", "etf", "all")
 _Position = PositionState
 
 
-def compute_features(bars: pd.DataFrame) -> pd.DataFrame:
+def compute_features(bars: pd.DataFrame, *, pct_scale: str = "auto") -> pd.DataFrame:
     """Per-code rolling features. Uses only bars up to each date (PIT-safe).
 
     Adds ``trade_date`` / ``ret1`` / ``vol20`` / ``rev_chg`` / ``ma20`` / ``ma60``.
     Rolling windows require a full history (``min_periods`` == window), so the
     first N bars per code produce NaN and are naturally gated out.
+
+    ``pct_scale`` governs the mixed-scale ``pct_chg`` column — see
+    :func:`pct_scale.detect_pct_scale`. ``"auto"`` (default) fits the scale
+    against the ``close`` series and rewrites ``pct_chg`` into **percent points**,
+    the contract scale for :func:`rules.is_limit_up` / :func:`rules.is_limit_down`.
+    ``"verbatim"`` is the legacy behaviour, kept only for A/B comparison.
     """
     need = {"code", "date", "close"}
     missing = need - set(bars.columns)
@@ -117,13 +124,22 @@ def compute_features(bars: pd.DataFrame) -> pd.DataFrame:
     # appear as fake gaps in ``close`` (B1 repro: 600551.SH moves -32.6% while
     # ``pct_chg`` stays inside ±10%). Rebuild a dividend-adjusted price series
     # from ``pct_chg`` so both features and P&L are corporate-action clean.
-    # ``pct_chg`` ships on a *mixed* scale (fractions for most rows, percent
-    # points for some), so the scale is detected per load from median magnitude.
+    # ``pct_chg`` ships on a *mixed* scale. Under ``pct_scale="auto"`` the per-code
+    # scale is fitted against the ``close`` series (``pct_scale.normalize_pct_chg``)
+    # and the column is rewritten into **percent points** — the very scale
+    # ``rules.is_limit_up`` / ``is_limit_down`` compare against, so those checks
+    # finally see values they can act on. ``"verbatim"`` keeps the legacy
+    # whole-table median heuristic and leaves the column untouched.
     df["raw_close"] = df["close"].astype(float)
     if "pct_chg" in df.columns and df["pct_chg"].notna().any():
-        pct = df["pct_chg"].astype(float)
-        med = float(pct.abs().median())
-        frac = (pct / 100.0 if med > 0.5 else pct).fillna(0.0).clip(-0.6, 0.6)
+        if pct_scale == "verbatim":
+            pct = df["pct_chg"].astype(float)
+            med = float(pct.abs().median())
+            frac = (pct / 100.0 if med > 0.5 else pct).fillna(0.0).clip(-0.6, 0.6)
+        else:
+            points, _ = normalize_pct_chg(df)
+            df["pct_chg"] = points
+            frac = (points / 100.0).fillna(0.0).clip(-0.6, 0.6)
         base = df.groupby("code", sort=False)["raw_close"].transform("first")
         df["close"] = base * (1.0 + frac).groupby(df["code"], sort=False).cumprod()
 
@@ -203,6 +219,7 @@ def run_portfolio_backtest(
     regime: Mapping[str, bool] | None = None,
     start: str | None = None,
     end: str | None = None,
+    pct_scale: str = "auto",
 ) -> dict[str, Any]:
     """Run a long-only book over ``bars`` and return curve + trades + metrics.
 
@@ -231,6 +248,12 @@ def run_portfolio_backtest(
     ``B5`` knobs default to *off*: ``cooldown_days = 0`` (no 冷静期) and
     ``drift_band = None`` (no 持仓偏差 rule), so the default run stays
     bit-for-bit the ``B1``–``B4`` baseline.
+
+    ``pct_scale`` (default ``"auto"``) forwards to :func:`compute_features` and
+    repairs the mixed-scale ``pct_chg`` dump, so the price-limit checks receive
+    percent points rather than whatever the loader left in the column. This
+    **does** move the baseline — sealed limits now actually defer / skip trades —
+    which is the point; ``"verbatim"`` reproduces the pre-fix numbers for A/B.
     """
     if exclude_funds is not None:
         universe = "stock" if exclude_funds else "all"
@@ -257,7 +280,7 @@ def run_portfolio_backtest(
         slippage_bps=slippage_bps,
         min_commission=min_commission,
     )
-    feats = compute_features(bars)
+    feats = compute_features(bars, pct_scale=pct_scale)
     if universe == "stock":
         feats = feats[~feats["code"].map(is_fund)]
     elif universe == "etf":
@@ -445,6 +468,9 @@ def run_portfolio_backtest(
             "min_commission": min_commission,
             "value_factor": value_factor,
             "universe": universe,
+            # B6.1: the scale in force for ``pct_chg`` — echo it so an A/B run is
+            # self-describing (``"verbatim"`` == the pre-fix baseline).
+            "pct_scale": pct_scale,
             # B5: policy echo so an online review can be proven to run the same
             # parameters the backtest did (asserted in tests/test_rules.py).
             "cooldown_days": cooldown_policy.cooldown_days,

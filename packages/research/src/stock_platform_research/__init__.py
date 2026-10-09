@@ -36,6 +36,12 @@ from .persistence import (
 from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, build_multi_day_pit_panel, panel_to_csv
+from .pct_scale import (
+    SCALE_FRACTION,
+    SCALE_POINTS,
+    detect_pct_scale,
+    normalize_pct_chg,
+)
 from .performance import (
     align_fills_to_performance,
     compute_performance,
@@ -126,8 +132,11 @@ __all__ = [
     "drawdown_series",
     "DEFAULT_COMMISSION_RATE",
     "DEFAULT_STAMP_SELL_RATE",
+    "SCALE_FRACTION",
+    "SCALE_POINTS",
     "UNIVERSES",
     "asset_class",
+    "detect_pct_scale",
     "evaluate_drift",
     "evaluate_exit",
     "format_review_markdown",
@@ -137,6 +146,7 @@ __all__ = [
     "is_limit_up",
     "limit_pct",
     "norm_code",
+    "normalize_pct_chg",
     "review_positions",
     "run_portfolio_backtest",
     "trade_cost",
@@ -192,4 +202,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.13.7"
+__version__ = "3.13.8"

@@ -8,6 +8,27 @@
 
 - （无）
 
+## [3.13.8] - 2026-10-10
+
+### Fixed
+
+- **修复涨跌停判定因 `pct_chg` 标度混用而近乎失效**（B5 遗留缺陷，见 `docs/contracts/trading-rules.md` §7）：`daily_price.pct_chg` 绝大多数**股票**行是小数（`0.0123` == 1.23%），绝大多数 **ETF** 行是百分点（`1.23` == 1.23%），旧实现按 `|x|>0.5` 一刀切，把新股首日 +86.9%（小数）误判为百分点、把 ETF 0.94%（百分点）漏判，导致 `rules.is_limit_up/down`（阈值按百分点）**漏判 99.6%**（实测涨停 1007 次 → 归一后 104034 次）
+
+### Added
+
+- 新增 `pct_scale.py` 单点定义：`detect_pct_scale(bars)` 用 **`close` 序列拟合投票**逐 code 判定 `fraction` / `points`（剔除 |隐含收益|>21% 的除权日防污染，少于 10 个可投会话则回退 `asset_class` 先验）；`to_points` / `normalize_pct_chg` 归一为百分点（`rules` 契约标度）
+- `backtest.compute_features` / `run_portfolio_backtest` 新增 `pct_scale="auto"|"verbatim"`（默认 `auto`）；`auto` 用归一后的百分点重建复权价并喂涨跌停判定，`verbatim` 锁定旧行为供对照
+- 新增 `packages/research/tests/test_pct_scale.py`（12 用例：判据 / 边界 / 回退 / 单点一致）
+
+### Verified
+
+- 真机全周期 A/B（`market.db` 3.14 GB / 877 万行 / 6974 码）：`verbatim`（旧）与 B1–B6 基线**逐位一致**（0.902353 / 0.105348 / −0.171435 / 0.7511 / 630）；`auto`（新默认）→ 总收益 **+91.71%**（0.917123）/ CAGR 10.67% / 最大回撤 −17.30% / 夏普 0.7612 / 笔数 **628**（跌停顺延生效，−2 笔）/ 终值 **95,856.17**
+- 全量 `pytest packages apps`（`replay`）= **660 passed / 0 failed**（648 → 660，+12）
+
+### Notes
+
+- **这是行为修复（策略变更），非纯重构**：默认档 `auto` 相对 B1–B6 基线**基线移动**（涨跌停约束从失效变生效）；`verbatim` 档保留旧行为供回放。报告任何数字须声明 `pct_scale` 档位。
+
 ## [3.13.7] - 2026-10-09
 
 ### Fixed
