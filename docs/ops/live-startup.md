@@ -6,7 +6,7 @@
 ## 用仓库 `.venv` 启动
 
 ```powershell
-cd D:\workspace\git\stock-platform
+cd D:\workspace\stock_trading\stock-platform
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\research[dev]"

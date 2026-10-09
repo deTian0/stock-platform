@@ -20,7 +20,7 @@
 ## 安装
 
 ```powershell
-cd D:\workspace\git\stock-platform\packages\research
+cd D:\workspace\stock_trading\stock-platform\packages\research
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```

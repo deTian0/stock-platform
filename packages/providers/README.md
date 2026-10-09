@@ -29,7 +29,7 @@
 ## 安装
 
 ```powershell
-cd D:\workspace\git\stock-platform\packages\providers
+cd D:\workspace\stock_trading\stock-platform\packages\providers
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```

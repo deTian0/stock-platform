@@ -1,6 +1,6 @@
 # market-report-dashboard 模板归档（只读配方）
 
-> **来源**：`../market-report-dashboard/templates/`（Skill 仓；典型本地路径 `D:\workspace\git\market-report-dashboard`）  
+> **来源**：`../market-report-dashboard/templates/`（Skill 仓；典型本地路径 `D:\workspace\stock_trading\market-report-dashboard`）  
 > **形态**：只读 HTML 配方副本；**不是**运行时数据主链  
 > **权威扫描**：[market-report-dashboard-capability-report.md](../market-report-dashboard-capability-report.md)  
 > **治理**：[skills-governance.md](../../ops/skills-governance.md)  

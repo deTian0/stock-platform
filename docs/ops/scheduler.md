@@ -27,7 +27,7 @@
 手跑示例：
 
 ```powershell
-cd D:\workspace\git\stock-platform
+cd D:\workspace\stock_trading\stock-platform
 python -m pip install -e .\packages\providers -e .\packages\research
 .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2028-01-03
 # → SKIP（元旦调休工作日休市）exit 0
@@ -43,7 +43,7 @@ python -m pip install -e .\packages\providers -e .\packages\research
 3. 导入（管理员或当前用户）：
 
 ```powershell
-cd D:\workspace\git\stock-platform
+cd D:\workspace\stock_trading\stock-platform
 $xml = Get-Content -Raw .\scripts\ops\stock-platform-daily.xml
 Register-ScheduledTask -TaskName 'stock-platform-daily' -Xml $xml
 ```

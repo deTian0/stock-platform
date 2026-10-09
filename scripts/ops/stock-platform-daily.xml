@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-16"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Sample Windows Task Scheduler task for M40 daily pipeline (M42 ops pack).
   Default: replay fixtures; no secrets; liveTrading not enabled.
@@ -57,7 +57,7 @@
            Prefer pwsh.exe when PowerShell 7+ is installed; else powershell.exe. -->
       <Command>powershell.exe</Command>
       <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -SkipRefresh</Arguments>
-      <WorkingDirectory>D:\workspace\git\stock-platform</WorkingDirectory>
+      <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

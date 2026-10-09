@@ -9,7 +9,7 @@
 `packages/providers/tests/fixtures` 的 `daily_*`（≥60 根）对齐；JSON 请用 **UTF-8 无 BOM**。
 
 ```powershell
-cd D:\workspace\git\stock-platform
+cd D:\workspace\stock_trading\stock-platform
 python -m pip install -e .\packages\providers -e .\packages\research
 
 # 推荐：默认宇宙 + refresh + brief（产物含非空 picks）
@@ -41,7 +41,7 @@ powershell -NoProfile -File .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09
 # 本机 .env 或会话环境：
 # $env:STOCK_PLATFORM_TUSHARE_TOKEN = "你的token"   # 勿提交 git
 # 可选：$env:STOCK_PLATFORM_DAILY_PROVIDER = "tushare"
-# 可选：$env:STOCK_PLATFORM_ENGINE_MARKET_DB = "D:\workspace\git\a-stock-engine\data_cache\market.db"
+# 可选：$env:STOCK_PLATFORM_ENGINE_MARKET_DB = "D:\workspace\stock_trading\a-stock-engine\data_cache\market.db"
 
 # 一键日用（推荐）：tushare + 跳过 refresh + SQLite 落库 + 记入/结算绩效
 powershell -NoProfile -File .\scripts\ops\Invoke-DailyPipeline.ps1 -LiveDay -Asof 2026-09-12

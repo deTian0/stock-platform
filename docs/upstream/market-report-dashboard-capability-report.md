@@ -2,7 +2,7 @@
 
 > **状态**：只读上游扫描归档（非正式运行时依赖）  
 > **扫描日期**：2026-09-23  
-> **源路径**：`D:\workspace\git\market-report-dashboard`  
+> **源路径**：`D:\workspace\stock_trading\market-report-dashboard`  
 > **形态**：Cursor / Claude **Agent Skill** 文档包（非 pip 包、非 HTTP 服务）  
 > **平台权威**：本文件为 stock-platform 侧 SSOT；源仓可自持 `CAPABILITY-REPORT.md` 副本  
 > **禁止**：把本 Skill 当第二数据主链；禁止 `pip install` / 平行 WebSearch 冒充 providers live

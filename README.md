@@ -41,7 +41,7 @@ python -m stock_platform_workbench
 ## 快速开始
 
 ```powershell
-cd D:\workspace\git\stock-platform
+cd D:\workspace\stock_trading\stock-platform
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".\packages\providers[dev]"
 python -m pip install -e ".\packages\research[dev]"

@@ -8,6 +8,24 @@
 
 - （无）
 
+## [3.12.6] - 2026-10-09
+
+### Added
+
+- **自有推进路线图**：`docs/plans/trading-system-roadmap.md`——既有规划（M0–M47 / U1–U8 / MR-1–MR-5）执行见底后重开产品目标，定义 G/B/S/X/L/C 六域里程碑（工程地基 / 回测 / 策略深化 / 选股 / 实盘 / 双线收口）与关键路径 `G1 → B1 → B5 → X4 → L1`
+- **WorkBuddy 运行时限额实测**：`docs/ops/workbuddy-runtime-limits.md`——单请求 100 步、命令默认 120s（PowerShell 上限 600s）、上下文压缩阈值 60/70/90%、沙箱 6 程序黑名单、会话缓存上限 3000 MB；含对回测阶段的设计约束
+
+### Changed
+
+- **`G1` 工程地基（环境恢复）**：5 个 `stock_platform_*` 包 editable install 恢复；`pytest packages apps`（`STOCK_PLATFORM_PROVIDER_PRESET=replay`）**526 passed / 0 failed**
+- **`G2` 外部路径与 env 治理**：全仓仓根路径 `D:\workspace\git\` → `D:\workspace\stock_trading\` 迁移（**14 个文件**：README × 4、`docs/ops` × 5、`docs/upstream` × 2、`templates/index.html`、`.env.example`、`scripts/ops/stock-platform-daily.xml`）；`.env` 的 `STOCK_PLATFORM_ENGINE_MARKET_DB` 实测指向 `a-stock-engine/data_cache/market.db`（3.14 GB，冒烟 600519 → 406 交易日）；计划任务 `WorkingDirectory` 修正，XML 编码声明 `UTF-16`→`UTF-8`（原声明与文件实际 UTF-8 字节不符）
+
+### Verified
+
+- `scripts/check_docs.ps1`：**OK**（VERSION=3.12.6，112 required files，139 md）
+- `scripts/check_versions.ps1`：**OK**（VERSION 与 5 个 pyproject + 5 个 `__init__` 一致）
+- `pytest packages apps`：**526 passed / 1 warning / 14.14s**
+
 ## [3.12.5] - 2026-09-23
 
 ### Added

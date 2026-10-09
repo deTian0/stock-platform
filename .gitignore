@@ -44,3 +44,6 @@ htmlcov/
 # Cursor local
 .cursor/
 *.canvas.data.json
+
+# local scratch (not part of the product)
+userinput.py

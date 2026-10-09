@@ -6,7 +6,7 @@
 
 默认权威文件（本机已导入时）：
 
-`D:\workspace\git\a-stock-engine\data_cache\market.db`
+`D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`
 
 | 表 | 用途 | 规模（本机实测量级） |
 |----|------|----------------------|
@@ -20,7 +20,7 @@
 在 `stock-platform` 根 `.env`：
 
 ```text
-STOCK_PLATFORM_ENGINE_MARKET_DB=D:/workspace/git/a-stock-engine/data_cache/market.db
+STOCK_PLATFORM_ENGINE_MARKET_DB=D:/workspace/stock_trading/a-stock-engine/data_cache/market.db
 ```
 
 可选预设（日线走 engine，其余仍 replay）：
@@ -33,7 +33,7 @@ STOCK_PLATFORM_PROVIDER_PRESET=cn_engine_sqlite
 
 ```powershell
 # 读到行数（应 > 0）
-$env:STOCK_PLATFORM_ENGINE_MARKET_DB = "D:/workspace/git/a-stock-engine/data_cache/market.db"
+$env:STOCK_PLATFORM_ENGINE_MARKET_DB = "D:/workspace/stock_trading/a-stock-engine/data_cache/market.db"
 python -c "from datetime import date; from stock_platform_providers import EngineSqliteProvider; p=EngineSqliteProvider(); print(len(p.get_daily(['600519'], start=date(2026,1,1), end=date(2026,9,8))))"
 
 # PIT 财务（ann_date <= asof）
