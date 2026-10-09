@@ -8,6 +8,7 @@ import pytest
 from stock_platform_research.backtest import (
     DEFAULT_COMMISSION_RATE,
     DEFAULT_STAMP_SELL_RATE,
+    asset_class,
     compute_features,
     compute_metrics,
     is_etf,
@@ -264,3 +265,71 @@ def test_backtest_zero_cost_has_no_fee_drag():
     for t in free["trades"]:
         # with no cost and no slippage, net equals gross
         assert t["net_ret"] == pytest.approx(t["gross_ret"], abs=1e-6)
+
+
+# ---------- B4: universe selection + asset-class reporting ----------
+
+_MIXED_SERIES = {
+    "600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)],
+    "000001.SZ": [8.0 * (1.0 + 0.001 * i) for i in range(200)],
+    "510300.SH": [4.0 * (1.0 + 0.0015 * i) for i in range(200)],
+    "159915.SZ": [3.0 * (1.0 + 0.0012 * i) for i in range(200)],
+}
+_MIXED_KW = dict(min_pick_score=0.0, min_hold=5, max_positions=5, max_picks_per_day=4)
+_ETF_CODES = {"510300.SH", "159915.SZ"}
+_STOCK_CODES = {"600519.SH", "000001.SZ"}
+
+
+def test_backtest_universe_etf_only_excludes_stocks():
+    bars = _make_bars(_MIXED_SERIES)
+    res = run_portfolio_backtest(bars, universe="etf", **_MIXED_KW)
+    entered = {t["code"] for t in res["trades"]}
+    assert entered, "expected ETF entries"
+    assert entered <= _ETF_CODES
+    assert res["params"]["universe"] == "etf"
+    assert set(res["metrics"]["by_asset"]) <= {"etf"}
+
+
+def test_backtest_universe_all_is_mixed_pool():
+    bars = _make_bars(_MIXED_SERIES)
+    stock = run_portfolio_backtest(bars, universe="stock", **_MIXED_KW)
+    mixed = run_portfolio_backtest(bars, universe="all", **_MIXED_KW)
+    entered = {t["code"] for t in mixed["trades"]}
+    assert entered & _ETF_CODES, "mixed book must hold at least one ETF"
+    assert entered & _STOCK_CODES, "mixed book must hold at least one stock"
+    assert set(mixed["metrics"]["by_asset"]) == {"stock", "etf"}
+    assert mixed["params"]["universe"] == "all"
+    # the stock-only run never touched an ETF
+    assert {t["code"] for t in stock["trades"]} <= _STOCK_CODES
+
+
+def test_backtest_trades_carry_asset_class():
+    bars = _make_bars(_MIXED_SERIES)
+    res = run_portfolio_backtest(bars, universe="all", **_MIXED_KW)
+    assert res["trades"]
+    for t in res["trades"]:
+        assert t["asset_class"] in ("stock", "etf", "fund")
+        assert t["asset_class"] == asset_class(t["code"])
+    by_asset = res["metrics"]["by_asset"]
+    assert by_asset["etf"]["n_trades"] == sum(
+        1 for t in res["trades"] if t["asset_class"] == "etf"
+    )
+
+
+def test_backtest_legacy_exclude_funds_alias_matches_universe():
+    bars = _make_bars(_MIXED_SERIES)
+    legacy = run_portfolio_backtest(bars, exclude_funds=False, **_MIXED_KW)
+    modern = run_portfolio_backtest(bars, universe="all", **_MIXED_KW)
+    assert legacy["final_equity"] == modern["final_equity"]
+    assert legacy["params"]["universe"] == "all"
+    # explicit exclude_funds=True reproduces the stock-only baseline
+    stock = run_portfolio_backtest(bars, exclude_funds=True, **_MIXED_KW)
+    assert stock["final_equity"] == run_portfolio_backtest(
+        bars, universe="stock", **_MIXED_KW
+    )["final_equity"]
+
+
+def test_backtest_rejects_unknown_universe():
+    bars = _make_bars({"600519.SH": [10.0 + i for i in range(80)]})
+    with pytest.raises(ValueError, match="universe"):
+        run_portfolio_backtest(bars, universe="bogus")

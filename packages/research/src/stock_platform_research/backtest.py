@@ -19,7 +19,11 @@ This module adds the missing layer on top of the **same** kernels
   duty 万5 **sell-only**, ETF exempt, plus a configurable per-side **slippage**
   applied to fill prices only (default ``0`` = zero-friction B1/B2 baseline)
 - a real equity curve plus portfolio metrics (CAGR / max drawdown / Sharpe /
-  Sortino / Calmar / turnover / win-rate)
+  Sortino / Calmar / turnover / win-rate), including a per-asset-class
+  ``by_asset`` breakdown for mixed stock / ETF books (milestone ``B4``)
+- a selectable ``universe`` (``stock`` / ``etf`` / ``all``) so the book can be
+  stocks-only (baseline), ETFs-only, or a mixed pool; classification and the ETF
+  stamp exemption share one definition (:func:`portfolio.asset_class`)
 
 Data source is injected as a plain ``bars`` DataFrame (``code`` / ``date`` /
 ``close``, optional ``pct_chg``). This module never opens SQLite and never
@@ -51,10 +55,11 @@ import pandas as pd
 
 from .gates import apply_entry_gates
 from .lvrev import score_lvrev
-from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model)
+from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + B4 asset classes)
     DEFAULT_COMMISSION_RATE,
     DEFAULT_STAMP_SELL_RATE,
     CostModel,
+    asset_class,
     compute_metrics,
     hhi,
     is_etf,
@@ -65,6 +70,9 @@ from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model)
 )
 
 TRADING_DAYS_PER_YEAR = 252
+
+# Valid ``universe`` selectors (B4). ``stock`` reproduces the B1/B2/B3 baseline.
+UNIVERSES = ("stock", "etf", "all")
 
 
 def limit_pct(code: Any, *, is_st: bool = False) -> float:
@@ -185,12 +193,20 @@ def run_portfolio_backtest(
     min_commission: float = 0.0,
     value_factor: bool = False,
     weights: Mapping[str, float] | None = None,
-    exclude_funds: bool = True,
+    universe: str = "stock",
+    exclude_funds: bool | None = None,
     regime: Mapping[str, bool] | None = None,
     start: str | None = None,
     end: str | None = None,
 ) -> dict[str, Any]:
     """Run a long-only book over ``bars`` and return curve + trades + metrics.
+
+    ``universe`` (``B4``) selects the tradable set: ``"stock"`` drops all
+    ``1xxxxx`` / ``5xxxxx`` funds (the engine-aligned B1/B2/B3 baseline default),
+    ``"etf"`` keeps only on-exchange funds in the ETF prefix table, ``"all"`` is a
+    mixed stock + ETF book. ETF sells are stamp-exempt through :class:`CostModel`.
+    The legacy ``exclude_funds`` flag still works: when passed it overrides
+    ``universe`` (``True`` → ``"stock"``, ``False`` → ``"all"``).
 
     ``regime`` optionally maps ``YYYY-MM-DD`` → tradable flag (caller-supplied
     L0 gate); when a day maps to ``False`` no new positions are opened.
@@ -201,6 +217,12 @@ def run_portfolio_backtest(
     every stop / target / trailing trigger still reads the reference close — so
     the defaults (0 slippage, no floor) reproduce the B1 / B2 baseline exactly.
     """
+    if exclude_funds is not None:
+        universe = "stock" if exclude_funds else "all"
+    universe = str(universe).strip().lower()
+    if universe not in UNIVERSES:
+        raise ValueError(f"universe must be one of {UNIVERSES}, got {universe!r}")
+
     cost_model = CostModel(
         commission_rate=commission_rate,
         stamp_sell_rate=stamp_sell_rate,
@@ -208,8 +230,10 @@ def run_portfolio_backtest(
         min_commission=min_commission,
     )
     feats = compute_features(bars)
-    if exclude_funds:
+    if universe == "stock":
         feats = feats[~feats["code"].map(is_fund)]
+    elif universe == "etf":
+        feats = feats[feats["code"].map(is_etf)]
     if start is not None:
         feats = feats[feats["trade_date"] >= pd.Timestamp(start)]
     if end is not None:
@@ -285,6 +309,7 @@ def run_portfolio_backtest(
                 trades.append(
                     {
                         "code": code,
+                        "asset_class": asset_class(code),
                         "entry_idx": pos.entry_idx,
                         "exit_idx": di,
                         "held_days": held,
@@ -396,6 +421,7 @@ def run_portfolio_backtest(
             "slippage_bps": slippage_bps,
             "min_commission": min_commission,
             "value_factor": value_factor,
+            "universe": universe,
         },
         "environment": "SIMULATE",
         "liveTradingEnabled": False,

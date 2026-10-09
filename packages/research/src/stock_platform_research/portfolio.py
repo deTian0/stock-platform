@@ -25,6 +25,10 @@ Conventions (frozen in ``docs/contracts/portfolio-metrics.md``)
   added by milestone ``B3``): commission / stamp duty / slippage / commission
   floor — same **single-definition** rule, ``backtest.py`` consumes this class
   instead of keeping its own copy
+- asset classification is **also single-definition** (milestone ``B4``):
+  :func:`asset_class` maps a code to ``stock`` / ``etf`` / ``fund`` off the same
+  prefix tables that drive the stamp exemption, and ``compute_metrics`` reports a
+  per-class ``by_asset`` breakdown so a mixed stock/ETF book can be read apart
 """
 
 from __future__ import annotations
@@ -64,6 +68,23 @@ def is_fund(code: Any) -> bool:
 def is_etf(code: Any) -> bool:
     """ETF / on-exchange fund → stamp-duty exempt (mirrors engine ``_is_etf``)."""
     return norm_code(code).startswith(_ETF_PREFIXES)
+
+
+def asset_class(code: Any) -> str:
+    """Coarse asset class for universe selection and reporting (``B4``).
+
+    ``"etf"``  — on-exchange fund matching :data:`_ETF_PREFIXES` (stamp-exempt)
+    ``"fund"`` — other ``1xxxxx`` / ``5xxxxx`` (bonds / LOFs / … not in the table)
+    ``"stock"``— everything else
+
+    Deliberately built on :func:`is_etf` / :func:`is_fund` so the classification
+    and the stamp-exemption rule can never drift apart.
+    """
+    if is_etf(code):
+        return "etf"
+    if is_fund(code):
+        return "fund"
+    return "stock"
 
 
 @dataclass(frozen=True)
@@ -223,7 +244,46 @@ def _empty_metrics(initial_capital: float) -> dict[str, Any]:
         "avg_positions": None,
         "max_positions": 0,
         "final_equity": float(initial_capital),
+        "by_asset": {},
     }
+
+
+def _bucket_by_asset(trade_rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per-asset-class trade breakdown for a mixed stock / ETF book (``B4``).
+
+    Class comes from the trade's explicit ``asset_class`` when present, otherwise
+    it is derived from ``code`` via :func:`asset_class` (single definition). A
+    trade with neither is skipped rather than dumped into a fake bucket.
+    """
+    buckets: dict[str, list[Mapping[str, Any]]] = {}
+    for trade in trade_rows:
+        ac = trade.get("asset_class") or (
+            asset_class(trade["code"]) if trade.get("code") is not None else None
+        )
+        if ac is None:
+            continue
+        buckets.setdefault(str(ac), []).append(trade)
+
+    out: dict[str, dict[str, Any]] = {}
+    for ac, rows in sorted(buckets.items()):
+        n = len(rows)
+        wins = sum(1 for r in rows if float(r.get("net_ret") or 0.0) > 0)
+        notional = sum(
+            float(r["entry_value"]) + float(r["exit_value"])
+            for r in rows
+            if r.get("entry_value") is not None and r.get("exit_value") is not None
+        )
+        out[ac] = {
+            "n_trades": n,
+            "win_rate": round(wins / n, 4) if n else 0.0,
+            "avg_net_ret": round(
+                sum(float(r.get("net_ret") or 0.0) for r in rows) / n, 4
+            )
+            if n
+            else 0.0,
+            "turnover_notional": round(notional, 2),
+        }
+    return out
 
 
 def compute_metrics(
@@ -240,7 +300,8 @@ def compute_metrics(
     / ``avg_top_weight`` / ``avg_invested_ratio`` / ``avg_positions``) are
     ``None`` when the curve does not carry the per-day fields, and
     ``turnover_notional_per_year`` is ``None`` when trades carry no notional —
-    never fabricated. Empty input ⇒ all zeros with ``n_days = 0``.
+    never fabricated. ``by_asset`` splits the trade log by asset class (``B4``).
+    Empty input ⇒ all zeros with ``n_days = 0``.
     """
     curve = list(equity_curve or [])
     trade_rows = list(trades or [])
@@ -320,6 +381,7 @@ def compute_metrics(
         "avg_positions": round(avg_positions, 4) if avg_positions is not None else None,
         "max_positions": max_positions,
         "final_equity": round(final, 2),
+        "by_asset": _bucket_by_asset(trade_rows),
     }
 
 

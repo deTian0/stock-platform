@@ -8,6 +8,7 @@
 > **性能补强（2026-10-09）**：加载器优化，全周期 **106 s → 65 s**，指标逐位不变（见 §5 #5）
 > **指标补强 B2（2026-10-09，`v3.13.2`）**：指标单点化（`portfolio.py` 权威层）+ 成交额换手 / HHI 集中度，口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 > **费用补强 B3（2026-10-09，`v3.13.3`）**：费用与摩擦单点化（`CostModel`）+ **新增滑点**（默认 0），口径见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md)、敏感性见 §3.1
+> **资产类型补强 B4（2026-10-09，`v3.13.4`）**：`asset_class` 单点定义 + `universe`（`stock`/`etf`/`all`）+ 分资产 `by_asset` 报告；口径见 [`docs/contracts/asset-classes.md`](../contracts/asset-classes.md)、实测见 §3.2
 
 ---
 
@@ -103,6 +104,29 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 
 复现：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --slippage-bps 10`（或 `--zero-cost`）。
 
+### 3.2 资产类型 / 宇宙对照（B4，2026-10-09）
+
+`universe` 三档，同区间同参数（1618 日；`stock` 档为基线默认）：
+
+| `universe` | 总收益 | CAGR | 最大回撤 | 夏普 | 笔数 | 胜率 | 终值 | 耗时 | 分资产笔数 |
+|---|---|---|---|---|---|---|---|---|---|
+| **`stock`（默认）** | **+90.24%** | **10.53%** | **-17.14%** | **0.7511** | **630** | **46.19%** | **95,117.64** | 47.6 s | stock 630 |
+| `all`（股票+ETF 混池） | +102.58% | 11.60% | -20.61% | 0.8547 | 609 | 45.98% | 101,288.29 | 48.1 s | **stock 609 · etf 0** |
+| `etf`（仅 ETF） | **-16.31%** | -2.83% | -42.05% | -0.0604 | 9 | 0.0% | 41,844.97 | 20.0 s | etf 9 |
+| `all` + 关闭打分门槛※ | +9.79% | 1.51% | — | — | 752 | 35.8% | — | 47.1 s | stock 644 · **etf 103** · fund 5 |
+
+※「机制演示档」：`min_pick_score=0.0`，**非默认配置**，只用于证实混池与免税路径确实通。
+
+**三条必须写进结论的发现**（口径见 [`docs/contracts/asset-classes.md`](../contracts/asset-classes.md) §6）：
+
+1. **默认门槛下混池不会买 ETF。** 全周期 1428 个 ETF 码中日均 **15.3** 只可过闸门（股票 156.3 只），但 ETF 的 lvrev 合成分中位上限仅 **0.50**（股票 **0.86**）→ `min_pick_score=0.80` 把 ETF 全部挡在门外。**混池 ≠ ETF 配置。**
+2. **混池数字不可横比股票基线。** 入场闸门的 `vol20` 中位 / `rev_chg` 分位取自当日入选帧，加入 ETF 会改变分位 → 股票入选集合变化。`all` 的 +102.58% 是**宇宙变化**，不是策略改进。
+3. **ETF 名册含脏数据。** `--universe etf` 出现 -99.9992% 级别的极端值，avg_net_ret 有 +56% / -39% 离群 → 原始 ETF 池需先做代码规范 + 流动性筛（属 X 域，B4 不实现）。
+
+**免税路径实测**：对混池中的真实 ETF 成交通道验算 —— `515250` 卖出成本率 = `8.54e-05`（**仅佣金**），股票参照 `600519.SH` 卖出 = `5.854e-04`（佣金 + 万5 印花税）。豁免按 `is_etf` 前缀表生效，与分类同源。
+
+复现：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --universe all`（或 `etf`）。
+
 ---
 
 ## 4. 与 `a-stock-engine` 的一致性对照
@@ -112,6 +136,7 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 | 打分内核 | `lvrev` W_DEFAULT（vol 0.5 / rev 0.5） | 同（v4.29 canonical） |
 | 闸门 | `apply_entry_gates` | 同源 |
 | 费用 | 万0.854 / 万5 / ETF 免 | 同 |
+| 资产类型 | `universe` `stock`/`etf`/`all`（默认 `stock` = 排除基金） | **整体排除基金**（无 `etf`/`all` 档） |
 | 持有期 | min_hold 45 | MIN_HOLD=45 |
 | 宇宙 | 全市场 6964 码（排除 BSE） | 全市场（含 survivors/ST 过滤） |
 | 区间 | 2020-01 ～ 2026-09（6.7 年） | 样本内全期 |
@@ -157,6 +182,7 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 - **未启用 L0 熊市闸门**：需要宽基指数序列 + 估值分位，`regime` 参数已预留（调用方可注入）。
 - **无 ST / 退市黑名单**：`fundamentals.name` 未接入。
 - **无生存者偏差校正**：未按"上市满 1 年"过滤。
+- **ETF 名册未清洗**（B4 起可选入宇宙，但默认不选）：`market.db` 的 1/5 前缀池含 `151.SZ` 等非标准 / 流动性枯竭条目，`--universe etf` 会出现极端离群；作为可交易宇宙前须先做代码规范 + 流动性筛（X 域议题）。
 - **单进程 Python 循环**：1618 天 **65 s**（加载 11.5 s + 回测 48.6 s，2026-10-09 优化后）；扩到分钟级或大批量参数扫描仍需再优化或拆批。
 
 ---
@@ -181,6 +207,6 @@ $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 
 - ~~**B2 组合指标补全**~~：**done（`v3.13.2`，2026-10-09）** —— 指标单点化（`portfolio.py` 权威 + `backtest.py` re-export）+ 成交额换手 / HHI 集中度 / 暴露；口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 - ~~**B3 费用与摩擦模型对齐**~~：**done（`v3.13.3`，2026-10-09）** —— `CostModel` 单点定义 + **新增滑点** + 修买入侧计费不对称 + CLI 四参数（`--commission-rate` / `--stamp-sell-rate` / `--slippage-bps` / `--zero-cost`）；与 `local_backtest.py` 跨线互测；口径与敏感性见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md) 与 §3.1
-- **B4 ETF 支持**：混池净值报告
+- ~~**B4 ETF 支持**~~：**done（`v3.13.4`，2026-10-09）** —— `asset_class` 单点定义 + `universe`（`stock`/`etf`/`all`）+ CLI `--universe` + 分资产 `by_asset` 报告 + ETF 卖免印花税贯通；跨线互测前缀表；口径见 [`docs/contracts/asset-classes.md`](../contracts/asset-classes.md)，实测见 §3.2
 - **B5 回测↔在线规则统一层**：冷静期 / 退出条件 / 持仓偏差单点定义 + 双路调用（承接本报告 §3 的卖出原因表）
 - **B6 可视化**：`#backtest` 面板净值曲线 + 回撤带

@@ -125,3 +125,30 @@ def test_cli_zero_cost_forces_every_rate_to_zero(tmp_path, capsys):
     assert "commission=0" in err
     assert "stamp_sell=0" in err
     assert "slippage_bps=0" in err
+
+
+# ---------- B4: universe flag ----------
+
+def test_parser_universe_defaults_to_stock():
+    args = build_parser().parse_args([])
+    assert args.universe == "stock"
+
+
+def test_parser_accepts_universe_choices():
+    for u in ("stock", "etf", "all"):
+        assert build_parser().parse_args(["--universe", u]).universe == u
+
+
+def test_parser_rejects_unknown_universe():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--universe", "bogus"])
+
+
+def test_cli_echoes_universe(tmp_path, capsys):
+    db = _make_db(tmp_path)
+    rc = main(
+        ["--db", str(db), "--universe", "all", "--start", "2023-01-03", "--end", "2023-01-04"]
+    )
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "[universe] all" in err

@@ -8,6 +8,37 @@
 
 - （无）
 
+## [3.13.4] - 2026-10-09
+
+### Added
+
+- **`B4` ETF 与资产类型支持**：`portfolio.asset_class(code)` **单点定义** —— 按共享前缀表返回 `stock` / `etf` / `fund`（`etf` = 命中 `_ETF_PREFIXES`；`fund` = 其余 `1xxxxx` / `5xxxxx`，**保守**按应税处理）；分类与印花税豁免由同一张表驱动，不可能分叉
+- `run_portfolio_backtest(..., universe=)`：`stock`（默认，与引擎一致整体排除基金）/ `etf` / `all`（股票 + ETF 混池）；非法档位 `ValueError` fail-closed；旧参数 `exclude_funds` 保留为别名（显式传入时覆盖 `universe`）
+- CLI 新增 `--universe {stock,etf,all}`（默认 `stock`），运行时在 stderr 回显入选行数 / 码数
+- **分资产报告**：`compute_metrics(...)["by_asset"]` 按类给出 `n_trades` / `win_rate` / `avg_net_ret` / `turnover_notional`；`trades` 新增 `asset_class` 字段；既无 `code` 也无 `asset_class` 的交易跳过，空输入 = `{}`（**不编造**）
+- **口径契约**：`docs/contracts/asset-classes.md` —— 三分类判定 / `universe` 三档语义 / 与免税绑定 / `by_asset` / 跨线对齐 / 实测发现
+- 测试：新增 `test_asset_class.py`（语义 + **跨线互测**：静态解析引擎 `_is_fund` / `_is_etf` 前缀表 + `by_asset` 报告）
+
+### Changed
+
+- `backtest.py` 的基金过滤由「一刀切 `exclude_funds`」改为 `universe` 选择；**默认档 `universe="stock"` 与旧默认 `exclude_funds=True` 完全等价**
+- `backtest.py` 与包根 re-export `asset_class` / `UNIVERSES`
+
+### Verified
+
+- **零回归**：`universe="stock"` 全周期指标**逐位不变** —— `total_return` 0.902353 / `cagr` 0.105348 / `mdd` -0.171435 / `sharpe` 0.7511 / `n_trades` 630 / `win_rate` 0.4619 / `final_equity` 95117.64
+- **宇宙对照**（同区间同参数，1618 日）：`stock` **+90.24%** / 630 笔 · `all` **+102.58%** / 609 笔（**ETF 0 笔**）· `etf` **-16.31%** / 9 笔
+- **免税路径贯通实测**：混池中真实 ETF `515250` 卖出成本率 **8.54e-05**（仅佣金）vs 股票参照 `600519.SH` **5.854e-04**（佣金 + 万5 印花税）
+- **三条诚实发现**（已写入契约 §6）：① 默认门槛 `min_pick_score=0.80` 下 ETF 全部被挡（ETF 合成分中位上限 0.50 vs 股票 0.86）→ **混池 ≠ ETF 配置**；② 入场闸门截面分位取自当日入选帧，加入 ETF 会改变股票入选 → `all` 数字**不可与 `stock` 横比**；③ 原始 ETF 池含非标准 / 流动性枯竭条目 → 作宇宙前须先清洗（X 域议题）
+- `pytest packages/research` = **138 passed**（B4 新增 18 个用例）；全量 `pytest packages apps`（`replay`）= **592 passed / 0 failed**
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.4）
+
+### Docs
+
+- 新增 `docs/contracts/asset-classes.md` 并登记进 `scripts/check_docs.ps1` required
+- `docs/ops/backtest-baseline.md`：新增 §3.2 资产类型 / 宇宙对照 + §6 已知限制补 ETF 名册未清洗
+- `docs/plans/trading-system-roadmap.md`：`B4` 标 done
+
 ## [3.13.3] - 2026-10-09
 
 ### Added
