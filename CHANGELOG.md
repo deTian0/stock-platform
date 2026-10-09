@@ -8,6 +8,33 @@
 
 - （无）
 
+## [3.13.6] - 2026-10-09
+
+### Added
+
+- **`B6` 回测可视化扩展**：Workbench `#backtest` 面板新增「组合净值曲线（B1 引擎 · 只读 market.db）」区块 —— **净值曲线 + 回撤带 + 逐日表三者共用同一份 `daily` 数组**，悬停图上某日即高亮对应表行、点表行也定位图上该点（逐日表联动）。仍是 Jinja + static，**未引入任何新前端依赖**（手写 `createElementNS` SVG，无 chart/echarts/plotly/d3）
+- 新增组合指标 `portfolio.drawdown_series(equity_curve)`：逐点**瞬时**回撤（`equity / peak - 1`，每次创新高归零）的**单点定义**；非正权益日（停牌）跳过但保持**索引对齐**（图上第 i 点 == 表第 i 行）。`max_drawdown_from_curve` 改为返回该序列的最深点（同一模块内委派），**scalar 指标与图上回撤带不可能分叉**
+- 新增 API `POST /api/research/backtest/portfolio`：只读 `STOCK_PLATFORM_ENGINE_MARKET_DB`，走与 `stock-platform-backtest` CLI **完全相同的代码路径**（`load_engine_bars` → `filter_universe` → `run_portfolio_backtest`）；返回对齐的 `daily[]`（`date` / `equity` / `ret` / `drawdown` / `n_positions` / `invested_ratio`）+ `B2`–`B5` 指标块 + `params`。无 DB / 非法 `universe` 一律 fail-closed（503 / 400 中文）
+
+### Changed
+
+- `apps/workbench`：`routes/research.py` 新增 `PortfolioBacktestRequest` + `_daily_from_curve()`；`openapi_models.py` 新增 `PortfolioBacktestResponse`；`templates/index.html` / `static/app.js` / `static/app.css` 扩展可视化。Workbench API 操作数 **58 → 59**（全量 API 目录测与计数断言同步）
+- 包根 re-export `drawdown_series`
+
+### Verified
+
+- **零回归（纯重构）**：`drawdown_series` 落地后全周期（2020-01～2026-09）默认档指标与 `B5` 基线**逐位不变** —— `total_return` 0.902353 / `cagr` 0.105348 / `max_drawdown` -0.171435 / `sharpe` 0.7511 / `n_trades` 630 / `win_rate` 0.4619 / `final_equity` 95117.64（加载 13.4 s + 回测 49.3 s）
+- **pre-`B6` oracle 等价**：测试保留旧实现为 oracle，对 600 点（含停牌日）序列断言 `max_drawdown_from_curve` **逐位相等**，并把「最深处 == 序列最小值」写成不变量
+- **真机端到端**（`D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`，3.14 GB，只读）：`POST /api/research/backtest/portfolio`（2025-09-01～2026-09-03）= **HTTP 200 · 18.5 s** · 245 交易日 · 85 笔 · 终值 46,502.02；`daily[0].ret is None`；`metrics.max_drawdown` **-0.193254** 与 `min(daily[].drawdown)` **逐位相等**
+- 测试：全量 `pytest packages apps`（`replay`）= **643 passed / 0 failed / 37.22 s**（B6 新增 10 个用例：`drawdown_series` 5 + API/UI 契约 5）
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.6）
+
+### Docs
+
+- `docs/contracts/portfolio-metrics.md`：补 `drawdown_series` 口径与「最深处 = `max_drawdown_from_curve`」契约
+- `docs/plans/trading-system-roadmap.md`：`B6` 标 done → **B 域（B1–B6）全部收官**
+- `docs/ops/backtest-baseline.md`：补可视化端点入口与耗时口径
+
 ## [3.13.5] - 2026-10-09
 
 ### Added

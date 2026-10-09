@@ -167,19 +167,56 @@ def trade_cost(
     ).trade_cost(code, is_buy=is_buy)
 
 
-def max_drawdown_from_curve(equity_curve: Sequence[Mapping[str, Any]]) -> float:
-    """Peak-to-trough drawdown (≤ 0) over an equity curve of ``{equity: float}``."""
+def drawdown_series(
+    equity_curve: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Per-point drawdown (≤ 0) over an equity curve of ``{date?, equity}``.
+
+    This is the **single definition** of drawdown (milestone ``B6``): the
+    scalar :func:`max_drawdown_from_curve` is the deepest point of this series,
+    so the metric and the plotted band can never disagree.
+
+    Conventions (carried over verbatim from the pre-``B6`` scalar):
+    the running peak seeds at ``1.0``; a non-positive equity point is skipped
+    (it neither advances the peak nor emits a new depth) and simply repeats the
+    previous depth so the series stays **index-aligned** with the curve, which
+    the workbench chart / daily table rely on. The value is the **instantaneous**
+    drawdown ``equity / peak - 1`` (so it returns to ``0`` at every new high,
+    giving a proper underwater band), and its minimum over the series is exactly
+    the scalar :func:`max_drawdown_from_curve`. No rounding here — callers round
+    for display; the metric path stays bit-identical to the pre-``B6`` value.
+    """
+    series: list[dict[str, Any]] = []
     peak = 1.0
-    max_dd = 0.0
+    depth = 0.0
     for point in equity_curve:
         eq = float(point.get("equity") or 0.0)
-        if eq <= 0:
-            continue
-        if eq > peak:
-            peak = eq
-        if peak:
-            max_dd = min(max_dd, (eq / peak) - 1.0)
-    return max_dd
+        if eq > 0:
+            if eq > peak:
+                peak = eq
+            if peak:
+                depth = (eq / peak) - 1.0
+        item: dict[str, Any] = {"drawdown": depth}
+        date = point.get("date")
+        if date is not None:
+            item["date"] = date
+        series.append(item)
+    return series
+
+
+def max_drawdown_from_curve(equity_curve: Sequence[Mapping[str, Any]]) -> float:
+    """Peak-to-trough drawdown (≤ 0) over an equity curve of ``{equity: float}``.
+
+    Delegates to :func:`drawdown_series` so the scalar metric *is* the deepest
+    point of the series (one definition, no drift).
+    """
+    series = drawdown_series(equity_curve)
+    depth = 0.0
+    for point in series:
+        dd = float(point["drawdown"])
+        if dd < depth:
+            depth = dd
+    return depth
 
 
 def approx_turnover_from_curve(equity_curve: Sequence[Mapping[str, Any]]) -> float:

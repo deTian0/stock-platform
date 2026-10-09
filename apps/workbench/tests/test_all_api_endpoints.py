@@ -241,6 +241,21 @@ def _ok_pit(body: Any, status: int) -> None:
     assert (status == 200 and isinstance(body, dict)) or (status == 503 and "detail" in body)
 
 
+def _ok_portfolio_backtest(body: Any, status: int) -> None:
+    if status == 503:
+        assert "detail" in body  # no engine market.db → fail-closed, not fake data
+        return
+    assert status == 200
+    assert body["ok"] is True
+    assert body["liveTradingEnabled"] is False
+    assert isinstance(body["daily"], list)
+    # curve and drawdown are the same length → chart/table linkage is index-aligned
+    for point in body["daily"]:
+        assert set(point) >= {"date", "equity", "ret", "drawdown", "invested_ratio"}
+        if point["drawdown"] is not None:
+            assert point["drawdown"] <= 0
+
+
 ENDPOINT_HITS: dict[tuple[str, str], EndpointHit] = {}
 
 
@@ -686,6 +701,16 @@ _reg(
         assert_body=_ok_pit,
     )
 )
+_reg(
+    EndpointHit(
+        "POST",
+        "/api/research/backtest/portfolio",
+        # No engine market.db in CI → deterministic 503 fail-closed (not fake data).
+        json={"start": "2020-01-01", "end": "2020-12-31", "universe": "stock"},
+        expect_status=frozenset({200, 503}),
+        assert_body=_ok_portfolio_backtest,
+    )
+)
 
 
 @pytest.fixture()
@@ -763,7 +788,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 58
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 59
 
 
 @pytest.mark.unit
@@ -811,4 +836,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 61
+    assert n_ops + n_extra == 62

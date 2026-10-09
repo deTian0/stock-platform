@@ -39,7 +39,7 @@ compute_metrics` **re-export**（旧调用点 `from .backtest import compute_met
 | `n_days` | 净值曲线点数 | = 交易日数（有 bar 的日） |
 | `total_return` | `final / initial − 1` | 分数字 |
 | `cagr` | `(final/initial)^(1/years) − 1`，`years = n_days/252` | 几何年化；`final ≤ 0` 时置 `−1` |
-| `max_drawdown` | 峰到谷最大回撤 | 逐点维护 running peak |
+| `max_drawdown` | 峰到谷最大回撤 | **单点定义**：`drawdown_series()` 的最深点（见 §2.1） |
 | `sharpe` | `mean(日收益)/std(日收益) × √252` | `std=0` → `0` |
 | `sortino` | `mean(日收益)/下行标准差 × √252` | 下行 = **负日收益**，目标收益 0 |
 | `calmar` | `cagr / |max_drawdown|` | 无回撤 → `0` |
@@ -49,6 +49,17 @@ compute_metrics` **re-export**（旧调用点 `from .backtest import compute_met
 | `final_equity` | 期末权益 | 货币单位 |
 
 > **`total_return` / `cagr` / `max_drawdown` 为分数**；汇率无关，不涉及跨币种。
+
+### 2.1 `drawdown_series()` —— 回撤的**单点定义**（`B6`）
+
+```python
+portfolio.drawdown_series(equity_curve) -> [{"drawdown": float, "date": str}, ...]
+```
+
+- **定义**：逐点**瞬时**回撤 `equity / running_peak − 1`（`running_peak` 初值 `1.0`）。每次创新高即回到 `0`，因此可直接作为**回撤带**（underwater band）绘制。
+- **索引对齐**：返回长度 **等于** 输入曲线长度，且**保序**。非正权益点（停牌 / 无 bar）**跳过**——既不推进峰值也不产生新深度，仅**重复上一点深度**。图上第 `i` 个点 == 逐日表第 `i` 行，联动不会错位。
+- **不取整**：序列保留全精度；`max_drawdown` 因而是**该序列的最小值**（`B6` 起 `max_drawdown_from_curve()` 直接委派于此）。**`max_drawdown` 与图上最深回撤逐位相等**，是可在测试中断言的不变量。
+- **空输入** → `[]`，且 `max_drawdown_from_curve([]) == 0.0`。
 
 ---
 

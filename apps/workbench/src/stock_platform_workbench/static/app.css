@@ -852,7 +852,7 @@ footer a {
   }
 }
 
-/* M-U4 TSP UI subset ¡ª accuracy sparkline */
+/* M-U4 TSP UI subset ï¿½ï¿½ accuracy sparkline */
 .tsp-spark-wrap {
   display: flex;
   flex-wrap: wrap;
@@ -872,4 +872,64 @@ footer a {
   padding: 0.5rem 0.75rem;
   border-left: 3px solid var(--accent);
   background: var(--panel);
+}
+
+/* B6: portfolio net-value curve + drawdown band + linked daily table */
+.pf-block {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0.75rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+}
+
+.pf-block h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+#pf-chart-wrap {
+  margin-top: 0.5rem;
+}
+
+.pf-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+#pf-table-wrap {
+  max-height: 20rem;
+  overflow: auto;
+  margin-top: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+#pf-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 1;
+}
+
+#pf-table td {
+  font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.5rem;
+}
+
+#pf-table tbody tr.pf-row {
+  cursor: pointer;
+}
+
+#pf-table tbody tr.pf-row:hover {
+  background: var(--accent-soft);
+}
+
+#pf-table tbody tr.pf-active {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }

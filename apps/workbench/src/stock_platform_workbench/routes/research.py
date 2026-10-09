@@ -67,6 +67,7 @@ from ..openapi_models import (
     LogBriefResponse,
     PerformanceSummaryResponse,
     PitFundamentalsResponse,
+    PortfolioBacktestResponse,
     RecommendDefaultsResponse,
     RollingBacktestResponse,
     StrategyAbStatusResponse,
@@ -1251,6 +1252,145 @@ def post_rolling_backtest(request: Request, body: RollingBacktestRequest) -> dic
     if not out.get("ok"):
         raise HTTPException(status_code=400, detail=out.get("error") or "回测失败")
     return out
+
+
+class PortfolioBacktestRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start: date | None = Field(None, description="Inclusive start YYYY-MM-DD")
+    end: date | None = Field(None, description="Inclusive end YYYY-MM-DD")
+    universe: str = Field("stock", description="Tradable set: stock | etf | all")
+    initial_capital: float = Field(50000.0, gt=0, alias="initialCapital")
+    max_positions: int = Field(15, ge=1, le=50, alias="maxPositions")
+    min_pick_score: float = Field(0.80, ge=0.0, le=1.0, alias="minPickScore")
+    slippage_bps: float = Field(0.0, ge=0.0, le=200.0, alias="slippageBps")
+    symbols: str | None = Field(None, description="Optional comma-separated code subset")
+
+
+def _daily_from_curve(
+    equity_curve: list[dict[str, Any]],
+    drawdown: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge equity curve + aligned drawdown into the single chart/table array.
+
+    ``B6``: the net-value curve, the drawdown band and the daily table all render
+    **this** array, so a hovered point and a highlighted row can never point at
+    different days — alignment is by construction, not by convention.
+    """
+    daily: list[dict[str, Any]] = []
+    prev_equity: float | None = None
+    for i, point in enumerate(equity_curve):
+        equity = point.get("equity")
+        ret: float | None = None
+        if prev_equity not in (None, 0) and equity is not None:
+            ret = round(float(equity) / float(prev_equity) - 1.0, 6)
+        dd_point = drawdown[i] if i < len(drawdown) else {}
+        daily.append(
+            {
+                "date": point.get("date"),
+                "equity": equity,
+                "ret": ret,
+                "drawdown": dd_point.get("drawdown"),
+                "n_positions": point.get("n_positions"),
+                "invested_ratio": point.get("invested_ratio"),
+            }
+        )
+        if equity is not None:
+            prev_equity = float(equity)
+    return daily
+
+
+@router.post(
+    "/backtest/portfolio",
+    summary="组合净值回测（B1 引擎）",
+    responses={**ok200(PortfolioBacktestResponse), **RESP_400, **RESP_503},
+)
+def post_portfolio_backtest(body: PortfolioBacktestRequest) -> dict[str, Any]:
+    """Run the B1/B2/B3/B4/B5 portfolio engine over a **read-only** ``market.db``.
+
+    Returns one aligned ``daily`` array (equity + drawdown + per-day return +
+    exposure) plus the metric block, so the workbench ``#backtest`` panel can plot
+    a net-value curve with a drawdown band and drive a linked daily table with no
+    new front-end dependency. Costs, asset classes and trading rules all come
+    from their single definitions (``B3``/``B4``/``B5``). SIMULATE only.
+
+    Heavy: the loader streams all ``daily_price`` rows and ``compute_features``
+    runs over the whole frame — exactly the ``stock-platform-backtest`` code path
+    — so a multi-year window costs tens of seconds. The DB is opened read-only
+    and is never written.
+    """
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        resolve_engine_market_db,
+    )
+    from stock_platform_research.backtest import UNIVERSES, run_portfolio_backtest
+    from stock_platform_research.backtest_cli import filter_universe, load_engine_bars
+    from stock_platform_research.portfolio import drawdown_series
+
+    db_path = resolve_engine_market_db()
+    if db_path is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=503, detail=f"market.db not found: {db_path}")
+
+    universe = str(body.universe or "stock").strip().lower()
+    if universe not in UNIVERSES:
+        raise HTTPException(
+            status_code=400, detail=f"universe must be one of {UNIVERSES}"
+        )
+
+    start = body.start.isoformat() if body.start else None
+    end = body.end.isoformat() if body.end else None
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be <= end")
+
+    try:
+        bars = load_engine_bars(
+            db_path, start=start, end=end, codes=_parse_symbols(body.symbols)
+        )
+        bars = filter_universe(bars)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"行情库读取失败：{exc}") from exc
+
+    if bars.empty:
+        raise HTTPException(status_code=400, detail="区间内无行情数据（fail-closed）")
+
+    result = run_portfolio_backtest(
+        bars,
+        initial_capital=body.initial_capital,
+        max_positions=body.max_positions,
+        min_pick_score=body.min_pick_score,
+        slippage_bps=body.slippage_bps,
+        universe=universe,
+        start=start,
+        end=end,
+    )
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=400, detail=result.get("reason") or "组合回测失败"
+        )
+
+    equity_curve = list(result.get("equity_curve") or [])
+    return {
+        "ok": True,
+        "dbSource": str(db_path),
+        "universe": universe,
+        "start": start,
+        "end": end,
+        "n_days": result.get("n_days"),
+        "n_trades": len(result.get("trades") or []),
+        "initial_capital": result.get("initial_capital"),
+        "final_equity": result.get("final_equity"),
+        "daily": _daily_from_curve(equity_curve, drawdown_series(equity_curve)),
+        "metrics": result.get("metrics"),
+        "params": result.get("params"),
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+        "dataNote": "只读 market.db（ADR 0049/0050）；复权价由 pct_chg 重建。",
+        "note": "SIMULATE 纸面回测；非投资建议；不进每日推荐主路径。",
+    }
 
 
 class WalkForwardRequest(BaseModel):

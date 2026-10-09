@@ -7,6 +7,7 @@ from .backtest import (
     asset_class,
     compute_features,
     compute_metrics,
+    drawdown_series,
     is_etf,
     is_fund,
     norm_code,
@@ -122,6 +123,7 @@ __all__ = [
     "attach_strategy_ab",
     "compute_features",
     "compute_metrics",
+    "drawdown_series",
     "DEFAULT_COMMISSION_RATE",
     "DEFAULT_STAMP_SELL_RATE",
     "UNIVERSES",
@@ -190,4 +192,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.13.5"
+__version__ = "3.13.6"

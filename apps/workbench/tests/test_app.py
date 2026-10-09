@@ -1663,3 +1663,89 @@ def test_ui_shows_generate_cta(client: TestClient) -> None:
     css = client.get("/static/app.css").text
     assert "is-loading" in css
     assert "button:disabled" in css
+
+
+def _write_market_db(db: Path) -> None:
+    """Minimal read-only engine market.db for the B6 portfolio backtest."""
+    import sqlite3
+
+    from datetime import timedelta
+
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE daily_price (code TEXT, date TEXT, close REAL, pct_chg REAL, "
+        "vol REAL, amount REAL, PRIMARY KEY(code,date))"
+    )
+    start = date(2024, 1, 2)
+    symbols = ["600519.SH", "000001.SZ", "000858.SZ", "510300.SH"]
+    for i in range(400):
+        d = start + timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        for code in symbols:
+            # deterministic wave so features/gates have something to chew on
+            close = 100.0 + 6.0 * ((i % 40) / 40.0)
+            conn.execute(
+                "INSERT INTO daily_price VALUES (?,?,?,?,?,?)",
+                (code, d.isoformat(), close, 0.005, 1.0, 1.0),
+            )
+    conn.commit()
+    conn.close()
+
+
+def test_portfolio_backtest_fail_closed_without_engine(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No engine market.db → 503 Chinese fail-closed (never silent fake data)."""
+    monkeypatch.delenv("STOCK_PLATFORM_ENGINE_MARKET_DB", raising=False)
+    r = client.post("/api/research/backtest/portfolio", json={"universe": "stock"})
+    assert r.status_code == 503
+    assert "ENGINE_MARKET_DB" in (r.json().get("detail") or "")
+
+
+def test_portfolio_backtest_shape_and_alignment(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """B6: one aligned ``daily`` array drives the curve, the band and the table."""
+    db = tmp_path / "market.db"
+    _write_market_db(db)
+    monkeypatch.setenv("STOCK_PLATFORM_ENGINE_MARKET_DB", str(db))
+
+    r = client.post(
+        "/api/research/backtest/portfolio",
+        json={
+            "start": "2024-01-01",
+            "end": "2025-12-31",
+            "universe": "stock",
+            "slippageBps": 0,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["environment"] == "SIMULATE"
+    assert body["liveTradingEnabled"] is False
+    assert body["dbSource"] == str(db)
+    assert body["universe"] == "stock"
+    daily = body["daily"]
+    assert daily, "expected a non-empty equity curve"
+    assert body["n_days"] == len(daily)
+    assert all(p["drawdown"] is not None and p["drawdown"] <= 0 for p in daily)
+    assert daily[0]["ret"] is None  # first day has no previous equity
+    assert daily[0]["date"] <= daily[-1]["date"]
+    for key in ("total_return", "cagr", "max_drawdown", "sharpe", "avg_invested_ratio"):
+        assert key in body["metrics"]
+    assert body["metrics"]["max_drawdown"] == pytest.approx(
+        min(p["drawdown"] for p in daily), abs=1e-6
+    )
+
+
+def test_portfolio_backtest_rejects_bad_universe(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    db = tmp_path / "market.db"
+    _write_market_db(db)
+    monkeypatch.setenv("STOCK_PLATFORM_ENGINE_MARKET_DB", str(db))
+    r = client.post("/api/research/backtest/portfolio", json={"universe": "crypto"})
+    assert r.status_code == 400
+    assert "universe" in (r.json().get("detail") or "")

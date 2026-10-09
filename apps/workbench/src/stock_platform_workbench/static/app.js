@@ -2138,6 +2138,481 @@
     }
   }
 
+  // ---- B6: portfolio net-value curve + drawdown band + linked daily table ----
+  // Pure SVG (createElementNS) — no chart library, no new front-end dependency.
+  // The curve, the band and the table all render the *same* `daily` array, so
+  // index i means the same day in all three: linkage is by construction.
+  var PF_W = 720;
+  var PF_H = 300;
+  var PF_PAD_L = 54;
+  var PF_PAD_R = 12;
+  var PF_EQ_TOP = 14;
+  var PF_EQ_BOTTOM = 186;
+  var PF_DD_TOP = 212;
+  var PF_DD_BOTTOM = 282;
+  var PF_COLORS = {
+    equity: "#0f5f52",
+    equityFill: "rgba(15,95,82,0.10)",
+    dd: "#8b2e2e",
+    ddFill: "rgba(139,46,46,0.18)",
+    axis: "#c8c1b2",
+    text: "#5a635c",
+    cursor: "#7d9a96",
+  };
+  var pfState = { daily: [], rows: [], geo: null, cursor: null, active: -1 };
+
+  function pfFmtNum(v, digits) {
+    if (v == null || v === "") return "—";
+    var n = Number(v);
+    if (Number.isNaN(n)) return String(v);
+    var d = digits == null ? 2 : digits;
+    return n.toLocaleString("zh-CN", {
+      minimumFractionDigits: d,
+      maximumFractionDigits: d,
+    });
+  }
+
+  function pfSvgEl(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    if (attrs) {
+      for (var k in attrs) {
+        if (Object.prototype.hasOwnProperty.call(attrs, k)) {
+          el.setAttribute(k, String(attrs[k]));
+        }
+      }
+    }
+    return el;
+  }
+
+  function pfPrefillRange() {
+    var start = $("pf-start");
+    var end = $("pf-end");
+    if (!end || !start) return;
+    if (!end.value) end.value = new Date().toISOString().slice(0, 10);
+    if (!start.value) {
+      var d = new Date(end.value + "T00:00:00");
+      if (isNaN(d.getTime())) d = new Date();
+      d.setFullYear(d.getFullYear() - 1);
+      start.value = d.toISOString().slice(0, 10);
+    }
+  }
+
+  function renderPortfolioChart(daily) {
+    var svg = $("pf-chart");
+    var note = $("pf-chart-note");
+    var wrap = $("pf-chart-wrap");
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    pfState.cursor = null;
+    pfState.geo = null;
+    if (wrap) wrap.hidden = false;
+    var n = daily.length;
+    if (n < 2) {
+      if (note) note.textContent = "数据点不足（<2 日），无法绘图。";
+      return;
+    }
+    var eqVals = [];
+    var ddVals = [];
+    for (var i = 0; i < n; i++) {
+      var e = daily[i].equity;
+      if (e != null && !isNaN(Number(e))) eqVals.push(Number(e));
+      var dv = daily[i].drawdown;
+      ddVals.push(dv == null || isNaN(Number(dv)) ? 0 : Number(dv));
+    }
+    if (!eqVals.length) {
+      if (note) note.textContent = "净值序列为空，无法绘图。";
+      return;
+    }
+    var minEq = Math.min.apply(null, eqVals);
+    var maxEq = Math.max.apply(null, eqVals);
+    if (minEq === maxEq) {
+      minEq -= 1;
+      maxEq += 1;
+    }
+    var maxDd = Math.min(0, Math.min.apply(null, ddVals));
+    if (maxDd >= 0) maxDd = -0.01;
+
+    var x0 = PF_PAD_L;
+    var x1 = PF_W - PF_PAD_R;
+    var xOf = function (idx) {
+      return x0 + (idx * (x1 - x0)) / (n - 1);
+    };
+    var yEq = function (v) {
+      return PF_EQ_BOTTOM - ((v - minEq) / (maxEq - minEq)) * (PF_EQ_BOTTOM - PF_EQ_TOP);
+    };
+    var yDd = function (v) {
+      return PF_DD_TOP + (v / maxDd) * (PF_DD_BOTTOM - PF_DD_TOP);
+    };
+    pfState.geo = { xOf: xOf, yEq: yEq, yDd: yDd };
+
+    function textAt(x, y, str, anchor) {
+      var t = pfSvgEl("text", {
+        x: x,
+        y: y,
+        fill: PF_COLORS.text,
+        "font-size": 10,
+        "text-anchor": anchor || "start",
+      });
+      t.textContent = str;
+      svg.appendChild(t);
+    }
+
+    // equity panel gridlines + labels
+    [maxEq, (maxEq + minEq) / 2, minEq].forEach(function (v) {
+      var y = yEq(v);
+      svg.appendChild(
+        pfSvgEl("line", {
+          x1: x0,
+          y1: y,
+          x2: x1,
+          y2: y,
+          stroke: PF_COLORS.axis,
+          "stroke-width": 1,
+        })
+      );
+      textAt(x0 - 6, y + 3, pfFmtNum(v, 0), "end");
+    });
+    textAt(x0 - 6, PF_EQ_TOP - 3, "净值", "end");
+    textAt(x0 - 6, PF_DD_TOP - 6, "回撤带", "end");
+
+    // equity area + line
+    var eqPts = [];
+    for (var j = 0; j < n; j++) {
+      var ev = daily[j].equity;
+      if (ev == null || isNaN(Number(ev))) continue;
+      eqPts.push([xOf(j), yEq(Number(ev))]);
+    }
+    if (eqPts.length >= 2) {
+      var areaPath =
+        "M " + eqPts[0][0].toFixed(1) + " " + PF_EQ_BOTTOM.toFixed(1);
+      for (var a = 0; a < eqPts.length; a++) {
+        areaPath += " L " + eqPts[a][0].toFixed(1) + " " + eqPts[a][1].toFixed(1);
+      }
+      areaPath +=
+        " L " +
+        eqPts[eqPts.length - 1][0].toFixed(1) +
+        " " +
+        PF_EQ_BOTTOM.toFixed(1) +
+        " Z";
+      svg.appendChild(pfSvgEl("path", { d: areaPath, fill: PF_COLORS.equityFill }));
+      var linePts = eqPts
+        .map(function (p) {
+          return p[0].toFixed(1) + "," + p[1].toFixed(1);
+        })
+        .join(" ");
+      svg.appendChild(
+        pfSvgEl("polyline", {
+          points: linePts,
+          fill: "none",
+          stroke: PF_COLORS.equity,
+          "stroke-width": 2,
+        })
+      );
+    }
+
+    // drawdown band (underwater area) + zero line
+    svg.appendChild(
+      pfSvgEl("line", {
+        x1: x0,
+        y1: PF_DD_TOP,
+        x2: x1,
+        y2: PF_DD_TOP,
+        stroke: PF_COLORS.axis,
+        "stroke-width": 1,
+      })
+    );
+    var ddPath = "M " + x0.toFixed(1) + " " + PF_DD_TOP.toFixed(1);
+    for (var k = 0; k < n; k++) {
+      ddPath += " L " + xOf(k).toFixed(1) + " " + yDd(ddVals[k]).toFixed(1);
+    }
+    ddPath += " L " + x1.toFixed(1) + " " + PF_DD_TOP.toFixed(1) + " Z";
+    svg.appendChild(pfSvgEl("path", { d: ddPath, fill: PF_COLORS.ddFill }));
+    textAt(x0 - 6, PF_DD_TOP + 10, "0%", "end");
+    textAt(x0 - 6, PF_DD_BOTTOM, formatPct(maxDd), "end");
+
+    // x axis ticks (first / thirds / last, de-duplicated)
+    var ticks = [0, Math.floor((n - 1) / 3), Math.floor((2 * (n - 1)) / 3), n - 1];
+    var seen = {};
+    ticks.forEach(function (idx) {
+      if (seen[idx]) return;
+      seen[idx] = true;
+      textAt(
+        xOf(idx),
+        PF_DD_BOTTOM + 14,
+        String(daily[idx].date || "").slice(0, 10),
+        idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"
+      );
+    });
+
+    // cursor group (hover) — drawn last so it sits on top
+    var cursor = pfSvgEl("g", { visibility: "hidden" });
+    var cLine = pfSvgEl("line", {
+      y1: PF_EQ_TOP,
+      y2: PF_DD_BOTTOM,
+      stroke: PF_COLORS.cursor,
+      "stroke-width": 1,
+      "stroke-dasharray": "3 3",
+    });
+    var cDotEq = pfSvgEl("circle", {
+      r: 3,
+      fill: PF_COLORS.equity,
+      stroke: "#fff",
+      "stroke-width": 1,
+    });
+    var cDotDd = pfSvgEl("circle", {
+      r: 3,
+      fill: PF_COLORS.dd,
+      stroke: "#fff",
+      "stroke-width": 1,
+    });
+    cursor.appendChild(cLine);
+    cursor.appendChild(cDotEq);
+    cursor.appendChild(cDotDd);
+    svg.appendChild(cursor);
+    pfState.cursor = { g: cursor, line: cLine, eq: cDotEq, dd: cDotDd };
+
+    var overlay = pfSvgEl("rect", {
+      x: x0,
+      y: PF_EQ_TOP,
+      width: x1 - x0,
+      height: PF_DD_BOTTOM - PF_EQ_TOP,
+      fill: "transparent",
+    });
+    overlay.style.cursor = "crosshair";
+    svg.appendChild(overlay);
+    overlay.addEventListener("mousemove", function (evt) {
+      var rect = svg.getBoundingClientRect();
+      if (!rect.width) return;
+      var mx = (evt.clientX - rect.left) * (PF_W / rect.width);
+      var idx = Math.round(((mx - x0) / (x1 - x0)) * (n - 1));
+      pfHighlight(Math.max(0, Math.min(n - 1, idx)));
+    });
+    overlay.addEventListener("mouseleave", function () {
+      pfHighlight(-1);
+    });
+
+    if (note) {
+      note.textContent =
+        "共 " +
+        n +
+        " 个交易日 · 区间净值 " +
+        pfFmtNum(minEq, 0) +
+        "～" +
+        pfFmtNum(maxEq, 0) +
+        " · 最深回撤 " +
+        formatPct(maxDd) +
+        "（悬停查看某日明细）";
+    }
+  }
+
+  function pfHighlight(idx) {
+    var cur = pfState.cursor;
+    var daily = pfState.daily;
+    var rows = pfState.rows;
+    var r;
+    for (r = 0; r < rows.length; r++) {
+      if (rows[r]) rows[r].classList.remove("pf-active");
+    }
+    if (idx == null || idx < 0 || idx >= daily.length || !pfState.geo) {
+      if (cur) cur.g.setAttribute("visibility", "hidden");
+      pfState.active = -1;
+      return;
+    }
+    pfState.active = idx;
+    var geo = pfState.geo;
+    var d = daily[idx];
+    var x = geo.xOf(idx);
+    if (cur) {
+      cur.g.setAttribute("visibility", "visible");
+      cur.line.setAttribute("x1", x);
+      cur.line.setAttribute("x2", x);
+      var ev = d.equity == null ? null : Number(d.equity);
+      if (ev == null || isNaN(ev)) cur.eq.setAttribute("visibility", "hidden");
+      else {
+        cur.eq.setAttribute("visibility", "visible");
+        cur.eq.setAttribute("cx", x);
+        cur.eq.setAttribute("cy", geo.yEq(ev));
+      }
+      var dv = d.drawdown == null ? 0 : Number(d.drawdown);
+      cur.dd.setAttribute("cx", x);
+      cur.dd.setAttribute("cy", geo.yDd(isNaN(dv) ? 0 : dv));
+    }
+    if (rows[idx]) {
+      rows[idx].classList.add("pf-active");
+      try {
+        rows[idx].scrollIntoView({ block: "nearest" });
+      } catch (_) {
+        /* older engines: skip auto-scroll */
+      }
+    }
+    if ($("pf-chart-note")) {
+      $("pf-chart-note").textContent =
+        "第 " +
+        (idx + 1) +
+        "/" +
+        daily.length +
+        " 日 · " +
+        (d.date || "—") +
+        " · 净值 " +
+        pfFmtNum(d.equity) +
+        " · 日收益 " +
+        formatPct(d.ret) +
+        " · 回撤 " +
+        formatPct(d.drawdown) +
+        " · 持仓 " +
+        (d.n_positions == null ? "—" : d.n_positions) +
+        " · 仓位 " +
+        formatPct(d.invested_ratio);
+    }
+  }
+
+  function renderPortfolioTable(tbody, daily) {
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    pfState.rows = [];
+    if (!daily.length) {
+      emptyTable(tbody, 6, "无逐日数据（空态；非假数据）");
+      return;
+    }
+    for (var i = 0; i < daily.length; i++) {
+      var d = daily[i];
+      var tr = document.createElement("tr");
+      tr.className = "pf-row";
+      tr.setAttribute("data-idx", String(i));
+      tr.innerHTML =
+        td(d.date || "—") +
+        tdNum(pfFmtNum(d.equity)) +
+        tdNum(formatPct(d.ret)) +
+        tdNum(formatPct(d.drawdown)) +
+        tdNum(d.n_positions == null ? "—" : d.n_positions) +
+        tdNum(formatPct(d.invested_ratio));
+      (function (row) {
+        var idx = Number(row.getAttribute("data-idx"));
+        row.addEventListener("mouseenter", function () {
+          pfHighlight(idx);
+        });
+        row.addEventListener("click", function () {
+          pfHighlight(idx);
+        });
+      })(tr);
+      tbody.appendChild(tr);
+      pfState.rows.push(tr);
+    }
+  }
+
+  async function runPortfolioBacktest(event) {
+    if (event) event.preventDefault();
+    var errEl = $("pf-error");
+    clearError(errEl);
+    var startV = $("pf-start") && $("pf-start").value;
+    var endV = $("pf-end") && $("pf-end").value;
+    var universe = ($("pf-universe") && $("pf-universe").value) || "stock";
+    var slippage = Number(($("pf-slippage") && $("pf-slippage").value) || "0");
+    var capital = Number(($("pf-capital") && $("pf-capital").value) || "50000");
+    if ($("pf-meta")) {
+      $("pf-meta").textContent =
+        "正在运行组合回测（universe=" +
+        universe +
+        (startV ? " · " + startV + "～" + (endV || "最新") : "") +
+        "）… 整库扫描 + 全帧特征较慢，请稍候";
+    }
+    var tbody = $("pf-table") && $("pf-table").querySelector("tbody");
+    try {
+      var data = await fetchJson("/api/research/backtest/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start: startV || null,
+          end: endV || null,
+          universe: universe,
+          initialCapital: capital,
+          slippageBps: slippage,
+        }),
+      });
+      var daily = (data && data.daily) || [];
+      var m = (data && data.metrics) || {};
+      if ($("pf-meta")) {
+        $("pf-meta").textContent =
+          "ok · 宇宙=" +
+          (data.universe || universe) +
+          " · " +
+          (data.start || "起点") +
+          "～" +
+          (data.end || "末") +
+          " · 日数=" +
+          (data.n_days != null ? data.n_days : daily.length) +
+          " · 交易=" +
+          (data.n_trades != null ? data.n_trades : "—") +
+          " · 终值=" +
+          pfFmtNum(data.final_equity);
+      }
+      renderKv($("pf-kv"), [
+        ["总收益", formatPct(m.total_return)],
+        ["CAGR", formatPct(m.cagr)],
+        ["最大回撤", formatPct(m.max_drawdown)],
+        ["夏普", m.sharpe == null ? "—" : Number(m.sharpe).toFixed(3)],
+        ["索提诺", m.sortino == null ? "—" : Number(m.sortino).toFixed(3)],
+        ["Calmar", m.calmar == null ? "—" : Number(m.calmar).toFixed(3)],
+        ["胜率", formatPct(m.win_rate)],
+        [
+          "成交额换手/年",
+          m.turnover_notional_per_year == null
+            ? "—"
+            : Number(m.turnover_notional_per_year).toFixed(2),
+        ],
+        ["平均仓位", formatPct(m.avg_invested_ratio)],
+        [
+          "平均持仓数",
+          m.avg_positions == null ? "—" : Number(m.avg_positions).toFixed(1),
+        ],
+        ["初始资金", pfFmtNum(data.initial_capital)],
+        ["终值", pfFmtNum(data.final_equity)],
+        ["行情库", data.dbSource || "—"],
+        ["环境", data.environment || "SIMULATE"],
+        ["实盘", ynZh(!!data.liveTradingEnabled)],
+      ]);
+      pfState.daily = daily;
+      renderPortfolioChart(daily);
+      pfHighlight(-1);
+      renderPortfolioTable(tbody, daily);
+      if ($("pf-table-wrap")) $("pf-table-wrap").hidden = !daily.length;
+      if ($("pf-json")) {
+        $("pf-json").textContent = JSON.stringify(
+          {
+            ok: data.ok,
+            universe: data.universe,
+            start: data.start,
+            end: data.end,
+            n_days: data.n_days,
+            n_trades: data.n_trades,
+            initial_capital: data.initial_capital,
+            final_equity: data.final_equity,
+            metrics: data.metrics,
+            params: data.params,
+            dbSource: data.dbSource,
+            dataNote: data.dataNote,
+            note: data.note,
+            environment: data.environment,
+            liveTradingEnabled: data.liveTradingEnabled,
+            dailyCount: daily.length,
+          },
+          null,
+          2
+        );
+      }
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if ($("pf-meta")) $("pf-meta").textContent = "组合回测失败（fail-closed）";
+      if (tbody) {
+        emptyTable(tbody, 6, "组合回测失败：无行情库或条件不满足（不静默假数据）");
+      }
+      if ($("pf-chart-wrap")) $("pf-chart-wrap").hidden = true;
+      if ($("pf-table-wrap")) $("pf-table-wrap").hidden = true;
+      renderKv($("pf-kv"), []);
+      if ($("pf-json")) $("pf-json").textContent = "";
+    }
+  }
+
   async function runWalkForwardSummary(event) {
     if (event) event.preventDefault();
     const errEl = $("wf-error");
@@ -2895,6 +3370,10 @@
     $("btn-strategy-list").addEventListener("click", listStrategies);
     if ($("backtest-form")) {
       $("backtest-form").addEventListener("submit", runRollingBacktest);
+    }
+    if ($("pf-form")) {
+      $("pf-form").addEventListener("submit", runPortfolioBacktest);
+      pfPrefillRange();
     }
     if ($("walkforward-form")) {
       $("walkforward-form").addEventListener("submit", runWalkForwardSummary);
