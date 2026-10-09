@@ -85,7 +85,7 @@
 
 | ID | 名称 | 量级 | 目标 tag | 验收标准 |
 |----|------|------|----------|----------|
-| **B1** | 回测基线与复现报告 | M | `v3.13.0` | 用 `market.db`（约 3.1–3.3 GB，2020–2026，1546 交易日）跑一次完整回测；产出净值 / 回撤 / 夏普 / 换手 / 胜率基线报告；结果与 `a-stock-engine` 已有结果做一致性对照，差异有解释 |
+| **B1** | 回测基线与复现报告 | M | `v3.13.0` | **done（2026-10-09）** `backtest.py` 组合引擎 + `stock-platform-backtest` CLI；全周期（2020-01～2026-09，**1618 交易日 / 6964 码**）基线：**+90.24% / CAGR 10.53% / MDD -17.14% / 夏普 0.751 / 胜率 46.2% / 630 笔 / 平均持有 35.4 天**；与引擎对照差异逐条归因（持有期 / 区间 / L0 闸门 / ST·生存者 / 复权）；报告 `docs/ops/backtest-baseline.md` |
 | **B2** | 组合级指标补全 | M | `v3.13.1` | `research/portfolio.py` 扩展：年化收益、最大回撤、Calmar、夏普、索提诺、换手率、持仓集中度；口径文档化并入 `docs/contracts/` |
 | **B3** | 费用与摩擦模型对齐 | S | `v3.13.2` | 佣金万 0.854 免 5 + 卖出印花税万 5 + 滑点，做成配置项（非硬编码）；与 `local_backtest.py` 常量对齐并互测 |
 | **B4** | ETF 与资产类型支持 | M | `v3.13.3` | 回测支持 ETF（免印花税）与股票混池；`_is_etf` 判定规则与上游一致；含 ETF 的净值报告 |
@@ -224,6 +224,7 @@ C2 ← B1；C3 ← S1
 | `.venv` 解释器 | Python 3.14.6（`D:\soft\path\miniconda3`） | pyvenv.cfg 的 home 可解析，**能启动** |
 | `.venv` 依赖 | **不可用** | 5 个 `stock_platform_*` 包未安装；`fastapi`/`uvicorn`/`pytest`/`pandas`/`numpy`/`mootdx`/`tushare` 全 Missing；仅 `pydantic`/`jinja2`/`httpx`/`requests` 可用（conda base `--system-site-packages`） |
 | **G1 执行结果** | **已恢复** | 5 个包 editable install 成功；`pytest packages apps` = **526 passed / 0 failed / 1 warning / 14.88s**（warning 为 fastapi testclient 的 httpx 弃用提示，非阻塞） |
+| **B1 执行结果** | **已完成** | 全周期 2020-01-02～2026-09-03（1618 交易日 / 6964 码）**+90.24%**，CAGR 10.53%，MDD -17.14%，夏普 0.751，胜率 46.2%，630 笔，平均持有 35.4 天；加载 53.7 s + 回测 47.2 s（向量化后）；报告 `docs/ops/backtest-baseline.md` |
 | **G2 执行结果** | **已完成** | 仓根路径全仓迁移 14 文件；`market.db` 冒烟：`resolve_engine_market_db()` → `D:\workspace\stock_trading\a-stock-engine\data_cache\market.db`，`get_daily(['600519'])` = **406 行**（2025-01-02～2026-09-03），`get_fundamentals_pit` 正常；`check_docs`（112 required / 139 md）+ `check_versions`（5 pkg）双绿；全量测试 **526 passed / 14.14s** |
 
 ### 7.1 G1 安装明细（2026-10-09）
@@ -248,4 +249,5 @@ C2 ← B1；C3 ← S1
 |------|------|
 | 2026-10-09 | 初版：体检既有规划见底 → 定义 G/B/S/X/L/C 六域里程碑；确认推进顺序 回测 → 策略 → 选股；`M-E4` 降为 `L1` 门禁项 |
 | 2026-10-09 | `G1` 完成：5 个包 editable install 恢复，全量测试 526 passed；回填 §7 实测记录 |
+| 2026-10-09 | `B1` 完成：组合回测引擎 + CLI + 基线报告；`apply_entry_gates` 向量化（200 s→106 s）；修 `close` 未复权导致假亏损；发布 `v3.13.0` |
 | 2026-10-09 | `G2` 完成：全仓仓根路径迁移 + 计划任务 XML 修正 + `market.db` 挂载冒烟通过；`G1`+`G2` 合并发布 `v3.12.6` |
