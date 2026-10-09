@@ -14,8 +14,10 @@ This module adds the missing layer on top of the **same** kernels
 - MIN_HOLD holding period, hard stop-loss, target take-profit, trailing stop,
   max-hold safety valve
 - max concurrent positions + equal-weight sizing + 100-share lot rounding
-- an explicit cost model aligned with ``a-stock-engine/local_backtest.py``:
-  commission 万0.854 on both sides, stamp duty 万5 **sell-only**, ETF exempt
+- an explicit cost model (``portfolio.CostModel``, milestone ``B3``) aligned with
+  ``a-stock-engine/local_backtest.py``: commission 万0.854 on both sides, stamp
+  duty 万5 **sell-only**, ETF exempt, plus a configurable per-side **slippage**
+  applied to fill prices only (default ``0`` = zero-friction B1/B2 baseline)
 - a real equity curve plus portfolio metrics (CAGR / max drawdown / Sharpe /
   Sortino / Calmar / turnover / win-rate)
 
@@ -49,34 +51,20 @@ import pandas as pd
 
 from .gates import apply_entry_gates
 from .lvrev import score_lvrev
-from .portfolio import compute_metrics, hhi, max_drawdown_from_curve  # noqa: F401 (re-export)
-
-# --- cost model: aligned with a-stock-engine/local_backtest.py (v4.31) ---
-DEFAULT_COMMISSION_RATE = 0.0000854  # 万0.854, 免5 (both sides)
-DEFAULT_STAMP_SELL_RATE = 0.0005  # 万5 stamp duty, sell side only
-TRADING_DAYS_PER_YEAR = 252
-
-# Prefixes treated as ETF / on-exchange fund (stamp-duty exempt).
-_ETF_PREFIXES = (
-    "15", "51", "56", "58", "510", "511", "512", "513", "515", "516", "517",
-    "518", "519", "520", "560", "561", "562", "563", "564", "565", "566",
-    "567", "568", "588", "501", "502", "505", "506", "507", "508",
+from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model)
+    DEFAULT_COMMISSION_RATE,
+    DEFAULT_STAMP_SELL_RATE,
+    CostModel,
+    compute_metrics,
+    hhi,
+    is_etf,
+    is_fund,
+    max_drawdown_from_curve,
+    norm_code,
+    trade_cost,
 )
 
-
-def norm_code(raw: Any) -> str:
-    """``'000001.SZ'`` / ``'000001'`` → ``'000001'`` (6 digits)."""
-    return str(raw).replace(".", "")[:6]
-
-
-def is_fund(code: Any) -> bool:
-    """``1xxxxx`` / ``5xxxxx`` prefixes = on-exchange fund / ETF / bond."""
-    return norm_code(code).startswith(("1", "5"))
-
-
-def is_etf(code: Any) -> bool:
-    """ETF / on-exchange fund → stamp-duty exempt (mirrors engine ``_is_etf``)."""
-    return norm_code(code).startswith(_ETF_PREFIXES)
+TRADING_DAYS_PER_YEAR = 252
 
 
 def limit_pct(code: Any, *, is_st: bool = False) -> float:
@@ -85,19 +73,6 @@ def limit_pct(code: Any, *, is_st: bool = False) -> float:
     if is_st:
         return 0.05
     return 0.20 if c.startswith(("30", "68")) else 0.10
-
-
-def trade_cost(
-    code: Any,
-    *,
-    is_buy: bool,
-    commission_rate: float = DEFAULT_COMMISSION_RATE,
-    stamp_sell_rate: float = DEFAULT_STAMP_SELL_RATE,
-) -> float:
-    """Round-trip-leg cost rate: commission both sides; stamp only on sell (stocks)."""
-    if is_etf(code):
-        return commission_rate
-    return commission_rate if is_buy else commission_rate + stamp_sell_rate
 
 
 def compute_features(bars: pd.DataFrame) -> pd.DataFrame:
@@ -206,6 +181,8 @@ def run_portfolio_backtest(
     lot_size: int = 100,
     commission_rate: float = DEFAULT_COMMISSION_RATE,
     stamp_sell_rate: float = DEFAULT_STAMP_SELL_RATE,
+    slippage_bps: float = 0.0,
+    min_commission: float = 0.0,
     value_factor: bool = False,
     weights: Mapping[str, float] | None = None,
     exclude_funds: bool = True,
@@ -217,7 +194,19 @@ def run_portfolio_backtest(
 
     ``regime`` optionally maps ``YYYY-MM-DD`` → tradable flag (caller-supplied
     L0 gate); when a day maps to ``False`` no new positions are opened.
+
+    Costs come from a single :class:`~stock_platform_research.portfolio.CostModel`
+    built from ``commission_rate`` / ``stamp_sell_rate`` / ``slippage_bps`` /
+    ``min_commission``. Slippage moves the **fill price** only — every signal and
+    every stop / target / trailing trigger still reads the reference close — so
+    the defaults (0 slippage, no floor) reproduce the B1 / B2 baseline exactly.
     """
+    cost_model = CostModel(
+        commission_rate=commission_rate,
+        stamp_sell_rate=stamp_sell_rate,
+        slippage_bps=slippage_bps,
+        min_commission=min_commission,
+    )
     feats = compute_features(bars)
     if exclude_funds:
         feats = feats[~feats["code"].map(is_fund)]
@@ -283,14 +272,15 @@ def run_portfolio_backtest(
                     reason = f"max_hold({held}d)"
 
             if reason:
-                cr = trade_cost(
-                    code,
-                    is_buy=False,
-                    commission_rate=commission_rate,
-                    stamp_sell_rate=stamp_sell_rate,
+                # Fill at the slipped price; both legs price through the shared
+                # CostModel so the basis is symmetric with the buy side.
+                sell_fill = cost_model.fill_price(px, is_buy=False)
+                gross_fill = pos.shares * sell_fill
+                proceeds = gross_fill - cost_model.costs(gross_fill, code, is_buy=False)
+                entry_notional = pos.shares * pos.entry_price
+                cost_basis = entry_notional + cost_model.costs(
+                    entry_notional, code, is_buy=True
                 )
-                proceeds = pos.shares * px * (1.0 - cr)
-                cost_basis = pos.shares * pos.entry_price * (1.0 + commission_rate)
                 cash += proceeds
                 trades.append(
                     {
@@ -299,10 +289,10 @@ def run_portfolio_backtest(
                         "exit_idx": di,
                         "held_days": held,
                         "entry_price": pos.entry_price,
-                        "exit_price": px,
-                        "entry_value": round(pos.shares * pos.entry_price, 2),
-                        "exit_value": round(pos.shares * px, 2),
-                        "gross_ret": round(ret_pct, 4),
+                        "exit_price": sell_fill,
+                        "entry_value": round(entry_notional, 2),
+                        "exit_value": round(gross_fill, 2),
+                        "gross_ret": round((sell_fill / pos.entry_price - 1.0) * 100.0, 4),
                         "net_ret": round((proceeds / cost_basis - 1.0) * 100.0, 4)
                         if cost_basis
                         else 0.0,
@@ -354,28 +344,30 @@ def run_portfolio_backtest(
             if len(positions) >= max_positions:
                 break
             code = row["code"]
-            px = float(row["close"])
+            px = float(row["close"])  # reference close — signal / limit checks only
             if px <= 0 or pd.isna(px):
                 continue
             # limit-up: cannot fill a buy at the sealed price
             upct = row.get("pct_chg")
             if upct is not None and not pd.isna(upct) and float(upct) >= limit_pct(code) * 100.0 - 0.01:
                 continue
+            fill = cost_model.fill_price(px, is_buy=True)
             budget = min(cash, slot_value)
-            shares = math.floor(budget / px / lot_size) * lot_size
+            shares = math.floor(budget / fill / lot_size) * lot_size
             if shares <= 0:
                 continue
-            cost = shares * px * (1.0 + commission_rate)
+            gross = shares * fill
+            cost = gross + cost_model.costs(gross, code, is_buy=True)
             if cost > cash:
                 continue
             cash -= cost
             positions[code] = _Position(
                 code=code,
-                entry_price=px,
+                entry_price=fill,
                 shares=float(shares),
                 entry_idx=di,
-                target=px * (1.0 + target_base / 100.0),
-                peak=px,
+                target=fill * (1.0 + target_base / 100.0),
+                peak=fill,
             )
 
     return {
@@ -401,6 +393,8 @@ def run_portfolio_backtest(
             "min_pick_score": min_pick_score,
             "commission_rate": commission_rate,
             "stamp_sell_rate": stamp_sell_rate,
+            "slippage_bps": slippage_bps,
+            "min_commission": min_commission,
             "value_factor": value_factor,
         },
         "environment": "SIMULATE",

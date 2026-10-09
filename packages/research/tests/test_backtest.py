@@ -215,3 +215,52 @@ def test_backtest_trades_carry_notional():
         assert t["entry_value"] > 0
         assert t["exit_value"] > 0
     assert res["metrics"]["turnover_notional_per_year"] is not None
+
+
+# ---------- B3: cost model / slippage ----------
+
+def test_backtest_cost_params_default_to_zero_friction_extras():
+    bars = _make_bars({"600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)]})
+    res = run_portfolio_backtest(
+        bars, min_pick_score=0.0, min_hold=5, max_positions=3, max_picks_per_day=1
+    )
+    assert res["params"]["commission_rate"] == DEFAULT_COMMISSION_RATE
+    assert res["params"]["stamp_sell_rate"] == DEFAULT_STAMP_SELL_RATE
+    assert res["params"]["slippage_bps"] == 0.0
+    assert res["params"]["min_commission"] == 0.0
+
+
+def test_backtest_slippage_worsens_fills_for_shared_entries():
+    series = {"600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)]}
+    bars = _make_bars(series)
+    kw = dict(min_pick_score=0.0, min_hold=5, max_positions=3, max_picks_per_day=1)
+    base = run_portfolio_backtest(bars, **kw)
+    slipped = run_portfolio_backtest(bars, slippage_bps=50.0, **kw)  # 0.5% per side
+    assert base["trades"] and slipped["trades"]
+
+    def _key(trade: dict) -> tuple[str, int]:
+        return (trade["code"], trade["entry_idx"])
+
+    base_by_key = {_key(t): t for t in base["trades"]}
+    slipped_by_key = {_key(t): t for t in slipped["trades"]}
+    shared = set(base_by_key) & set(slipped_by_key)
+    assert shared, "expected at least one entry common to both runs"
+    for k in shared:
+        # same entry day ⇒ same reference close ⇒ slipped buy fills higher
+        assert slipped_by_key[k]["entry_price"] > base_by_key[k]["entry_price"]
+    assert slipped["final_equity"] < base["final_equity"]
+
+
+def test_backtest_zero_cost_has_no_fee_drag():
+    series = {"600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)]}
+    bars = _make_bars(series)
+    kw = dict(min_pick_score=0.0, min_hold=5, max_positions=3, max_picks_per_day=1)
+    base = run_portfolio_backtest(bars, **kw)
+    free = run_portfolio_backtest(
+        bars, commission_rate=0.0, stamp_sell_rate=0.0, **kw
+    )
+    assert free["trades"]
+    assert free["final_equity"] > base["final_equity"]
+    for t in free["trades"]:
+        # with no cost and no slippage, net equals gross
+        assert t["net_ret"] == pytest.approx(t["gross_ret"], abs=1e-6)
