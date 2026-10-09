@@ -190,6 +190,51 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             ),
         )
     )
+    reg.register(
+        ProviderDeclaration(
+            name="workbuddy",
+            display="WorkBuddy MCP JSON cache",
+            kind="builtin",
+            datasets=frozenset({"daily", "realtime"}),
+            available=True,
+            status="ok",
+            note=(
+                "daily/realtime from STOCK_PLATFORM_WORKBUDDY_CACHE_DIR (JSON cache "
+                "landed by the WorkBuddy MCP bridge: westock-data / neodata); "
+                "offline-deterministic, zero network on the read path"
+            ),
+        )
+    )
+    reg.register(
+        ProviderDeclaration(
+            name="tdx",
+            display="通达信 local vipdoc/*.day",
+            kind="builtin",
+            datasets=frozenset({"daily"}),
+            available=True,
+            status="ok",
+            note=(
+                "CN daily from a TDX desktop install (vipdoc/{sh,sz,bj}/lday/*.day); "
+                "root via STOCK_PLATFORM_TDX_ROOT or auto-detect; "
+                "offline, realtime unavailable"
+            ),
+        )
+    )
+    reg.register(
+        ProviderDeclaration(
+            name="futu",
+            display="富途 OpenAPI (OpenD)",
+            kind="builtin",
+            datasets=frozenset({"daily", "realtime"}),
+            available=True,
+            status="ok",
+            note=(
+                "CN daily/realtime via futu-api over OpenD "
+                "(STOCK_PLATFORM_FUTU_HOST/PORT, default 127.0.0.1:11111); "
+                "requires futu-api + running OpenD gateway"
+            ),
+        )
+    )
 
 
 def build_capability_matrix(

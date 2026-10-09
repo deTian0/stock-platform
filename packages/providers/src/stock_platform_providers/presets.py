@@ -90,6 +90,47 @@ PREFERENCE_PRESETS: dict[str, dict[str, Any]] = {
             "other caps stay replay. For PIT/settle/compare — not live trading."
         ),
     },
+    "workbuddy": {
+        "id": "workbuddy",
+        "label": "WorkBuddy MCP JSON cache (westock/neodata)",
+        "is_default": False,
+        "preferences": {
+            **_REPLAY_PREFS,
+            "daily": "workbuddy",
+            "realtime": "workbuddy",
+        },
+        "note": (
+            "daily/realtime → workbuddy (STOCK_PLATFORM_WORKBUDDY_CACHE_DIR JSON cache "
+            "landed by the WorkBuddy MCP bridge); other caps stay replay."
+        ),
+    },
+    "cn_tdx": {
+        "id": "cn_tdx",
+        "label": "CN daily via 通达信 local vipdoc/*.day",
+        "is_default": False,
+        "preferences": {
+            **_REPLAY_PREFS,
+            "daily": "tdx",
+        },
+        "note": (
+            "Offline: daily → tdx (STOCK_PLATFORM_TDX_ROOT or auto-detect); "
+            "realtime unavailable from local files. Requires the TDX desktop cache."
+        ),
+    },
+    "cn_futu": {
+        "id": "cn_futu",
+        "label": "CN daily/realtime via 富途 OpenAPI (OpenD)",
+        "is_default": False,
+        "preferences": {
+            **_REPLAY_PREFS,
+            "daily": "futu",
+            "realtime": "futu",
+        },
+        "note": (
+            "daily/realtime → futu (OpenD STOCK_PLATFORM_FUTU_HOST/PORT); "
+            "requires futu-api + running OpenD. Other caps stay replay."
+        ),
+    },
 }
 
 
@@ -102,6 +143,9 @@ def list_preference_presets() -> list[dict[str, Any]]:
             "us_hk_global_http",
             "cn_tushare_http",
             "cn_engine_sqlite",
+            "workbuddy",
+            "cn_tdx",
+            "cn_futu",
         )
     ]
 
