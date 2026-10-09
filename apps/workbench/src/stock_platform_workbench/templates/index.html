@@ -1152,6 +1152,69 @@
         <summary>原始 JSON</summary>
         <pre id="backtest-json" class="code"></pre>
       </details>
+      <div class="pf-block" id="pf-block" style="margin-top:1.25rem">
+        <h3>组合净值曲线（B1 引擎 · 只读 market.db）</h3>
+        <p class="hint">
+          跑组合回测引擎：持有期 / 止损 / 移动止损 / 费用（<code>B3</code>）/ 资产类型（<code>B4</code>）/
+          交易规则（<code>B5</code>）全部取自各里程碑的单点定义，与
+          <code>stock-platform-backtest</code> CLI 同一代码路径。
+          逐日输出净值 + 回撤 + 仓位；<strong>净值曲线、回撤带与下方逐日表共用同一份
+          <code>daily</code> 数组</strong>，悬停图上某日即高亮对应表行（反之点表行也高亮图上该点）。
+          只读 <code>STOCK_PLATFORM_ENGINE_MARKET_DB</code>；无 DB fail-closed；SIMULATE；非投资建议。
+          整库扫描 + 全帧特征，窗口越长越慢（多年窗口需数十秒）。
+        </p>
+        <form id="pf-form" class="row">
+          <label>开始
+            <input id="pf-start" type="date" />
+          </label>
+          <label>结束
+            <input id="pf-end" type="date" />
+          </label>
+          <label>宇宙
+            <select id="pf-universe">
+              <option value="stock" selected>stock</option>
+              <option value="etf">etf</option>
+              <option value="all">all（股票+ETF 混池）</option>
+            </select>
+          </label>
+          <label>滑点 bps
+            <input id="pf-slippage" type="number" min="0" max="200" step="1" value="0" />
+          </label>
+          <label>初始资金
+            <input id="pf-capital" type="number" min="1000" step="1000" value="50000" />
+          </label>
+          <button type="submit">运行组合回测</button>
+        </form>
+        <p id="pf-meta" class="status" aria-live="polite"></p>
+        <pre id="pf-error" class="error" hidden></pre>
+        <div id="pf-chart-wrap" hidden>
+          <svg id="pf-chart" class="pf-chart" viewBox="0 0 720 300"
+               role="img" aria-label="组合净值曲线与回撤带"></svg>
+          <p id="pf-chart-note" class="hint"></p>
+        </div>
+        <dl id="pf-kv" class="kv" hidden></dl>
+        <div class="table-wrap" id="pf-table-wrap" hidden>
+          <table id="pf-table">
+            <thead>
+              <tr>
+                <th>date</th>
+                <th>净值</th>
+                <th>日收益</th>
+                <th>回撤</th>
+                <th>持仓数</th>
+                <th>仓位</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6">尚未运行组合回测（无 DB 时 fail-closed，不静默假数据）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="raw-json">
+          <summary>原始 JSON</summary>
+          <pre id="pf-json" class="code"></pre>
+        </details>
+      </div>
       <div class="wf-block" id="walkforward-block" style="margin-top:1rem">
         <h3>Walk-forward 摘要（M-R2）</h3>
         <p class="hint">

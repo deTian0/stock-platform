@@ -88,3 +88,36 @@ def test_realtime_and_news_wired() -> None:
     js = JS.read_text(encoding="utf-8")
     assert 'addEventListener("submit", loadRealtime)' in js
     assert "/api/market/realtime" in js
+
+
+@pytest.mark.unit
+def test_portfolio_backtest_chart_is_wired_without_new_deps() -> None:
+    """B6: net-value curve + drawdown band + linked daily table stay in app.js."""
+    html = HTML.read_text(encoding="utf-8")
+    for el_id in (
+        'id="pf-form"',
+        'id="pf-chart"',
+        'id="pf-chart-wrap"',
+        'id="pf-table"',
+        'id="pf-table-wrap"',
+        'id="pf-json"',
+    ):
+        assert el_id in html
+    js = JS.read_text(encoding="utf-8")
+    for name in (
+        "function renderPortfolioChart",
+        "function renderPortfolioTable",
+        "function pfHighlight",
+        "function runPortfolioBacktest",
+        "function pfPrefillRange",
+    ):
+        assert name in js
+    assert "/api/research/backtest/portfolio" in js
+    # Chart is hand-rolled SVG — no plotting library is imported.
+    assert 'createElementNS("http://www.w3.org/2000/svg"' in js
+    for lib in ("chart.js", "Chart.js", "cdn.jsdelivr.net", "echarts", "plotly", "d3."):
+        assert lib not in js
+    # Form + prefill are registered at boot.
+    assert '$("pf-form").addEventListener("submit", runPortfolioBacktest)' in js
+    # Curve, band and table all read the same `daily` array (index == day).
+    assert "pfState.daily = daily" in js

@@ -65,6 +65,7 @@ from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + 
     CostModel,
     asset_class,
     compute_metrics,
+    drawdown_series,
     hhi,
     is_etf,
     is_fund,

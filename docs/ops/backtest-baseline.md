@@ -157,6 +157,19 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 
 `stock-platform-position-review --holdings book.json [--db market.db --asof YYYY-MM-DD]` —— 对当前账本逐只给出 `hold` / `exit` / `trim` / `add`，**调用与回测相同的规则函数**。富化模式经 `compute_features` 取同源复权价与 `ma20`/`ma60`，`held_days` 由 `entry_date` 在全量会话序列定位。口径见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md) §6。
 
+### 3.5 可视化端点与耗时（B6，2026-10-09）
+
+Workbench `#backtest` 面板「组合净值曲线」区块 = `POST /api/research/backtest/portfolio`，走**与本节 CLI 相同的代码路径**（`load_engine_bars` → `filter_universe` → `run_portfolio_backtest`），只读 `STOCK_PLATFORM_ENGINE_MARKET_DB`。返回的 `daily[]` 同时驱动**净值曲线、回撤带与逐日表**（索引即交易日），因此 `metrics.max_drawdown` 与图上最深回撤**逐位相等**（[`portfolio-metrics.md`](../contracts/portfolio-metrics.md) §2.1）。
+
+实测耗时（`market.db` 3.14 GB / 877 万行，只读）：
+
+| 窗口 | 交易日 | 笔数 | 耗时 | 结果 |
+|---|---|---|---|---|
+| 全周期 2020-01-02～2026-09-03 | 1618 | 630 | 加载 13.4 s + 回测 49.3 s ≈ **63 s** | `total_return` +90.24% · `max_drawdown` −17.14% |
+| **1 年** 2025-09-01～2026-09-03 | **245** | **85** | **18.5 s**（HTTP 200） | `total_return` −7.00% · `max_drawdown` **−0.193254** == `min(daily[].drawdown)` |
+
+> **耗时瓶颈是加载 + 全帧特征**（与窗口长度弱相关，~13 s + ~5 s 固定），回测循环才随窗口增长。故面板默认填**近 1 年**，多年窗口需数十秒；长跑请勿在 120 s 工具超时内前台等待。
+
 ---
 
 ## 4. 与 `a-stock-engine` 的一致性对照

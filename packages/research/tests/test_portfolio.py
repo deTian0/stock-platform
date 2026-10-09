@@ -8,6 +8,7 @@ import pytest
 from stock_platform_research.portfolio import (
     approx_turnover_from_curve,
     compute_metrics,
+    drawdown_series,
     hhi,
     max_drawdown_from_curve,
     portfolio_metrics,
@@ -138,3 +139,86 @@ def test_portfolio_metrics_carry_core_block() -> None:
     assert out["cagr"] == pytest.approx(1.1 ** (252 / 2) - 1, rel=1e-3)
     assert "sharpe" in out and "sortino" in out and "calmar" in out
     assert out["n_days"] == 2
+
+
+def test_drawdown_series_is_index_aligned_and_non_positive() -> None:
+    curve = [
+        {"date": "d1", "equity": 1.0},
+        {"date": "d2", "equity": 1.1},
+        {"date": "d3", "equity": 0.99},
+        {"date": "d4", "equity": 0.88},
+    ]
+    series = drawdown_series(curve)
+    assert len(series) == len(curve)  # index-aligned for the workbench table
+    assert [p["date"] for p in series] == ["d1", "d2", "d3", "d4"]
+    assert all(p["drawdown"] <= 0 for p in series)
+    assert series[0]["drawdown"] == pytest.approx(0.0)
+    assert series[1]["drawdown"] == pytest.approx(0.0)  # new high → no drawdown
+    assert series[2]["drawdown"] == pytest.approx((0.99 / 1.1) - 1.0)
+    assert series[3]["drawdown"] == pytest.approx((0.88 / 1.1) - 1.0)
+
+
+def test_max_drawdown_is_deepest_point_of_series() -> None:
+    curve = [
+        {"date": "d1", "equity": 1.0},
+        {"date": "d2", "equity": 0.9},
+        {"date": "d3", "equity": 1.2},
+        {"date": "d4", "equity": 1.02},
+    ]
+    series = drawdown_series(curve)
+    assert max_drawdown_from_curve(curve) == pytest.approx(
+        min(p["drawdown"] for p in series)
+    )
+
+
+def test_drawdown_series_skips_non_positive_but_stays_aligned() -> None:
+    curve = [
+        {"date": "d1", "equity": 1.0},
+        {"date": "d2", "equity": 0.85},
+        {"date": "d3", "equity": 0.0},  # suspended: repeats previous depth
+        {"date": "d4", "equity": 1.0},
+    ]
+    series = drawdown_series(curve)
+    assert len(series) == 4
+    assert series[1]["drawdown"] == pytest.approx(-0.15)
+    assert series[2]["drawdown"] == pytest.approx(-0.15)  # unchanged by the skip
+    assert series[3]["drawdown"] == pytest.approx(0.0)
+    assert max_drawdown_from_curve(curve) == pytest.approx(-0.15)
+
+
+def test_drawdown_series_empty_and_flat() -> None:
+    assert drawdown_series([]) == []
+    assert max_drawdown_from_curve([]) == 0.0
+    flat = [{"date": "d1", "equity": 2.0}, {"date": "d2", "equity": 2.0}]
+    assert [p["drawdown"] for p in drawdown_series(flat)] == [0.0, 0.0]
+
+
+def _pre_b6_max_drawdown(equity_curve) -> float:
+    """Exact pre-``B6`` implementation, kept as an oracle for the refactor."""
+    peak = 1.0
+    max_dd = 0.0
+    for point in equity_curve:
+        eq = float(point.get("equity") or 0.0)
+        if eq <= 0:
+            continue
+        if eq > peak:
+            peak = eq
+        if peak:
+            max_dd = min(max_dd, (eq / peak) - 1.0)
+    return max_dd
+
+
+def test_max_drawdown_matches_pre_b6_oracle() -> None:
+    # 600 pseudo-random-but-deterministic points with suspensions mixed in.
+    curve = []
+    eq = 1.0
+    for i in range(600):
+        eq = eq * (1.0 + (((i * 37) % 17) - 8) / 400.0)
+        if i % 53 == 0:
+            curve.append({"date": "s%d" % i, "equity": 0.0})  # suspended
+        else:
+            curve.append({"date": "d%d" % i, "equity": eq})
+    assert max_drawdown_from_curve(curve) == _pre_b6_max_drawdown(curve)
+    assert max_drawdown_from_curve(curve) == pytest.approx(
+        min(p["drawdown"] for p in drawdown_series(curve))
+    )

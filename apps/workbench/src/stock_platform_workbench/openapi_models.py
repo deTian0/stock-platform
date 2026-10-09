@@ -394,6 +394,22 @@ class RollingBacktestResponse(ExtraAllowModel):
     liveTradingEnabled: bool | None = False
 
 
+class PortfolioBacktestResponse(ExtraAllowModel):
+    ok: bool = True
+    daily: list[dict[str, Any]] = Field(default_factory=list)
+    metrics: dict[str, Any] | None = None
+    params: dict[str, Any] | None = None
+    dbSource: str | None = None
+    universe: str | None = "stock"
+    n_days: int | None = None
+    n_trades: int | None = None
+    final_equity: float | None = None
+    dataNote: str | None = None
+    note: str | None = None
+    environment: str | None = "SIMULATE"
+    liveTradingEnabled: bool | None = False
+
+
 class PitFundamentalsResponse(ExtraAllowModel):
     ok: bool = True
     offlinePit: bool = True
