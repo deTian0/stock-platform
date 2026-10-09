@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from stock_platform_workbench.app import create_app
+from stock_platform_workbench.brief_ux import REPLAY_FIXTURE_ASOF
 from stock_platform_workbench.intel_report_ux import prefill_intel_report
 from stock_platform_workbench.state import build_default_state
 
@@ -148,3 +149,31 @@ def test_prefill_unit_calendar_only() -> None:
         ("picks" in (m.get("field") or "")) or ("brief" in (m.get("reason") or ""))
         for m in out["missing"]
     )
+
+
+# --- v3.13.7 regression: the *default* asof branch (no query string at all) ---
+
+
+def test_intel_crosswalk_default_asof(client: TestClient) -> None:
+    """Omitting ``asof`` must not 500 — that is the UI's first-load request.
+
+    ``loadIntelCrosswalk`` sends no query string while its asof input is empty,
+    so ``asof or default_brief_asof(...)`` is the **default** path, not an edge
+    case.  It had been written against the pre-v3.10.1 signature and raised
+    ``TypeError`` for five releases, because every test passed ``asof``.
+    """
+    r = client.get("/api/research/intel-report/crosswalk")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asof"] == REPLAY_FIXTURE_ASOF.isoformat()
+    assert body["writesBriefSqlite"] is False
+    assert body["liveTradingEnabled"] is False
+
+
+def test_intel_prefill_default_asof(client: TestClient) -> None:
+    r = client.get("/api/research/intel-report/prefill", params={"kind": "a-share-preopen"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asof"] == REPLAY_FIXTURE_ASOF.isoformat()
+    assert body["writesBriefSqlite"] is False
+    assert "platform-crosswalk" in body["html"]
