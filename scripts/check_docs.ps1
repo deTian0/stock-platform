@@ -110,6 +110,7 @@ $required = @(
   'docs/contracts/portfolio-metrics.md',
   'docs/contracts/cost-model.md',
   'docs/contracts/asset-classes.md',
+  'docs/contracts/trading-rules.md',
   'scripts/release_tag.ps1',
   'scripts/check_docs.ps1',
   'scripts/check_versions.ps1',

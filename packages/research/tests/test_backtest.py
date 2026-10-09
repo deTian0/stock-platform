@@ -333,3 +333,49 @@ def test_backtest_rejects_unknown_universe():
     bars = _make_bars({"600519.SH": [10.0 + i for i in range(80)]})
     with pytest.raises(ValueError, match="universe"):
         run_portfolio_backtest(bars, universe="bogus")
+
+
+# ---------- B5: shared rules + cooldown ----------
+
+def test_backtest_cooldown_zero_is_a_noop():
+    series = {"600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)]}
+    bars = _make_bars(series)
+    kw = dict(min_pick_score=0.0, min_hold=5, max_positions=3, max_picks_per_day=1)
+    base = run_portfolio_backtest(bars, **kw)
+    explicit = run_portfolio_backtest(bars, cooldown_days=0, **kw)
+    assert explicit["final_equity"] == base["final_equity"]
+    assert len(explicit["trades"]) == len(base["trades"])
+    assert explicit["params"]["cooldown_days"] == 0
+
+
+def test_backtest_cooldown_delays_reentry_into_the_same_code():
+    series = {
+        "600519.SH": [10.0 * (1.0 + 0.002 * i) for i in range(200)],
+        "000001.SZ": [8.0 * (1.0 + 0.0015 * i) for i in range(200)],
+    }
+    bars = _make_bars(series)
+    kw = dict(
+        min_pick_score=0.0,
+        min_hold=5,
+        max_hold_days=8,
+        max_positions=3,
+        max_picks_per_day=2,
+    )
+    base = run_portfolio_backtest(bars, **kw)
+    cooled = run_portfolio_backtest(bars, cooldown_days=12, **kw)
+
+    def _by_code(res):
+        out: dict[str, list[dict]] = {}
+        for t in res["trades"]:
+            out.setdefault(t["code"], []).append(t)
+        return {c: sorted(v, key=lambda t: t["entry_idx"]) for c, v in out.items()}
+
+    base_by_code = _by_code(base)
+    repeats = [c for c, v in base_by_code.items() if len(v) >= 2]
+    assert repeats, "fixture must produce a same-code re-entry"
+
+    for code, trades in _by_code(cooled).items():
+        for prev, nxt in zip(trades, trades[1:]):
+            assert nxt["entry_idx"] - prev["exit_idx"] >= 12
+    assert len(cooled["trades"]) <= len(base["trades"])
+    assert cooled["params"]["cooldown_days"] == 12

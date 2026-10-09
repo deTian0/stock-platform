@@ -8,6 +8,37 @@
 
 - （无）
 
+## [3.13.5] - 2026-10-09
+
+### Added
+
+- **`B5` 回测↔在线规则统一层**：新增 `rules.py` 作为交易规则的**单点定义**——`ExitPolicy` / `CooldownPolicy` / `DriftPolicy`（frozen dataclass）、`ExitDecision` / `DriftDecision`，纯函数 `evaluate_exit()` / `advance_peak()` / `evaluate_drift()`，以及共享交易限制 `limit_pct()` / `is_limit_up()` / `is_limit_down()`
+- **在线路径**：新增 `position_review.review_positions()` —— 对当前持仓逐只给出 `hold` / `exit` / `trim` / `add`，**调用与回测完全相同的 rules 函数**（吸收 `V2-code-review-20260905` 检查重点 item 5）
+- 新增 CLI `stock-platform-position-review`：自包含模式（holdings JSON 自带价）或富化模式（`--db` + `--asof` 只读 `market.db`，经 `compute_features` 取同源复权价与 `ma20`/`ma60`，并由 `entry_date` 定位 `held_days`）
+- **冷静期**（`cooldown_days`）：出场后 N 会话内禁止同码再入场；**持仓偏差**（`drift_band`）：权重相对偏离超带即 `trim` / `add`。两者**默认关闭**（`0` / `None`）
+- **口径契约**：`docs/contracts/trading-rules.md` —— 退出规则顺序与 reason 字符串 / 冷静期 / 持仓偏差 / 涨跌停判据 / T+1 / 单点定义双路调用契约 / 已知局限
+
+### Changed
+
+- `run_portfolio_backtest` 的**全部**交易判断改为委派 rules：退出走 `evaluate_exit()`、峰值走 `advance_peak()`、涨跌停走 `is_limit_up()` / `is_limit_down()`；删除内联退出逻辑与本地 `limit_pct()`，`_Position` 变为 `rules.PositionState` 的别名
+- `params` 新增回显 `exit_policy` / `cooldown_days` / `drift_band`（供"两侧参数一致"断言）
+- 包根 re-export `ExitPolicy` / `CooldownPolicy` / `DriftPolicy` / `evaluate_exit` / `evaluate_drift` / `review_positions` 等
+
+### Verified
+
+- **零回归（纯重构）**：默认档全周期指标与 `B4` 基线**逐位不变** —— `total_return` 0.902353 / `cagr` 0.105348 / `mdd` -0.171435 / `sharpe` 0.7511 / `n_trades` 630 / `win_rate` 0.4619 / `final_equity` 95117.64；耗时 加载 13.3 s + 回测 47.0 s
+- **冷静期对照**（`cooldown_days=10`）：`total_return` 0.898259（−0.41 pp）· `n_trades` 631 · `final_equity` 94912.95（**−204.69**，≈ −0.22%）· `sharpe` 0.7508 —— 低频组合同码快速再入场罕见，故影响小；属风险约束而非收益工具
+- **单点定义断言**：`backtest.evaluate_exit is rules.evaluate_exit`、`backtest.ExitPolicy is rules.ExitPolicy`、`backtest._Position is rules.PositionState` 等全部为真（同一对象，非等价拷贝）
+- **差分一致断言**：同一持仓状态下，在线路径给出的 `reason` 与回测所用规则函数的输出**逐字相同**；且回测 `params.exit_policy` 与 `rules.ExitPolicy()` 默认值相等
+- 测试：`pytest packages/research` = **179 passed**（B5 新增 41 个用例）；全量 `pytest packages apps`（`replay`）= **633 passed / 0 failed**
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.5）
+
+### Docs
+
+- 新增 `docs/contracts/trading-rules.md` 并登记进 `scripts/check_docs.ps1` required
+- `docs/ops/backtest-baseline.md`：新增退出/冷静期参数口径与冷静期对照
+- `docs/plans/trading-system-roadmap.md`：`B5` 标 done（**关键路径项** `G1 → B1 → B5 → X4 → L1`）
+
 ## [3.13.4] - 2026-10-09
 
 ### Added

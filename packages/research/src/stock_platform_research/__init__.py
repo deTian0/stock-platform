@@ -45,6 +45,21 @@ from .performance import (
     settled_records,
 )
 from .portfolio import portfolio_metrics, run_portfolio_pit
+from .position_review import format_review_markdown, review_positions
+from .rules import (
+    CooldownPolicy,
+    DriftDecision,
+    DriftPolicy,
+    ExitDecision,
+    ExitPolicy,
+    PositionState,
+    advance_peak,
+    evaluate_drift,
+    evaluate_exit,
+    is_limit_down,
+    is_limit_up,
+    limit_pct,
+)
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
@@ -87,11 +102,18 @@ __all__ = [
     "W_VALUE",
     "BriefRecord",
     "BriefRepository",
+    "CooldownPolicy",
     "DailyPipelineReport",
+    "DriftDecision",
+    "DriftPolicy",
+    "ExitDecision",
+    "ExitPolicy",
+    "PositionState",
     "SqliteBriefRepository",
     "StrategyConfig",
     "UniverseEmptyError",
     "WalkForwardFold",
+    "advance_peak",
     "aggregate_oos",
     "align_fills_to_performance",
     "apply_entry_gates",
@@ -104,9 +126,16 @@ __all__ = [
     "DEFAULT_STAMP_SELL_RATE",
     "UNIVERSES",
     "asset_class",
+    "evaluate_drift",
+    "evaluate_exit",
+    "format_review_markdown",
     "is_etf",
     "is_fund",
+    "is_limit_down",
+    "is_limit_up",
+    "limit_pct",
     "norm_code",
+    "review_positions",
     "run_portfolio_backtest",
     "trade_cost",
     "brief_to_orders",
@@ -161,4 +190,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.13.4"
+__version__ = "3.13.5"

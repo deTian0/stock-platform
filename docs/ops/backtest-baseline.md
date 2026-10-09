@@ -9,6 +9,7 @@
 > **指标补强 B2（2026-10-09，`v3.13.2`）**：指标单点化（`portfolio.py` 权威层）+ 成交额换手 / HHI 集中度，口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 > **费用补强 B3（2026-10-09，`v3.13.3`）**：费用与摩擦单点化（`CostModel`）+ **新增滑点**（默认 0），口径见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md)、敏感性见 §3.1
 > **资产类型补强 B4（2026-10-09，`v3.13.4`）**：`asset_class` 单点定义 + `universe`（`stock`/`etf`/`all`）+ 分资产 `by_asset` 报告；口径见 [`docs/contracts/asset-classes.md`](../contracts/asset-classes.md)、实测见 §3.2
+> **交易规则补强 B5（2026-10-09，`v3.13.5`）**：退出 / 冷静期 / 持仓偏差 / 涨跌停**单点定义**（`rules.py`），回测与在线路径**双路调用同一函数**；口径见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md)、冷静期对照见 §3.3
 
 ---
 
@@ -28,9 +29,11 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 |---|---|
 | 持仓状态 | 每仓 entry price / shares / running peak |
 | 持有期 | `min_hold`（默认 45 天）约束主动卖出；`max_hold_days` 安全上限 |
-| 风控 | 硬止损 `-8%`、目标止盈 `+5%`、趋势破位（MA20≤MA60）、移动止损（自高点 -6%，且曾盈利≥2%） |
+| 风控 | 硬止损 `-8%`、目标止盈 `+5%`、趋势破位（MA20≤MA60）、移动止损（自高点 -6%，且曾盈利≥2%）——B5 起由 `rules.ExitPolicy` + `rules.evaluate_exit` **单点定义** |
 | 仓位 | 最大并发 `15` 仓、等权、100 股取整 |
-| 现实性约束 | **跌停卖不掉→顺延**；**涨停买不进→跳过**；停牌持有顺延 |
+| 现实性约束 | **跌停卖不掉→顺延**；**涨停买不进→跳过**；停牌持有顺延 —— B5 起判定由 `rules.is_limit_down` / `rules.is_limit_up` **单点定义** |
+| 冷静期 | 出场后 N 会话禁止同码再入场（`cooldown_days`，**默认 0 = 关闭**，B5 新增） |
+| 持仓偏差 | 权重相对偏离超带即 `trim` / `add`（`drift_band`，**默认 None = 关闭**，B5 新增；仅在线复核使用） |
 | 费用 | 佣金 **万0.854 双边**（免5）；印花税 **万5 仅卖出**；**ETF 免印花税**——B3 起由 `portfolio.CostModel` **单点定义**，与 `local_backtest.py` 逐值对齐 |
 | 滑点 | **单边可配置**（`slippage_bps`，默认 `0` = 零摩擦）；**仅改成交价、不改信号**（B3 新增） |
 | 指标 | 年化 / 最大回撤 / 夏普 / 索提诺 / Calmar / 换手 / 胜率 / 平均持有 |
@@ -127,6 +130,33 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 
 复现：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --universe all`（或 `etf`）。
 
+### 3.3 退出策略与冷静期对照（B5，2026-10-09）
+
+`exit_policy` 默认档与 B1–B4 完全同值（`stop_loss=8` / `take_profit=0` / `target_base=5` / `trail_stop_pct=6` / `trail_min_peak_ret=2` / `min_hold=45` / `max_hold_days=60`）。新增的 `cooldown_days` 默认 `0`（关闭）；本档仅演示口径：
+
+| 指标 | `cooldown_days=0`（默认） | `cooldown_days=10` | Δ |
+|---|---|---|---|
+| 总收益 | **+90.24%**（0.902353） | +89.83%（0.898259） | −0.41 pp |
+| CAGR | **10.53%** | 10.50% | −0.04 pp |
+| 最大回撤 | **-17.14%** | -17.14% | ~0 |
+| 夏普 | **0.7511** | 0.7508 | −0.0003 |
+| 索提诺 / Calmar | 0.7223 / 0.6145 | 0.7177 / 0.6124 | −0.0046 / −0.0021 |
+| 笔数 | **630** | 631 | +1 |
+| 胜率 | **46.19%** | 45.96% | −0.23 pp |
+| 终值 | **95,117.64** | 94,912.95 | **−204.69** |
+| 成交额换手（倍/年） | 11.28 | 11.29 | +0.01 |
+| 平均 HHI | 0.086483 | 0.086447 | −0.00004 |
+
+- **默认档逐位不变** ⇒ `evaluate_exit` 的抽取代换是**纯重构**，不是策略变更。
+- **冷静期是风险约束，不是收益工具**：低频组合（1618 会话 / 630 笔）里同码快速再入场本就罕见，故影响仅 −0.22%；笔数 +1 属**级联效应**（某日被阻断的再入场让位给另一标的，后续链路偏移）。
+- **报告任何数字必须声明 `exit_policy` / `cooldown_days` / `drift_band`**，见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md) §9。
+
+复现：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08`（默认档）；冷静期档需脚本调 `run_portfolio_backtest(..., cooldown_days=10)`（CLI 暂未暴露该参数）。
+
+### 3.4 在线持仓复核（B5）
+
+`stock-platform-position-review --holdings book.json [--db market.db --asof YYYY-MM-DD]` —— 对当前账本逐只给出 `hold` / `exit` / `trim` / `add`，**调用与回测相同的规则函数**。富化模式经 `compute_features` 取同源复权价与 `ma20`/`ma60`，`held_days` 由 `entry_date` 在全量会话序列定位。口径见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md) §6。
+
 ---
 
 ## 4. 与 `a-stock-engine` 的一致性对照
@@ -136,6 +166,8 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 | 打分内核 | `lvrev` W_DEFAULT（vol 0.5 / rev 0.5） | 同（v4.29 canonical） |
 | 闸门 | `apply_entry_gates` | 同源 |
 | 费用 | 万0.854 / 万5 / ETF 免 | 同 |
+| 退出 / 冷静期 / 涨跌停规则 | `rules.py` **单点定义**，回测与在线复核**双路共用** | 内联在 `local_backtest.py`（无在线路径、无冷静期） |
+| 持仓偏差 | `DriftPolicy`（默认关闭，仅在线复核） | 无 |
 | 资产类型 | `universe` `stock`/`etf`/`all`（默认 `stock` = 排除基金） | **整体排除基金**（无 `etf`/`all` 档） |
 | 持有期 | min_hold 45 | MIN_HOLD=45 |
 | 宇宙 | 全市场 6964 码（排除 BSE） | 全市场（含 survivors/ST 过滤） |
@@ -183,6 +215,9 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 - **无 ST / 退市黑名单**：`fundamentals.name` 未接入。
 - **无生存者偏差校正**：未按"上市满 1 年"过滤。
 - **ETF 名册未清洗**（B4 起可选入宇宙，但默认不选）：`market.db` 的 1/5 前缀池含 `151.SZ` 等非标准 / 流动性枯竭条目，`--universe etf` 会出现极端离群；作为可交易宇宙前须先做代码规范 + 流动性筛（X 域议题）。
+- **涨跌停判定实际极少触发**（B5 起显式声明）：判据用 `pct_chg`，而该列**标度混用**（多数行是小数 `0.10`，少数是百分点 `10.0`）；阈值是百分点，故只有百分点行可能命中。属**既有 B1 行为**，B5 刻意不改（改则基线移动，属策略变更）；详见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md) §7。
+- **ETF 涨跌停档位未接入**：`limit_pct` 只提供股票三档，ETF 按主板 10% 处理；ETF 无涨跌停这一假设尚未声明（后续项）。
+- **无 T+1 开盘成交**：虽然回测循环顺序（出场复核 → 建仓）已等价 T+1，但成交仍在**当日收盘价**，不是次日开盘。
 - **单进程 Python 循环**：1618 天 **65 s**（加载 11.5 s + 回测 48.6 s，2026-10-09 优化后）；扩到分钟级或大批量参数扫描仍需再优化或拆批。
 
 ---
@@ -208,5 +243,6 @@ $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 - ~~**B2 组合指标补全**~~：**done（`v3.13.2`，2026-10-09）** —— 指标单点化（`portfolio.py` 权威 + `backtest.py` re-export）+ 成交额换手 / HHI 集中度 / 暴露；口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
 - ~~**B3 费用与摩擦模型对齐**~~：**done（`v3.13.3`，2026-10-09）** —— `CostModel` 单点定义 + **新增滑点** + 修买入侧计费不对称 + CLI 四参数（`--commission-rate` / `--stamp-sell-rate` / `--slippage-bps` / `--zero-cost`）；与 `local_backtest.py` 跨线互测；口径与敏感性见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md) 与 §3.1
 - ~~**B4 ETF 支持**~~：**done（`v3.13.4`，2026-10-09）** —— `asset_class` 单点定义 + `universe`（`stock`/`etf`/`all`）+ CLI `--universe` + 分资产 `by_asset` 报告 + ETF 卖免印花税贯通；跨线互测前缀表；口径见 [`docs/contracts/asset-classes.md`](../contracts/asset-classes.md)，实测见 §3.2
-- **B5 回测↔在线规则统一层**：冷静期 / 退出条件 / 持仓偏差单点定义 + 双路调用（承接本报告 §3 的卖出原因表）
-- **B6 可视化**：`#backtest` 面板净值曲线 + 回撤带
+- ~~**B5 回测↔在线规则统一层**~~：**done（`v3.13.5`，2026-10-09）** —— `rules.py` 单点定义（退出 / 冷静期 / 持仓偏差 / 涨跌停）+ 在线路径 `position_review` / CLI；回测委派全部交易判断；单点定义与差分一致断言齐备；口径见 [`docs/contracts/trading-rules.md`](../contracts/trading-rules.md)，冷静期对照见 §3.3
+- **B6 可视化**：`#backtest` 面板净值曲线 + 回撤带 + 逐日表联动（仍 Jinja + static）
+- **（B5 派生）涨跌停判据标度**：`pct_chg` 混用标度使涨跌停约束近乎失效 —— 需单独立项（建议并入 B7 或 X 域数据规范），修前须重定基线
