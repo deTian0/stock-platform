@@ -13,7 +13,16 @@ import sqlite3
 
 import pytest
 
-from stock_platform_research.backtest_cli import filter_universe, load_engine_bars
+from stock_platform_research.backtest_cli import (
+    build_parser,
+    filter_universe,
+    load_engine_bars,
+    main,
+)
+from stock_platform_research.portfolio import (
+    DEFAULT_COMMISSION_RATE,
+    DEFAULT_STAMP_SELL_RATE,
+)
 
 ROWS = [
     ("600519.SH", "2023-01-03", 10.0, 0.01),
@@ -84,3 +93,35 @@ def test_filter_universe_keeps_bse_when_disabled(tmp_path):
 def test_missing_db_raises(tmp_path):
     with pytest.raises(sqlite3.OperationalError):
         load_engine_bars(tmp_path / "nope.db")
+
+
+# ---------- B3: cost flags ----------
+
+def test_parser_defaults_match_cost_model_constants():
+    args = build_parser().parse_args([])
+    assert args.commission_rate == DEFAULT_COMMISSION_RATE
+    assert args.stamp_sell_rate == DEFAULT_STAMP_SELL_RATE
+    assert args.slippage_bps == 0.0
+    assert args.zero_cost is False
+
+
+def test_parser_accepts_cost_flags():
+    args = build_parser().parse_args(
+        ["--commission-rate", "0.001", "--stamp-sell-rate", "0.0008", "--slippage-bps", "10"]
+    )
+    assert args.commission_rate == 0.001
+    assert args.stamp_sell_rate == 0.0008
+    assert args.slippage_bps == 10.0
+
+
+def test_cli_zero_cost_forces_every_rate_to_zero(tmp_path, capsys):
+    db = _make_db(tmp_path)
+    rc = main(
+        ["--db", str(db), "--zero-cost", "--start", "2023-01-03", "--end", "2023-01-04"]
+    )
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "[cost]" in err
+    assert "commission=0" in err
+    assert "stamp_sell=0" in err
+    assert "slippage_bps=0" in err

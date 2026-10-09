@@ -21,11 +21,16 @@ Conventions (frozen in ``docs/contracts/portfolio-metrics.md``)
   the curve; ``avg_invested_ratio`` says how much equity was actually held
 - empty inputs never fabricate a metric: the block is all zeros / ``None`` with
   ``n_days = 0``
+- trading costs and friction live in :class:`CostModel` (also defined *here*,
+  added by milestone ``B3``): commission / stamp duty / slippage / commission
+  floor — same **single-definition** rule, ``backtest.py`` consumes this class
+  instead of keeping its own copy
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
@@ -33,6 +38,112 @@ import pandas as pd
 from .pit import run_pit_long_only
 
 TRADING_DAYS_PER_YEAR = 252
+
+# --- cost model defaults: aligned with a-stock-engine/local_backtest.py (B3) ---
+DEFAULT_COMMISSION_RATE = 0.0000854  # 万0.854, 免5 (both sides)
+DEFAULT_STAMP_SELL_RATE = 0.0005  # 万5 stamp duty, sell side only
+
+# Prefixes treated as ETF / on-exchange fund (stamp-duty exempt).
+_ETF_PREFIXES = (
+    "15", "51", "56", "58", "510", "511", "512", "513", "515", "516", "517",
+    "518", "519", "520", "560", "561", "562", "563", "564", "565", "566",
+    "567", "568", "588", "501", "502", "505", "506", "507", "508",
+)
+
+
+def norm_code(raw: Any) -> str:
+    """``'000001.SZ'`` / ``'000001'`` → ``'000001'`` (6 digits)."""
+    return str(raw).replace(".", "")[:6]
+
+
+def is_fund(code: Any) -> bool:
+    """``1xxxxx`` / ``5xxxxx`` prefixes = on-exchange fund / ETF / bond."""
+    return norm_code(code).startswith(("1", "5"))
+
+
+def is_etf(code: Any) -> bool:
+    """ETF / on-exchange fund → stamp-duty exempt (mirrors engine ``_is_etf``)."""
+    return norm_code(code).startswith(_ETF_PREFIXES)
+
+
+@dataclass(frozen=True)
+class CostModel:
+    """Cost + friction model — the **single source of truth** for trading costs.
+
+    Aligned with ``a-stock-engine/local_backtest.py``: commission 万0.854 on both
+    sides, stamp duty 万5 **sell-only** (stocks only), ETF / on-exchange funds are
+    stamp-exempt. ``min_commission`` defaults to ``0.0`` because Huabao's "免5"
+    means there is **no** ¥5 order floor — a pure proportional fee.
+
+    ``slippage_bps`` is a **per-side** slippage in basis points (1 bp = 0.01%),
+    applied to the **fill price only**: buys fill higher, sells fill lower. It
+    never touches the signal — screening, gating and the stop / target / trailing
+    triggers all read the *reference* close. Default ``0.0`` reproduces the
+    B1 / B2 baseline bit-for-bit.
+    """
+
+    commission_rate: float = DEFAULT_COMMISSION_RATE
+    stamp_sell_rate: float = DEFAULT_STAMP_SELL_RATE
+    slippage_bps: float = 0.0
+    min_commission: float = 0.0
+    etf_stamp_exempt: bool = True
+
+    def trade_cost(self, code: Any, *, is_buy: bool) -> float:
+        """Proportional cost **rate** for one leg (commission + sell-side stamp).
+
+        ``min_commission`` is a per-order floor *in currency*, so it cannot be
+        expressed as a rate; use :meth:`costs` whenever a floor is in play.
+        """
+        if is_buy:
+            return self.commission_rate
+        if self.etf_stamp_exempt and is_etf(code):
+            return self.commission_rate
+        return self.commission_rate + self.stamp_sell_rate
+
+    def costs(self, notional: float, code: Any, *, is_buy: bool) -> float:
+        """Total currency cost of one leg (commission floor + stamp applied).
+
+        With ``min_commission == 0`` this is exactly ``notional × trade_cost``.
+        """
+        if notional <= 0.0:
+            return 0.0
+        commission = max(notional * self.commission_rate, self.min_commission)
+        if is_buy or (self.etf_stamp_exempt and is_etf(code)):
+            return commission
+        return commission + notional * self.stamp_sell_rate
+
+    def fill_price(self, px: float, *, is_buy: bool) -> float:
+        """Reference price → fill price after per-side slippage."""
+        slip = self.slippage_bps / 10_000.0
+        return px * (1.0 + slip) if is_buy else px * (1.0 - slip)
+
+    @classmethod
+    def zero(cls) -> "CostModel":
+        """All-in zero cost — mirrors the engine's ``--zero-cost`` isolation run."""
+        return cls(
+            commission_rate=0.0,
+            stamp_sell_rate=0.0,
+            slippage_bps=0.0,
+            min_commission=0.0,
+        )
+
+
+def trade_cost(
+    code: Any,
+    *,
+    is_buy: bool,
+    commission_rate: float = DEFAULT_COMMISSION_RATE,
+    stamp_sell_rate: float = DEFAULT_STAMP_SELL_RATE,
+) -> float:
+    """Round-trip-leg cost rate: commission both sides; stamp only on sell (stocks).
+
+    Kept as a module-level convenience for the pre-``B3`` call signature; it
+    delegates to :class:`CostModel` so there is exactly one definition.
+    """
+    return CostModel(
+        commission_rate=commission_rate,
+        stamp_sell_rate=stamp_sell_rate,
+    ).trade_cost(code, is_buy=is_buy)
 
 
 def max_drawdown_from_curve(equity_curve: Sequence[Mapping[str, Any]]) -> float:

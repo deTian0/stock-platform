@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from .backtest import run_portfolio_backtest
+from .portfolio import DEFAULT_COMMISSION_RATE, DEFAULT_STAMP_SELL_RATE
 
 ENV_DB = "STOCK_PLATFORM_ENGINE_MARKET_DB"
 
@@ -90,6 +91,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-hold", type=int, default=45)
     p.add_argument("--stop-loss", type=float, default=8.0)
     p.add_argument("--min-pick-score", type=float, default=0.80)
+    p.add_argument(
+        "--commission-rate",
+        type=float,
+        default=DEFAULT_COMMISSION_RATE,
+        help=f"per-side commission rate (default {DEFAULT_COMMISSION_RATE:g} = 0.854/10000)",
+    )
+    p.add_argument(
+        "--stamp-sell-rate",
+        type=float,
+        default=DEFAULT_STAMP_SELL_RATE,
+        help=f"sell-side stamp duty, stocks only (default {DEFAULT_STAMP_SELL_RATE:g} = 5/10000)",
+    )
+    p.add_argument(
+        "--slippage-bps",
+        type=float,
+        default=0.0,
+        help="per-side slippage in basis points, 1 bp = 0.01%% (default: 0)",
+    )
+    p.add_argument(
+        "--zero-cost",
+        action="store_true",
+        help="force commission / stamp / slippage to 0 (cost-isolation run)",
+    )
     p.add_argument("--json", action="store_true", help="emit the full result as JSON")
     return p
 
@@ -111,6 +135,16 @@ def main(argv: list[str] | None = None) -> int:
     bars = filter_universe(bars)
     print(f"[filter] rows={len(bars)} codes={bars['code'].nunique()}", file=sys.stderr)
 
+    commission_rate = 0.0 if args.zero_cost else args.commission_rate
+    stamp_sell_rate = 0.0 if args.zero_cost else args.stamp_sell_rate
+    slippage_bps = 0.0 if args.zero_cost else args.slippage_bps
+    print(
+        "[cost] commission={:g} stamp_sell={:g} slippage_bps={:g}".format(
+            commission_rate, stamp_sell_rate, slippage_bps
+        ),
+        file=sys.stderr,
+    )
+
     res = run_portfolio_backtest(
         bars,
         initial_capital=args.initial_capital,
@@ -119,6 +153,9 @@ def main(argv: list[str] | None = None) -> int:
         min_hold=args.min_hold,
         stop_loss=args.stop_loss,
         min_pick_score=args.min_pick_score,
+        commission_rate=commission_rate,
+        stamp_sell_rate=stamp_sell_rate,
+        slippage_bps=slippage_bps,
         start=args.start,
         end=args.end,
     )

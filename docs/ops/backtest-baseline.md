@@ -7,6 +7,7 @@
 > **口径**：SIMULATE｜`liveTradingEnabled=false`｜非投资建议
 > **性能补强（2026-10-09）**：加载器优化，全周期 **106 s → 65 s**，指标逐位不变（见 §5 #5）
 > **指标补强 B2（2026-10-09，`v3.13.2`）**：指标单点化（`portfolio.py` 权威层）+ 成交额换手 / HHI 集中度，口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
+> **费用补强 B3（2026-10-09，`v3.13.3`）**：费用与摩擦单点化（`CostModel`）+ **新增滑点**（默认 0），口径见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md)、敏感性见 §3.1
 
 ---
 
@@ -29,7 +30,8 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 | 风控 | 硬止损 `-8%`、目标止盈 `+5%`、趋势破位（MA20≤MA60）、移动止损（自高点 -6%，且曾盈利≥2%） |
 | 仓位 | 最大并发 `15` 仓、等权、100 股取整 |
 | 现实性约束 | **跌停卖不掉→顺延**；**涨停买不进→跳过**；停牌持有顺延 |
-| 费用 | 佣金 **万0.854 双边**（免5）；印花税 **万5 仅卖出**；**ETF 免印花税**——与 `local_backtest.py` 逐值对齐 |
+| 费用 | 佣金 **万0.854 双边**（免5）；印花税 **万5 仅卖出**；**ETF 免印花税**——B3 起由 `portfolio.CostModel` **单点定义**，与 `local_backtest.py` 逐值对齐 |
+| 滑点 | **单边可配置**（`slippage_bps`，默认 `0` = 零摩擦）；**仅改成交价、不改信号**（B3 新增） |
 | 指标 | 年化 / 最大回撤 / 夏普 / 索提诺 / Calmar / 换手 / 胜率 / 平均持有 |
 
 **参数默认值逐一对齐 `a-stock-engine` v4.31**：`MAX_PICKS_PER_DAY=8`、`MAX_POSITIONS=15`、`MIN_HOLD=45`、`STOP_LOSS=8.0`、`TARGET_BASE=5.0`、`TRAIL_STOP_PCT=6.0`、`REVERSAL_Q=0.30`、`MIN_PICK_SCORE=0.80`。
@@ -83,6 +85,24 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 
 单笔净收益区间 **-15.21% ～ +82.03%**；无 >100% 或无 <-20% 的离群值。
 
+### 3.1 成本敏感性（B3，2026-10-09）
+
+默认档 = 含佣金 + 印花税、**无滑点**。四档同区间同参数对比（1618 日 / 6964 码）：
+
+| 档 | 总收益 | CAGR | 最大回撤 | 夏普 | 笔数 | 终值 | Δ 终值 vs 默认 |
+|---|---|---|---|---|---|---|---|
+| 零成本（`--zero-cost`） | +92.69% | 10.76% | -17.92% | 0.7605 | 634 | 96,344.57 | **+1,226.93** |
+| **默认（含费）** | **+90.24%** | **10.53%** | **-17.14%** | **0.7511** | **630** | **95,117.64** | — |
+| 滑点 5 bps | +89.41% | 10.46% | -17.55% | 0.7454 | 632 | 94,706.19 | −411.45 |
+| 滑点 10 bps | +87.35% | 10.27% | -17.60% | 0.7374 | 634 | 93,674.91 | **−1,442.73** |
+
+- **费率拖累** = 零成本 − 默认 = **1,226.93 元**（≈ 初始 5 万的 2.45% 收益）。
+- **滑点拖累** 10 bps 单边 ≈ **1,442.73 元**（≈ 2.89% 收益），与费率**同级** —— 摩擦不可忽略。
+- 笔数 630→634 的漂移源于滑点改变成交价 → 触及止损/目标的时点变化。
+- **报告任何数字必须声明费用档**（费率 + 滑点），见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md) §7。
+
+复现：`stock-platform-backtest --start 2020-01-01 --end 2026-09-08 --slippage-bps 10`（或 `--zero-cost`）。
+
 ---
 
 ## 4. 与 `a-stock-engine` 的一致性对照
@@ -133,7 +153,7 @@ B1 在**同一套内核**（`lvrev.score_lvrev` + `gates.apply_entry_gates`）�
 
 ## 6. 已知限制（未做，不掩盖）
 
-- **成交价 = 当日收盘价**：`market.db` 无 open/high/low，与引擎 `get_price_on_date` 同口径；**非 T+1 开盘成交**。
+- **成交价基准 = 当日收盘价**：`market.db` 无 open/high/low，与引擎 `get_price_on_date` 同口径；**非 T+1 开盘成交**。B3 起可经 `slippage_bps` 施加单边滑点（默认 0）。
 - **未启用 L0 熊市闸门**：需要宽基指数序列 + 估值分位，`regime` 参数已预留（调用方可注入）。
 - **无 ST / 退市黑名单**：`fundamentals.name` 未接入。
 - **无生存者偏差校正**：未按"上市满 1 年"过滤。
@@ -160,7 +180,7 @@ $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"
 ## 8. 下一步
 
 - ~~**B2 组合指标补全**~~：**done（`v3.13.2`，2026-10-09）** —— 指标单点化（`portfolio.py` 权威 + `backtest.py` re-export）+ 成交额换手 / HHI 集中度 / 暴露；口径见 [`docs/contracts/portfolio-metrics.md`](../contracts/portfolio-metrics.md)
-- **B3 费用模型配置化**：佣金/印花税/滑点做成配置项并与 `local_backtest.py` 互测
+- ~~**B3 费用与摩擦模型对齐**~~：**done（`v3.13.3`，2026-10-09）** —— `CostModel` 单点定义 + **新增滑点** + 修买入侧计费不对称 + CLI 四参数（`--commission-rate` / `--stamp-sell-rate` / `--slippage-bps` / `--zero-cost`）；与 `local_backtest.py` 跨线互测；口径与敏感性见 [`docs/contracts/cost-model.md`](../contracts/cost-model.md) 与 §3.1
 - **B4 ETF 支持**：混池净值报告
 - **B5 回测↔在线规则统一层**：冷静期 / 退出条件 / 持仓偏差单点定义 + 双路调用（承接本报告 §3 的卖出原因表）
 - **B6 可视化**：`#backtest` 面板净值曲线 + 回撤带

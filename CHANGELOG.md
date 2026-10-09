@@ -8,6 +8,40 @@
 
 - （无）
 
+## [3.13.3] - 2026-10-09
+
+### Added
+
+- **`B3` 费用与摩擦模型配置化**：新增 `portfolio.CostModel`（frozen dataclass）—— `commission_rate` / `stamp_sell_rate` / `slippage_bps` / `min_commission` / `etf_stamp_exempt`，含 `trade_cost()`（比例）/ `costs()`（金额，含佣金下限）/ `fill_price()`（滑点后成交价）/ `zero()`（对标引擎 `--zero-cost`）
+- **滑点**（此前完全缺失的摩擦项）：单边基点，**仅作用于成交价**（买入抬价、卖出压价）；选股 / 入场闸门 / 涨跌停判定 / 止损目标与移动止损**触发**一律读参考收盘价
+- 回测引擎新增 `slippage_bps` / `min_commission` 参数；`trades` 的 `entry_price` / `exit_price` / `entry_value` / `exit_value` 改为**真实成交口径**（含滑点）
+- CLI 新增 `--commission-rate` / `--stamp-sell-rate` / `--slippage-bps` / `--zero-cost`；运行时在 stderr 回显费用档
+- **口径契约**：`docs/contracts/cost-model.md` —— 固化费率 / 滑点语义 / 比率与金额双 API / 免5 含义 / 跨线对齐 / 敏感性口径
+- 测试：新增 `test_cost_model.py`（语义 + **跨线互测**：静态解析 `a-stock-engine/local_backtest.py` 的常量与 ETF 前缀表）
+
+### Changed
+
+- **费用单点定义**：费率常量、资产类型判定（`norm_code` / `is_fund` / `is_etf` / `_ETF_PREFIXES`）与 `trade_cost` 从 `backtest.py` 移入 `portfolio.py`；`backtest.py` 顶部 re-export，旧调用点 `from .backtest import ...` 不变（`backtest.CostModel is portfolio.CostModel` 为真）。这是 `B5`（回测↔在线规则统一层）的又一块铺路砖
+
+### Fixed
+
+- **买入侧计费不对称**：建仓与持仓成本基（`cost_basis`）原先硬用 `commission_rate`、绕过 `trade_cost()`，现统一走 `CostModel` 使买入腿与卖出腿对称。因 ETF 与股票买入佣金相同，**当前数值无害**，但消除了一引入滑点 / 分品种费率即漏计的隐性缺陷
+
+### Verified
+
+- **零回归**：默认档（滑点 0）全周期指标**逐位不变** —— `total_return` 0.902353 / `cagr` 0.105348 / `mdd` -0.171435 / `sharpe` 0.7511 / `n_trades` 630 / `win_rate` 0.4619 / `final_equity` 95117.64 / `turnover_notional_per_year` 11.28 / `avg_hhi` 0.086483
+- **成本敏感性**（全周期 1618 日 / 6964 码；权益差 vs 默认档）：零成本 **+1226.93** / 滑点 5 bps **−411.45** / 滑点 10 bps **−1442.73**（≈ 2.89% 收益）—— 费率拖累与 10 bps 滑点拖累同级，**摩擦不可忽略**
+- **两线互测**：平台 `CostModel.trade_cost` 与引擎 `_trade_cost` 在 股票/ETF × 买/卖 四象限逐项相等；费率常量与 ETF 前缀表（30 项）一致
+- `pytest packages/research` = **120 passed**（B3 新增 16 个用例）；全量 `pytest packages apps`（`replay`）= **574 passed / 0 failed**
+- `scripts/check_docs.ps1` / `scripts/check_versions.ps1` 双绿（VERSION=3.13.3）
+
+### Docs
+
+- 新增 `docs/contracts/cost-model.md` 并登记进 `scripts/check_docs.ps1` required
+- 新增 `docs/plans/b3-cost-model-milestone.md`（里程碑方案），`docs/plans/README.md` 登记
+- `docs/plans/trading-system-roadmap.md`：`B3` 标 done
+- `docs/ops/backtest-baseline.md`：新增成本敏感性小节
+
 ## [3.13.2] - 2026-10-09
 
 ### Added
