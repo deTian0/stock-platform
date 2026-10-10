@@ -8,6 +8,37 @@
 
 - （无）
 
+## [4.1.2] - 2026-10-10
+
+### Added
+
+- **闸门参数敏感性扫描与稳健区间判定（`S3`）**：入场闸门常量**单点化** `gates.EntryGateParams`（frozen dataclass：`reversal_q` / `ma20_band` / `ma60_band` / `vol_filter`，默认值 = 原硬编码字面量**逐字**）；`apply_entry_gates(df, reversal_q=None, *, params=None)` —— 显式 `reversal_q` 覆盖 `params.reversal_q`，两者都缺用 `0.30`；`apply_entry_gates(df)` / `apply_entry_gates(df, reversal_q=0.30)` / `apply_entry_gates(df, params=EntryGateParams())` **三者逐位相同**。ADR [`0062`](docs/architecture/0062-gate-parameter-sensitivity.md)
+  - 新增 `research.sensitivity` 扫描**单点**：`sweep_entry_gate`（单旋钮网格扫描，每点经 `book_replay.replay_book` X4 单循环 + **同一** `screener_entry_provider`，`feats` 只建一次 → 两点只差旋钮）/ `summarize_sweep`（**纯函数**，`robust` / `fragile` / `flat` / `insufficient` 四类判定 + `robustRange` + `stability` + `monotonic`）/ `build_sensitivity_report`（多旋钮汇总，任一 `fragile` → `overall=fragile`）
+  - `summarize_sweep` 容差带语义：`sign·(obj − best) ≥ −tolerance × |best|`；`robustRange` = **包含最优点且连续**的一段网格值；连续点数 `< 2` → `fragile`（**孤峰** = 过拟合风险）；目标方向由 `OBJECTIVE_DIRECTION` 登记（`max_drawdown → min`），未登记默认 `max`
+  - `book_replay.screener_entry_provider` 增 `gate_params` 透传（`reversal_q` 缺省 `0.30` → `None`，**有效值不变** → 既有调用逐位不变）
+- CLI `stock-platform-strategy-sensitivity`（`--db/--start/--end/--universe/--knobs/--objective/--tolerance/--min-pick-score/--initial-capital/--max-positions/--reversal-q-grid/--min-pick-score-grid/--ma-band-grid/--json`，只读 `market.db`）
+- API `POST /api/research/strategy/sensitivity`（只读 `market.db`；未知旋钮 / 非法 objective **400** / 无 DB **503** fail-closed）
+- Workbench `#sensitivity` 面板（旋钮判定表 + 逐点指标表 + 原始 JSON，手写零新依赖）
+- 契约 [`docs/contracts/gate-sensitivity.md`](docs/contracts/gate-sensitivity.md) + 实测 [`docs/ops/gate-sensitivity-benchmark.md`](docs/ops/gate-sensitivity-benchmark.md)
+
+### Changed
+
+- 版本号 `4.1.1` → **`4.1.2`**
+
+### Verified
+
+- **真机 `market.db` 验收**（2024-09-02→2026-09-08，489 交易日 / 2.52 M 行特征帧 / 3 旋钮 × 5 点 = 15 次完整回放 / **182.7 s**）：
+  - `min_pick_score` → **`robust`**（`0.5`/`0.6`/`0.7` 的 sharpe 1.253/1.129/1.157 全在最优值 10% 容差内 → **稳健区间 3 点**，`stability=0.60`）
+  - `reversal_q` → **`fragile`**（仅 `0.1` 达标，`robustRange=0.1–0.1`）；`ma_band` → **`fragile`**（仅 `0.9` 达标，`robustRange=0.9–0.9`）→ **`overall=fragile`**
+  - 出厂值 `reversal_q=0.30`（sharpe 1.060）/ `ma_band=0.93`（1.060，**全网格最差**）/ `min_pick_score=0.80`（1.060）均**不**是最优 —— 但 `fragile` 判定明确拦下「照最优值调档」：正是「避免过拟合单点」
+- 出厂闸门值**逐位不变**（`reversal_q=0.30` / `ma_band=0.93` / `min_pick_score=0.80`）；`apply_entry_gates` 既有调用逐位不变
+- 聚焦测试：research `45 passed`、workbench `147 passed`（端点目录 63 → **64**）
+
+### Docs
+
+- 新增 `docs/architecture/0062-gate-parameter-sensitivity.md` + `docs/contracts/gate-sensitivity.md` + `docs/ops/gate-sensitivity-benchmark.md`（均已登记 `scripts/check_docs.ps1`）
+- 路线图 `S3` 标 `done（2026-10-10）`，目标 tag 顺延 `v3.14.2` → `v4.1.2`
+
 ## [4.1.1] - 2026-10-10
 
 ### Added

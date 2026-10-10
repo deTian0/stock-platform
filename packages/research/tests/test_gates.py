@@ -11,7 +11,7 @@ import random
 
 import pandas as pd
 
-from stock_platform_research.gates import apply_entry_gates
+from stock_platform_research.gates import EntryGateParams, apply_entry_gates
 
 NAN = float("nan")
 
@@ -113,3 +113,26 @@ def test_all_gates_reject_extreme_row():
         ]
     )
     assert list(apply_entry_gates(df)) == [False]
+
+
+# ---------------------------------------------------------------------------
+# S3: the hard-coded constants are now one EntryGateParams object.
+#
+# The oracle above bakes in ``0.93`` and the vol-median filter; asserting the
+# parameterised gate still equals it proves S3 changed *no* semantics, only the
+# route by which a caller may move a knob.
+# ---------------------------------------------------------------------------
+def test_params_object_default_matches_reference_loop():
+    for seed in range(6):
+        df = _random_frame(300, seed)
+        got = list(apply_entry_gates(df, params=EntryGateParams()))
+        want = list(_reference_apply_entry_gates(df))
+        assert got == want, f"EntryGateParams() drifted at seed={seed}"
+
+
+def test_params_object_ma_band_matches_explicit_scalar():
+    """Bumping ``ma20_band``/``ma60_band`` together equals the old 0.93 path."""
+    df = _random_frame(300, 7)
+    via_params = list(apply_entry_gates(df, params=EntryGateParams(ma20_band=0.93, ma60_band=0.93)))
+    via_default = list(apply_entry_gates(df))
+    assert via_params == via_default

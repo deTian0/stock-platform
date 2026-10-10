@@ -51,7 +51,7 @@ from .persistence import (
     open_brief_repository,
     reset_brief_repository_cache,
 )
-from .gates import apply_entry_gates, apply_risk_gates
+from .gates import EntryGateParams, apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_S2, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, build_multi_day_pit_panel, panel_to_csv
 from .market_universe import (
@@ -176,6 +176,18 @@ from .factor_ic import (
     spearman_rank_ic,
     summarize_factor_ic,
     summarize_factor_ic_from_rows,
+)
+from .sensitivity import (
+    DEFAULT_GRIDS,
+    DEFAULT_OBJECTIVE,
+    DEFAULT_TOLERANCE,
+    SWEEP_KNOBS,
+    VERDICTS,
+    build_sensitivity_report,
+    gate_params_for,
+    score_floor_for,
+    summarize_sweep,
+    sweep_entry_gate,
 )
 
 __all__ = [
@@ -337,6 +349,17 @@ __all__ = [
     "admit_factor",
     "build_factor_ic_report",
     "select_enabled",
+    "EntryGateParams",
+    "SWEEP_KNOBS",
+    "DEFAULT_GRIDS",
+    "DEFAULT_OBJECTIVE",
+    "DEFAULT_TOLERANCE",
+    "VERDICTS",
+    "build_sensitivity_report",
+    "gate_params_for",
+    "score_floor_for",
+    "summarize_sweep",
+    "sweep_entry_gate",
 ]
 
-__version__ = "4.1.1"
+__version__ = "4.1.2"
