@@ -156,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
             "（优先 STOCK_PLATFORM_ENGINE_MARKET_DB；与 Workbench 闭环对齐）"
         ),
     )
+    p.add_argument(
+        "--no-track-hits",
+        action="store_true",
+        help="X3: 关闭命中追踪（默认开启：②A 头部记入命中周期，落平台 SQLite）",
+    )
     args = p.parse_args(argv)
 
     if args.provider == "replay" and not args.fixtures:
@@ -188,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         lookback_days=args.lookback_days,
         skip_refresh=bool(args.skip_refresh),
         max_attempts=args.max_attempts,
+        track_hits=not bool(args.no_track_hits),
     )
     payload = report.to_dict()
     settle_meta: dict[str, Any] = {}
@@ -202,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
                 "stage": payload["stage"],
                 "briefPath": payload.get("brief_path"),
                 "rankingsCounts": (payload.get("brief") or {}).get("rankingsCounts") or None,
+                "hits": payload.get("hits") or None,
                 "provider": args.provider,
                 "error": payload.get("error"),
                 "settleAfter": settle_meta or None,

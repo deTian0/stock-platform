@@ -89,6 +89,19 @@ from .rankings import (
     format_rankings_markdown,
     rankings_to_rows,
 )
+from .hit_tracking import (
+    HIT_SESSION_TYPES,
+    POST_MARKET,
+    PRE_MARKET,
+    HitTrackingConfig,
+    SqliteHitTrackingRepository,
+    apply_hit,
+    format_hit_report,
+    hit_tracking_snapshot,
+    open_hit_repository,
+    reset_hit_repository_cache,
+    track_brief_hits,
+)
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
@@ -140,6 +153,17 @@ __all__ = [
     "ExitPolicy",
     "PositionState",
     "SqliteBriefRepository",
+    "SqliteHitTrackingRepository",
+    "HIT_SESSION_TYPES",
+    "HitTrackingConfig",
+    "POST_MARKET",
+    "PRE_MARKET",
+    "apply_hit",
+    "format_hit_report",
+    "hit_tracking_snapshot",
+    "open_hit_repository",
+    "reset_hit_repository_cache",
+    "track_brief_hits",
     "StrategyConfig",
     "UniverseEmptyError",
     "WalkForwardFold",
@@ -244,4 +268,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "4.0.1"
+__version__ = "4.0.2"

@@ -336,6 +336,18 @@ class PerformanceSummaryResponse(ExtraAllowModel):
     autoSettled: bool | None = None
 
 
+class HitTrackingResponse(ExtraAllowModel):
+    asof: str | None = None
+    environment: str = "SIMULATE"
+    liveTradingEnabled: bool = False
+    pre_market: dict[str, Any] = Field(default_factory=dict)
+    post_market: dict[str, Any] = Field(default_factory=dict)
+    pre_market_in_cycle: dict[str, Any] = Field(default_factory=dict)
+    details: list[dict[str, Any]] = Field(default_factory=list)
+    cycleCalendarDays: int | None = None
+    emptyMessage: str | None = None
+
+
 class LogBriefResponse(ExtraAllowModel):
     logPath: str
     appended: int

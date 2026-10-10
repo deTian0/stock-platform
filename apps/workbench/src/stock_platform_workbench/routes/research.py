@@ -15,15 +15,21 @@ from stock_platform_execution.timing import market_now
 from stock_platform_providers import get_market_strategy
 from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
 from stock_platform_research import (
+    HIT_SESSION_TYPES,
+    PRE_MARKET,
+    HitTrackingConfig,
     UniverseEmptyError,
     attach_strategy_ab,
     brief_to_orders,
     build_multi_day_pit_panel,
     compare_strategy_configs,
     default_performance_log_path,
+    format_hit_report,
+    hit_tracking_snapshot,
     list_strategy_configs,
     log_brief_decisions,
     open_brief_repository,
+    open_hit_repository,
     performance_summary,
     review_stored_brief,
     run_refresh,
@@ -34,6 +40,7 @@ from stock_platform_research import (
     summarize_factor_ic,
     summarize_factor_ic_from_rows,
     summarize_walk_forward,
+    track_brief_hits,
 )
 from stock_platform_research.rolling_review import resolve_asof_window, resolve_universe_symbols
 from stock_platform_research.strategy_config import default_strategy_config_dir
@@ -63,6 +70,7 @@ from ..openapi_models import (
     BriefSaveResponse,
     BriefToPaperResponse,
     FactorIcResponse,
+    HitTrackingResponse,
     IntelReportCrosswalkResponse,
     IntelReportPrefillResponse,
     LogBriefResponse,
@@ -101,6 +109,15 @@ def _brief_repo(request: Request):
     if override is not None:
         return override
     return open_brief_repository()
+
+
+def _hit_repo(request: Request):
+    """Resolve the hit-tracking repository (tests may set state.hit_repo)."""
+    state = request.app.state.workbench
+    override = getattr(state, "hit_repo", None)
+    if override is not None:
+        return override
+    return open_hit_repository()
 
 
 def _log_brief_to_performance(brief: dict[str, Any], *, holding: str = "5d") -> None:
@@ -938,6 +955,98 @@ def post_settle_performance(
     summary = settle_performance_log(path, get_daily=get_daily)
     summary["settleSource"] = settle_source
     return summary
+
+
+@router.get(
+    "/hit-tracking",
+    summary="命中追踪（三类累计）",
+    responses=ok200(HitTrackingResponse),
+)
+def get_hit_tracking(
+    request: Request,
+    asof: date | None = Query(None, description="参考日（判定周期是否在窗内）；默认最近默认 asof"),
+    session: str | None = Query(
+        None, description="明细筛选：pre_market | post_market（空=全部）"
+    ),
+    limit: int = Query(10, ge=1, le=200, description="周期内/明细取前 N"),
+    include_report: bool = Query(True, alias="includeReport", description="附 markdown 报告"),
+) -> dict[str, Any]:
+    """X3 只读：``pre_market`` / ``post_market`` / ``pre_market_in_cycle`` 三类累计 + 明细。
+
+    周期规则与 ``a-stock-engine`` 同源（10 交易日 ≈ 14 日历日、周期内再命中滑动延期、
+    同日同 session 去重）。空库返回中文 emptyMessage，不造假。
+    """
+    asof_d = _resolve_asof(request, asof)
+    repo = _hit_repo(request)
+    snap = hit_tracking_snapshot(repo, asof=asof_d.isoformat(), cycle_top_n=limit)
+    if session is not None and session not in HIT_SESSION_TYPES:
+        raise HTTPException(status_code=400, detail=f"session 须为 {HIT_SESSION_TYPES}")
+    snap["details"] = repo.details(session_type=session, limit=limit)
+    snap["cycleCalendarDays"] = HitTrackingConfig().cycle_calendar_days
+    total_codes = snap["pre_market"]["codeCount"] + snap["post_market"]["codeCount"]
+    snap["emptyMessage"] = (
+        None
+        if total_codes
+        else "暂无命中记录：先在「今日推荐」生成并落库，或在「同步命中」把已存推荐记入周期。"
+    )
+    snap["report"] = (
+        format_hit_report(repo, asof=asof_d.isoformat(), top_n=limit)
+        if include_report
+        else None
+    )
+    return snap
+
+
+class HitTrackRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asof: date | None = Field(None, description="命中日（默认最近默认 asof）")
+    session: str = Field(PRE_MARKET, description="pre_market | post_market")
+    boards: str = Field("quality", description="逗号分隔 board slug：quality/short_term/watchlist")
+    from_store: bool = Field(
+        True, alias="fromStore", description="True=读已存 brief；False=临时生成"
+    )
+
+
+@router.post(
+    "/hit-tracking/track",
+    summary="同步推荐到命中追踪",
+    responses={**ok200(HitTrackingResponse), **RESP_400, **RESP_404, **RESP_RESEARCH},
+)
+def post_hit_tracking_track(request: Request, body: HitTrackRequest) -> dict[str, Any]:
+    """显式把某日推荐榜单记入命中周期（幂等：同日同 session 不重复计数）。"""
+    if body.session not in HIT_SESSION_TYPES:
+        raise HTTPException(status_code=400, detail=f"session 须为 {HIT_SESSION_TYPES}")
+    asof_d = _resolve_asof(request, body.asof)
+    if body.from_store:
+        record = _brief_repo(request).get_by_asof(asof_d.isoformat())
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到 asof={asof_d.isoformat()} 的已存推荐，无法同步命中",
+            )
+        brief: dict[str, Any] = dict(record.payload) if record.payload else record.to_dict()
+    else:
+        brief = _build_brief_for_request(
+            request,
+            asof=asof_d,
+            symbols=None,
+            top_n=10,
+            value_factor=False,
+            reversal_q=0.30,
+            adjust_kind=None,
+            soft_gates=True,
+        )
+    boards = tuple(b.strip() for b in str(body.boards or "").split(",") if b.strip())
+    tracked = track_brief_hits(
+        _hit_repo(request), brief, boards=boards or ("quality",), session_type=body.session
+    )
+    snap = hit_tracking_snapshot(_hit_repo(request), asof=asof_d.isoformat())
+    snap["tracked"] = tracked
+    snap["cycleCalendarDays"] = HitTrackingConfig().cycle_calendar_days
+    snap["report"] = format_hit_report(_hit_repo(request), asof=asof_d.isoformat())
+    snap["emptyMessage"] = None
+    return snap
 
 
 class LogBriefRequest(BaseModel):

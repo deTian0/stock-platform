@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 
 from .brief import build_premarket_brief, write_brief_csv
+from .hit_tracking import PRE_MARKET, open_hit_repository, track_brief_hits
 from .market_universe import resolve_universe
 from .panel import build_cross_section_panel, panel_to_csv
 from .persistence import open_brief_repository
@@ -34,6 +35,7 @@ class DailyPipelineReport:
     brief: dict[str, Any] | None = None
     brief_path: str | None = None
     panel_path: str | None = None
+    hits: dict[str, Any] | None = None
     error: str | None = None
     failures: list[dict[str, Any]] = field(default_factory=list)
 
@@ -64,6 +66,8 @@ def run_daily_pipeline(
     skip_refresh: bool = False,
     max_attempts: int = 3,
     persist_db: bool = True,
+    track_hits: bool = True,
+    hit_boards: list[str] | None = None,
     db_url: str | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
@@ -76,6 +80,10 @@ def run_daily_pipeline(
     ``X2``: pass ``holdings`` (book rows with ``code`` / ``entry_price``) to fill
     the ③A 持仓 and ③B 操作建议 boards; without it those two boards are empty by
     design (fail-closed, never guessed).
+
+    ``X3``: ``track_hits`` (default on) records the ②A recommendation head into the
+    hit cycle in the same SQLite (``hit_boards`` overrides the board set). Tracking
+    is best-effort — a failure lands on ``report.hits["error"]``, never on the brief.
     """
     if isinstance(asof, str):
         asof_d = date.fromisoformat(asof[:10])
@@ -168,6 +176,28 @@ def run_daily_pipeline(
             # Authority archive (U2); JSON under briefs/ remains optional export.
             open_brief_repository(db_url).save(brief, symbols=resolved)
 
+        # X3: record the pre-market recommendation head into the hit cycle.
+        # Tracking must never break the brief — any failure is captured, not raised.
+        hits_payload: dict[str, Any] | None = None
+        if track_hits:
+            try:
+                hit_repo = open_hit_repository(db_url)
+                tracked = track_brief_hits(
+                    hit_repo,
+                    brief,
+                    boards=tuple(hit_boards) if hit_boards else ("quality",),
+                    session_type=PRE_MARKET,
+                )
+                hits_payload = {
+                    "sessionType": tracked["sessionType"],
+                    "pickDate": tracked["pickDate"],
+                    "boards": tracked["boards"],
+                    "recorded": tracked["recorded"],
+                    "skipped": tracked["skipped"],
+                }
+            except Exception as exc:  # noqa: BLE001 — tracking is best-effort
+                hits_payload = {"recorded": 0, "error": f"{type(exc).__name__}: {exc}"}
+
         ok_report = DailyPipelineReport(
             asof=asof_s,
             ok=True,
@@ -185,6 +215,7 @@ def run_daily_pipeline(
             },
             brief_path=str(brief_json),
             panel_path=str(panel_path),
+            hits=hits_payload,
         )
         latest = {
             "asof": asof_s,
