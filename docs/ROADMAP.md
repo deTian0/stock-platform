@@ -10,6 +10,7 @@
 > 多仓能力盘点（合并输入）：[`plans/workspace-projects-capability-inventory.md`](plans/workspace-projects-capability-inventory.md)。  
 > **按能力域合并**（非整仓）：[`plans/capability-domain-merge-roadmap.md`](plans/capability-domain-merge-roadmap.md)（**Now / Next / Later 余量已 done**；**M-E4 实盘仍门禁**；见 v3.12.0）。  
 > **情报报告 Skill 配方**（非整仓）：[`plans/market-report-dashboard-merge-milestones.md`](plans/market-report-dashboard-merge-milestones.md)（**MR-1…MR-5** 见 v3.12.5；实盘 M-E4 仍门禁）。
+> **自有主线路线图（G/B/S/X/L/C 六域）**：[`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md)（**X 域 X1–X4 已收官**，关键路径推进至 `L1` 实盘立项门禁）。双线边界：[`plans/dual-line-responsibility.md`](plans/dual-line-responsibility.md)。
 > 文档总索引：[`README.md`](README.md)。
 
 ---

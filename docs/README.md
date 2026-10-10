@@ -7,7 +7,9 @@
 | 目录 / 文件 | 用途 |
 |-------------|------|
 | [`ROADMAP.md`](ROADMAP.md) | 里程碑总表（M0–M47 / Phase） |
-| [`plans/`](plans/) | 能力盘点、能力域合并、可用推荐 U 线、情报报告 MR 线、选型清单 |
+| [`plans/`](plans/) | 能力盘点、能力域合并、自有六域路线图、可用推荐 U 线、情报报告 MR 线、选型清单 |
+| [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) | 自有主线路线图（G/B/S/X/L/C 六域） |
+| [`plans/dual-line-responsibility.md`](plans/dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） |
 | [`architecture/`](architecture/) | ADR（编号递增） |
 | [`contracts/`](contracts/) | 对外契约（数据集、能力矩阵、市场策略、东财 HTTP 等） |
 | [`ops/`](ops/) | 运维：刷新、调度、live 启动、Skills 治理、诚实性说明 |
