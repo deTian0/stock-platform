@@ -1,0 +1,296 @@
+{
+  "all_mixed": {
+    "curve_sha256": "993020af39916f7470530c8073b7ba4a24ff5cdeb456bfe3cf74f9369beb6b63",
+    "final_equity": 53311.4,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.840028,
+      "avg_hold_days": 43.5,
+      "avg_invested_ratio": 0.287749,
+      "avg_positions": 1.47,
+      "avg_top_weight": 0.841338,
+      "by_asset": {
+        "etf": {
+          "avg_net_ret": 5.0521,
+          "n_trades": 2,
+          "turnover_notional": 40808.96,
+          "win_rate": 1.0
+        },
+        "stock": {
+          "avg_net_ret": 4.9834,
+          "n_trades": 4,
+          "turnover_notional": 80800.8,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.084154,
+      "calmar": 0.0,
+      "final_equity": 53311.4,
+      "max_drawdown": 0.0,
+      "max_positions": 4,
+      "n_days": 200,
+      "n_trades": 6,
+      "sharpe": 15.9586,
+      "sortino": 0.0,
+      "total_return": 0.066228,
+      "turnover_notional_per_year": 2.93,
+      "turnover_per_year": 7.6,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 6,
+    "trades_sha256": "165632f8b3254a148557e40dfbf0b51b68147ad8a6b3e5d720b92b50e806572a"
+  },
+  "cooldown_3": {
+    "curve_sha256": "073488015ded4aa7e2e63d2f9710db1c1de0a1c60be5df4d0296ce510662e208",
+    "final_equity": 52226.67,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.875043,
+      "avg_hold_days": 46.25,
+      "avg_invested_ratio": 0.208934,
+      "avg_positions": 1.055,
+      "avg_top_weight": 0.87659,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 4.9729,
+          "n_trades": 4,
+          "turnover_notional": 80964.0,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.056433,
+      "calmar": 0.0,
+      "final_equity": 52226.67,
+      "max_drawdown": 0.0,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 4,
+      "sharpe": 24.236,
+      "sortino": 0.0,
+      "total_return": 0.044533,
+      "turnover_notional_per_year": 1.99,
+      "turnover_per_year": 5.0,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 4,
+    "trades_sha256": "14688b30b52aacbaed33e50b08f7a6c68bbcceb19f7ed45d516635e1936befab"
+  },
+  "cost_off": {
+    "curve_sha256": "8a5b10c74fe8ce124094f21d6dc825d1914fca149863353fc7b6e86d77161f1e",
+    "final_equity": 53940.0,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.917504,
+      "avg_hold_days": 46.5,
+      "avg_invested_ratio": 0.361675,
+      "avg_positions": 1.105,
+      "avg_top_weight": 0.917926,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 5.1012,
+          "n_trades": 4,
+          "turnover_notional": 134604.8,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.100286,
+      "calmar": 0.0,
+      "final_equity": 53940.0,
+      "max_drawdown": 0.0,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 4,
+      "sharpe": 27.4927,
+      "sortino": 0.0,
+      "total_return": 0.0788,
+      "turnover_notional_per_year": 3.24,
+      "turnover_per_year": 5.0,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 4,
+    "trades_sha256": "badab9d047b2312b3f121f31aef58cfbec318cadea883c719e7da272f131159e"
+  },
+  "etf_only": {
+    "curve_sha256": "812f79215f2fe760e971c1bc736602d39dab3f264a19e9e8eccea788849b3504",
+    "final_equity": 52712.51,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.892505,
+      "avg_hold_days": 43.0,
+      "avg_invested_ratio": 0.228846,
+      "avg_positions": 1.14,
+      "avg_top_weight": 0.893119,
+      "by_asset": {
+        "etf": {
+          "avg_net_ret": 5.0313,
+          "n_trades": 5,
+          "turnover_notional": 103184.12,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.068831,
+      "calmar": 0.0,
+      "final_equity": 52712.51,
+      "max_drawdown": 0.0,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 5,
+      "sharpe": 34.7484,
+      "sortino": 0.0,
+      "total_return": 0.05425,
+      "turnover_notional_per_year": 2.52,
+      "turnover_per_year": 6.3,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 5,
+    "trades_sha256": "aac22a0382a8ed8079723021fd2b1530f8ebe998169d7d1796379068d43accb3"
+  },
+  "single_code": {
+    "curve_sha256": "d21ed774b3b360bac500e772770af40b8644a576235b1f36e96bb94d01746dcd",
+    "final_equity": 55773.18,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.965,
+      "avg_hold_days": 29.0,
+      "avg_invested_ratio": 0.318689,
+      "avg_positions": 0.965,
+      "avg_top_weight": 0.965,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 5.0325,
+          "n_trades": 6,
+          "turnover_notional": 208772.0,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.147609,
+      "calmar": 0.0,
+      "final_equity": 55773.18,
+      "max_drawdown": 0.0,
+      "max_positions": 1,
+      "n_days": 200,
+      "n_trades": 6,
+      "sharpe": 138.2688,
+      "sortino": 0.0,
+      "total_return": 0.115464,
+      "turnover_notional_per_year": 4.96,
+      "turnover_per_year": 7.6,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 6,
+    "trades_sha256": "21a2e759c4bb88a5a1858f5959944f1108de1b040e0571b59f0554e9202cbaae"
+  },
+  "slippage_50bp": {
+    "curve_sha256": "8c08b2056655b550bc620fe4ff59baa2f7306ab2438f1a368c5be583516ccb6d",
+    "final_equity": 53184.4,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.912505,
+      "avg_hold_days": 50.75,
+      "avg_invested_ratio": 0.366435,
+      "avg_positions": 1.115,
+      "avg_top_weight": 0.912992,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 4.4191,
+          "n_trades": 4,
+          "turnover_notional": 135381.76,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.080901,
+      "calmar": 27.3608,
+      "final_equity": 53184.4,
+      "max_drawdown": -0.002957,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 4,
+      "sharpe": 11.7903,
+      "sortino": 3.7041,
+      "total_return": 0.063688,
+      "turnover_notional_per_year": 3.28,
+      "turnover_per_year": 5.0,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 4,
+    "trades_sha256": "a2df1fc979c054eb12fc515034976eb2e76268f11549b3074949621afffc90b8"
+  },
+  "stock_baseline": {
+    "curve_sha256": "bbd433683a2009a7a91a6706e907a3f199298e67ac525036e011b8ddf0d11ce0",
+    "final_equity": 52305.93,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.920043,
+      "avg_hold_days": 46.25,
+      "avg_invested_ratio": 0.217332,
+      "avg_positions": 1.1,
+      "avg_top_weight": 0.92159,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 4.9834,
+          "n_trades": 4,
+          "turnover_notional": 80800.8,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.058454,
+      "calmar": 0.0,
+      "final_equity": 52305.93,
+      "max_drawdown": 0.0,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 4,
+      "sharpe": 26.4756,
+      "sortino": 0.0,
+      "total_return": 0.046119,
+      "turnover_notional_per_year": 1.98,
+      "turnover_per_year": 5.0,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 4,
+    "trades_sha256": "f96a14f7c284119bf153aa47f9840379e4a2233d3e39846979fa5090fa75ffdc"
+  },
+  "verbatim_scale": {
+    "curve_sha256": "bbd433683a2009a7a91a6706e907a3f199298e67ac525036e011b8ddf0d11ce0",
+    "final_equity": 52305.93,
+    "initial_capital": 50000.0,
+    "metrics": {
+      "avg_hhi": 0.920043,
+      "avg_hold_days": 46.25,
+      "avg_invested_ratio": 0.217332,
+      "avg_positions": 1.1,
+      "avg_top_weight": 0.92159,
+      "by_asset": {
+        "stock": {
+          "avg_net_ret": 4.9834,
+          "n_trades": 4,
+          "turnover_notional": 80800.8,
+          "win_rate": 1.0
+        }
+      },
+      "cagr": 0.058454,
+      "calmar": 0.0,
+      "final_equity": 52305.93,
+      "max_drawdown": 0.0,
+      "max_positions": 2,
+      "n_days": 200,
+      "n_trades": 4,
+      "sharpe": 26.4756,
+      "sortino": 0.0,
+      "total_return": 0.046119,
+      "turnover_notional_per_year": 1.98,
+      "turnover_per_year": 5.0,
+      "win_rate": 1.0
+    },
+    "n_days": 200,
+    "trade_count": 4,
+    "trades_sha256": "f96a14f7c284119bf153aa47f9840379e4a2233d3e39846979fa5090fa75ffdc"
+  }
+}

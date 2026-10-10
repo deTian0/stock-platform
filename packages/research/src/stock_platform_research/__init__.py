@@ -15,6 +15,24 @@ from .backtest import (
     trade_cost,
 )
 from .batch import score_cross_section, score_cross_section_csv
+from .book_replay import (
+    EntryContext,
+    ReplayParams,
+    replay_book,
+    screener_entry_provider,
+)
+from .picks_backtest import (
+    PICK_LEDGER_FILENAME,
+    append_picks_ledger,
+    compare_picks_vs_screener,
+    default_picks_ledger_path,
+    load_picks_ledger,
+    normalize_picks,
+    picks_entry_provider,
+    picks_from_brief,
+    picks_schedule,
+    run_picks_backtest,
+)
 from .brief import (
     brief_to_orders,
     build_premarket_brief,
@@ -149,9 +167,12 @@ __all__ = [
     "DailyPipelineReport",
     "DriftDecision",
     "DriftPolicy",
+    "EntryContext",
     "ExitDecision",
     "ExitPolicy",
+    "PICK_LEDGER_FILENAME",
     "PositionState",
+    "ReplayParams",
     "SqliteBriefRepository",
     "SqliteHitTrackingRepository",
     "HIT_SESSION_TYPES",
@@ -170,10 +191,12 @@ __all__ = [
     "advance_peak",
     "aggregate_oos",
     "align_fills_to_performance",
+    "append_picks_ledger",
     "apply_entry_gates",
     "apply_risk_gates",
     "assert_no_lookahead_columns",
     "attach_strategy_ab",
+    "compare_picks_vs_screener",
     "compute_features",
     "compute_metrics",
     "drawdown_series",
@@ -266,6 +289,15 @@ __all__ = [
     "summarize_walk_forward",
     "universe_size_guidance",
     "write_brief_csv",
+    "default_picks_ledger_path",
+    "load_picks_ledger",
+    "normalize_picks",
+    "picks_entry_provider",
+    "picks_from_brief",
+    "picks_schedule",
+    "replay_book",
+    "run_picks_backtest",
+    "screener_entry_provider",
 ]
 
-__version__ = "4.0.3"
+__version__ = "4.0.4"

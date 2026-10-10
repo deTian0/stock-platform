@@ -30,6 +30,16 @@ This module adds the missing layer on top of the **same** kernels
   review (:func:`position_review.review_positions`) calls — one definition, two
   call paths, no room for the two to drift
 
+``X4`` (picks ↔ backtest parity)
+--------------------------------
+The daily loop itself no longer lives here. It is the **single definition**
+:func:`book_replay.replay_book`, and this module is now a thin wrapper that only
+supplies the *screener* entry provider
+(:func:`book_replay.screener_entry_provider`). The logged-picks path
+(:func:`picks_backtest.run_picks_backtest`) calls the **very same** loop with a
+different provider, so a recommendation and a backtest position are judged by one
+engine. ``tests/test_book_replay.py`` pins the pre-``X4`` numbers bit for bit.
+
 Data source is injected as a plain ``bars`` DataFrame (``code`` / ``date`` /
 ``close``, optional ``pct_chg``). This module never opens SQLite and never
 imports providers — the caller owns read-only ``market.db`` access.
@@ -52,13 +62,21 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 
 from __future__ import annotations
 
-import math
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 import pandas as pd
 
-from .gates import apply_entry_gates
-from .lvrev import score_lvrev
+from .book_replay import (  # noqa: F401 (re-export: X4 shared replay loop)
+    EntryCandidate,
+    EntryContext,
+    EntryProvider,
+    ReplayParams,
+    empty_result,
+    replay_book,
+    screener_entry_provider,
+)
+from .gates import apply_entry_gates  # noqa: F401 (screener policy, re-exported)
+from .lvrev import score_lvrev  # noqa: F401 (screener policy, re-exported)
 from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + B4 asset classes)
     DEFAULT_COMMISSION_RATE,
     DEFAULT_STAMP_SELL_RATE,
@@ -95,6 +113,9 @@ UNIVERSES = ("stock", "etf", "all")
 # ``B5``: ``PositionState`` (in ``rules``) is the shared position record; the old
 # private name is kept as an alias so the rest of this module reads unchanged.
 _Position = PositionState
+
+# ``X4``: the pre-refactor private empty-result helper is now the shared one.
+_empty_result = empty_result
 
 
 def compute_features(bars: pd.DataFrame, *, pct_scale: str = "auto") -> pd.DataFrame:
@@ -177,17 +198,38 @@ def compute_features(bars: pd.DataFrame, *, pct_scale: str = "auto") -> pd.DataF
     return out
 
 
-def _empty_result(initial_capital: float, reason: str) -> dict[str, Any]:
-    return {
-        "ok": False,
-        "reason": reason,
-        "equity_curve": [],
-        "trades": [],
-        "metrics": compute_metrics([], [], initial_capital=initial_capital),
-        "environment": "SIMULATE",
-        "liveTradingEnabled": False,
-        "disclaimer": "Research only; not investment advice.",
-    }
+def prepare_book_frame(
+    bars: pd.DataFrame,
+    *,
+    universe: str = "stock",
+    exclude_funds: bool | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    pct_scale: str = "auto",
+) -> pd.DataFrame:
+    """The shared ``bars`` → tradable feature frame step (``X4``).
+
+    Applies, in order: ``compute_features`` → the ``universe`` filter → the
+    ``start`` / ``end`` window slice. Both the screener backtest and the
+    logged-picks replay call this, so the two paths cannot disagree about which
+    rows are tradable.
+    """
+    if exclude_funds is not None:
+        universe = "stock" if exclude_funds else "all"
+    universe = str(universe).strip().lower()
+    if universe not in UNIVERSES:
+        raise ValueError(f"universe must be one of {UNIVERSES}, got {universe!r}")
+
+    feats = compute_features(bars, pct_scale=pct_scale)
+    if universe == "stock":
+        feats = feats[~feats["code"].map(is_fund)]
+    elif universe == "etf":
+        feats = feats[feats["code"].map(is_etf)]
+    if start is not None:
+        feats = feats[feats["trade_date"] >= pd.Timestamp(start)]
+    if end is not None:
+        feats = feats[feats["trade_date"] <= pd.Timestamp(end)]
+    return feats
 
 
 def run_portfolio_backtest(
@@ -249,6 +291,11 @@ def run_portfolio_backtest(
     ``drift_band = None`` (no 持仓偏差 rule), so the default run stays
     bit-for-bit the ``B1``–``B4`` baseline.
 
+    ``X4``: the loop itself is :func:`book_replay.replay_book` — the *same*
+    function the logged-picks replay (:func:`picks_backtest.run_picks_backtest`)
+    runs. This wrapper contributes only the screener entry provider, so the two
+    paths share one engine and cannot drift.
+
     ``pct_scale`` (default ``"auto"``) forwards to :func:`compute_features` and
     repairs the mixed-scale ``pct_chg`` dump, so the price-limit checks receive
     percent points rather than whatever the loader left in the column. This
@@ -273,183 +320,53 @@ def run_portfolio_backtest(
     )
     cooldown_policy = CooldownPolicy(cooldown_days=int(cooldown_days))
     drift_policy = DriftPolicy(band=drift_band)
-
     cost_model = CostModel(
         commission_rate=commission_rate,
         stamp_sell_rate=stamp_sell_rate,
         slippage_bps=slippage_bps,
         min_commission=min_commission,
     )
-    feats = compute_features(bars, pct_scale=pct_scale)
-    if universe == "stock":
-        feats = feats[~feats["code"].map(is_fund)]
-    elif universe == "etf":
-        feats = feats[feats["code"].map(is_etf)]
-    if start is not None:
-        feats = feats[feats["trade_date"] >= pd.Timestamp(start)]
-    if end is not None:
-        feats = feats[feats["trade_date"] <= pd.Timestamp(end)]
+
+    feats = prepare_book_frame(
+        bars,
+        universe=universe,
+        start=start,
+        end=end,
+        pct_scale=pct_scale,
+    )
     if feats.empty:
-        return _empty_result(initial_capital, "no bars in range")
+        return empty_result(initial_capital, "no bars in range")
 
-    cash = float(initial_capital)
-    positions: dict[str, _Position] = {}
-    last_exit_idx: dict[str, int] = {}  # B5 冷静期 bookkeeping (no-op at default)
-    equity_curve: list[dict[str, Any]] = []
-    trades: list[dict[str, Any]] = []
-
-    for di, (day, frame) in enumerate(feats.groupby("trade_date", sort=True)):
-        day_str = day.date().isoformat()
-        px_by_code = dict(zip(frame["code"], frame["close"]))
-
-        # --- 1. position review at today's close ---
-        to_close: list[str] = []
-        pct_by_code = (
-            dict(zip(frame["code"], frame["pct_chg"])) if "pct_chg" in frame.columns else {}
-        )
-        for code, pos in list(positions.items()):
-            px = px_by_code.get(code)
-            if px is None or pd.isna(px) or float(px) <= 0:
-                continue  # suspended / no bar: hold, retry next session
-            px = float(px)
-            # limit-down: sell order sealed, cannot fill today -> roll to next session
-            if is_limit_down(code, pct_by_code.get(code)):
-                continue
-            # B5: peak advance + the exit decision itself come from the shared
-            # rules layer — the online review calls the very same functions.
-            pos.peak = advance_peak(pos.peak, px)
-            held = di - pos.entry_idx
-
-            row_ma20 = frame.loc[frame["code"] == code, "ma20"]
-            row_ma60 = frame.loc[frame["code"] == code, "ma60"]
-            ma20 = float(row_ma20.iloc[0]) if len(row_ma20) else None
-            ma60 = float(row_ma60.iloc[0]) if len(row_ma60) else None
-
-            decision = evaluate_exit(
-                px=px,
-                entry_price=pos.entry_price,
-                target=pos.target,
-                peak=pos.peak,
-                held_days=held,
-                ma20=ma20,
-                ma60=ma60,
-                policy=exit_policy,
-            )
-
-            if decision is not None:
-                reason = decision.reason
-                # Fill at the slipped price; both legs price through the shared
-                # CostModel so the basis is symmetric with the buy side.
-                sell_fill = cost_model.fill_price(px, is_buy=False)
-                gross_fill = pos.shares * sell_fill
-                proceeds = gross_fill - cost_model.costs(gross_fill, code, is_buy=False)
-                entry_notional = pos.shares * pos.entry_price
-                cost_basis = entry_notional + cost_model.costs(
-                    entry_notional, code, is_buy=True
-                )
-                cash += proceeds
-                trades.append(
-                    {
-                        "code": code,
-                        "asset_class": asset_class(code),
-                        "entry_idx": pos.entry_idx,
-                        "exit_idx": di,
-                        "held_days": held,
-                        "entry_price": pos.entry_price,
-                        "exit_price": sell_fill,
-                        "entry_value": round(entry_notional, 2),
-                        "exit_value": round(gross_fill, 2),
-                        "gross_ret": round((sell_fill / pos.entry_price - 1.0) * 100.0, 4),
-                        "net_ret": round((proceeds / cost_basis - 1.0) * 100.0, 4)
-                        if cost_basis
-                        else 0.0,
-                        "reason": reason,
-                        "exit_date": day_str,
-                    }
-                )
-                last_exit_idx[code] = di
-                to_close.append(code)
-        for code in to_close:
-            del positions[code]
-
-        # --- 2. mark to market (+ same-day concentration scalars) ---
-        total = cash
-        holdings: list[float] = []
-        for pos in positions.values():
-            px = px_by_code.get(pos.code)
-            mv = pos.shares * (float(px) if px and not pd.isna(px) else pos.entry_price)
-            total += mv
-            holdings.append(mv)
-        held_value = sum(holdings)
-        equity_curve.append(
-            {
-                "date": day_str,
-                "equity": round(total, 2),
-                "n_positions": len(positions),
-                # B2: same-day concentration (HHI over holding market values,
-                # cash excluded) + how much equity was actually deployed.
-                "hhi": round(hhi(holdings), 6),
-                "top_weight": round(max(holdings) / held_value, 6) if held_value > 0 else 0.0,
-                "invested_ratio": round(held_value / total, 6) if total > 0 else 0.0,
-            }
-        )
-
-        # --- 3. entries at today's close ---
-        tradable = True if regime is None else bool(regime.get(day_str, True))
-        if not tradable or len(positions) >= max_positions:
-            continue
-
-        scored = score_lvrev(frame, value_factor=value_factor, weights=weights)
-        mask = apply_entry_gates(scored, reversal_q=reversal_q)
-        elig = scored.loc[mask]
-        elig = elig[elig["composite_score"] >= min_pick_score]
-        if elig.empty:
-            continue
-        elig = elig[~elig["code"].isin(positions)]
-
-        slot_value = total / max_positions
-        for _, row in elig.head(max_picks_per_day).iterrows():
-            if len(positions) >= max_positions:
-                break
-            code = row["code"]
-            px = float(row["close"])  # reference close — signal / limit checks only
-            if px <= 0 or pd.isna(px):
-                continue
-            # limit-up: cannot fill a buy at the sealed price (shared rule)
-            if is_limit_up(code, row.get("pct_chg")):
-                continue
-            # B5 冷静期: skip a code still inside its post-exit cooldown window
-            # (no-op at the default ``cooldown_days = 0``).
-            if cooldown_policy.blocks(last_exit_idx=last_exit_idx.get(code), current_idx=di):
-                continue
-            fill = cost_model.fill_price(px, is_buy=True)
-            budget = min(cash, slot_value)
-            shares = math.floor(budget / fill / lot_size) * lot_size
-            if shares <= 0:
-                continue
-            gross = shares * fill
-            cost = gross + cost_model.costs(gross, code, is_buy=True)
-            if cost > cash:
-                continue
-            cash -= cost
-            positions[code] = _Position(
-                code=code,
-                entry_price=fill,
-                shares=float(shares),
-                entry_idx=di,
-                target=exit_policy.target_price(fill),
-                peak=fill,
-            )
+    loop = replay_book(
+        feats,
+        entry_provider=screener_entry_provider(
+            reversal_q=reversal_q,
+            min_pick_score=min_pick_score,
+            value_factor=value_factor,
+            weights=weights,
+        ),
+        params=ReplayParams(
+            initial_capital=initial_capital,
+            max_positions=max_positions,
+            max_picks_per_day=max_picks_per_day,
+            lot_size=lot_size,
+            exit_policy=exit_policy,
+            cooldown_policy=cooldown_policy,
+            cost_model=cost_model,
+            regime=regime,
+        ),
+    )
 
     return {
         "ok": True,
-        "equity_curve": equity_curve,
-        "trades": trades,
-        "n_days": len(equity_curve),
-        "final_equity": equity_curve[-1]["equity"] if equity_curve else float(initial_capital),
-        "initial_capital": initial_capital,
+        "equity_curve": loop["equity_curve"],
+        "trades": loop["trades"],
+        "open_positions": loop.get("open_positions") or [],
+        "n_days": loop["n_days"],
+        "final_equity": loop["final_equity"],
+        "initial_capital": loop["initial_capital"],
         "metrics": compute_metrics(
-            equity_curve, trades, initial_capital=initial_capital
+            loop["equity_curve"], loop["trades"], initial_capital=initial_capital
         ),
         "params": {
             "max_picks_per_day": max_picks_per_day,
