@@ -8,6 +8,33 @@
 
 - （无）
 
+## [4.0.5] - 2026-10-10
+
+### Added
+
+- **双线职责边界（`C1`）**：新增 [`docs/plans/dual-line-responsibility.md`](docs/plans/dual-line-responsibility.md) —— 定边界 + 定归属 + 列判据（不做大规模代码合并）。
+  - 日常调度主链 = **引擎线**（`a-stock-engine`，08:30 盘前 / 15:30 盘后）；历史行情真相源 = `market.db`·`daily_price`（平台**只读**）；产品 / 研究权威 = **平台线**
+  - 5 组使用判据（日用 → 引擎；研究 / 回测 / 绩效 / 选股↔回测 → 平台；数据缺口 → 修生产侧；命中追踪 / 榜单 → 平台；实盘 → 都停）
+  - 数据归属表（承接 ADR 0058）+ 双方红线（平台不代抓不补写 / 引擎冻结新功能）
+  - 与路线图 / `ROADMAP` / `README` / ADR 0058 / `engine-market-db.md` 交叉链
+
+### Changed
+
+- **文档与 CI 一致性（`G3`）**：自有主线路线图 `trading-system-roadmap.md` 挂进 `docs/ROADMAP.md` 顶部焦点区与 `docs/README.md`；`docs/plans/README.md` 陈旧状态刷新
+- **补齐 `scripts/check_docs.ps1` 的 `$required` 三处遗漏**：`trading-system-roadmap.md`（主路线图竟未登记）/ `b3-cost-model-milestone.md` / 新 C1 文档 —— `files` **128 → 131**
+- 版本号 `4.0.4` → **`4.0.5`**
+
+### Verified
+
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.5，docs `files=131` / `md=158`）
+- CI `monorepo` job 确认：5 包 editable 安装 + `pytest packages apps`（`STOCK_PLATFORM_PROVIDER_PRESET=replay`）
+- 全量 `pytest packages apps`（`replay`）= **786 passed / 0 failed**（纯文档里程碑，计数不变）
+
+### Docs
+
+- 新增 `docs/plans/dual-line-responsibility.md`（已登记 `scripts/check_docs.ps1`）
+- 路线图 `G3` / `C1` 标 `done（2026-10-10）`；**G 域（G1–G3）全部收官**
+
 ## [4.0.4] - 2026-10-10
 
 ### Added

@@ -300,4 +300,4 @@ __all__ = [
     "screener_entry_provider",
 ]
 
-__version__ = "4.0.4"
+__version__ = "4.0.5"
