@@ -8,6 +8,33 @@
 
 - （无）
 
+## [4.1.1] - 2026-10-10
+
+### Added
+
+- **因子库扩展与 IC/ICIR 正交准入（`S2`）**：新增 `research.factors` 因子库**单点**（`FACTOR_LIBRARY` / `FactorSpec`），在 lvrev 已加权的 `low_vol` / `reversal` 之外新增三个候选 —— `long_reversal`（6 个月反转，`-(close.shift(20)/close.shift(120)-1)`，**跳过最近一月**）/ `max_ret`（20 日单日最大涨幅·彩票偏好）/ `illiq`（Amihud 非流动性 `mean(|ret1|/amount)×1e9`）；`build_feature_frame` 复用 `compute_features` 唯一 PIT/复权点（仅 `keep_extra=("vol","amount")`）；`factor_correlation` **scipy-free**。ADR [`0061`](docs/architecture/0061-factor-library-admission.md)
+  - `factor_ic` 增**准入闸门** `admit_factor`（`n_dates≥20` / `|IC|≥0.02` / `|ICIR|≥0.15` / **符号一致**，全过才启用）+ **正交选择** `select_enabled`（与已启用因子 `|Spearman ρ|≥0.70` 判**冗余** → 不启用）+ `build_factor_ic_report`
+  - `compute_features` 加 `keep_extra`（**默认空** → 既有调用逐位不变）；`lvrev` 加 `W_S2` 且 `factor_scores` 补 `momentum` / `max_ret` / `illiq` 列（缺列填中性 `0.5`，默认权重 `0` → 基线精确等价）
+- CLI `stock-platform-factor-ic`（`--db/--start/--end/--horizon/--sample-every/--min-names/--universe/--factors/--min-abs-ic/--min-abs-icir/--min-dates/--correlation/--json`，只读 `market.db`）
+- API `POST /api/research/factor/admission`（只读 `market.db`；未知因子 **400** / 无 DB **503** fail-closed）
+- Workbench `#factor-library` 面板（判定表 + 启用/冗余/否决 + 相关矩阵，手写零新依赖）
+- 契约 [`docs/contracts/factor-library.md`](docs/contracts/factor-library.md) + 实测 [`docs/ops/factor-ic-benchmark.md`](docs/ops/factor-ic-benchmark.md)
+
+### Changed
+
+- 版本号 `4.1.0` → **`4.1.1`**
+
+### Verified
+
+- **真机 `market.db` 验收**（全周期，`horizon=20` / `sample_every=5` → **324 个采样截面**）：`long_reversal` IC **+0.033** / ICIR **+0.198**、`illiq` IC **+0.077** / ICIR **+0.798** **启用**（满足「≥2 个正交因子」）；`max_ret`（IC −0.094 / ICIR −0.572）与 `low_vol` 相关 **+0.876** → **冗余不启用**（`enabled=['low_vol','reversal','illiq','long_reversal']` / `redundant=['max_ret']`）
+- 默认档 `W_DEFAULT`（`vol=0.5, rev=0.5`）**逐位不变**；`compute_features` 既有调用逐位不变
+- 聚焦测试：research `45 passed`、workbench `146 passed`（端点目录 62 → **63**）
+
+### Docs
+
+- 新增 `docs/architecture/0061-factor-library-admission.md` + `docs/contracts/factor-library.md` + `docs/ops/factor-ic-benchmark.md`（均已登记 `scripts/check_docs.ps1`）
+- 路线图 `S2` 标 `done（2026-10-10）`，目标 tag 顺延 `v3.14.1` → `v4.1.1`
+
 ## [4.1.0] - 2026-10-10
 
 ### Added

@@ -21,6 +21,7 @@
       <a href="#hits" title="命中周期（10 交易日≈14 日历日）">命中追踪</a>
       <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
+      <a href="#factor-library" title="因子库 IC/ICIR 准入">因子库</a>
       <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
       <a href="#intel-report" title="情报报告模板（只读配方）">情报报告</a>
       <a href="#market-tools">行情工具</a>
@@ -102,6 +103,7 @@
           <a href="#backtest">滚动回测</a>
           <a href="#performance">推荐绩效</a>
           <a href="#strategy-compare">策略对比</a>
+          <a href="#factor-library">因子库</a>
           <a href="#tsp-subset">accuracy 图</a>
         </div>
       </div>
@@ -1431,6 +1433,57 @@
             <pre id="ab-engine-json" class="code"></pre>
           </details>
         </div>
+      </div>
+    </section>
+
+    <section id="factor-library" class="panel">
+      <h2>因子库 · IC/ICIR 准入（S2）</h2>
+      <p class="hint">
+        在 lvrev（低波 0.5 + 反转 0.5）之外评估正交因子：低波动 / 短期反转 /
+        <b>6 个月反转</b> / <b>极端收益 MAX</b> / <b>Amihud 非流动性</b>。
+        每个因子按 Rank IC 与 ICIR 过闸门，<b>不达标不启用</b>；与已启用因子 |ρ| ≥ 0.70 视为冗余。
+        只读 <code>market.db</code>，SIMULATE，不进每日推荐主路径。
+      </p>
+      <form id="factor-library-form" class="row">
+        <label>起 <input id="factor-library-start" type="date" /></label>
+        <label>止 <input id="factor-library-end" type="date" /></label>
+        <label>前瞻(交易日) <input id="factor-library-horizon" type="number" min="1" max="250" value="20" /></label>
+        <label>采样间隔 <input id="factor-library-sample" type="number" min="1" max="60" value="5" /></label>
+        <label>universe
+          <select id="factor-library-universe">
+            <option value="stock" selected>stock</option>
+            <option value="etf">etf</option>
+            <option value="all">all</option>
+          </select>
+        </label>
+        <label class="check"><input id="factor-library-corr" type="checkbox" checked /> 相关矩阵</label>
+        <button type="submit" id="btn-factor-library-go">运行准入</button>
+      </form>
+      <p id="factor-library-meta" class="status" aria-live="polite"></p>
+      <pre id="factor-library-error" class="error" hidden></pre>
+      <div id="factor-library-result" hidden>
+        <p id="factor-library-verdict" class="status"></p>
+        <div class="table-wrap">
+          <table id="factor-library-table">
+            <thead>
+              <tr>
+                <th>因子</th>
+                <th>说明</th>
+                <th class="num">mean IC</th>
+                <th class="num">ICIR</th>
+                <th class="num">n</th>
+                <th>裁决</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6">尚未运行（无 DB 时 fail-closed）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="raw-json">
+          <summary>原始 JSON</summary>
+          <pre id="factor-library-json" class="code"></pre>
+        </details>
       </div>
     </section>
 

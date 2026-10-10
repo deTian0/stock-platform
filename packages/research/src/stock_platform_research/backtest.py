@@ -62,7 +62,7 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
@@ -118,10 +118,17 @@ _Position = PositionState
 _empty_result = empty_result
 
 
-def compute_features(bars: pd.DataFrame, *, pct_scale: str = "auto") -> pd.DataFrame:
+def compute_features(
+    bars: pd.DataFrame,
+    *,
+    pct_scale: str = "auto",
+    keep_extra: Sequence[str] = (),
+) -> pd.DataFrame:
     """Per-code rolling features. Uses only bars up to each date (PIT-safe).
 
     Adds ``trade_date`` / ``ret1`` / ``vol20`` / ``rev_chg`` / ``ma20`` / ``ma60``.
+    ``keep_extra`` optionally carries additional raw columns (e.g. ``vol`` /
+    ``amount`` for the ``S2`` factor library) through the adjustment step.
     Rolling windows require a full history (``min_periods`` == window), so the
     first N bars per code produce NaN and are naturally gated out.
 
@@ -187,13 +194,17 @@ def compute_features(bars: pd.DataFrame, *, pct_scale: str = "auto") -> pd.DataF
 
     # Full-market runs hold ~8.8M rows; keep only what the loop needs and
     # downcast to shrink the peak footprint (float32 is ample for prices).
+    # ``keep_extra`` opts a caller into carrying raw columns through the
+    # adjustment step (e.g. the S2 factor library needs ``vol`` / ``amount``);
+    # default ``()`` keeps the legacy column set byte-identical.
     keep = [
         "code", "trade_date", "close", "pct_chg",
         "ret1", "vol20", "rev_chg", "ma20", "ma60",
+        *keep_extra,
     ]
     out = df[[c for c in keep if c in df.columns]].copy()
-    for col in ("close", "pct_chg", "ret1", "vol20", "rev_chg", "ma20", "ma60"):
-        if col in out.columns:
+    for col in ("close", "pct_chg", "ret1", "vol20", "rev_chg", "ma20", "ma60", *keep_extra):
+        if col in out.columns and pd.api.types.is_numeric_dtype(out[col]):
             out[col] = out[col].astype("float32")
     return out
 

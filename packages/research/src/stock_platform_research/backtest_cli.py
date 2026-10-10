@@ -36,6 +36,7 @@ def load_engine_bars(
     start: str | None = None,
     end: str | None = None,
     codes: list[str] | None = None,
+    with_amount: bool = False,
 ) -> pd.DataFrame:
     """Bulk, read-only load of ``daily_price`` into a bars DataFrame.
 
@@ -53,7 +54,12 @@ def load_engine_bars(
 
     So we always stream the whole column set and filter/sort in memory.
     """
-    sql = "SELECT code, date, close, pct_chg FROM daily_price"
+    columns = "code, date, close, pct_chg"
+    if with_amount:
+        # S2 factor library needs the raw ``vol`` / ``amount``; opt-in so the
+        # default column set stays byte-identical for existing callers.
+        columns += ", vol, amount"
+    sql = f"SELECT {columns} FROM daily_price"
 
     uri = "file:%s?mode=ro" % str(db_path).replace("\\", "/")
     con = sqlite3.connect(uri, uri=True)

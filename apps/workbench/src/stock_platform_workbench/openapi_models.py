@@ -422,6 +422,25 @@ class FactorIcResponse(ExtraAllowModel):
     liveTradingEnabled: bool | None = False
 
 
+class FactorAdmissionResponse(ExtraAllowModel):
+    ok: bool | None = None
+    horizon: int | None = None
+    sampleEvery: int | None = None
+    minNames: int | None = None
+    nDates: int | None = None
+    factors: dict[str, Any] | None = None
+    enabled: list[str] = Field(default_factory=list)
+    disabled: list[str] = Field(default_factory=list)
+    reason: str | None = None
+    dbSource: str | None = None
+    universe: str | None = None
+    start: str | None = None
+    end: str | None = None
+    correlation: dict[str, Any] | None = None
+    environment: str | None = "SIMULATE"
+    liveTradingEnabled: bool | None = False
+
+
 class RollingBacktestResponse(ExtraAllowModel):
     ok: bool = True
     days: list[dict[str, Any]] = Field(default_factory=list)
