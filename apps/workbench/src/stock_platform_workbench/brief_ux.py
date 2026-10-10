@@ -200,6 +200,7 @@ def _run_brief(
     daily_provider: Any,
     soft_gates: bool,
     universe_tier: str | None = None,
+    holdings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     adj = None
     adjust_fn = None
@@ -225,6 +226,7 @@ def _run_brief(
         value_factor=value_factor,
         reversal_q=reversal_q,
         soft_gates=soft_gates,
+        holdings=holdings,
     )
 
 
@@ -263,6 +265,7 @@ def _run_fallback_brief(
     soft_gates: bool,
     notes: list[str],
     universe_tier: str | None = None,
+    holdings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Apply explicit fallback provider; align asof when switching to replay fixtures."""
     fb = _fallback_daily_provider(state, primary_name)
@@ -285,11 +288,37 @@ def _run_fallback_brief(
         daily_provider=alt,
         soft_gates=soft_gates,
         universe_tier=universe_tier,
+        holdings=holdings,
     )
     brief["providerFallback"] = True
     brief["providerFallbackFrom"] = primary_name
     brief["provider"] = getattr(alt, "name", type(alt).__name__)
     return brief
+
+
+ENV_HOLDINGS_PATH = "STOCK_PLATFORM_HOLDINGS_PATH"
+
+
+def load_holdings_book(path: str | None = None) -> tuple[list[dict[str, Any]], str | None]:
+    """Read the local book that feeds the ③A / ③B boards (``X2``).
+
+    Single reader: ``research.position_review_cli.load_holdings`` — the same one
+    the position-review CLI uses, so the JSON shape cannot drift. Returns
+    ``(rows, note)``; any failure is **fail-closed** (empty rows + Chinese note),
+    never a fabricated book.
+    """
+    raw = (path or os.environ.get(ENV_HOLDINGS_PATH, "") or "").strip()
+    if not raw:
+        return [], None
+    try:
+        from stock_platform_research.position_review_cli import load_holdings
+
+        rows = load_holdings(raw)
+    except Exception as exc:  # noqa: BLE001 — book is optional input, never fatal
+        return [], f"持仓文件读取失败（③A/③B 榜单留空）：{type(exc).__name__}: {exc}"
+    if not rows:
+        return [], f"持仓文件为空：{raw}"
+    return rows, None
 
 
 def build_brief_with_fallback(
@@ -303,8 +332,13 @@ def build_brief_with_fallback(
     adjust_kind: str | None = "qfq",
     soft_gates: bool = True,
     universe_tier: str | None = None,
+    holdings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Build brief using matrix daily provider; optional explicit fallback on transport/empty."""
+    """Build brief using matrix daily provider; optional explicit fallback on transport/empty.
+
+    ``holdings`` fills the ③A / ③B boards (X2); ``None`` leaves them empty on
+    purpose (fail-closed — the UI must not invent a book).
+    """
     asof_d = asof or default_brief_asof(state)
     daily = state.resolve("daily")
     primary_name = getattr(daily, "name", type(daily).__name__)
@@ -330,6 +364,7 @@ def build_brief_with_fallback(
             daily_provider=daily,
             soft_gates=soft_gates,
             universe_tier=tier,
+            holdings=holdings,
         )
         provider_used = primary_name
     except UniverseEmptyError:
@@ -351,6 +386,7 @@ def build_brief_with_fallback(
             soft_gates=soft_gates,
             notes=notes,
             universe_tier=tier,
+            holdings=holdings,
         )
         if fb_brief is None:
             raise
@@ -371,6 +407,7 @@ def build_brief_with_fallback(
                 soft_gates=soft_gates,
                 notes=notes,
                 universe_tier=tier,
+                holdings=holdings,
             )
             if fb_brief is not None:
                 brief = fb_brief

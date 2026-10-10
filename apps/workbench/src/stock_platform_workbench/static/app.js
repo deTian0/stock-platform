@@ -1330,6 +1330,67 @@
       $("recommend-meta").textContent = metaBits.join(" · ");
     }
     renderStrategyAb(data && data.strategyAb);
+    renderRankings(data && data.rankings);
+  }
+
+  var BOARD_ORDER = ["quality", "short_term", "holdings", "actions", "watchlist"];
+
+  function renderRankings(rankings) {
+    var host = $("recommend-rankings");
+    var block = $("recommend-rankings-block");
+    var meta = $("recommend-rankings-meta");
+    if (!host || !block) return;
+    if (!rankings || !rankings.boards) {
+      block.hidden = true;
+      return;
+    }
+    block.hidden = false;
+    var html = "";
+    for (var i = 0; i < BOARD_ORDER.length; i++) {
+      var board = rankings.boards[BOARD_ORDER[i]];
+      if (!board) continue;
+      var items = board.items || [];
+      html +=
+        "<h4>" + escapeHtml(board.key || BOARD_ORDER[i]) + "（" + items.length + "）</h4>";
+      if (!items.length) {
+        html += '<p class="empty-hint">无（fail-closed：不生成占位条目）</p>';
+        continue;
+      }
+      html += '<div class="table-wrap table-compact"><table><thead><tr>';
+      if (board.slug === "actions") {
+        html += "<th>#</th><th>代码</th><th>动作</th><th class=\"num\">收益%</th><th>原因</th>";
+      } else {
+        html += "<th>#</th><th>代码</th><th class=\"num\">综合分</th><th class=\"num\">现价</th><th>说明</th>";
+      }
+      html += "</tr></thead><tbody>";
+      for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        html += "<tr>";
+        if (board.slug === "actions") {
+          html +=
+            td(it.rank) +
+            td(it.symbol) +
+            td(it.action) +
+            tdNum(it.ret_pct == null ? "—" : Number(it.ret_pct).toFixed(2)) +
+            td(it.reason);
+        } else {
+          var note = it.reasonSummary || "";
+          if (it.belowMedian) note += " ⚠️低于截面中位";
+          html +=
+            td(it.rank) +
+            td(it.symbol) +
+            tdNum(formatScore(it.composite_score)) +
+            tdNum(formatPrice(it.close)) +
+            td(note);
+        }
+        html += "</tr>";
+      }
+      html += "</tbody></table></div>";
+    }
+    host.innerHTML = html;
+    if (meta) {
+      meta.textContent = (rankings.notes || []).join(" · ");
+    }
   }
 
   function renderStrategyAb(ab) {

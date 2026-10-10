@@ -118,6 +118,14 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=f"Persist root (default env STOCK_PLATFORM_REFRESH_DIR or {default_refresh_dir()})",
     )
+    p.add_argument(
+        "--holdings",
+        default=None,
+        help=(
+            "X2: 持仓 JSON（list 或 {'holdings': [...]}，含 code/entry_price）"
+            "→ 填充 ③A 持仓 / ③B 操作建议；不传则两榜为空（fail-closed）"
+        ),
+    )
     p.add_argument("--top", type=int, default=10)
     p.add_argument("--lookback-days", type=int, default=120)
     p.add_argument("--max-attempts", type=int, default=3)
@@ -156,9 +164,15 @@ def main(argv: list[str] | None = None) -> int:
     provider = _build_provider(args)
     market_source = _build_market_symbol_source(args)
     asof = date.fromisoformat(args.asof)
+    holdings: list[dict[str, Any]] | None = None
+    if args.holdings:
+        from .position_review_cli import load_holdings  # single reader for holdings JSON
+
+        holdings = load_holdings(args.holdings)
     report = run_daily_pipeline(
         asof=asof,
         provider=provider,
+        holdings=holdings,
         out_dir=args.out,
         universe_path=args.universe,
         universe_tier=args.tier,
@@ -187,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
                 "asof": payload["asof"],
                 "stage": payload["stage"],
                 "briefPath": payload.get("brief_path"),
+                "rankingsCounts": (payload.get("brief") or {}).get("rankingsCounts") or None,
                 "provider": args.provider,
                 "error": payload.get("error"),
                 "settleAfter": settle_meta or None,

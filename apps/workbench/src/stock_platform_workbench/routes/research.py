@@ -43,6 +43,7 @@ from ..brief_ux import (
     build_brief_with_fallback,
     default_brief_asof,
     friendly_brief_error,
+    load_holdings_book,
     paper_now_iso_for_asof,
     recommend_defaults,
 )
@@ -162,6 +163,7 @@ def _build_brief_for_request(
     adjust_kind: str | None,
     soft_gates: bool = True,
     universe_tier: str | None = None,
+    holdings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     state = request.app.state.workbench
     try:
@@ -175,6 +177,7 @@ def _build_brief_for_request(
             adjust_kind=adjust_kind,
             soft_gates=soft_gates,
             universe_tier=universe_tier,
+            holdings=holdings,
         )
     except UniverseEmptyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -276,10 +279,16 @@ def get_brief(
         alias="strategyAb",
         description="Opt-in A/B sidecar (or set STOCK_PLATFORM_STRATEGY_AB=1); default off",
     ),
+    holdings_path: str | None = Query(
+        None,
+        alias="holdingsPath",
+        description="X2: 持仓 JSON 路径（默认 STOCK_PLATFORM_HOLDINGS_PATH）→ ③A/③B 榜单",
+    ),
 ) -> dict[str, Any]:
     """Build premarket brief; default auto-persists to SQLite and logs pending performance."""
     kind = None if (adjust_kind or "").lower() in {"", "none", "raw"} else adjust_kind
     syms = _parse_symbols(symbols)
+    holdings, holdings_note = load_holdings_book(holdings_path)
     brief = _build_brief_for_request(
         request,
         asof=asof,
@@ -290,6 +299,7 @@ def get_brief(
         adjust_kind=kind,
         soft_gates=soft_gates,
         universe_tier=universe_tier,
+        holdings=holdings,
     )
     _maybe_attach_strategy_ab(
         request,
@@ -298,6 +308,9 @@ def get_brief(
         symbols=syms,
         universe_tier=universe_tier,
     )
+    brief["holdingsLoaded"] = len(holdings or [])
+    if holdings_note:
+        brief["holdingsNote"] = holdings_note
     if persist:
         _persist_brief(request, brief, symbols=syms)
     return brief

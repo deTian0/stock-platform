@@ -159,6 +159,17 @@
           </tbody>
         </table>
       </div>
+      <div class="table-wrap" id="recommend-rankings-block" hidden>
+        <div class="panel-head">
+          <h3>榜单（②A/②B/③A/③B/③C）</h3>
+        </div>
+        <p class="hint">
+          与 a-stock-engine 同源：②A 质量榜 / ②B 短线榜 / ③A 持仓 / ③B 操作建议（与回测共用 B5 规则）/ ③C 观察名单。
+          未传持仓 JSON（<code>STOCK_PLATFORM_HOLDINGS_PATH</code>）时 ③A/③B 留空——fail-closed，不臆造持仓。
+        </p>
+        <p id="recommend-rankings-meta" class="status" aria-live="polite"></p>
+        <div id="recommend-rankings"></div>
+      </div>
       <details class="raw-json">
         <summary>原始 JSON</summary>
         <pre id="recommend-json" class="code"></pre>

@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
 from .batch import score_cross_section
 from .panel import build_cross_section_panel, panel_to_csv
+from .rankings import RankingConfig, build_rankings
 from .universe import load_universe
 
 
@@ -191,6 +192,9 @@ def build_premarket_brief(
     reversal_q: float = 0.30,
     lookback_calendar_days: int = 120,
     soft_gates: bool = False,
+    holdings: Sequence[Mapping[str, Any]] | None = None,
+    ranking_config: RankingConfig | None = None,
+    rankings: bool = True,
 ) -> dict[str, Any]:
     """Build a deterministic TopN pre-market brief.
 
@@ -199,6 +203,10 @@ def build_premarket_brief(
 
     When ``soft_gates`` is True and strict entry gates yield zero picks while the
     panel is non-empty, re-score without entry gates and annotate ``gatesRelaxed``.
+
+    ``X2``: the same scored cross-section is also split into the five ranking
+    boards (②A/②B/③A/③B/③C) under ``rankings``; ``picks`` keeps its historical
+    meaning (= the ②A quality board) so existing consumers do not move.
     """
     if isinstance(asof, str):
         asof_s = asof[:10]
@@ -230,12 +238,14 @@ def build_premarket_brief(
     univ_size = len(resolved_symbols) if resolved_symbols is not None else len(panel)
 
     gates_relaxed = False
+    # ``top_n=None``: the boards (③C 观察名单) need ranks beyond the pick list,
+    # so the whole scored cross-section is kept and sliced afterwards.
     scored = score_cross_section(
         panel,
         value_factor=value_factor,
         reversal_q=reversal_q,
         apply_gates=True,
-        top_n=top_n,
+        top_n=None,
     )
     if scored.empty and soft_gates and len(panel) > 0:
         scored = score_cross_section(
@@ -243,12 +253,14 @@ def build_premarket_brief(
             value_factor=value_factor,
             reversal_q=reversal_q,
             apply_gates=False,
-            top_n=top_n,
+            top_n=None,
         )
         gates_relaxed = not scored.empty
 
+    picks_df = scored.head(int(top_n)) if top_n is not None else scored
+
     picks: list[dict[str, Any]] = []
-    for rank, (_, row) in enumerate(scored.iterrows(), start=1):
+    for rank, (_, row) in enumerate(picks_df.iterrows(), start=1):
         reasons = build_reasons_for_row(row, gated=not gates_relaxed)
         item = {
             "rank": rank,
@@ -282,6 +294,17 @@ def build_premarket_brief(
         "environment": "SIMULATE",
         "disclaimer": "Research brief only; not investment advice; paper SIMULATE by default.",
     }
+    if rankings:
+        boards = build_rankings(
+            scored,
+            holdings=holdings,
+            config=ranking_config,
+            panel=panel,
+            asof=asof_s,
+            gated=not gates_relaxed,
+        )
+        out["rankings"] = boards
+        out["rankingsCounts"] = boards.get("counts") or {}
     if gates_relaxed:
         out["gatesNote"] = _SOFT_GATES_NOTE_ZH
     if not picks:
