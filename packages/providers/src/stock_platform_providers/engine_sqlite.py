@@ -20,17 +20,21 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 from .base import AssetType
 from .errors import SymbolError
 from .normalize import normalize_daily_row
-from .symbol import normalize_symbol
+from .symbol import is_bse_symbol, normalize_symbol
 
 ENV_ENGINE_MARKET_DB = "STOCK_PLATFORM_ENGINE_MARKET_DB"
 PROVIDER_NAME = "engine_sqlite"
+
+# X1: default window used when enumerating the whole market (calendar days).
+DEFAULT_UNIVERSE_LOOKBACK_DAYS = 120
+DEFAULT_UNIVERSE_MIN_BARS = 1
 
 # Fail-closed Chinese messages (Workbench / research callers may surface as-is).
 MSG_DB_MISSING = (
@@ -187,6 +191,78 @@ class EngineSqliteProvider:
         raise NotImplementedError(
             "engine_sqlite is daily-only (offline market.db); use live/replay for realtime"
         )
+
+    def latest_trade_date(self) -> str | None:
+        """Max ``date`` in ``daily_price`` (ISO ``YYYY-MM-DD``), ``None`` if empty."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT MAX(date) FROM daily_price").fetchone()
+        if row is None or row[0] is None:
+            return None
+        return _norm_ymd(row[0])
+
+    def list_symbols(
+        self,
+        *,
+        asof: date | str | None = None,
+        lookback_days: int = DEFAULT_UNIVERSE_LOOKBACK_DAYS,
+        min_bars: int = DEFAULT_UNIVERSE_MIN_BARS,
+        include_bse: bool = False,
+        limit: int | None = None,
+    ) -> list[str]:
+        """Enumerate tradable codes from ``daily_price`` (milestone ``X1``).
+
+        This is the **single source of truth** for turning the engine warehouse
+        into a symbol list: :mod:`stock_platform_research.market_universe`
+        consumes the result and never re-implements the query, so coverage rules
+        (window / min bars / BSE) have exactly one definition.
+
+        Behaviour
+        ---------
+        - ``asof`` defaults to the latest trade date present in the DB
+        - window is ``[asof - lookback_days, asof]`` (calendar days)
+        - bar counts are summed **after** collapsing ``600519.SH`` and the legacy
+          bare ``600519`` form onto the same 6-digit code (the warehouse mixes both)
+        - ``min_bars`` drops delisted / long-suspended / dirty leftovers
+        - BSE (``4`` / ``8`` / ``92`` prefixes) excluded via
+          :func:`symbol.is_bse_symbol` unless ``include_bse=True``
+        - rows whose code is not a 6-digit A-share number (e.g. ``"42"``, ``"8"``)
+          are always dropped
+        - returns sorted bare 6-digit codes; **empty → ``[]``** (fail-closed is
+          the caller's job, see ``market_universe.resolve_market_universe``)
+        """
+        if asof in (None, ""):
+            asof_s = self.latest_trade_date()
+            if asof_s is None:
+                return []
+        else:
+            asof_s = _norm_ymd(asof)
+
+        with self._connect() as conn:
+            start_d = date.fromisoformat(asof_s) - timedelta(days=int(lookback_days))
+            rows = conn.execute(
+                "SELECT code, COUNT(*) AS n FROM daily_price "
+                "WHERE date >= ? AND date <= ? GROUP BY code",
+                (start_d.isoformat(), asof_s),
+            ).fetchall()
+
+        counts: dict[str, int] = {}
+        for code, n in rows:
+            bare = str(code).split(".")[0].strip()
+            if not (bare.isdigit() and len(bare) == 6):
+                continue
+            counts[bare] = counts.get(bare, 0) + int(n or 0)
+
+        min_n = max(1, int(min_bars))
+        out: list[str] = []
+        for bare in sorted(counts):
+            if counts[bare] < min_n:
+                continue
+            if not include_bse and is_bse_symbol(bare):
+                continue
+            out.append(bare)
+        if limit is not None:
+            out = out[: max(0, int(limit))]
+        return out
 
     def get_fundamentals_pit(
         self,

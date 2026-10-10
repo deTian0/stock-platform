@@ -16,10 +16,11 @@ from typing import Any
 import pandas as pd
 
 from .brief import build_premarket_brief, write_brief_csv
+from .market_universe import resolve_universe
 from .panel import build_cross_section_panel, panel_to_csv
 from .persistence import open_brief_repository
 from .refresh import RefreshReport, default_refresh_dir, run_refresh
-from .universe import default_universe_fixture_path, load_universe
+from .universe import UNIVERSE_SOURCES, default_universe_fixture_path
 
 
 @dataclass
@@ -28,6 +29,7 @@ class DailyPipelineReport:
     ok: bool
     stage: str
     out_dir: str
+    universe: dict[str, Any] | None = None
     refresh: dict[str, Any] | None = None
     brief: dict[str, Any] | None = None
     brief_path: str | None = None
@@ -51,6 +53,9 @@ def run_daily_pipeline(
     out_dir: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_tier: str | None = None,
+    universe_source: str = "config",
+    market_symbol_source: Any | None = None,
+    market_universe_kwargs: dict[str, Any] | None = None,
     symbols: list[str] | None = None,
     datasets: list[str] | None = None,
     top_n: int = 10,
@@ -80,10 +85,27 @@ def run_daily_pipeline(
     day_dir.mkdir(parents=True, exist_ok=True)
 
     univ = universe_path or default_universe_fixture_path()
+    universe_meta: dict[str, Any] = {
+        "source": str(universe_source or "config").strip().lower(),
+        "sources": list(UNIVERSE_SOURCES),
+    }
     try:
-        resolved = symbols
-        if resolved is None:
-            resolved = load_universe(univ, tier=universe_tier)
+        if symbols is not None:
+            resolved = symbols
+            universe_meta["explicitSymbols"] = True
+        else:
+            # X1: ``market_db`` needs the asof / window of this very run.
+            market_kwargs = dict(market_universe_kwargs or {})
+            market_kwargs.setdefault("asof", asof_d)
+            market_kwargs.setdefault("lookback_days", lookback_days)
+            resolved = resolve_universe(
+                source=universe_source,
+                path=univ,
+                tier=universe_tier,
+                market_symbol_source=market_symbol_source,
+                **market_kwargs,
+            )
+        universe_meta["size"] = len(resolved)
 
         refresh_payload: dict[str, Any] | None = None
         if not skip_refresh:
@@ -104,6 +126,7 @@ def run_daily_pipeline(
                     ok=False,
                     stage="refresh",
                     out_dir=str(root),
+                    universe=dict(universe_meta),
                     refresh=refresh_payload,
                     error="refresh failed",
                     failures=refresh_payload.get("failures") or [],
@@ -144,6 +167,7 @@ def run_daily_pipeline(
             ok=True,
             stage="brief",
             out_dir=str(root),
+            universe=dict(universe_meta),
             refresh=refresh_payload,
             brief={
                 "asof": brief["asof"],
@@ -176,6 +200,7 @@ def run_daily_pipeline(
             ok=False,
             stage="error",
             out_dir=str(root),
+            universe=dict(universe_meta),
             error=f"{type(exc).__name__}: {exc}",
             failures=[{"error": str(exc), "trace": traceback.format_exc()[-2000:]}],
         )
