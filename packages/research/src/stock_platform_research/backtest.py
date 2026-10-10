@@ -77,6 +77,7 @@ from .book_replay import (  # noqa: F401 (re-export: X4 shared replay loop)
 )
 from .gates import apply_entry_gates  # noqa: F401 (screener policy, re-exported)
 from .lvrev import score_lvrev  # noqa: F401 (screener policy, re-exported)
+from .neutralization import attach_industry  # S4: industry join single point
 from .portfolio import (  # noqa: F401 (re-export: B2 metrics + B3 cost model + B4 asset classes)
     DEFAULT_COMMISSION_RATE,
     DEFAULT_STAMP_SELL_RATE,
@@ -217,6 +218,7 @@ def prepare_book_frame(
     start: str | None = None,
     end: str | None = None,
     pct_scale: str = "auto",
+    industry_map: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """The shared ``bars`` → tradable feature frame step (``X4``).
 
@@ -240,6 +242,9 @@ def prepare_book_frame(
         feats = feats[feats["trade_date"] >= pd.Timestamp(start)]
     if end is not None:
         feats = feats[feats["trade_date"] <= pd.Timestamp(end)]
+    if industry_map is not None:
+        # S4: optional industry label column (code → industry), read-only source.
+        feats = attach_industry(feats, industry_map)
     return feats
 
 

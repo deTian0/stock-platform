@@ -3437,6 +3437,94 @@
     }
   }
 
+  async function runNeutralization(event) {
+    if (event) event.preventDefault();
+    var errEl = $("neutralization-error");
+    if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+    var startV = $("neutralization-start") && $("neutralization-start").value;
+    var endV = $("neutralization-end") && $("neutralization-end").value;
+    var mode = ($("neutralization-mode") && $("neutralization-mode").value) || "demean";
+    var rescale = ($("neutralization-rescale") && $("neutralization-rescale").value) || "rank";
+    var minGroup = Number(($("neutralization-min-group") && $("neutralization-min-group").value) || "5");
+    var styleRaw = ($("neutralization-style") && $("neutralization-style").value) || "";
+    var capRaw = ($("neutralization-max-per-industry") && $("neutralization-max-per-industry").value) || "";
+    var universe = ($("neutralization-universe") && $("neutralization-universe").value) || "stock";
+    var style = styleRaw.split(",").map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    if ($("neutralization-meta")) {
+      $("neutralization-meta").textContent = "运行中… 两臂各完整回放一次，窗口越长越慢";
+    }
+    var body = { mode: mode, rescale: rescale, minGroupSize: minGroup, universe: universe };
+    if (style.length) body.style = style;
+    if (capRaw) body.maxPerIndustry = Number(capRaw);
+    if (startV) body.start = startV;
+    if (endV) body.end = endV;
+    try {
+      var data = await fetchJson("/api/research/strategy/neutralization", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      renderNeutralization(data);
+    } catch (err) {
+      if (errEl) { errEl.hidden = false; errEl.textContent = String(err && err.message ? err.message : err); }
+      if ($("neutralization-meta")) $("neutralization-meta").textContent = "中性化 A/B 失败";
+      if ($("neutralization-result")) $("neutralization-result").hidden = true;
+    }
+  }
+
+  function neutralizationWinnerLabel(w) {
+    if (w === "neutral") return "中性化";
+    if (w === "raw") return "原始";
+    if (w === "tie") return "持平";
+    return w || "—";
+  }
+
+  function renderNeutralization(data) {
+    if (!data || !data.ok) return;
+    if ($("neutralization-result")) $("neutralization-result").hidden = false;
+    var neu = data.neutralize || {};
+    if ($("neutralization-meta")) {
+      $("neutralization-meta").textContent =
+        "mode=" + (neu.mode || "-") + " · rescale=" + (neu.rescale || "-") +
+        " · 每行业上限=" + (data.maxPerIndustry === null || data.maxPerIndustry === undefined ? "不限" : data.maxPerIndustry) +
+        " · 截面 " + (data.nDates || "-") + " · 行业数 " + (data.nIndustries || 0) +
+        " · 只读 " + (data.dbSource || "market.db");
+    }
+    if ($("neutralization-verdict")) {
+      $("neutralization-verdict").textContent =
+        "胜出 " + neutralizationWinnerLabel(data.winner) +
+        "；原始成交 " + (((data.a || {}).tradeCount) || 0) +
+        " / 中性化成交 " + (((data.b || {}).tradeCount) || 0) +
+        (data.industryAvailable ? "" : "；⚠ 帧无行业列，已退化为全局去均值");
+    }
+    var tbody = $("neutralization-table") && $("neutralization-table").querySelector("tbody");
+    if (tbody) {
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      var keys = ["total_return", "cagr", "max_drawdown", "sharpe", "sortino", "calmar", "win_rate", "n_trades", "avg_hold_days", "final_equity"];
+      var am = (data.a || {}).metrics || {}, bm = (data.b || {}).metrics || {}, dm = data.delta || {};
+      for (var i = 0; i < keys.length; i++) {
+        var tr = document.createElement("tr");
+        tr.innerHTML = td(keys[i]) + tdNum(am[keys[i]]) + tdNum(bm[keys[i]]) + tdNum(dm[keys[i]]);
+        tbody.appendChild(tr);
+      }
+    }
+    var ebody = $("neutralization-exposure-table") && $("neutralization-exposure-table").querySelector("tbody");
+    if (ebody) {
+      while (ebody.firstChild) ebody.removeChild(ebody.firstChild);
+      var arms = [["raw", (data.exposure || {}).raw], ["neutral", (data.exposure || {}).neutral]];
+      for (var a = 0; a < arms.length; a++) {
+        var e = arms[a][1] || {};
+        var tr2 = document.createElement("tr");
+        tr2.innerHTML = td(arms[a][0]) + tdNum(e.n_codes) + tdNum(e.n_industries) +
+          tdNum(e.max_weight) + td(e.max_industry || "—") + tdNum(e.hhi);
+        ebody.appendChild(tr2);
+      }
+    }
+    if ($("neutralization-json")) {
+      $("neutralization-json").textContent = JSON.stringify(data, null, 2);
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -3962,6 +4050,15 @@
         var snD0 = new Date();
         snD0.setFullYear(snD0.getFullYear() - 1);
         $("sensitivity-start").value = snD0.toISOString().slice(0, 10);
+      }
+    }
+    if ($("neutralization-form")) {
+      $("neutralization-form").addEventListener("submit", runNeutralization);
+      if ($("neutralization-end")) $("neutralization-end").value = new Date().toISOString().slice(0, 10);
+      if ($("neutralization-start")) {
+        var nzD0 = new Date();
+        nzD0.setFullYear(nzD0.getFullYear() - 1);
+        $("neutralization-start").value = nzD0.toISOString().slice(0, 10);
       }
     }
     if ($("backtest-form")) {

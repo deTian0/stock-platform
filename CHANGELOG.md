@@ -8,6 +8,39 @@
 
 - （无）
 
+## [4.1.3] - 2026-10-10
+
+### Added
+
+- **行业中性化与风格暴露约束（`S4`）**：新增 `research.neutralization` **单点** —— `NeutralizeParams`（frozen dataclass：`industry_col` / `mode`(`demean`|`zscore`) / `clip` / `min_group_size` / `rescale`(`rank`|`none`) / `composite_demean` / `style` / `style_clip`）＋ `industry_neutralize_series` / `neutralize_factor_scores` / `residualize` / `resolve_groups` / `attach_industry` / `industry_exposure`。语义**承接** `a-stock-engine/src/factor_engine.py` 的 `_zscore`（行业分组 z + 组内去均值）；作用面是 `[0,1]` 因子分，`rescale="rank"` 把尺度还原，**下游 `min_pick_score` 语义不变**。ADR [`0063`](docs/architecture/0063-industry-neutralization.md)
+  - `lvrev.score_lvrev(..., neutralize=None)`：**默认关 → 组合分逐位不变**；启用时「逐因子行业中性化 → 可选风格残差化 → 可选 `rank` 重标定 → 加权求和 → 可选组合分行业去均值」
+  - **行业只读接入**：`backtest_cli.load_engine_industry()` 读 `fundamentals(code, industry)`（**缺表 fail-closed**）；`code` 两侧经 `portfolio.norm_code` 归一（实测 `daily_price` = `000001.SZ` 带后缀、`fundamentals` = `000001` 裸 6 位，**原始交集为 0** → 必须归一）；`attach_industry` 未映射码 → `__UNKNOWN__` 独立组（权重恒为 1）
+  - **透传链（不复制中性化）**：`prepare_book_frame(..., industry_map=None)`（默认不加列）＋ `screener_entry_provider(..., neutralize=None, max_per_industry=None)`
+  - **暴露约束** `max_per_industry`：在 `max_picks_per_day` **之前**按行业 `head(k)` 并按 `composite_score` 重排 —— 改「构成」不改「排序规则」
+- 新增 `research.neutralization_ab`：`compare_neutralization_ab` / `neutralization_ab_from_bars` / `run_neutralization_book` —— 两臂消费**同一**特征帧、跑**同一个** `book_replay.replay_book`；`delta` / `review` / `sameDefinition` **直接复用 `strategy_ab`（`S1`）的实现**（不复制）；并附各臂**行业暴露画像**（`n_codes` / `n_industries` / `max_weight` / `max_industry` / `hhi`）
+- CLI `stock-platform-strategy-neutralization`（`--db/--start/--end/--universe/--mode/--clip/--min-group-size/--rescale/--no-composite-demean/--style/--max-per-industry/--min-pick-score/--initial-capital/--max-positions/--json`，只读 `market.db`）
+- API `POST /api/research/strategy/neutralization`（只读 `market.db`；非法 `mode` / `rescale` / `universe` / 窗口 → **400**，无 DB → **503** fail-closed；**校验 400 先于 DB 503**）
+- Workbench `#neutralization` 面板（两臂指标 + `delta` 表 + 行业暴露表 + 原始 JSON，手写零新依赖）
+- 契约 [`docs/contracts/industry-neutralization.md`](docs/contracts/industry-neutralization.md) + 实测 [`docs/ops/neutralization-benchmark.md`](docs/ops/neutralization-benchmark.md)
+
+### Changed
+
+- 版本号 `4.1.2` → **`4.1.3`**
+
+### Verified
+
+- **真机 `market.db` 验收**（2024-09-02 → 2026-09-08，489 交易日 / 2,949,567 行 / 6,789 码 / 111 行业 / 两轮合计 **95.9 s**）：
+  - **仅中性化**：`total_return` 0.3029 → **0.5257**（+0.2228）、`sharpe` 1.0599 → **1.1430**、`final_equity` 65,146.49 → **76,287.46**；但 `max_drawdown` -0.1767 → **-0.2673**（更深）、`win_rate` 0.4659 → **0.3839**（更低）、笔数 176 → 224、平均持有 35.22 → 30.00 天
+  - **中性化 + `maxPerIndustry=3`**：`total_return` **0.5850** / `sharpe` **1.2492** / `max_drawdown` -0.2423 —— 优于纯中性化
+  - **「中性化 ≠ 更分散」**：持仓集合 HHI 反而 0.0225 → 0.0302（+cap 0.0312），如实记录，**不据此改档**
+  - `raw` 臂两轮**逐位一致**（两臂只差处理项的直接证据）；出厂 `W_DEFAULT` / `min_pick_score=0.80` / `EntryGateParams()` **逐位未改**
+- 聚焦测试：research 新增 `test_neutralization.py` + `test_neutralization_ab.py` **28 passed**（`test_gates` / `test_lvrev` 回归同绿）；workbench **185 passed**（端点目录 64 → **65**）
+
+### Docs
+
+- 新增 `docs/architecture/0063-industry-neutralization.md` + `docs/contracts/industry-neutralization.md` + `docs/ops/neutralization-benchmark.md`（均已登记 `scripts/check_docs.ps1`）
+- 路线图 `S4` 标 `done（2026-10-10）`，目标 tag 顺延 `v3.14.3` → `v4.1.3`
+
 ## [4.1.2] - 2026-10-10
 
 ### Added

@@ -177,6 +177,24 @@ from .factor_ic import (
     summarize_factor_ic,
     summarize_factor_ic_from_rows,
 )
+from .neutralization import (
+    NEUTRALIZE_MODES,
+    NEUTRALIZE_RESCALES,
+    UNKNOWN_GROUP,
+    NeutralizeParams,
+    attach_industry,
+    industry_exposure,
+    industry_neutralize_series,
+    neutralize_factor_scores,
+    residualize,
+    resolve_groups,
+)
+from .neutralization_ab import (
+    NEUTRALIZATION_ARMS,
+    compare_neutralization_ab,
+    neutralization_ab_from_bars,
+    run_neutralization_book,
+)
 from .sensitivity import (
     DEFAULT_GRIDS,
     DEFAULT_OBJECTIVE,
@@ -360,6 +378,20 @@ __all__ = [
     "score_floor_for",
     "summarize_sweep",
     "sweep_entry_gate",
+    "NEUTRALIZE_MODES",
+    "NEUTRALIZE_RESCALES",
+    "UNKNOWN_GROUP",
+    "NeutralizeParams",
+    "attach_industry",
+    "industry_exposure",
+    "industry_neutralize_series",
+    "neutralize_factor_scores",
+    "residualize",
+    "resolve_groups",
+    "NEUTRALIZATION_ARMS",
+    "compare_neutralization_ab",
+    "neutralization_ab_from_bars",
+    "run_neutralization_book",
 ]
 
-__version__ = "4.1.2"
+__version__ = "4.1.3"

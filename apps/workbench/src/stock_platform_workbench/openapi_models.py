@@ -461,6 +461,30 @@ class StrategySensitivityResponse(ExtraAllowModel):
     liveTradingEnabled: bool | None = False
 
 
+class StrategyNeutralizationResponse(ExtraAllowModel):
+    ok: bool | None = None
+    neutralize: dict[str, Any] | None = None
+    maxPerIndustry: int | None = None
+    industryColumn: str | None = None
+    industryAvailable: bool | None = None
+    nIndustries: int | None = None
+    minPickScore: float | None = None
+    a: dict[str, Any] | None = None
+    b: dict[str, Any] | None = None
+    delta: dict[str, float | None] | None = None
+    winner: str | None = None
+    exposure: dict[str, Any] | None = None
+    sameDefinition: dict[str, bool] | None = None
+    warning: str | None = None
+    nDates: int | None = None
+    dbSource: str | None = None
+    universe: str | None = None
+    start: str | None = None
+    end: str | None = None
+    environment: str | None = "SIMULATE"
+    liveTradingEnabled: bool | None = False
+
+
 class RollingBacktestResponse(ExtraAllowModel):
     ok: bool = True
     days: list[dict[str, Any]] = Field(default_factory=list)

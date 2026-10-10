@@ -255,6 +255,18 @@ def _ok_strategy_sensitivity(body: Any, status: int) -> None:
     assert set(body["verdicts"]) <= set(body["knobs"])
 
 
+def _ok_strategy_neutralization(body: Any, status: int) -> None:
+    if status == 503:
+        assert "detail" in body
+        return
+    assert status == 200
+    assert body["ok"] is True
+    assert body["liveTradingEnabled"] is False
+    assert body["winner"] in {"raw", "neutral", "tie"}
+    assert all(body["sameDefinition"].values())
+    assert set(["final_equity", "n_trades"]) <= set(body["delta"])
+
+
 def _ok_rolling(body: Any, status: int) -> None:
     assert (status == 200 and body.get("ok") is True) or (status == 503 and "detail" in body)
 
@@ -724,6 +736,16 @@ _reg(
 _reg(
     EndpointHit(
         "POST",
+        "/api/research/strategy/neutralization",
+        # No engine market.db in CI -> 503 fail-closed (not fake data).
+        json={"mode": "demean", "rescale": "rank", "minGroupSize": 5, "universe": "stock"},
+        expect_status=frozenset({200, 503}),
+        assert_body=_ok_strategy_neutralization,
+    )
+)
+_reg(
+    EndpointHit(
+        "POST",
         "/api/research/backtest/rolling-review",
         # Explicit symbols stay within replay fixtures (broad tiers may 500 on missing files).
         json={
@@ -873,7 +895,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 64
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 65
 
 
 @pytest.mark.unit
@@ -921,4 +943,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 67
+    assert n_ops + n_extra == 68
