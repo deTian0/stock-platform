@@ -56,3 +56,43 @@ Workbench：刷新「推荐绩效」默认 `autoSettle=true`；有 engine db 时
 - 数据截止以引擎导入日为准，**不是** live。
 - OHLC 仅可靠 close（引擎表无 open/high/low 时为 null）；结算用收盘价即可。
 - `daily_price.code` 为 `600519.SH` / `000001.SZ` 形态；适配器会从 6 位码自动映射。
+
+## 摄取与覆盖自检（C2）
+
+**摄取归生产侧**：写 `daily_price` 是 `a-stock-engine` 的职责，平台**只读**（ADR 0050 / [ADR 0058](../architecture/0058-market-db-source-of-truth.md)）。平台不代抓、不补写；发现问题只报警不改库。
+
+### 刷新全市场日线（引擎侧）
+
+```powershell
+cd D:\workspace\stock_trading\a-stock-engine
+# 1) 单位口径实测校准（拿最新全市场日与存量重叠代码比对，四字段比值应≈1.0）
+.\.venv\Scripts\python.exe empirical\backfill_market_daily.py --validate
+# 2) 看缺口（<3000 行/日的交易日都会列出）
+.\.venv\Scripts\python.exe empirical\backfill_market_daily.py --start 2026-09-04 --end 2026-10-09 --dry-run
+# 3) 执行回补（顺序 + sleep，CPU-safe）
+.\.venv\Scripts\python.exe empirical\backfill_market_daily.py --start 2026-09-04 --end 2026-10-09 --apply
+```
+
+单位口径（tushare → 引擎 `daily_price`）：`pct_chg` **÷100**（存量是小数制）、`vol` **×100**（手→股）、`amount` **×1000**（千元→元）、剔除 `.BJ`。脚本只写「带后缀股票行」，与存量 720 万行一致。
+
+### 覆盖自检（平台侧，只读）
+
+`GET /api/ops/health` 的 `marketDb` 块给出裁决（不 500、不改库）：
+
+| status | 含义 |
+|--------|------|
+| `ok` | 窗口内交易日齐全，且每日 ≥ `minRowsPerDay`（默认 3000） |
+| `thin` | 存在低于行数下限的交易日 → 部分导入 |
+| `stale` | 存在缺失交易日 / `lagTradingDays > 0` → 摄取已中断 |
+| `empty` / `missing_table` | 窗口无数据 / 表缺失 |
+| `unconfigured` | 未设 `STOCK_PLATFORM_ENGINE_MARKET_DB` |
+
+`thin` / `stale` / `empty` / `missing_table` / `error` 会把整体 `status` 降级为 `degraded`。
+
+### 已知的坑（改摄取前先读）
+
+- `multifactor.refresh_etf_daily_prices` **每日只写 14 只 ETF**（`WELL_KNOWN_ETFS`）且 `pct_chg` 写 0 —— 它是"当日行数=14"的唯一来源，不代表全市场正常。
+- ⚠️ **且它会摧毁这 14 只 ETF 的长历史**：函数先 `delete_prices_for_codes(ok_codes)`（模式含裸码 / `.SZ` / `.SH`，即删掉**全部历史**）再写入 `LocalPriceLoader` 的 65 根 K 线。2026-10-10 实测：这 14 只各只剩 `2026-06-09 ~ 2026-09-08` 共 **65 行**、`pct_chg` **全为 0**；而同一张表里非 `WELL_KNOWN_ETFS` 的 ETF（如裸码 `518880`）仍有 **1499 行**长历史。
+  - 修复路径（已实测可用）：`pro.fund_daily(ts_code=..., start_date=..., end_date=...)` 返回未复权日线且 `pct_chg` 正确（如 `510300.SH` 2026 年内 183 行），**14 次调用**即可重建。**未在本轮执行**——需要用显式决策定夺复权口径（`fund_daily` 为未复权，存量 ETF 行为裸码 + 未知复权），避免引入口径混用。
+- `import_local_data.py` 的断点续传按**日期是否存在**判定（`SELECT DISTINCT date FROM daily_price`），**部分覆盖日会被永久跳过**；修复部分日只能用 `empirical/backfill_market_daily.py`（`INSERT OR REPLACE`）。
+- 该库**不含北交所**（无 `.BJ` 后缀码），`include_bse=True` 与默认结果一致。

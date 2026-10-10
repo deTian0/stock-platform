@@ -36,6 +36,24 @@ PROVIDER_NAME = "engine_sqlite"
 DEFAULT_UNIVERSE_LOOKBACK_DAYS = 120
 DEFAULT_UNIVERSE_MIN_BARS = 1
 
+# C2: coverage / freshness guard for `daily_price` (calendar-day window + full-market floor).
+# A full A-share cross-section is ~5.2k rows; anything far below is a partial import.
+DEFAULT_COVERAGE_LOOKBACK_DAYS = 30
+DEFAULT_COVERAGE_MIN_ROWS = 3000
+
+MSG_COVERAGE_TABLE_MISSING = (
+    "引擎 market.db 缺少 daily_price 表：平台只读，无法代抓；请先在引擎侧完成日线导入。"
+)
+
+# Human-readable verdicts for `EngineSqliteProvider.coverage_snapshot` (Chinese, no i18n layer).
+_MSG_COVERAGE: dict[str, str] = {
+    "ok": "日线覆盖正常：窗口内全部交易日齐全，且达到全市场行数下限。",
+    "thin": "日线覆盖偏薄：存在低于全市场行数下限的交易日（部分导入）。",
+    "stale": "日线覆盖滞后：窗口内存在缺失的交易日，引擎侧导入可能已中断。",
+    "empty": "日线为空：窗口内没有任何交易日数据。",
+    "missing_table": MSG_COVERAGE_TABLE_MISSING,
+}
+
 # Fail-closed Chinese messages (Workbench / research callers may surface as-is).
 MSG_DB_MISSING = (
     "未配置或找不到引擎 market.db：请设置 STOCK_PLATFORM_ENGINE_MARKET_DB "
@@ -199,6 +217,116 @@ class EngineSqliteProvider:
         if row is None or row[0] is None:
             return None
         return _norm_ymd(row[0])
+
+    def coverage_snapshot(
+        self,
+        *,
+        asof: date | str | None = None,
+        lookback_days: int = DEFAULT_COVERAGE_LOOKBACK_DAYS,
+        min_rows: int = DEFAULT_COVERAGE_MIN_ROWS,
+    ) -> dict[str, Any]:
+        """Read-only ``daily_price`` coverage / freshness snapshot (milestone ``C2``).
+
+        Guards the failure mode where the engine ingest stops **silently**: the table
+        keeps a plausible ``MAX(date)`` while every fresh day is either absent or a
+        thin partial import (the engine's ``refresh_etf_daily_prices`` writes only
+        ~14 ETFs per day, so a stalled *stock* ingest shows up as ``14 rows`` days
+        next to a wall of full ~5.2k-row history).
+
+        Never mutates the warehouse (``mode=ro``, ADR 0050) and never raises for
+        data-shape reasons — ``status`` carries the verdict so ops can log it without
+        wrapping every field in ``try/except``:
+
+        - ``ok``            window complete, every day at/above ``min_rows``
+        - ``thin``          days present but below ``min_rows`` (partial import)
+        - ``stale``         expected trading day(s) missing / ``latest`` lags behind
+        - ``empty``         no rows at all in the window
+        - ``missing_table`` ``daily_price`` absent (engine never imported)
+
+        ``lagTradingDays`` counts CN trading days strictly after ``latestTradeDate``
+        up to the expected trading day, so a weekend/holiday tail is never reported
+        as staleness.
+        """
+        from .calendar import get_trading_calendar  # local import keeps module load light
+
+        target = (
+            date.fromisoformat(_norm_ymd(asof)) if asof not in (None, "") else date.today()
+        )
+        cal = get_trading_calendar("CN")
+        expected = cal.last_trading_day(target)
+        span = max(1, int(lookback_days))
+        window_start = expected - timedelta(days=span)
+
+        with self._connect() as conn:
+            if not self._table_exists(conn, "daily_price"):
+                return {
+                    "status": "missing_table",
+                    "dbPath": str(self.db_path),
+                    "expectedTradingDay": expected.isoformat(),
+                    "windowStart": window_start.isoformat(),
+                    "lookbackDays": span,
+                    "minRowsPerDay": int(min_rows),
+                    "message": MSG_COVERAGE_TABLE_MISSING,
+                }
+            rows = conn.execute(
+                "SELECT date, COUNT(*) FROM daily_price "
+                "WHERE date >= ? AND date <= ? GROUP BY date",
+                (window_start.isoformat(), expected.isoformat()),
+            ).fetchall()
+
+        counts: dict[str, int] = {
+            _norm_ymd(d): int(n or 0) for d, n in rows if d is not None
+        }
+
+        # Expected CN trading days inside the window (ascending, inclusive).
+        expected_days: list[date] = []
+        cursor = expected
+        while cursor >= window_start:
+            if cal.is_trading_day(cursor):
+                expected_days.append(cursor)
+            cursor -= timedelta(days=1)
+        expected_days.reverse()
+
+        missing = [d.isoformat() for d in expected_days if d.isoformat() not in counts]
+        thin = [
+            {"date": d, "rows": counts[d]}
+            for d in (x.isoformat() for x in expected_days)
+            if d in counts and counts[d] < int(min_rows)
+        ]
+
+        latest = max(counts) if counts else None
+        lag = 0
+        if latest is not None:
+            probe = date.fromisoformat(latest) + timedelta(days=1)
+            while probe <= expected:
+                if cal.is_trading_day(probe):
+                    lag += 1
+                probe += timedelta(days=1)
+
+        if not counts:
+            status = "empty"
+        elif missing or lag > 0:
+            status = "stale"
+        elif thin:
+            status = "thin"
+        else:
+            status = "ok"
+
+        return {
+            "status": status,
+            "dbPath": str(self.db_path),
+            "expectedTradingDay": expected.isoformat(),
+            "latestTradeDate": latest,
+            "latestRows": counts.get(latest, 0) if latest else 0,
+            "lagTradingDays": lag,
+            "windowStart": window_start.isoformat(),
+            "lookbackDays": span,
+            "minRowsPerDay": int(min_rows),
+            "expectedDays": len(expected_days),
+            "missingDays": missing,
+            "thinDays": thin,
+            "message": _MSG_COVERAGE.get(status, ""),
+        }
 
     def list_symbols(
         self,

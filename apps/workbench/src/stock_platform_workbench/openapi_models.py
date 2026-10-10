@@ -115,6 +115,13 @@ class OpsHealthResponse(ExtraAllowModel):
     supplementTokenConfigured: bool = False
     preferences: dict[str, str] = Field(default_factory=dict)
     eastmoney: dict[str, Any] = Field(default_factory=dict)
+    marketDb: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "只读 market.db 覆盖快照（C2）：status=ok|thin|stale|empty|missing_table|"
+            "unconfigured|error，含 latestTradeDate / lagTradingDays / missingDays / thinDays"
+        ),
+    )
     lastRefresh: dict[str, Any] | None = None
 
 
