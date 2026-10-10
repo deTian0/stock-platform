@@ -3267,6 +3267,80 @@
     }
   }
 
+  async function runFactorLibrary(event) {
+    if (event) event.preventDefault();
+    var errEl = $("factor-library-error");
+    if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+    var startV = $("factor-library-start") && $("factor-library-start").value;
+    var endV = $("factor-library-end") && $("factor-library-end").value;
+    var horizon = Number(($("factor-library-horizon") && $("factor-library-horizon").value) || "20");
+    var sampleEvery = Number(($("factor-library-sample") && $("factor-library-sample").value) || "5");
+    var universe = ($("factor-library-universe") && $("factor-library-universe").value) || "stock";
+    var corr = !!($("factor-library-corr") && $("factor-library-corr").checked);
+    if ($("factor-library-meta")) {
+      $("factor-library-meta").textContent = "运行中… 只读 market.db（窗口越长越慢）";
+    }
+    var body = { horizon: horizon, sampleEvery: sampleEvery, universe: universe, correlation: corr };
+    if (startV) body.start = startV;
+    if (endV) body.end = endV;
+    try {
+      var data = await fetchJson("/api/research/factor/admission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      renderFactorLibrary(data);
+    } catch (err) {
+      if (errEl) { errEl.hidden = false; errEl.textContent = String(err && err.message ? err.message : err); }
+      if ($("factor-library-meta")) $("factor-library-meta").textContent = "因子准入失败";
+      if ($("factor-library-result")) $("factor-library-result").hidden = true;
+    }
+  }
+
+  function factorLibraryVerdict(name, data) {
+    if (data.rejected && data.rejected.indexOf(name) >= 0) return "不达标（未启用）";
+    if (data.redundant && data.redundant.indexOf(name) >= 0) return "冗余（未启用）";
+    if (data.enabled && data.enabled.indexOf(name) >= 0) return "已启用";
+    return "—";
+  }
+
+  function renderFactorLibrary(data) {
+    if (!data || !data.ok) return;
+    if ($("factor-library-result")) $("factor-library-result").hidden = false;
+    if ($("factor-library-meta")) {
+      $("factor-library-meta").textContent =
+        "horizon=" + data.horizon + "d · 采样每 " + data.sampleEvery + " 日 · 评估截面 " + data.nDates +
+        " · universe=" + (data.universe || "stock") + " · 只读 " + (data.dbSource || "market.db");
+    }
+    if ($("factor-library-verdict")) {
+      $("factor-library-verdict").textContent =
+        "已启用 " + ((data.enabled || []).join(", ") || "无") +
+        "；不启用 " + ((data.disabled || []).join(", ") || "无");
+    }
+    var tbody = $("factor-library-table") && $("factor-library-table").querySelector("tbody");
+    if (tbody) {
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      var names = Object.keys(data.factors || {});
+      for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        var f = data.factors[name];
+        var ic = f.mean_ic === null || f.mean_ic === undefined ? "n/a" : Number(f.mean_ic).toFixed(4);
+        var icir = f.icir === null || f.icir === undefined ? "n/a" : Number(f.icir).toFixed(4);
+        var n = f.n_dates === null || f.n_dates === undefined ? 0 : f.n_dates;
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          td(name + " · " + (f.label || "")) +
+          td(f.description || "") +
+          tdNum(ic) + tdNum(icir) + tdNum(n) +
+          td(factorLibraryVerdict(name, data));
+        tbody.appendChild(tr);
+      }
+    }
+    if ($("factor-library-json")) {
+      $("factor-library-json").textContent = JSON.stringify(data, null, 2);
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -3774,6 +3848,15 @@
         var abD0 = new Date();
         abD0.setFullYear(abD0.getFullYear() - 1);
         $("ab-engine-start").value = abD0.toISOString().slice(0, 10);
+      }
+    }
+    if ($("factor-library-form")) {
+      $("factor-library-form").addEventListener("submit", runFactorLibrary);
+      if ($("factor-library-end")) $("factor-library-end").value = new Date().toISOString().slice(0, 10);
+      if ($("factor-library-start")) {
+        var flD0 = new Date();
+        flD0.setFullYear(flD0.getFullYear() - 1);
+        $("factor-library-start").value = flD0.toISOString().slice(0, 10);
       }
     }
     if ($("backtest-form")) {

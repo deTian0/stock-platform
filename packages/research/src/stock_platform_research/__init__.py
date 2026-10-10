@@ -52,7 +52,7 @@ from .persistence import (
     reset_brief_repository_cache,
 )
 from .gates import apply_entry_gates, apply_risk_gates
-from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
+from .lvrev import W_DEFAULT, W_S2, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, build_multi_day_pit_panel, panel_to_csv
 from .market_universe import (
     ASSET_TYPE_CHOICES,
@@ -157,7 +157,22 @@ from .walkforward import (
     summarize_walk_forward,
 )
 from .empirical_compare import compare_empirical_baseline, extract_engine_fold_returns
+from .factors import (
+    BASELINE_FACTORS,
+    FACTOR_LIBRARY,
+    NEW_FACTORS,
+    FactorSpec,
+    build_factor_frame,
+    build_feature_frame,
+    factor_correlation,
+    factor_spec,
+    list_factors,
+)
 from .factor_ic import (
+    DEFAULT_ADMISSION,
+    admit_factor,
+    build_factor_ic_report,
+    select_enabled,
     spearman_rank_ic,
     summarize_factor_ic,
     summarize_factor_ic_from_rows,
@@ -308,6 +323,20 @@ __all__ = [
     "compare_strategy_ab_from_bars",
     "config_entry_provider",
     "run_config_book",
+    "W_S2",
+    "FactorSpec",
+    "FACTOR_LIBRARY",
+    "BASELINE_FACTORS",
+    "NEW_FACTORS",
+    "build_factor_frame",
+    "build_feature_frame",
+    "factor_correlation",
+    "factor_spec",
+    "list_factors",
+    "DEFAULT_ADMISSION",
+    "admit_factor",
+    "build_factor_ic_report",
+    "select_enabled",
 ]
 
-__version__ = "4.1.0"
+__version__ = "4.1.1"

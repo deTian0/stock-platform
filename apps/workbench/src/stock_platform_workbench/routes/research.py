@@ -69,6 +69,7 @@ from ..openapi_models import (
     BriefReviewResponse,
     BriefSaveResponse,
     BriefToPaperResponse,
+    FactorAdmissionResponse,
     FactorIcResponse,
     HitTrackingResponse,
     IntelReportCrosswalkResponse,
@@ -1722,3 +1723,111 @@ def get_pit_fundamentals(
         "liveTradingEnabled": False,
         "note": "非 live financial；与 brief SQLite 分离；禁止未来函数。",
     }
+
+
+class FactorAdmissionRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start: date | None = Field(None, description="Window start YYYY-MM-DD")
+    end: date | None = Field(None, description="Window end YYYY-MM-DD")
+    horizon: int = Field(20, ge=1, le=250, description="forward-return horizon (trading days)")
+    sample_every: int = Field(5, ge=1, le=60, alias="sampleEvery")
+    min_names: int = Field(30, ge=3, le=2000, alias="minNames")
+    universe: str = Field("stock", description="stock | etf | all")
+    factors: list[str] | None = Field(None, description="subset of the library (default: all)")
+    thresholds: dict[str, float] | None = Field(None, description="override admission thresholds")
+    correlation: bool = Field(False, description="also return the Spearman factor correlation matrix")
+
+
+@router.post(
+    "/factor/admission",
+    summary="因子库 IC/ICIR 准入（S2）",
+    responses={**ok200(FactorAdmissionResponse), **RESP_400, **RESP_503},
+)
+def post_factor_admission(body: FactorAdmissionRequest) -> dict[str, Any]:
+    """S2 — run the factor library through the IC/ICIR admission gate.
+
+    Read-only ``market.db``; SIMULATE; **不达标不启用**; off the brief / picks
+    path. Validation (factor ids / universe / window) runs **before** the DB
+    probe so the branch order is 400 → 503.
+    """
+    from stock_platform_research.backtest import UNIVERSES
+    from stock_platform_research.factor_ic import build_factor_ic_report
+    from stock_platform_research.factors import (
+        build_factor_frame,
+        build_feature_frame,
+        factor_correlation,
+        list_factors,
+    )
+
+    names = list(body.factors) if body.factors else None
+    if names:
+        unknown = [n for n in names if n not in list_factors()]
+        if unknown:
+            raise HTTPException(
+                status_code=400, detail=f"未知因子：{unknown}；已知={list_factors()}"
+            )
+
+    universe = str(body.universe or "stock").strip().lower()
+    if universe not in UNIVERSES:
+        raise HTTPException(status_code=400, detail=f"universe must be one of {UNIVERSES}")
+
+    start = body.start.isoformat() if body.start else None
+    end = body.end.isoformat() if body.end else None
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be <= end")
+
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        resolve_engine_market_db,
+    )
+    from stock_platform_research.backtest_cli import filter_universe, load_engine_bars
+
+    db_path = resolve_engine_market_db()
+    if db_path is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=503, detail=f"market.db not found: {db_path}")
+
+    try:
+        bars = load_engine_bars(db_path, start=start, end=end, with_amount=True)
+        bars = filter_universe(bars)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"行情库读取失败：{exc}") from exc
+
+    if bars.empty:
+        raise HTTPException(status_code=400, detail="区间内无行情数据（fail-closed）")
+
+    feats = build_feature_frame(bars)
+    report = build_factor_ic_report(
+        feats,
+        horizon=body.horizon,
+        factors=names,
+        thresholds=body.thresholds,
+        sample_every=body.sample_every,
+        min_names=body.min_names,
+    )
+    if not report.get("ok"):
+        raise HTTPException(status_code=400, detail=report.get("reason") or "因子准入失败")
+
+    payload = dict(report)
+    payload["dbSource"] = str(db_path)
+    payload["universe"] = universe
+    payload["start"] = start
+    payload["end"] = end
+    if body.correlation:
+        def _cell(value: Any) -> float | None:
+            try:
+                fv = float(value)
+            except (TypeError, ValueError):
+                return None
+            return None if fv != fv else round(fv, 4)
+
+        corr = factor_correlation(build_factor_frame(feats, factors=names))
+        payload["correlation"] = {
+            str(a): {str(b): _cell(corr.loc[a, b]) for b in corr.columns}
+            for a in corr.index
+        }
+    return payload
