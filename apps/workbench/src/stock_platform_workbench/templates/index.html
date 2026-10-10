@@ -22,6 +22,7 @@
       <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
       <a href="#factor-library" title="因子库 IC/ICIR 准入">因子库</a>
+      <a href="#sensitivity" title="闸门参数敏感性 (S3)">敏感性</a>
       <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
       <a href="#intel-report" title="情报报告模板（只读配方）">情报报告</a>
       <a href="#market-tools">行情工具</a>
@@ -104,6 +105,7 @@
           <a href="#performance">推荐绩效</a>
           <a href="#strategy-compare">策略对比</a>
           <a href="#factor-library">因子库</a>
+          <a href="#sensitivity">敏感性</a>
           <a href="#tsp-subset">accuracy 图</a>
         </div>
       </div>
@@ -1483,6 +1485,82 @@
         <details class="raw-json">
           <summary>原始 JSON</summary>
           <pre id="factor-library-json" class="code"></pre>
+        </details>
+      </div>
+    </section>
+
+    <section id="sensitivity" class="panel">
+      <h2>闸门参数敏感性（S3）</h2>
+      <p class="hint">
+        扫描入场闸门关键阈值（<b>反转分位 reversal_q</b> / <b>分数下限 min_pick_score</b> /
+        <b>均线带宽 ma_band</b>）：每个网格点走<b>同一</b>回测引擎，只差旋钮。
+        判定 <b>稳健</b>（最优非单点）/ <b>脆弱</b>（仅最优点达标，过拟合风险）/ <b>平坦</b>（不敏感）。
+        只读 <code>market.db</code>，SIMULATE，不进每日推荐主路径。
+      </p>
+      <form id="sensitivity-form" class="row">
+        <label>起 <input id="sensitivity-start" type="date" /></label>
+        <label>止 <input id="sensitivity-end" type="date" /></label>
+        <label>旋钮 <input id="sensitivity-knobs" type="text" size="30" value="reversal_q,min_pick_score,ma_band" /></label>
+        <label>目标
+          <select id="sensitivity-objective">
+            <option value="sharpe" selected>sharpe</option>
+            <option value="total_return">total_return</option>
+            <option value="calmar">calmar</option>
+            <option value="max_drawdown">max_drawdown</option>
+          </select>
+        </label>
+        <label>容差 <input id="sensitivity-tolerance" type="number" min="0.001" max="1" step="0.01" value="0.10" /></label>
+        <label>universe
+          <select id="sensitivity-universe">
+            <option value="stock" selected>stock</option>
+            <option value="etf">etf</option>
+            <option value="all">all</option>
+          </select>
+        </label>
+        <button type="submit" id="btn-sensitivity-go">运行扫描</button>
+      </form>
+      <p id="sensitivity-meta" class="status" aria-live="polite"></p>
+      <pre id="sensitivity-error" class="error" hidden></pre>
+      <div id="sensitivity-result" hidden>
+        <p id="sensitivity-verdict" class="status"></p>
+        <div class="table-wrap">
+          <table id="sensitivity-table">
+            <thead>
+              <tr>
+                <th>旋钮</th>
+                <th>裁决</th>
+                <th>最优值</th>
+                <th>稳健区间</th>
+                <th class="num">stability</th>
+                <th class="num">单调</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6">尚未运行（无 DB 时 fail-closed）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table id="sensitivity-points-table">
+            <thead>
+              <tr>
+                <th>旋钮</th>
+                <th class="num">取值</th>
+                <th class="num">笔数</th>
+                <th class="num">sharpe</th>
+                <th class="num">总收益</th>
+                <th class="num">最大回撤</th>
+                <th class="num">calmar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="7">尚未运行。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="raw-json">
+          <summary>原始 JSON</summary>
+          <pre id="sensitivity-json" class="code"></pre>
         </details>
       </div>
     </section>

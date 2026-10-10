@@ -138,6 +138,11 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="factor-library-verdict"' in body
     assert "runFactorLibrary" in client.get("/static/app.js").text
     assert "/api/research/factor/admission" in client.get("/static/app.js").text
+    assert 'id="sensitivity-form"' in body
+    assert 'id="sensitivity-table"' in body
+    assert 'id="sensitivity-verdict"' in body
+    assert "runSensitivity" in client.get("/static/app.js").text
+    assert "/api/research/strategy/sensitivity" in client.get("/static/app.js").text
     assert "tsp-spark" in client.get("/static/app.css").text
     assert 'id="pref-preset"' in body
     assert 'id="recommend-review-block"' in body

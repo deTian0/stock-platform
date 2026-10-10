@@ -3341,6 +3341,102 @@
     }
   }
 
+
+  async function runSensitivity(event) {
+    if (event) event.preventDefault();
+    var errEl = $("sensitivity-error");
+    if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+    var startV = $("sensitivity-start") && $("sensitivity-start").value;
+    var endV = $("sensitivity-end") && $("sensitivity-end").value;
+    var knobsRaw = ($("sensitivity-knobs") && $("sensitivity-knobs").value) || "";
+    var objective = ($("sensitivity-objective") && $("sensitivity-objective").value) || "sharpe";
+    var tolerance = Number(($("sensitivity-tolerance") && $("sensitivity-tolerance").value) || "0.10");
+    var universe = ($("sensitivity-universe") && $("sensitivity-universe").value) || "stock";
+    var knobs = knobsRaw.split(",").map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    if ($("sensitivity-meta")) {
+      $("sensitivity-meta").textContent = "运行中… 每点完整回放，窗口越长越慢";
+    }
+    var body = { objective: objective, tolerance: tolerance, universe: universe };
+    if (knobs.length) body.knobs = knobs;
+    if (startV) body.start = startV;
+    if (endV) body.end = endV;
+    try {
+      var data = await fetchJson("/api/research/strategy/sensitivity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      renderSensitivity(data);
+    } catch (err) {
+      if (errEl) { errEl.hidden = false; errEl.textContent = String(err && err.message ? err.message : err); }
+      if ($("sensitivity-meta")) $("sensitivity-meta").textContent = "敏感性扫描失败";
+      if ($("sensitivity-result")) $("sensitivity-result").hidden = true;
+    }
+  }
+
+  function sensitivityVerdictLabel(v) {
+    if (v === "robust") return "稳健";
+    if (v === "fragile") return "脆弱（过拟合风险）";
+    if (v === "flat") return "平坦（不敏感）";
+    if (v === "insufficient") return "点数不足";
+    return v || "—";
+  }
+
+  function renderSensitivity(data) {
+    if (!data || !data.ok) return;
+    if ($("sensitivity-result")) $("sensitivity-result").hidden = false;
+    if ($("sensitivity-meta")) {
+      $("sensitivity-meta").textContent =
+        "目标=" + data.objective + " · 容差=" + data.tolerance + " · 截面 " + (data.nDates || "-") +
+        " · universe=" + (data.universe || "stock") + " · 只读 " + (data.dbSource || "market.db");
+    }
+    if ($("sensitivity-verdict")) {
+      $("sensitivity-verdict").textContent =
+        "总判 " + sensitivityVerdictLabel(data.overall) +
+        "；稳健 " + ((data.robust || []).join(", ") || "无") +
+        "；脆弱 " + ((data.fragile || []).join(", ") || "无");
+    }
+    var tbody = $("sensitivity-table") && $("sensitivity-table").querySelector("tbody");
+    if (tbody) {
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      var knobs = Object.keys(data.knobs || {});
+      for (var i = 0; i < knobs.length; i++) {
+        var kb = data.knobs[knobs[i]] || {};
+        var s = kb.summary || {};
+        var rr = s.robustRange;
+        var rrTxt = rr ? (rr.lo + "–" + rr.hi + " (" + rr.n + "点)") : "n/a";
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          td(knobs[i]) +
+          td(sensitivityVerdictLabel(s.verdict)) +
+          tdNum(s.best === null || s.best === undefined ? "n/a" : s.best) +
+          td(rrTxt) +
+          tdNum(s.stability === null || s.stability === undefined ? "n/a" : s.stability) +
+          tdNum(s.monotonic);
+        tbody.appendChild(tr);
+      }
+    }
+    var ptbody = $("sensitivity-points-table") && $("sensitivity-points-table").querySelector("tbody");
+    if (ptbody) {
+      while (ptbody.firstChild) ptbody.removeChild(ptbody.firstChild);
+      var knames = Object.keys(data.knobs || {});
+      for (var k = 0; k < knames.length; k++) {
+        var pts = (data.knobs[knames[k]] || {}).points || [];
+        for (var j = 0; j < pts.length; j++) {
+          var m = pts[j].metrics || {};
+          var tr2 = document.createElement("tr");
+          tr2.innerHTML =
+            td(knames[k]) + tdNum(pts[j].value) + tdNum(pts[j].nTrades) +
+            tdNum(m.sharpe) + tdNum(m.total_return) + tdNum(m.max_drawdown) + tdNum(m.calmar);
+          ptbody.appendChild(tr2);
+        }
+      }
+    }
+    if ($("sensitivity-json")) {
+      $("sensitivity-json").textContent = JSON.stringify(data, null, 2);
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -3857,6 +3953,15 @@
         var flD0 = new Date();
         flD0.setFullYear(flD0.getFullYear() - 1);
         $("factor-library-start").value = flD0.toISOString().slice(0, 10);
+      }
+    }
+    if ($("sensitivity-form")) {
+      $("sensitivity-form").addEventListener("submit", runSensitivity);
+      if ($("sensitivity-end")) $("sensitivity-end").value = new Date().toISOString().slice(0, 10);
+      if ($("sensitivity-start")) {
+        var snD0 = new Date();
+        snD0.setFullYear(snD0.getFullYear() - 1);
+        $("sensitivity-start").value = snD0.toISOString().slice(0, 10);
       }
     }
     if ($("backtest-form")) {

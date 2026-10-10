@@ -441,6 +441,26 @@ class FactorAdmissionResponse(ExtraAllowModel):
     liveTradingEnabled: bool | None = False
 
 
+class StrategySensitivityResponse(ExtraAllowModel):
+    ok: bool | None = None
+    objective: str | None = None
+    tolerance: float | None = None
+    knobs: dict[str, Any] | None = None
+    verdicts: dict[str, str] | None = None
+    robust: list[str] = Field(default_factory=list)
+    fragile: list[str] = Field(default_factory=list)
+    flat: list[str] = Field(default_factory=list)
+    insufficient: list[str] = Field(default_factory=list)
+    overall: str | None = None
+    nDates: int | None = None
+    dbSource: str | None = None
+    universe: str | None = None
+    start: str | None = None
+    end: str | None = None
+    environment: str | None = "SIMULATE"
+    liveTradingEnabled: bool | None = False
+
+
 class RollingBacktestResponse(ExtraAllowModel):
     ok: bool = True
     days: list[dict[str, Any]] = Field(default_factory=list)

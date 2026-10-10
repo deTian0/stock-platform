@@ -35,11 +35,12 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
+from .gates import EntryGateParams
 from .portfolio import CostModel, asset_class, compute_metrics, hhi
 from .rules import (
     CooldownPolicy,
@@ -346,10 +347,11 @@ def replay_book(
 
 def screener_entry_provider(
     *,
-    reversal_q: float = 0.30,
+    reversal_q: float | None = None,
     min_pick_score: float = 0.80,
     value_factor: bool = False,
     weights: Mapping[str, float] | None = None,
+    gate_params: EntryGateParams | None = None,
 ) -> EntryProvider:
     """The ``lvrev`` TopN entry provider — the pre-``X4`` in-loop picker, verbatim.
 
@@ -357,13 +359,25 @@ def screener_entry_provider(
     (:func:`gates.apply_entry_gates`) and the score floor are screener *policy*,
     so they live with the screener; every *rule* they must respect stays in the
     shared loop.
+
+    ``S3`` adds ``gate_params`` so a sensitivity sweep can move one gate constant
+    while still entering through **this** provider (no second copy of the gate).
+    An explicit ``reversal_q`` overrides ``gate_params.reversal_q``; leaving both
+    unset reproduces the ``0.30`` default, so every pre-``S3`` caller is unchanged.
     """
-    from .gates import apply_entry_gates
+    from .gates import EntryGateParams, apply_entry_gates
     from .lvrev import score_lvrev
+
+    if gate_params is None:
+        gate_params = EntryGateParams(
+            reversal_q=0.30 if reversal_q is None else float(reversal_q)
+        )
+    elif reversal_q is not None:
+        gate_params = replace(gate_params, reversal_q=float(reversal_q))
 
     def _provider(ctx: EntryContext) -> list[dict[str, Any]]:
         scored = score_lvrev(ctx.frame, value_factor=value_factor, weights=weights)
-        mask = apply_entry_gates(scored, reversal_q=reversal_q)
+        mask = apply_entry_gates(scored, params=gate_params)
         elig = scored.loc[mask]
         elig = elig[elig["composite_score"] >= min_pick_score]
         if elig.empty:

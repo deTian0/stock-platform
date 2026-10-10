@@ -84,6 +84,7 @@ from ..openapi_models import (
     StrategyAbStatusResponse,
     StrategyCompareResponse,
     StrategyConfigsResponse,
+    StrategySensitivityResponse,
     WalkForwardResponse,
     WizardDailyResponse,
     ok200,
@@ -1830,4 +1831,110 @@ def post_factor_admission(body: FactorAdmissionRequest) -> dict[str, Any]:
             str(a): {str(b): _cell(corr.loc[a, b]) for b in corr.columns}
             for a in corr.index
         }
+    return payload
+
+
+class StrategySensitivityRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start: date | None = Field(None, description="Window start YYYY-MM-DD")
+    end: date | None = Field(None, description="Window end YYYY-MM-DD")
+    universe: str = Field("stock", description="stock | etf | all")
+    knobs: list[str] | None = Field(None, description="subset of the sweepable knobs (default: all)")
+    objective: str = Field("sharpe", description="metric judged for robustness")
+    tolerance: float = Field(0.10, gt=0.0, le=1.0, description="relative plateau tolerance")
+    min_pick_score: float = Field(0.80, ge=0.0, le=1.0, alias="minPickScore")
+    initial_capital: float = Field(50000.0, gt=0, alias="initialCapital")
+    max_positions: int = Field(15, ge=1, le=50, alias="maxPositions")
+    grids: dict[str, list[float]] | None = Field(None, description="per-knob grid override")
+
+
+@router.post(
+    "/strategy/sensitivity",
+    summary="闸门参数敏感性扫描（S3）",
+    responses={**ok200(StrategySensitivityResponse), **RESP_400, **RESP_503},
+)
+def post_strategy_sensitivity(body: StrategySensitivityRequest) -> dict[str, Any]:
+    """S3 — sweep the entry-gate knobs and return a robust-range verdict.
+
+    Every grid point replays the whole book through the **same** engine
+    (``book_replay.replay_book``), entered via the same provider, so two points
+    differ only by the knob. Read-only ``market.db``; SIMULATE; off the brief /
+    picks path. Validation (knob ids / objective / universe / window) runs
+    **before** the DB probe so the branch order is 400 -> 503.
+    """
+    from stock_platform_research.backtest import UNIVERSES, prepare_book_frame
+    from stock_platform_research.book_replay import ReplayParams
+    from stock_platform_research.sensitivity import (
+        OBJECTIVE_DIRECTION,
+        SWEEP_KNOBS,
+        build_sensitivity_report,
+    )
+
+    knobs = list(body.knobs) if body.knobs else None
+    if knobs:
+        unknown = [k for k in knobs if k not in SWEEP_KNOBS]
+        if unknown:
+            raise HTTPException(
+                status_code=400, detail=f"未知旋钮：{unknown}；已知={list(SWEEP_KNOBS)}"
+            )
+    objective = str(body.objective or "sharpe").strip()
+    if objective not in OBJECTIVE_DIRECTION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"objective must be one of {sorted(OBJECTIVE_DIRECTION)}",
+        )
+    universe = str(body.universe or "stock").strip().lower()
+    if universe not in UNIVERSES:
+        raise HTTPException(status_code=400, detail=f"universe must be one of {UNIVERSES}")
+
+    start = body.start.isoformat() if body.start else None
+    end = body.end.isoformat() if body.end else None
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be <= end")
+
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        resolve_engine_market_db,
+    )
+    from stock_platform_research.backtest_cli import filter_universe, load_engine_bars
+
+    db_path = resolve_engine_market_db()
+    if db_path is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=503, detail=f"market.db not found: {db_path}")
+
+    try:
+        bars = load_engine_bars(db_path, start=start, end=end)
+        bars = filter_universe(bars)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"行情库读取失败：{exc}") from exc
+
+    if bars.empty:
+        raise HTTPException(status_code=400, detail="区间内无行情数据（fail-closed）")
+
+    feats = prepare_book_frame(bars, universe=universe, start=start, end=end)
+    if feats.empty:
+        raise HTTPException(status_code=400, detail="区间内无可交易样本（fail-closed）")
+
+    report = build_sensitivity_report(
+        feats,
+        knobs=knobs,
+        grids=body.grids,
+        objective=objective,
+        tolerance=body.tolerance,
+        min_pick_score=body.min_pick_score,
+        params=ReplayParams(
+            initial_capital=body.initial_capital, max_positions=body.max_positions
+        ),
+    )
+    payload = dict(report)
+    payload["dbSource"] = str(db_path)
+    payload["universe"] = universe
+    payload["start"] = start
+    payload["end"] = end
+    payload["nDates"] = int(feats["trade_date"].nunique())
     return payload
