@@ -56,6 +56,28 @@ def _build_provider(args: argparse.Namespace) -> object:
     )
 
 
+def _build_market_symbol_source(args: argparse.Namespace) -> object | None:
+    """X1: build the market.db symbol source when ``--universe-source=market_db``."""
+    if str(args.universe_source or "config").strip().lower() != "market_db":
+        return None
+    try:
+        from stock_platform_providers import EngineSqliteProvider
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit(
+            "market_db universe requires stock-platform-providers. "
+            'Install with: pip install -e ".\\packages\\providers"'
+        ) from exc
+    db = str(
+        args.market_db or os.environ.get("STOCK_PLATFORM_ENGINE_MARKET_DB", "") or ""
+    ).strip()
+    if not db:
+        raise SystemExit(
+            "--universe-source=market_db requires --market-db or "
+            "STOCK_PLATFORM_ENGINE_MARKET_DB (read-only market.db path)"
+        )
+    return EngineSqliteProvider(db)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description="Daily pipeline: refresh → panel → premarket brief (fail-closed)"
@@ -71,6 +93,26 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Universe tier when layered: core|watch|full (default watch for layered)",
     )
+    p.add_argument(
+        "--universe-source",
+        default="config",
+        choices=["config", "market_db"],
+        help="X1: config = JSON fixture (default); market_db = whole market from market.db",
+    )
+    p.add_argument(
+        "--market-db",
+        default=None,
+        help="market.db path for --universe-source=market_db (default STOCK_PLATFORM_ENGINE_MARKET_DB)",
+    )
+    p.add_argument(
+        "--asset-type",
+        default="stock",
+        choices=["stock", "etf", "fund", "all"],
+        help="Asset filter for --universe-source=market_db (default stock)",
+    )
+    p.add_argument("--min-bars", type=int, default=1, help="Min bars in window (market_db only)")
+    p.add_argument("--limit", type=int, default=None, help="Cap universe size (market_db only)")
+    p.add_argument("--include-bse", action="store_true", help="Keep BSE codes (market_db only)")
     p.add_argument(
         "--out",
         default=None,
@@ -112,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         p.error("--fixtures is required when --provider=replay (CI zero public net)")
 
     provider = _build_provider(args)
+    market_source = _build_market_symbol_source(args)
     asof = date.fromisoformat(args.asof)
     report = run_daily_pipeline(
         asof=asof,
@@ -119,6 +162,14 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out,
         universe_path=args.universe,
         universe_tier=args.tier,
+        universe_source=args.universe_source,
+        market_symbol_source=market_source,
+        market_universe_kwargs={
+            "asset_type": args.asset_type,
+            "min_bars": args.min_bars,
+            "limit": args.limit,
+            "include_bse": bool(args.include_bse),
+        },
         top_n=args.top,
         lookback_days=args.lookback_days,
         skip_refresh=bool(args.skip_refresh),

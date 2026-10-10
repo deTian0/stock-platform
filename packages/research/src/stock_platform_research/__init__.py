@@ -36,6 +36,15 @@ from .persistence import (
 from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import W_DEFAULT, W_VALUE, factor_scores, score_lvrev
 from .panel import build_cross_section_panel, build_multi_day_pit_panel, panel_to_csv
+from .market_universe import (
+    ASSET_TYPE_CHOICES,
+    DEFAULT_MARKET_LOOKBACK_DAYS,
+    DEFAULT_MARKET_MIN_BARS,
+    MarketSymbolSource,
+    MarketUniverse,
+    resolve_market_universe,
+    resolve_universe,
+)
 from .pct_scale import (
     SCALE_FRACTION,
     SCALE_POINTS,
@@ -83,6 +92,7 @@ from .strategy_ab import (
     strategy_ab_status,
 )
 from .universe import (
+    UNIVERSE_SOURCES,
     UniverseEmptyError,
     default_daily_universe_path,
     default_universe_fixture_path,
@@ -135,6 +145,12 @@ __all__ = [
     "SCALE_FRACTION",
     "SCALE_POINTS",
     "UNIVERSES",
+    "UNIVERSE_SOURCES",
+    "ASSET_TYPE_CHOICES",
+    "DEFAULT_MARKET_LOOKBACK_DAYS",
+    "DEFAULT_MARKET_MIN_BARS",
+    "MarketSymbolSource",
+    "MarketUniverse",
     "asset_class",
     "detect_pct_scale",
     "evaluate_drift",
@@ -147,6 +163,8 @@ __all__ = [
     "limit_pct",
     "norm_code",
     "normalize_pct_chg",
+    "resolve_market_universe",
+    "resolve_universe",
     "review_positions",
     "run_portfolio_backtest",
     "trade_cost",
@@ -202,4 +220,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "3.13.9"
+__version__ = "4.0.0"

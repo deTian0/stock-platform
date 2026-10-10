@@ -8,6 +8,43 @@
 
 - （无）
 
+## [4.0.0] - 2026-10-10
+
+### Added
+
+- **全市场选股接入（`X1`）**：日线宇宙从 JSON fixture（`core`/`watch`/`full`，数十~数百代码）扩到 `market.db` **全市场**（排除 BSE）。宇宙解析只有**一个入口** `research.market_universe.resolve_universe(source=...)`，`UNIVERSE_SOURCES = ("config", "market_db")`，默认仍是 `config`（X1 不改变既有行为）。契约 [`docs/contracts/market-universe.md`](docs/contracts/market-universe.md)、ADR [`0055`](docs/architecture/0055-market-universe.md)
+  - **providers** `EngineSqliteProvider.list_symbols`：仓库 → 代码列表的**唯一定义** —— 日期窗口聚合（走 `idx_dp_date`）、`min_bars`、BSE 排除（经 `symbol.is_bse_symbol` 单点）、6 位归一、**裸码与带后缀码合并计数**、脏码（非 6 位）丢弃
+  - **research** `resolve_market_universe`：只做资产类别过滤（复用 B4 单点 `portfolio.asset_class`）、`limit`、出处与代价记录、fail-closed；**不重复** BSE 前缀表，也**不重排** provider 结果
+  - `MarketUniverse` 随结果返回出处与代价：`counts`（source → normalized → asset_matched → final）、`elapsed_s`、`peak_memory_mb`（`tracemalloc`，默认关）
+- **CLI** `stock-platform-market-universe`：`--db` / `--asof` / `--asset-type` / `--min-bars` / `--limit` / `--include-bse` / `--probe-panel` / `--json` / `--symbols-only`；文档里的每个实测数字都由它现场产出
+- **流水线接线**：`run_daily_pipeline(universe_source="market_db", market_symbol_source=...)` 自动注入本次 `asof` / `lookback_days`，报告新增 `universe{source,size}`；`daily_cli` 新增 `--universe-source` / `--market-db` / `--asset-type` / `--min-bars` / `--limit` / `--include-bse`
+- 新增测试 `packages/research/tests/test_market_universe.py`（fake source）与 `packages/providers/tests/test_engine_sqlite_universe.py`（合成 sqlite，含裸码 / BSE / 脏码 / 窗口外数据），**全程不碰 3.14 GB 真实库**
+
+### Changed
+
+- 版本号 `3.13.9` → **`4.0.0`**（**major**：能力边界从 watch 宇宙扩到全市场）
+
+### Verified
+
+- 实测（`market.db` 3.14 GB / 877 万行 / asof 2026-09-03，见 [`docs/ops/market-universe-benchmark.md`](docs/ops/market-universe-benchmark.md)）：
+  - 全市场枚举（stock / 排除 BSE）= **5227 只**，耗时 **0.21 s**、峰值 **1.04 MB**
+  - `asset_type=all` 5241 只；`min_bars=60` 5194 只；`include_bse=True` 与默认一致（库内无 BSE 数据）
+  - **全市场单日 PIT panel**：5227 只 → **5209 行** / **23.0 s** / 峰值 **498.8 MB**
+  - SQL 口径：日期窗口聚合 **0.15 s** vs `SUBSTR(code,-2)` 全表扫描 **5.12 s**（**34×**）
+- 全量 `pytest packages apps`（`replay`）= **698 passed / 0 failed**（679 → 698，**+19**）
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.0）
+
+### Docs
+
+- 新增契约 `docs/contracts/market-universe.md`、ADR `docs/architecture/0055-market-universe.md`、实测 `docs/ops/market-universe-benchmark.md`，均已登记进 `scripts/check_docs.ps1` 的 `$required`
+
+### Notes
+
+- ⚠️ **发现数据覆盖缺陷（非平台代码问题）**：`market.db` 自 **2026-09-04** 起每日 bar 数从 ~5.2k 塌到 **14** 只（引擎侧导入中断），**最后可用交易日 = 2026-09-03**。宇宙枚举（120 天窗口）不受影响，但**当日横截面 / 选股会几乎空**（PIT 要求 asof 当日有 bar）。`X3` / `X4` 开工前应先修引擎侧导入 —— 平台只读，不代抓
+- 当前库**不含北交所数据**：`include_bse=True` 与默认结果完全一致（实际过滤 0 个）；排除规则为将来保留
+- `X1` 只做内核 + CLI + 文档，**未新增 Workbench API**；UI 接入留待 `X2`（榜单体系对齐）
+- 与既有红线无关：`L1` 未立项前不触碰 `liveTradingEnabled`
+
 ## [3.13.9] - 2026-10-10
 
 ### Added

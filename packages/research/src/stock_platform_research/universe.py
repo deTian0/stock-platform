@@ -14,12 +14,19 @@ UniverseTier = Literal["core", "watch", "full"]
 
 UNIVERSE_TIERS: tuple[UniverseTier, ...] = ("core", "watch", "full")
 
+# X1: where a universe comes from. ``config`` = JSON fixture (pre-X1 default);
+# ``market_db`` = whole market derived from a-stock-engine market.db.
+# Resolution lives in :mod:`market_universe.resolve_universe` (single entry point).
+UNIVERSE_SOURCES: tuple[str, ...] = ("config", "market_db")
+
 # Soft guidance for EM throttling when live refresh is used (docs + ops).
 # CI / default path remains replay and does not hit the public net.
-RECOMMENDED_SIZE_LIMITS: dict[UniverseTier, int] = {
+RECOMMENDED_SIZE_LIMITS: dict[str, int] = {
     "core": 50,
     "watch": 200,
     "full": 800,
+    # X1: whole-market tier (market.db minus BSE); measured ~5.3k tradable codes.
+    "market": 6000,
 }
 EM_MIN_INTERVAL_HINT = (
     "When using live East Money via em_get, keep EM_MIN_INTERVAL>=1.0s "
