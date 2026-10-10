@@ -8,6 +8,33 @@
 
 - （无）
 
+## [4.0.1] - 2026-10-10
+
+### Added
+
+- **榜单体系对齐（`X2`）**：brief 现在除 `picks[]` 外还产出与 `a-stock-engine` 同构的**五类榜单**，切分逻辑只有**一个定义** `research.rankings.build_rankings`。契约 [`docs/contracts/rankings.md`](docs/contracts/rankings.md)、ADR [`0056`](docs/architecture/0056-ranking-boards.md)
+  - `②A_质量榜` 综合分 TopN（默认 10）／`②B_短线榜`（默认 5，**排除 ②A 头部**，带 `entry_ok` 列时优先取过闸门者、不足按分补足）／`③A_持仓`（持仓 ∩ 截面；**未过今日入场闸门的持仓也列示**，`composite_score=null`）／`③B_操作建议`（**完全委派 B5 `rules`**，只收 `exit`/`trim`，`reason` 原文透传）／`③C_观察名单`（②A 之后 23 只）
+  - `RankingConfig` 为档位参数单点：`quality_top_n` / `short_term_top_n` / `watchlist_top_n` / `min_composite_score`（默认 0.0 关闭）
+  - **`picks` 语义不变**（= ②A 头部），DB 存档 / 绩效日志 / intel-report 零迁移
+- **CLI** `stock-platform-rankings`：`--panel`（原始特征面板或已评分面板）+ `--holdings` → `--md` / `--csv` / `--json`
+- **Workbench**：`/api/research/brief?holdingsPath=`（默认 `STOCK_PLATFORM_HOLDINGS_PATH`，复用 `position_review_cli.load_holdings` 唯一读取器）；响应新增 `rankings` / `rankingsCounts` / `holdingsLoaded` / `holdingsNote`；`#recommend` 页新增「榜单」区块（五榜表格 + fail-closed 提示）
+
+### Changed
+
+- `build_premarket_brief` 改为对**全量**评分截面切榜单后再 `head(top_n)` 生成 `picks`（默认档逐位不变）
+- `run_daily_pipeline(holdings=...)` / `stock-platform-daily --holdings`：流水线支持传入持仓以填充 ③A / ③B
+- 版本号 `4.0.0` → **`4.0.1`**
+
+### Verified
+
+- 全量 `pytest packages apps`（`replay`）= **719 passed / 0 failed**（698 → 719，**+21**）
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.1）
+- 新增测试：`packages/research/tests/test_rankings.py`（16 项：分榜切分 / ②B 优先 entry_ok / 门槛只切推荐类目 / 未过闸门持仓不丢 / ③B reason 来自 `rules` / 三种 fail-closed / CLI 三出口）、`apps/workbench/tests/test_rankings_api.py`（4 项：五榜结构 / 持仓填充 / 坏文件 fail-closed / UI 区块存在）
+
+### Docs
+
+- 新增契约 `docs/contracts/rankings.md`、ADR `docs/architecture/0056-ranking-boards.md`，均已登记进 `scripts/check_docs.ps1` 的 `$required`
+
 ## [4.0.0] - 2026-10-10
 
 ### Added

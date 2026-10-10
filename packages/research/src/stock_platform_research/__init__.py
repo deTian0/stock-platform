@@ -76,6 +76,19 @@ from .rules import (
     is_limit_up,
     limit_pct,
 )
+from .rankings import (
+    ACTIONS_KEY,
+    BOARD_KEYS,
+    BOARD_SLUGS,
+    HOLDINGS_KEY,
+    QUALITY_KEY,
+    SHORT_TERM_KEY,
+    WATCHLIST_KEY,
+    RankingConfig,
+    build_rankings,
+    format_rankings_markdown,
+    rankings_to_rows,
+)
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
@@ -172,6 +185,7 @@ __all__ = [
     "build_cross_section_panel",
     "build_multi_day_pit_panel",
     "build_premarket_brief",
+    "build_rankings",
     "build_reasons_for_row",
     "compare_empirical_baseline",
     "compare_strategy_configs",
@@ -182,6 +196,7 @@ __all__ = [
     "default_universe_fixture_path",
     "extract_engine_fold_returns",
     "factor_scores",
+    "format_rankings_markdown",
     "generate_folds",
     "list_strategy_configs",
     "load_strategy_config",
@@ -192,10 +207,19 @@ __all__ = [
     "open_brief_repository",
     "panel_to_csv",
     "performance_summary",
+    "rankings_to_rows",
     "portfolio_metrics",
     "reason_summary",
+    "ACTIONS_KEY",
+    "BOARD_KEYS",
+    "BOARD_SLUGS",
+    "HOLDINGS_KEY",
+    "QUALITY_KEY",
     "REFRESH_DATASETS",
     "RefreshReport",
+    "RankingConfig",
+    "SHORT_TERM_KEY",
+    "WATCHLIST_KEY",
     "reset_brief_repository_cache",
     "review_stored_brief",
     "run_daily_pipeline",
@@ -220,4 +244,4 @@ __all__ = [
     "write_brief_csv",
 ]
 
-__version__ = "4.0.0"
+__version__ = "4.0.1"

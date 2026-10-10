@@ -58,6 +58,7 @@ def run_daily_pipeline(
     market_universe_kwargs: dict[str, Any] | None = None,
     symbols: list[str] | None = None,
     datasets: list[str] | None = None,
+    holdings: list[dict[str, Any]] | None = None,
     top_n: int = 10,
     lookback_days: int = 120,
     skip_refresh: bool = False,
@@ -71,6 +72,10 @@ def run_daily_pipeline(
     When ``persist_db`` is True (default), also upserts into the SQLite brief
     repository (``STOCK_PLATFORM_DB_URL`` / ADR 0049) — shared with Workbench.
     On failure writes ``failure.json`` and returns ``ok=False`` (fail-closed).
+
+    ``X2``: pass ``holdings`` (book rows with ``code`` / ``entry_price``) to fill
+    the ③A 持仓 and ③B 操作建议 boards; without it those two boards are empty by
+    design (fail-closed, never guessed).
     """
     if isinstance(asof, str):
         asof_d = date.fromisoformat(asof[:10])
@@ -152,6 +157,7 @@ def run_daily_pipeline(
             panel=panel,
             top_n=top_n,
             universe_tier=universe_tier,
+            holdings=holdings,
         )
         brief_json = day_dir / "brief.json"
         brief_csv = day_dir / "brief.csv"
@@ -175,6 +181,7 @@ def run_daily_pipeline(
                 "panelSize": brief["panelSize"],
                 "topN": brief["topN"],
                 "pickCount": len(brief.get("picks") or []),
+                "rankingsCounts": brief.get("rankingsCounts") or {},
             },
             brief_path=str(brief_json),
             panel_path=str(panel_path),

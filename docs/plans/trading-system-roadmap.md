@@ -111,7 +111,7 @@
 | ID | 名称 | 量级 | 目标 tag | 验收标准 |
 |----|------|------|----------|----------|
 | **X1** | 全市场选股接入 | L | `v4.0.0` | **done（2026-10-10）** 从当前 watch 宇宙扩到 `market.db` 全市场（排除 BSE）；耗时与内存有实测数字并写入文档；空宇宙 fail-closed |
-| **X2** | 榜单体系对齐 | M | `v4.0.1` | 对齐 `a-stock-engine` 的榜单语义：质量榜 TopN / 短线榜 TopN / 持仓与减仓建议 / 观察名单；口径文档化 |
+| **X2** | 榜单体系对齐 | M | `v4.0.1` | **done（2026-10-10）** `research.rankings` 单点：②A 质量榜 / ②B 短线榜 / ③A 持仓 / ③B 操作建议（委派 B5 `rules`）/ ③C 观察名单；`picks` 语义不变；口径写入 `docs/contracts/rankings.md` + ADR 0056 |
 | **X3** | 命中追踪接入 | M | `v4.0.2` | 10 交易日周期 + 14 天延期 + 同日去重规则落入平台 SQLite；`pre_market` / `post_market` / `pre_market_in_cycle` 三类累计可查 |
 | **X4** | 选股↔回测闭环 | M | `v4.0.3` | 每日 picks 自动进回测对照；推荐绩效与回测口径同源（承接 B5） |
 
@@ -267,4 +267,5 @@ C2 ← B1；C3 ← S1
 | 2026-10-09 | 缺陷修复：`intel-report/crosswalk` 与 `prefill` **不带 `asof`** 时 500（`default_brief_asof` 签名于 `v3.10.1` 变更，而 `v3.12.5` 新增的调用点按旧签名写就 → 潜伏 5 个版本；UI 默认裸调用故**首屏必崩**，且全部用例都显式传 `asof` 使兜底分支零覆盖）→ 两处统一走 `_resolve_asof`；新增 AST **静态守卫** `test_signature_call_guard.py`（专杀「照旧签名写新调用点」，全包零违规）+ 两条默认 asof 行为回归；真机裸调用 200；发布 `v3.13.7` |
 | 2026-10-10 | 缺陷修复（B5 遗留）：**涨跌停判定因 `pct_chg` 标度混用近乎失效**（股票=小数 / ETF=百分点，`\|x\|>0.5` 一刀切漏判 99.6%）→ 新增 `pct_scale.py` 单点定义（`close` 序列拟合投票 + 除权行剔除 + `asset_class` 回退）；`compute_features` 加 `pct_scale="auto"\|"verbatim"`（默认 `auto`）；全周期 A/B：`verbatim` 与 B1–B6 逐位一致，`auto` 总收益 +91.71%（0.917123）/ 笔数 628 / 终值 95,856.17；全量 660 passed；发布 `v3.13.8` |
 | 2026-10-10 | **数据源适配层**：新增三 provider 统一接入非默认数据源 —— `workbuddy`（WorkBuddy MCP 的 JSON 缓存适配器，`STOCK_PLATFORM_WORKBUDDY_CACHE_DIR`）、`tdx`（通达信本地 `vipdoc/*/lday/*.day` 二进制）、`futu`（富途 OpenAPI 懒加载 `futu-api`）；三预设 `workbuddy`/`cn_tdx`/`cn_futu` + 能力矩阵声明 + 零网络单测；契约 `docs/contracts/data-source-adapters.md`、ADR `0054`；发布 `v3.13.9` |
+| 2026-10-10 | **`X2` 完成**：榜单体系对齐 —— 新增 `research.rankings` 单点（`build_rankings` + `RankingConfig`），五榜 ②A 质量榜（默认 10）/ ②B 短线榜（默认 5，排除 ②A 头部且优先 `entry_ok`）/ ③A 持仓（含未过闸门持仓，分数为 `null`）/ ③B 操作建议（**完全委派 B5 `rules`，只收 exit/trim**）/ ③C 观察名单（默认 23）；`min_composite_score` 值域隔离（平台 `[0,1]` ≠ 引擎百分制 60）；引擎的「评分低于中位数 ⇒ 减仓」启发式**降级为 ③A 上的只读 `belowMedian`**（不写第二套可操作规则）；`picks` 语义不变（= ②A 头部）；CLI `stock-platform-rankings` + `--holdings` 流水线接线 + Workbench `?holdingsPath`/`STOCK_PLATFORM_HOLDINGS_PATH`（复用 `load_holdings` 唯一读取器）+ `#recommend` 榜单区块；契约 `docs/contracts/rankings.md` + ADR `0056`；全量 719 passed；发布 `v4.0.1` |
 | 2026-10-10 | **`X1` 完成（X 域开局）**：全市场宇宙接入 —— `resolve_universe` 单一入口（`config`/`market_db`），providers `list_symbols` 与 research 过滤**职责切分**（BSE 判据归 providers、资产类别归 B4 单点，均不重复实现）；`MarketUniverse` 随结果返回出处与代价；CLI + 流水线 + `daily_cli` 接线；空宇宙一律 `UniverseEmptyError`（**禁止回落样例**）；实测 5227 只 / 0.21 s / 1.04 MB，全市场单日 panel 5209 行 / 23.0 s / 498.8 MB；契约 `docs/contracts/market-universe.md` + ADR `0055` + 实测 `docs/ops/market-universe-benchmark.md`；全量 698 passed；**major 发布 `v4.0.0`**。⚠️ 实测另发现 `market.db` 自 2026-09-04 起日覆盖塌到 14 只（引擎侧导入中断）→ 记为 `X3`/`X4` 前置阻塞（平台只读，不代抓） |
