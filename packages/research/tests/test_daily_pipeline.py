@@ -224,3 +224,57 @@ def test_daily_cli_settle_after_logs_performance(
     assert log_path.is_file()
     lines = [ln for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(lines) >= 1
+
+
+def test_daily_pipeline_records_hit_cycle(tmp_path: Path) -> None:
+    """X3: pipeline records the recommendation head into the hit cycle; idempotent."""
+    asof = date(2026, 9, 2)
+    provider = _PipelineProvider(
+        {
+            "600519": _synth_bars("600519", asof, base=100.0),
+            "000001": _synth_bars("000001", asof, base=10.0),
+        }
+    )
+    db = str(tmp_path / "pipeline.db")
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519", "000001"],
+        datasets=["daily"],
+        top_n=2,
+        db_url=db,
+    )
+    assert report.ok
+    assert report.hits is not None
+    assert report.hits["sessionType"] == "pre_market"
+    assert report.hits["pickDate"] == "2026-09-02"
+    assert report.hits["recorded"] >= 1
+
+    # Same asof → same-day dedup: nothing new recorded.
+    report2 = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519", "000001"],
+        datasets=["daily"],
+        top_n=2,
+        db_url=db,
+    )
+    assert report2.ok
+    assert report2.hits is not None
+    assert report2.hits["recorded"] == 0
+
+    # Opt-out leaves no hit rows behind.
+    report3 = run_daily_pipeline(
+        asof=date(2026, 9, 3),
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519"],
+        datasets=["daily"],
+        top_n=1,
+        track_hits=False,
+        db_url=db,
+    )
+    assert report3.ok
+    assert report3.hits is None

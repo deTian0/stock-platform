@@ -18,6 +18,7 @@
       <a href="#recommend" title="读卡片、历史与复盘">② 推荐</a>
       <a href="#paper" title="纸面草稿，始终 SIMULATE">③ 纸面</a>
       <a href="#performance" title="direction_accuracy 绩效">绩效</a>
+      <a href="#hits" title="命中周期（10 交易日≈14 日历日）">命中追踪</a>
       <a href="#backtest" title="滚动推荐复盘（轻量）">回测</a>
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
       <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
@@ -1104,6 +1105,57 @@
       <details class="raw-json">
         <summary>原始 JSON</summary>
         <pre id="performance-json" class="code"></pre>
+      </details>
+    </section>
+
+    <section id="hits" class="panel">
+      <h2>命中追踪</h2>
+      <p class="hint">
+        与 <code>a-stock-engine</code> 同源的命中周期：首次命中启动周期（10 交易日 ≈
+        <strong>14 日历日</strong>），周期内再次命中<strong>滑动延期</strong> 14 天，同日同 session 只计 1 次。
+        三类累计可查：<code>pre_market</code> / <code>post_market</code> /
+        <code>pre_market_in_cycle</code>。落平台 SQLite；SIMULATE；非投资建议。
+      </p>
+      <div class="row">
+        <label>参考日
+          <input id="hits-asof" type="date" />
+        </label>
+        <label>session
+          <select id="hits-session">
+            <option value="">全部</option>
+            <option value="pre_market" selected>pre_market</option>
+            <option value="post_market">post_market</option>
+          </select>
+        </label>
+        <button type="button" id="btn-hits">刷新命中</button>
+        <button type="button" id="btn-hits-track" class="secondary" title="把当前 asof 已存推荐记入命中周期（幂等）">同步命中</button>
+      </div>
+      <p id="hits-meta" class="status" aria-live="polite"></p>
+      <pre id="hits-error" class="error" hidden></pre>
+      <div id="hits-view" class="stats" hidden></div>
+      <div class="table-wrap">
+        <table id="hits-table">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>命中日</th>
+              <th>session</th>
+              <th>类目</th>
+              <th>周期内</th>
+              <th>累计</th>
+              <th>周期起</th>
+              <th>周期止</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="empty-row"><td colspan="9">尚无命中明细。先生成今日推荐（或在「同步命中」按 asof 记入）。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="raw-json">
+        <summary>原始 JSON</summary>
+        <pre id="hits-json" class="code"></pre>
       </details>
     </section>
 

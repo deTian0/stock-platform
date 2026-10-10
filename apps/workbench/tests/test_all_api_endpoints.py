@@ -614,6 +614,29 @@ _reg(
 )
 _reg(
     EndpointHit(
+        "GET",
+        "/api/research/hit-tracking",
+        expect_status=frozenset({200}),
+        assert_body=_ok_live_off,
+    )
+)
+_reg(
+    EndpointHit(
+        "POST",
+        "/api/research/hit-tracking/track",
+        json={
+            "asof": "2026-09-02",
+            "session": "pre_market",
+            "boards": "quality",
+            "fromStore": True,
+        },
+        expect_status=frozenset({200}),
+        needs_brief=True,
+        assert_body=_ok_live_off,
+    )
+)
+_reg(
+    EndpointHit(
         "POST",
         "/api/research/brief/debate",
         json={
@@ -788,7 +811,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 59
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 61
 
 
 @pytest.mark.unit
@@ -836,4 +859,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 62
+    assert n_ops + n_extra == 64

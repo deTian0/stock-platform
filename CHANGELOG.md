@@ -8,6 +8,36 @@
 
 - （无）
 
+## [4.0.2] - 2026-10-10
+
+### Added
+
+- **命中追踪接入（`X3`）**：把 `a-stock-engine` 的选股命中周期**搬进平台 SQLite**，规则只有**一个定义** `research.hit_tracking.apply_hit`。契约 [`docs/contracts/hit-tracking.md`](docs/contracts/hit-tracking.md)、ADR [`0057`](docs/architecture/0057-hit-tracking.md)
+  - 周期规则（**照搬引擎**）：首次命中启动周期 `cycle_end = pick_date + 14 日历日`（10 交易日≈14 自然日）；周期内再命中 **滑动延期** 14 天且 `cycle_hits += 1`；`pick_date == cycle_end` 算周期内（闭区间）；`total_cycles` 仅在新周期递增；`session_type ∈ {pre_market, post_market}` 两套计数独立
+  - `SqliteHitTrackingRepository`：`hit_tracking` 明细表 + `hit_summary` 汇总表，建在 `STOCK_PLATFORM_DB_URL`（与 brief 存档**同库不同表**）；去重由引擎的「先查后插」升级为硬约束 `UNIQUE(code, session_type, pick_date)`
+  - 代码归一为 6 位数字核（`600519.SH` / `sh600519` / `600519` 同键）；`HitTrackingConfig.cycle_calendar_days` 可配，默认 14
+- **三类累计查询**：`hit_tracking_snapshot(repo, asof=...)` 一次返回 `pre_market` / `post_market` / `pre_market_in_cycle`（前两者为生命周期累计，后者仅统计窗口仍开着的代码——语义分离，契约写明不可混用）；`format_hit_report` 输出 markdown
+- **CLI** `stock-platform-hits`：`--summary` / `--report` / `--details` / `--track-brief` / `--track-json`
+- **Workbench**：`GET /api/research/hit-tracking`（只读三类累计 + 明细 + markdown，空库中文 `emptyMessage`）；`POST /api/research/hit-tracking/track`（显式把已存 brief 记入，幂等）；新增 `#hits` 面板（三块汇总 + 明细表 + 「同步命中」按钮）
+
+### Changed
+
+- `run_daily_pipeline(track_hits=True)`（默认）把 ②A 头部记入 `pre_market` 命中周期，结果落在 `report.hits`；**追踪失败记 `report.hits["error"]`，绝不中断 brief**（`hit_boards` 可覆盖榜单集）
+- `stock-platform-daily --no-track-hits`：关闭默认命中追踪
+- **写入口收敛**：`GET /brief` **不**隐式写命中——Workbench 的 /brief 也用于探索性选股（任意 asof / symbols），计进去会污染周期
+- 版本号 `4.0.1` → **`4.0.2`**
+
+### Verified
+
+- 全量 `pytest packages apps`（`replay`）= **747 passed / 0 failed**（719 → 747，**+28**）
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.2）
+- 新增测试：`packages/research/tests/test_hit_tracking.py`（20 项：纯规则首次 / 滑窗 / 边界闭区间 / 新周期 / 可配天数、仓库同日去重 / 两 session 独立 / 代码归一 / 非法 session / `record_many`、三类累计快照 / 排除已结束周期 / 空库零值 / markdown / 明细筛选、brief 榜单→category 映射）、`apps/workbench/tests/test_hit_tracking_api.py`（5 项）；`test_daily_pipeline.py` 增命中周期回归（+1）
+- `test_all_api_endpoints.py` 端点目录登记两新操作（59 → 61 ops）
+
+### Docs
+
+- 新增契约 `docs/contracts/hit-tracking.md`、ADR `docs/architecture/0057-hit-tracking.md`，均已登记进 `scripts/check_docs.ps1` 的 `$required`
+
 ## [4.0.1] - 2026-10-10
 
 ### Added

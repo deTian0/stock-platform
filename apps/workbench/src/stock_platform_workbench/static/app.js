@@ -1947,6 +1947,122 @@
     }
   }
 
+  function renderHitsTable(rows) {
+    var table = $("hits-table");
+    var tbody = table ? table.querySelector("tbody") : null;
+    if (!tbody) return;
+    if (!rows || !rows.length) {
+      tbody.innerHTML =
+        '<tr class="empty-row"><td colspan="9">尚无命中明细。先生成今日推荐（或在「同步命中」按 asof 记入）。</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows
+      .map(function (r) {
+        return (
+          "<tr>" +
+          td(r.code) +
+          td(r.name) +
+          td(r.pick_date) +
+          td(r.session_type) +
+          td(r.category) +
+          tdNum(r.cycle_hits) +
+          tdNum(r.cumulative) +
+          td(r.cycle_start) +
+          td(r.cycle_end) +
+          "</tr>"
+        );
+      })
+      .join("");
+  }
+
+  async function loadHits() {
+    const errEl = $("hits-error");
+    if (!errEl) return;
+    clearError(errEl);
+    $("hits-meta").textContent = "";
+    var asof = $("hits-asof") && $("hits-asof").value;
+    var session = $("hits-session") ? $("hits-session").value : "";
+    var qs = [];
+    if (asof) qs.push("asof=" + encodeURIComponent(asof));
+    if (session) qs.push("session=" + encodeURIComponent(session));
+    qs.push("limit=20");
+    try {
+      const data = await fetchJson("/api/research/hit-tracking?" + qs.join("&"));
+      const pre = data.pre_market || {};
+      const post = data.post_market || {};
+      const cyc = data.pre_market_in_cycle || {};
+      $("hits-meta").textContent =
+        "pre_market=" +
+        (pre.cumulativeHits != null ? pre.cumulativeHits : 0) +
+        "(" +
+        (pre.codeCount || 0) +
+        " 只) · post_market=" +
+        (post.cumulativeHits != null ? post.cumulativeHits : 0) +
+        "(" +
+        (post.codeCount || 0) +
+        " 只) · pre_market_in_cycle=" +
+        (cyc.cycleHits != null ? cyc.cycleHits : 0) +
+        "(" +
+        (cyc.codeCount || 0) +
+        " 只) · 周期=" +
+        (data.cycleCalendarDays || 14) +
+        " 天" +
+        (data.emptyMessage ? " · " + data.emptyMessage : "");
+      renderStats($("hits-view"), [
+        ["盘前累计命中", pre.cumulativeHits],
+        ["盘前代码数", pre.codeCount],
+        ["盘后累计命中", post.cumulativeHits],
+        ["盘后代码数", post.codeCount],
+        ["盘前周期内命中", cyc.cycleHits],
+        ["周期内代码数", cyc.codeCount],
+      ]);
+      renderHitsTable(data.details || []);
+      $("hits-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      $("hits-json").textContent = "";
+    }
+  }
+
+  async function trackStoredBriefHits() {
+    const errEl = $("hits-error");
+    if (!errEl) return;
+    clearError(errEl);
+    var asof = $("hits-asof") && $("hits-asof").value;
+    if (!asof && $("recommend-asof")) asof = $("recommend-asof").value;
+    if (!asof) {
+      showError(errEl, "请先填写参考日，或先在「今日推荐」回看一个 asof");
+      return;
+    }
+    var session =
+      $("hits-session") && $("hits-session").value ? $("hits-session").value : "pre_market";
+    try {
+      const data = await fetchJson("/api/research/hit-tracking/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asof: asof,
+          session: session,
+          boards: "quality",
+          fromStore: true,
+        }),
+      });
+      var tr = data.tracked || {};
+      $("hits-meta").textContent =
+        "已同步 asof=" +
+        asof +
+        " · session=" +
+        session +
+        " · recorded=" +
+        (tr.recorded != null ? tr.recorded : 0) +
+        " · skipped=" +
+        (tr.skipped != null ? tr.skipped : 0);
+      await loadHits();
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+    }
+  }
+
   async function runWizard(event) {
     if (event) event.preventDefault();
     const errEl = $("wizard-error");
@@ -3420,6 +3536,12 @@
     if ($("btn-performance-log-stored")) {
       $("btn-performance-log-stored").addEventListener("click", logStoredBriefToPerformance);
     }
+    if ($("btn-hits")) {
+      $("btn-hits").addEventListener("click", loadHits);
+    }
+    if ($("btn-hits-track")) {
+      $("btn-hits-track").addEventListener("click", trackStoredBriefHits);
+    }
     if ($("recommend-review-holding")) {
       $("recommend-review-holding").addEventListener("change", function () {
         var meta = $("recommend-review-meta");
@@ -3472,6 +3594,7 @@
     loadMatrix();
     loadPaper();
     loadBroker();
+    loadHits();
   }
 
   if (document.readyState === "loading") {
