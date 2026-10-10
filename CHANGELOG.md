@@ -6,7 +6,24 @@
 
 ### Added
 
+- **实盘立项决议（`L1`）** —— ADR [`0064`](docs/architecture/0064-live-trading-charter.md)（状态 **`Proposed`**，待显式确认）：
+  - 券商选定 **华宝证券（国内）**（落选：富途 / 其它港美股通道 —— 跨境与外汇合规复杂度 + 1 万本金下无意义；同花顺真机通道不在本轮边界内）
+  - 资金上限 **1 万元（账户总资产口径，含现有持仓）**；禁融资融券 / 场外配资
+  - **合规边界 = Phase 0 纯模拟盘 —— 本次明确不解禁红线**（`liveTradingEnabled` 维持恒 `false`，`L2` / `L3` 不开工，`execution/profile.py` 的 `ProfileBlocked` 硬闸**零改动**）
+  - **三阶段解锁条件**：P0 纯模拟（当前）／P1 半自动人工下单（**免报备**，须券商书面口径）／P2 `QMT` 全自动（**必须报备**）
+  - **关键结论**：华宝 `QMT`/`PTrade` 门槛 ≈ 10 万（近 20 交易日日均证券资产）+ 6 个月 A 股经验 + 风险测评 C4/C5 → **1 万元拿不到终端 → 不能自动下单 → 法定定义上不算程序化交易 → 免报备**
+  - 解除红线**影响面清单**（≈37 源文件 + 21 测试文件 + 3 份契约 + 路线图红线第 7 条）＋**失败回滚方案**（P2「状态未知」一律人工介入）
+- 契约 [`docs/contracts/compliance-boundary.md`](docs/contracts/compliance-boundary.md)：四层边界 / 资金口径 / 免报备判据 / 阶段门禁 / P0 名义参数（Proposed） / 监管依据 / 可断言不变量
+
+### Changed
+
 - （无）
+
+### Docs
+
+- 新增 `docs/architecture/0064-live-trading-charter.md` + `docs/contracts/compliance-boundary.md`（均登记 `scripts/check_docs.ps1`，files 142 → 144）
+- 路线图 `L1` 行标记 `ADR 0064 已产出（Proposed）`；**版本映射建议 `v5.0.0` → `v4.1.4`**（`v5.0.0` 保留给「真正解除红线」的那次）
+- **本段待办**：`L1` 置 `Accepted` 前须**用户显式确认**（路线图 §3.5 明文要求）；确认后再升版本号 + 打 tag。
 
 ## [4.1.3] - 2026-10-10
 
