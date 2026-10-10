@@ -85,6 +85,7 @@ from ..openapi_models import (
     StrategyCompareResponse,
     StrategyConfigsResponse,
     StrategySensitivityResponse,
+    StrategyNeutralizationResponse,
     WalkForwardResponse,
     WizardDailyResponse,
     ok200,
@@ -1930,6 +1931,130 @@ def post_strategy_sensitivity(body: StrategySensitivityRequest) -> dict[str, Any
         params=ReplayParams(
             initial_capital=body.initial_capital, max_positions=body.max_positions
         ),
+    )
+    payload = dict(report)
+    payload["dbSource"] = str(db_path)
+    payload["universe"] = universe
+    payload["start"] = start
+    payload["end"] = end
+    payload["nDates"] = int(feats["trade_date"].nunique())
+    return payload
+
+
+class StrategyNeutralizationRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start: date | None = Field(None, description="Window start YYYY-MM-DD")
+    end: date | None = Field(None, description="Window end YYYY-MM-DD")
+    universe: str = Field("stock", description="stock | etf | all")
+    mode: str = Field("demean", description="demean | zscore")
+    clip: float = Field(3.0, gt=0.0, le=10.0, description="clip bound for mode=zscore")
+    min_group_size: int = Field(5, ge=1, le=200, alias="minGroupSize")
+    rescale: str = Field("rank", description="rank | none")
+    composite_demean: bool = Field(True, alias="compositeDemean")
+    style: list[str] | None = Field(None, description="style-exposure columns to residualize")
+    max_per_industry: int | None = Field(None, ge=1, le=50, alias="maxPerIndustry")
+    min_pick_score: float = Field(0.80, ge=0.0, le=1.0, alias="minPickScore")
+    initial_capital: float = Field(50000.0, gt=0, alias="initialCapital")
+    max_positions: int = Field(15, ge=1, le=50, alias="maxPositions")
+
+
+@router.post(
+    "/strategy/neutralization",
+    summary="行业中性化 / 风险暴露 A/B（S4）",
+    responses={**ok200(StrategyNeutralizationResponse), **RESP_400, **RESP_503},
+)
+def post_strategy_neutralization(body: StrategyNeutralizationRequest) -> dict[str, Any]:
+    """S4 — compare the raw book against the industry-neutral book on one engine.
+
+    Both arms replay the **same** feature frame through the **same** loop
+    (``book_replay.replay_book``) and differ only by the neutralization treatment
+    (plus the optional per-industry candidate cap). Read-only ``market.db`` (bars
+    **and** ``fundamentals.industry``); SIMULATE; off the brief / picks path.
+    Validation runs **before** the DB probe so the branch order is 400 -> 503.
+    """
+    from stock_platform_research.backtest import UNIVERSES, prepare_book_frame
+    from stock_platform_research.book_replay import ReplayParams
+    from stock_platform_research.neutralization import (
+        NEUTRALIZE_MODES,
+        NEUTRALIZE_RESCALES,
+        NeutralizeParams,
+    )
+    from stock_platform_research.neutralization_ab import compare_neutralization_ab
+
+    mode = str(body.mode or "demean").strip()
+    if mode not in NEUTRALIZE_MODES:
+        raise HTTPException(
+            status_code=400, detail=f"mode must be one of {NEUTRALIZE_MODES}"
+        )
+    rescale = str(body.rescale or "rank").strip()
+    if rescale not in NEUTRALIZE_RESCALES:
+        raise HTTPException(
+            status_code=400, detail=f"rescale must be one of {NEUTRALIZE_RESCALES}"
+        )
+    universe = str(body.universe or "stock").strip().lower()
+    if universe not in UNIVERSES:
+        raise HTTPException(status_code=400, detail=f"universe must be one of {UNIVERSES}")
+
+    start = body.start.isoformat() if body.start else None
+    end = body.end.isoformat() if body.end else None
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be <= end")
+
+    try:
+        neu = NeutralizeParams(
+            mode=mode,
+            clip=body.clip,
+            min_group_size=body.min_group_size,
+            rescale=rescale,
+            composite_demean=body.composite_demean,
+            style=tuple(body.style or ()),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        resolve_engine_market_db,
+    )
+    from stock_platform_research.backtest_cli import (
+        filter_universe,
+        load_engine_bars,
+        load_engine_industry,
+    )
+
+    db_path = resolve_engine_market_db()
+    if db_path is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=503, detail=f"market.db not found: {db_path}")
+
+    try:
+        bars = load_engine_bars(db_path, start=start, end=end)
+        bars = filter_universe(bars)
+        industry = load_engine_industry(db_path)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"行情库读取失败：{exc}") from exc
+
+    if bars.empty:
+        raise HTTPException(status_code=400, detail="区间内无行情数据（fail-closed）")
+
+    feats = prepare_book_frame(
+        bars, universe=universe, start=start, end=end, industry_map=industry
+    )
+    if feats.empty:
+        raise HTTPException(status_code=400, detail="区间内无可交易样本（fail-closed）")
+
+    report = compare_neutralization_ab(
+        feats,
+        neutralize=neu,
+        params=ReplayParams(
+            initial_capital=body.initial_capital, max_positions=body.max_positions
+        ),
+        max_per_industry=body.max_per_industry,
+        min_pick_score=body.min_pick_score,
     )
     payload = dict(report)
     payload["dbSource"] = str(db_path)

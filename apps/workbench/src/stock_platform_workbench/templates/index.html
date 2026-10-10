@@ -23,6 +23,7 @@
       <a href="#strategy-compare" title="策略配置对比">策略对比</a>
       <a href="#factor-library" title="因子库 IC/ICIR 准入">因子库</a>
       <a href="#sensitivity" title="闸门参数敏感性 (S3)">敏感性</a>
+      <a href="#neutralization" title="行业中性化 / 风险暴露 (S4)">中性化</a>
       <a href="#tsp-subset" title="TSP UI 子集首刀">TSP子集</a>
       <a href="#intel-report" title="情报报告模板（只读配方）">情报报告</a>
       <a href="#market-tools">行情工具</a>
@@ -106,6 +107,7 @@
           <a href="#strategy-compare">策略对比</a>
           <a href="#factor-library">因子库</a>
           <a href="#sensitivity">敏感性</a>
+          <a href="#neutralization">中性化</a>
           <a href="#tsp-subset">accuracy 图</a>
         </div>
       </div>
@@ -1561,6 +1563,84 @@
         <details class="raw-json">
           <summary>原始 JSON</summary>
           <pre id="sensitivity-json" class="code"></pre>
+        </details>
+      </div>
+    </section>
+
+    <section id="neutralization" class="panel">
+      <h2>行业中性化 / 风险暴露（S4）</h2>
+      <p class="hint">
+        打分前做<b>行业中性化</b>（按 <code>fundamentals.industry</code> 分组去均值 / z-score），
+        可选对<b>风格暴露</b>（如 <code>vol20</code>）做正交残差化，另可限制<b>每行业候选上限</b>（风险暴露约束）。
+        A/B 两臂走<b>同一</b>回测引擎，只差处理项；显示 <b>delta = 中性化 − 原始</b> 与各臂行业暴露。
+        只读 <code>market.db</code>，SIMULATE，不进每日推荐主路径。
+      </p>
+      <form id="neutralization-form" class="row">
+        <label>起 <input id="neutralization-start" type="date" /></label>
+        <label>止 <input id="neutralization-end" type="date" /></label>
+        <label>mode
+          <select id="neutralization-mode">
+            <option value="demean" selected>demean</option>
+            <option value="zscore">zscore</option>
+          </select>
+        </label>
+        <label>rescale
+          <select id="neutralization-rescale">
+            <option value="rank" selected>rank</option>
+            <option value="none">none</option>
+          </select>
+        </label>
+        <label>最小行业人数 <input id="neutralization-min-group" type="number" min="1" max="200" step="1" value="5" /></label>
+        <label>风格列 <input id="neutralization-style" type="text" size="14" value="vol20" /></label>
+        <label>每行业上限 <input id="neutralization-max-per-industry" type="number" min="1" max="50" step="1" placeholder="不限" /></label>
+        <label>universe
+          <select id="neutralization-universe">
+            <option value="stock" selected>stock</option>
+            <option value="etf">etf</option>
+            <option value="all">all</option>
+          </select>
+        </label>
+        <button type="submit" id="btn-neutralization-go">运行 A/B</button>
+      </form>
+      <p id="neutralization-meta" class="status" aria-live="polite"></p>
+      <pre id="neutralization-error" class="error" hidden></pre>
+      <div id="neutralization-result" hidden>
+        <p id="neutralization-verdict" class="status"></p>
+        <div class="table-wrap">
+          <table id="neutralization-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th class="num">原始</th>
+                <th class="num">中性化</th>
+                <th class="num">delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="4">尚未运行（无 DB 时 fail-closed）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table id="neutralization-exposure-table">
+            <thead>
+              <tr>
+                <th>臂</th>
+                <th class="num">选股数</th>
+                <th class="num">行业数</th>
+                <th class="num">最大行业权重</th>
+                <th>最大行业</th>
+                <th class="num">HHI</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6">尚未运行。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="raw-json">
+          <summary>原始 JSON</summary>
+          <pre id="neutralization-json" class="code"></pre>
         </details>
       </div>
     </section>

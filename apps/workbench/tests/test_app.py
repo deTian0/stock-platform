@@ -143,6 +143,18 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert 'id="sensitivity-verdict"' in body
     assert "runSensitivity" in client.get("/static/app.js").text
     assert "/api/research/strategy/sensitivity" in client.get("/static/app.js").text
+    assert 'id="neutralization-form"' in body
+    assert 'id="neutralization-table"' in body
+    assert 'id="neutralization-exposure-table"' in body
+    assert 'id="neutralization-verdict"' in body
+    assert "runNeutralization" in client.get("/static/app.js").text
+    assert "/api/research/strategy/neutralization" in client.get("/static/app.js").text
+    assert 'id="neutralization-form"' in body
+    assert 'id="neutralization-table"' in body
+    assert 'id="neutralization-exposure-table"' in body
+    assert 'id="neutralization-verdict"' in body
+    assert "runNeutralization" in client.get("/static/app.js").text
+    assert "/api/research/strategy/neutralization" in client.get("/static/app.js").text
     assert "tsp-spark" in client.get("/static/app.css").text
     assert 'id="pref-preset"' in body
     assert 'id="recommend-review-block"' in body

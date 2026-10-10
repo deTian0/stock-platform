@@ -41,6 +41,7 @@ from typing import Any, Callable, Mapping, Sequence
 import pandas as pd
 
 from .gates import EntryGateParams
+from .neutralization import NeutralizeParams
 from .portfolio import CostModel, asset_class, compute_metrics, hhi
 from .rules import (
     CooldownPolicy,
@@ -352,6 +353,8 @@ def screener_entry_provider(
     value_factor: bool = False,
     weights: Mapping[str, float] | None = None,
     gate_params: EntryGateParams | None = None,
+    neutralize: NeutralizeParams | None = None,
+    max_per_industry: int | None = None,
 ) -> EntryProvider:
     """The ``lvrev`` TopN entry provider — the pre-``X4`` in-loop picker, verbatim.
 
@@ -364,6 +367,13 @@ def screener_entry_provider(
     while still entering through **this** provider (no second copy of the gate).
     An explicit ``reversal_q`` overrides ``gate_params.reversal_q``; leaving both
     unset reproduces the ``0.30`` default, so every pre-``S3`` caller is unchanged.
+
+    ``S4`` adds ``neutralize`` — threaded straight into :func:`lvrev.score_lvrev`
+    so an industry-neutral arm enters through **this** provider too (never a second
+    scorer). ``max_per_industry`` caps how many candidates one industry may
+    contribute; it is applied *before* the loop's ``max_picks_per_day`` head and the
+    survivors are re-sorted by ``composite_score``, so the cap changes composition
+    without changing the ordering rule. Both default to ``None`` → unchanged.
     """
     from .gates import EntryGateParams, apply_entry_gates
     from .lvrev import score_lvrev
@@ -376,12 +386,27 @@ def screener_entry_provider(
         gate_params = replace(gate_params, reversal_q=float(reversal_q))
 
     def _provider(ctx: EntryContext) -> list[dict[str, Any]]:
-        scored = score_lvrev(ctx.frame, value_factor=value_factor, weights=weights)
+        scored = score_lvrev(
+            ctx.frame,
+            value_factor=value_factor,
+            weights=weights,
+            neutralize=neutralize,
+        )
         mask = apply_entry_gates(scored, params=gate_params)
         elig = scored.loc[mask]
         elig = elig[elig["composite_score"] >= min_pick_score]
         if elig.empty:
             return []
+        if max_per_industry is not None:
+            ind_col = neutralize.industry_col if neutralize is not None else "industry"
+            if ind_col in elig.columns and int(max_per_industry) > 0:
+                elig = (
+                    elig.groupby(ind_col, sort=False)
+                    .head(int(max_per_industry))
+                    .sort_values("composite_score", ascending=False)
+                )
+                if elig.empty:
+                    return []
         return [
             {
                 "code": str(row["code"]),

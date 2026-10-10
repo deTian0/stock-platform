@@ -86,6 +86,34 @@ def filter_universe(df: pd.DataFrame, *, exclude_bse: bool = True) -> pd.DataFra
     return out.reset_index(drop=True)
 
 
+def load_engine_industry(
+    db_path: str | Path,
+    *,
+    table: str = "fundamentals",
+    column: str = "industry",
+) -> dict[str, str]:
+    """Read-only ``code → industry`` map from the engine DB (milestone ``S4``).
+
+    ``fundamentals.code`` is bare 6-digit while ``daily_price.code`` carries an
+    exchange suffix; :func:`neutralization.attach_industry` normalises both sides,
+    so this loader returns the engine's raw keys untouched. Missing table/column
+    is **fail-closed** (``KeyError``) rather than an empty map — a silent empty map
+    would quietly disable neutralization.
+    """
+    uri = "file:%s?mode=ro" % str(db_path).replace("\\", "/")
+    con = sqlite3.connect(uri, uri=True)
+    try:
+        tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if table not in tables:
+            raise KeyError(f"{table!r} table not found in {db_path}")
+        df = pd.read_sql_query(f"SELECT code, {column} FROM {table}", con)
+    finally:
+        con.close()
+    df = df.dropna(subset=[column])
+    df = df[df[column].astype(str).str.strip() != ""]
+    return dict(zip(df["code"].astype(str), df[column].astype(str)))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stock-platform-backtest",

@@ -9,6 +9,13 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .neutralization import (
+    NeutralizeParams,
+    industry_neutralize_series,
+    neutralize_factor_scores,
+    resolve_groups,
+)
+
 # Locked weights (engine v4.29 / M2 rolling re-estimate OOS).
 W_DEFAULT = dict(vol=0.5, rev=0.5, value=0.0, q=0.0, g=0.0)
 W_VALUE = dict(vol=0.41, rev=0.41, value=0.18, q=0.0, g=0.0)
@@ -97,14 +104,24 @@ def score_lvrev(
     value_factor: bool = False,
     ey_weight: float = 0.0,
     weights: dict | None = None,
+    neutralize: NeutralizeParams | None = None,
 ) -> pd.DataFrame:
-    """Score cross-section; returns df sorted by ``composite_score`` descending."""
+    """Score cross-section; returns df sorted by ``composite_score`` descending.
+
+    ``neutralize`` (``S4``) removes industry tilt before the weighted sum
+    (per-factor industry de-mean / z-score, optional style-exposure
+    residualization). Left ``None`` (the default) the composite is computed
+    exactly as before ``S4`` — bit-for-bit.
+    """
     if len(df) == 0:
         out = df.copy()
         out["composite_score"] = 0.0
         return out
     d = df.copy()
     fs = factor_scores(d)
+
+    if neutralize is not None:
+        fs = neutralize_factor_scores(fs, d, neutralize)
 
     if ey_weight > 0 and "pe" in d.columns:
         pe_clean = d["pe"].where((d["pe"] > 0) & (d["pe"] < 300))
@@ -129,4 +146,16 @@ def score_lvrev(
         + w.get("illiq", 0.0) * fs["illiq"]
         + ey_weight * ey_rank
     )
+    if neutralize is not None and neutralize.composite_demean:
+        groups = resolve_groups(d, col=neutralize.industry_col)
+        cs = industry_neutralize_series(
+            d["composite_score"],
+            groups,
+            mode=neutralize.mode,
+            clip=neutralize.clip,
+            min_group_size=neutralize.min_group_size,
+        )
+        if neutralize.rescale == "rank":
+            cs = cs.rank(pct=True, na_option="keep").fillna(0.5)
+        d["composite_score"] = cs
     return d.sort_values("composite_score", ascending=False)
