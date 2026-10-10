@@ -76,6 +76,7 @@ $required = @(
   'docs/architecture/0055-market-universe.md',
   'docs/architecture/0056-ranking-boards.md',
   'docs/architecture/0057-hit-tracking.md',
+  'docs/architecture/0058-market-db-source-of-truth.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

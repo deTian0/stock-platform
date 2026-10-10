@@ -113,7 +113,7 @@
 | **X1** | 全市场选股接入 | L | `v4.0.0` | **done（2026-10-10）** 从当前 watch 宇宙扩到 `market.db` 全市场（排除 BSE）；耗时与内存有实测数字并写入文档；空宇宙 fail-closed |
 | **X2** | 榜单体系对齐 | M | `v4.0.1` | **done（2026-10-10）** `research.rankings` 单点：②A 质量榜 / ②B 短线榜 / ③A 持仓 / ③B 操作建议（委派 B5 `rules`）/ ③C 观察名单；`picks` 语义不变；口径写入 `docs/contracts/rankings.md` + ADR 0056 |
 | **X3** | 命中追踪接入 | M | `v4.0.2` | **done（2026-10-10）** `research.hit_tracking` 单点（`apply_hit`）＋ `SqliteHitTrackingRepository`；10 交易日≈14 日历日周期 / 周期内滑动延期 / `UNIQUE(code,session_type,pick_date)` 去重；`hit_tracking_snapshot` 三类累计（`pre_market` / `post_market` / `pre_market_in_cycle`）；契约 `docs/contracts/hit-tracking.md` + ADR 0057 |
-| **X4** | 选股↔回测闭环 | M | `v4.0.3` | 每日 picks 自动进回测对照；推荐绩效与回测口径同源（承接 B5） |
+| **X4** | 选股↔回测闭环 | M | `v4.0.4` | 每日 picks 自动进回测对照；推荐绩效与回测口径同源（承接 B5） |
 
 ---
 
@@ -145,7 +145,7 @@
 | ID | 名称 | 量级 | 目标 tag | 验收标准 |
 |----|------|------|----------|----------|
 | **C1** | 双线职责边界定稿 | S | 随 `G3` | 产出职责表：谁是日常调度主链、谁是数据真相源、什么情况下用哪条；写入 `docs/plans/` 并互相交叉链 |
-| **C2** | 数据真相源统一 | M | 随 `B1` | 确认 `market.db` 为唯一历史行情真相源（平台只读已在 ADR 0050 落地）；`selections.db` / `picks.db` 等派生库的归属与同步方式写明 |
+| **C2** | 数据真相源统一 | M | `v4.0.3` | **done（2026-10-10）** 确认 `daily_price`（`market.db`）为唯一历史行情真相源，派生库归属写明（引擎 `a-stock-engine.db` / `selections.db`、平台 `stock_platform.db`、引擎 `history/picks.db`）；**摄取归生产侧**、平台只读延续 ADR 0050；平台侧新增**覆盖守卫** `EngineSqliteProvider.coverage_snapshot` + `GET /api/ops/health.marketDb`（`thin` / `stale` / `empty` / `missing_table` / `error` → `degraded`）；实测破相已修复（2026-09-04~10-09 共 20 个交易日回补）；ADR 0058 + runbook `docs/ops/engine-market-db.md` |
 | **C3** | 重复实现收敛清单 | M | 随 `S1` | 列出选股引擎 / 回测引擎 / 行情抓取 / 多 Agent 的重复实现，逐项标注「保留 / 降级为参考 / 废弃」；不批量删除，按里程碑渐进收敛 |
 
 **约束**：C 域只做「定边界 + 定归属 + 列清单」，**不在本路线图内执行大规模代码合并**。
@@ -185,7 +185,8 @@ C2 ← B1；C3 ← S1
 | G | G1–G3 | `v3.12.6`（G1+G2 合并） → `v3.12.7`（G3） | patch |
 | B | B1–B6 | `v3.13.0` → `v3.13.6` | minor |
 | S | S1–S5 | `v3.14.0` → `v3.14.4` | minor |
-| X | X1–X4 | `v4.0.0` → `v4.0.3` | **major**（能力边界从 watch 扩到全市场） |
+| X | X1–X4 | `v4.0.0` → `v4.0.4` | **major**（能力边界从 watch 扩到全市场） |
+| C | C2（穿插） | `v4.0.3` | patch（数据治理：真相源统一 + 覆盖守卫） |
 | L | L1–L3 | `v5.0.0` → `v5.0.2` | **major**（解禁实盘红线） |
 
 每个里程碑收口时按既有流程：勾选本文件 → 更新 `CHANGELOG.md` → 更新 `VERSION` → `scripts/release_tag.ps1` → `git push --follow-tags`。
@@ -270,3 +271,4 @@ C2 ← B1；C3 ← S1
 | 2026-10-10 | **`X2` 完成**：榜单体系对齐 —— 新增 `research.rankings` 单点（`build_rankings` + `RankingConfig`），五榜 ②A 质量榜（默认 10）/ ②B 短线榜（默认 5，排除 ②A 头部且优先 `entry_ok`）/ ③A 持仓（含未过闸门持仓，分数为 `null`）/ ③B 操作建议（**完全委派 B5 `rules`，只收 exit/trim**）/ ③C 观察名单（默认 23）；`min_composite_score` 值域隔离（平台 `[0,1]` ≠ 引擎百分制 60）；引擎的「评分低于中位数 ⇒ 减仓」启发式**降级为 ③A 上的只读 `belowMedian`**（不写第二套可操作规则）；`picks` 语义不变（= ②A 头部）；CLI `stock-platform-rankings` + `--holdings` 流水线接线 + Workbench `?holdingsPath`/`STOCK_PLATFORM_HOLDINGS_PATH`（复用 `load_holdings` 唯一读取器）+ `#recommend` 榜单区块；契约 `docs/contracts/rankings.md` + ADR `0056`；全量 719 passed；发布 `v4.0.1` |
 | 2026-10-10 | **`X1` 完成（X 域开局）**：全市场宇宙接入 —— `resolve_universe` 单一入口（`config`/`market_db`），providers `list_symbols` 与 research 过滤**职责切分**（BSE 判据归 providers、资产类别归 B4 单点，均不重复实现）；`MarketUniverse` 随结果返回出处与代价；CLI + 流水线 + `daily_cli` 接线；空宇宙一律 `UniverseEmptyError`（**禁止回落样例**）；实测 5227 只 / 0.21 s / 1.04 MB，全市场单日 panel 5209 行 / 23.0 s / 498.8 MB；契约 `docs/contracts/market-universe.md` + ADR `0055` + 实测 `docs/ops/market-universe-benchmark.md`；全量 698 passed；**major 发布 `v4.0.0`**。⚠️ 实测另发现 `market.db` 自 2026-09-04 起日覆盖塌到 14 只（引擎侧导入中断）→ 记为 `X3`/`X4` 前置阻塞（平台只读，不代抓） |
 | 2026-10-10 | **`X3` 完成**：命中追踪接入 —— 新增 `research.hit_tracking` 单点（`apply_hit` 纯规则）＋ `SqliteHitTrackingRepository`（`hit_tracking` 明细 `UNIQUE(code,session_type,pick_date)` + `hit_summary` 汇总，与 brief 存档同库不同表）；规则**照搬** `a-stock-engine`（10 交易日≈14 日历日、周期内滑动延期、闭区间、`total_cycles` 仅新周期递增），仅把「先查后插」升级为硬唯一约束；`hit_tracking_snapshot` 三类累计（`pre_market` / `post_market` / `pre_market_in_cycle`）；写入口收敛（流水线默认 `track_hits=True` 记 ②A 头部、失败不外抛；`GET /brief` **不**隐式写，避免探索性选股污染周期）；CLI `stock-platform-hits` + `daily --no-track-hits` + Workbench `GET/POST /api/research/hit-tracking` + `#hits` 面板；契约 `docs/contracts/hit-tracking.md` + ADR `0057`；全量 747 passed；发布 `v4.0.2` |
+| 2026-10-10 | **`C2` 完成（X4 前置阻塞解除）**：数据真相源统一 + 覆盖守卫 —— 确认 `daily_price`（`market.db`）为唯一历史行情真相源，派生库（引擎 `a-stock-engine.db`/`selections.db`/`history/picks.db`、平台 `stock_platform.db`）归属写明且禁作行情输入；**摄取归生产侧**、平台只读延续 ADR 0050；平台新增只读 `EngineSqliteProvider.coverage_snapshot`（双判据：CN 交易日齐全 + 每日 ≥ `min_rows`，滞后**按交易日**计）+ `GET /api/ops/health.marketDb`（`thin`/`stale`/`empty`/`missing_table`/`error` → `degraded`）；**实测破相已修**：`daily_price` 自 2026-09-04 起塌陷（3 个部分日各 14 行 + 17 个交易日全缺）→ 生产侧 `empirical/backfill_market_daily.py` 回补 20 交易日 / 104,301 行 / 0 失败，单位口径 `--validate` 四字段比值全 1.0000；ADR `0058` + runbook `docs/ops/engine-market-db.md`；全量 761 passed；发布 `v4.0.3`。**X4 目标 tag 顺延至 `v4.0.4`** |

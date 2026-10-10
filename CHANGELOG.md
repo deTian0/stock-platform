@@ -8,6 +8,38 @@
 
 - （无）
 
+## [4.0.3] - 2026-10-10
+
+### Added
+
+- **数据真相源统一 + 覆盖守卫（`C2`）**：确认 `daily_price`（`market.db`）为唯一历史行情真相源，并把"摄取还在不在跑"变成**可查询的判据**。ADR [`0058`](docs/architecture/0058-market-db-source-of-truth.md)
+  - `EngineSqliteProvider.coverage_snapshot(asof, lookback_days=30, min_rows=3000)`：**只读**双判据快照 —— ① 窗口内 CN 交易日是否齐全（含 `lagTradingDays`，**按交易日而非自然日**计滞后，周末/长假不误报）；② 每日行数是否 ≥ `min_rows`。裁决 `ok | thin | stale | empty | missing_table`；异常收敛为 `status="error"`，**永不抛给调用方**
+  - `GET /api/ops/health` 新增 `marketDb` 块：`thin` / `stale` / `empty` / `missing_table` / `error` 会把整体 `status` 降级为 `degraded`；未配置时为 `unconfigured`**不降级**
+- 派生库归属写明（ADR 0058 表）：引擎 `a-stock-engine.db` / `selections.db` / `history/picks.db`、平台 `stock_platform.db` —— 均**不得**作为历史行情输入
+
+### Fixed
+
+- **引擎 `market.db` 覆盖破相（静默一个月）**：`daily_price` 自 `2026-09-04` 起破相 —— `09-04` / `09-07` / `09-08` 各仅 **14 行**（引擎 `refresh_etf_daily_prices` 每日只写 14 只 ETF 的签名行数），`09-09`~`10-09` 共 **17 个交易日完全缺失**，最后全市场日停在 `2026-09-03`（5223 行）。已在生产侧回补 **20 个交易日 / 104,301 行 / 0 失败**，覆盖恢复（每日 ~5.2k 行，最新 `2026-10-09`）
+- 摄取链路的两处结构缺陷已定位并写入 runbook：① 全市场写入只靠手动 `empirical/backfill_market_daily.py`，日常自动化随引擎归档停止后无人补；② `import_local_data.py` 的断点续传按**日期存在性**判定，**部分覆盖日被永久跳过**、无法自愈
+- **已知遗留（本轮不改）**：`refresh_etf_daily_prices` 会删光 14 只 `WELL_KNOWN_ETFS` 的**全部历史**再写 65 根、`pct_chg` 全 0（实测各仅剩 `2026-06-09~09-08`；同表裸码 `518880` 仍有 1499 行）。修复路径已实测可用（`fund_daily`，14 次调用），待复权口径决策后单独处理
+
+### Changed
+
+- 版本号 `4.0.2` → **`4.0.3`**
+
+### Verified
+
+- 全量 `pytest packages apps`（`replay`）= **761 passed / 0 failed**（747 → 761，**+14**）
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.3）
+- 新增测试：`packages/providers/tests/test_engine_coverage.py`（9 项：窗口齐全 / 薄日 / 缺日 / **交易日滞后口径** / 空窗 / 缺表不抛 / 快照形状与只读 / asof 默认 / 非法 asof）、`apps/workbench/tests/test_ops_market_db.py`（5 项：未配置不降级 / 齐全 ok / 薄日降级 / 缺日降级 / 坏库**不 5xx**）
+- 回补单位口径实测：`--validate` 对 `2026-09-03` 存量全市场日抽样 400 只，`close` / `pct_chg` / `vol` / `amount` 比值中位数**全为 1.0000**
+- 覆盖复核：`2026-09-04`~`10-09` 每个交易日恢复 ~5.2k 行；全库 8,875,338 行 / 1638 交易日 / 6983 码
+
+### Docs
+
+- 新增 ADR `docs/architecture/0058-market-db-source-of-truth.md`（已登记 `scripts/check_docs.ps1`）
+- `docs/ops/engine-market-db.md` 新增「摄取与覆盖自检（C2）」：刷新命令 / 单位口径 / 自检出口 / 三条已知坑
+
 ## [4.0.2] - 2026-10-10
 
 ### Added
