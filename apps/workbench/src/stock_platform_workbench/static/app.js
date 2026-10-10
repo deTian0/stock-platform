@@ -3051,6 +3051,222 @@
     }
   }
 
+  var AB_ENGINE_METRICS = [
+    ["total_return", "总收益", "pct"],
+    ["cagr", "CAGR", "pct"],
+    ["max_drawdown", "最大回撤", "pct"],
+    ["sharpe", "夏普", "num3"],
+    ["sortino", "索提诺", "num3"],
+    ["calmar", "Calmar", "num3"],
+    ["win_rate", "胜率", "pct"],
+    ["avg_hold_days", "平均持有(日)", "num2"],
+    ["turnover_per_year", "换手/年", "num1"],
+    ["turnover_notional_per_year", "成交额换手/年", "num2"],
+    ["avg_invested_ratio", "平均仓位", "pct"],
+    ["n_trades", "成交笔数", "int"],
+    ["final_equity", "终值", "money"],
+  ];
+
+  function abFmt(v, kind) {
+    if (v == null || v === "") return "—";
+    var n = Number(v);
+    if (Number.isNaN(n)) return String(v);
+    if (kind === "pct") return formatPct(n);
+    if (kind === "money") return pfFmtNum(n);
+    if (kind === "int") return String(Math.round(n));
+    if (kind === "num1") return n.toFixed(1);
+    if (kind === "num2") return n.toFixed(2);
+    return n.toFixed(3);
+  }
+
+  function abFmtDelta(v, kind) {
+    if (v == null || v === "") return "—";
+    var n = Number(v);
+    if (Number.isNaN(n)) return String(v);
+    return (n > 0 ? "+" : "") + abFmt(n, kind);
+  }
+
+  function renderAbEngineChart(aCurve, bCurve) {
+    var svg = $("ab-engine-chart");
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    function series(curve) {
+      var out = [];
+      for (var i = 0; i < (curve || []).length; i++) {
+        var e = curve[i] && curve[i].equity;
+        if (e != null && !isNaN(Number(e))) out.push(Number(e));
+      }
+      return out;
+    }
+    var sa = series(aCurve);
+    var sb = series(bCurve);
+    if (sa.length < 2 && sb.length < 2) {
+      var msg = pfSvgEl("text", {
+        x: 360, y: 120, "text-anchor": "middle", fill: PF_COLORS.text, "font-size": "13",
+      });
+      msg.textContent = "数据点不足（<2 日），无法绘图";
+      svg.appendChild(msg);
+      return;
+    }
+    function norm(s) {
+      return s.length ? s.map(function (v) { return v / s[0]; }) : s;
+    }
+    var na = norm(sa);
+    var nb = norm(sb);
+    var all = na.concat(nb);
+    var lo = Math.min.apply(null, all);
+    var hi = Math.max.apply(null, all);
+    if (!(hi > lo)) hi = lo + 1e-6;
+    var W = 720, H = 240, padL = 8, padR = 8, padT = 12, padB = 18;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    function linePath(s) {
+      var d = "";
+      for (var i = 0; i < s.length; i++) {
+        var x = padL + (s.length <= 1 ? 0 : (i / (s.length - 1)) * iw);
+        var y = padT + ih - ((s[i] - lo) / (hi - lo)) * ih;
+        d += (i === 0 ? "M" : "L") + x.toFixed(2) + " " + y.toFixed(2) + " ";
+      }
+      return d.trim();
+    }
+    var y1 = padT + ih - ((1.0 - lo) / (hi - lo)) * ih;
+    svg.appendChild(pfSvgEl("line", {
+      x1: padL, y1: y1, x2: W - padR, y2: y1,
+      stroke: PF_COLORS.axis, "stroke-dasharray": "4 4",
+    }));
+    if (na.length > 1) {
+      svg.appendChild(pfSvgEl("path", {
+        d: linePath(na), fill: "none", stroke: PF_COLORS.equity, "stroke-width": 2,
+      }));
+    }
+    if (nb.length > 1) {
+      svg.appendChild(pfSvgEl("path", {
+        d: linePath(nb), fill: "none", stroke: PF_COLORS.dd, "stroke-width": 2,
+      }));
+    }
+    var legend = pfSvgEl("text", { x: padL, y: 10, fill: PF_COLORS.text, "font-size": "10" });
+    legend.textContent = "A=" + (sa.length ? sa[0] : "—") + " · 绿=A  红=B（各自归一首日）";
+    svg.appendChild(legend);
+  }
+
+  async function runStrategyAbEngine(event) {
+    if (event) event.preventDefault();
+    var errEl = $("ab-engine-error");
+    clearError(errEl);
+    var configA = ($("ab-engine-a") && $("ab-engine-a").value.trim()) || "";
+    var configB = ($("ab-engine-b") && $("ab-engine-b").value.trim()) || "";
+    if (!configA || !configB) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = "configA / configB 必填。";
+      }
+      return;
+    }
+    var startV = $("ab-engine-start") && $("ab-engine-start").value;
+    var endV = $("ab-engine-end") && $("ab-engine-end").value;
+    var universe = ($("ab-engine-universe") && $("ab-engine-universe").value) || "stock";
+    var capital = Number(($("ab-engine-capital") && $("ab-engine-capital").value) || "50000");
+    if ($("ab-engine-meta")) {
+      $("ab-engine-meta").textContent =
+        "正在跑 A/B 同屏（两臂同一引擎）… 整库扫描 + 全帧特征较慢，请稍候";
+    }
+    try {
+      var data = await fetchJson("/api/research/strategy/ab-engine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          configA: configA,
+          configB: configB,
+          start: startV || null,
+          end: endV || null,
+          universe: universe,
+          initialCapital: capital,
+        }),
+      });
+      renderAbEngine(data);
+    } catch (e) {
+      showError(errEl, formatErrorMessage(e.detail || e));
+      if ($("ab-engine-meta")) $("ab-engine-meta").textContent = "A/B 失败";
+      if ($("ab-engine-result")) $("ab-engine-result").hidden = true;
+    }
+  }
+
+  function renderAbEngine(data) {
+    var a = (data && data.a) || {};
+    var b = (data && data.b) || {};
+    var am = a.metrics || {};
+    var bm = b.metrics || {};
+    var delta = (data && data.delta) || {};
+    if ($("ab-engine-result")) $("ab-engine-result").hidden = false;
+    if ($("ab-engine-meta")) {
+      $("ab-engine-meta").textContent =
+        "ok · 宇宙=" + (data.universe || "—") +
+        " · " + (data.start || "起点") + "～" + (data.end || "末") +
+        " · 引擎=" + ((data.sameDefinition || {}).singleLoop ? "单点(book_replay)" : "?") +
+        " · 实盘=" + ynZh(!!data.liveTradingEnabled);
+    }
+    if ($("ab-engine-winner")) {
+      $("ab-engine-winner").textContent =
+        "胜出：" + (data.winner || "—") +
+        (data.winnerNote ? "（" + data.winnerNote + "）" : "") +
+        " · A=" + (a.configId || "—") + "「" + (a.tradeCount != null ? a.tradeCount : "—") + " 笔」" +
+        " · B=" + (b.configId || "—") + "「" + (b.tradeCount != null ? b.tradeCount : "—") + " 笔」";
+    }
+    var tbody = $("ab-engine-table") && $("ab-engine-table").querySelector("tbody");
+    if (tbody) {
+      tbody.innerHTML = "";
+      for (var i = 0; i < AB_ENGINE_METRICS.length; i++) {
+        var key = AB_ENGINE_METRICS[i][0];
+        var label = AB_ENGINE_METRICS[i][1];
+        var kind = AB_ENGINE_METRICS[i][2];
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          td(label) +
+          tdNum(abFmt(am[key], kind)) +
+          tdNum(abFmt(bm[key], kind)) +
+          tdNum(abFmtDelta(delta[key], kind));
+        tbody.appendChild(tr);
+      }
+    }
+    var rt = $("ab-engine-review-table") && $("ab-engine-review-table").querySelector("tbody");
+    if (rt) {
+      rt.innerHTML = "";
+      var ar = a.review || {};
+      var br = b.review || {};
+      var rows = [
+        ["方向准确率", abFmt(ar.directionAccuracy, "pct"), abFmt(br.directionAccuracy, "pct")],
+        ["已结算", abFmt(ar.settledCount, "int"), abFmt(br.settledCount, "int")],
+        ["未平仓(pending)", abFmt(ar.pendingCount, "int"), abFmt(br.pendingCount, "int")],
+      ];
+      for (var j = 0; j < rows.length; j++) {
+        var tr2 = document.createElement("tr");
+        tr2.innerHTML = td(rows[j][0]) + tdNum(rows[j][1]) + tdNum(rows[j][2]);
+        rt.appendChild(tr2);
+      }
+    }
+    renderAbEngineChart(a.equityCurve, b.equityCurve);
+    if ($("ab-engine-json")) {
+      $("ab-engine-json").textContent = JSON.stringify(
+        {
+          ok: data.ok,
+          universe: data.universe,
+          start: data.start,
+          end: data.end,
+          winner: data.winner,
+          winnerNote: data.winnerNote,
+          sameDefinition: data.sameDefinition,
+          a: { configId: a.configId, tradeCount: a.tradeCount, metrics: am, review: a.review },
+          b: { configId: b.configId, tradeCount: b.tradeCount, metrics: bm, review: b.review },
+          delta: delta,
+          dbSource: data.dbSource,
+          environment: data.environment,
+          liveTradingEnabled: data.liveTradingEnabled,
+        },
+        null,
+        2
+      );
+    }
+  }
+
   async function loadFundFlow(event) {
     if (event) event.preventDefault();
     const errEl = $("fund-flow-error");
@@ -3551,6 +3767,15 @@
     }
     $("strategy-form").addEventListener("submit", compareStrategies);
     $("btn-strategy-list").addEventListener("click", listStrategies);
+    if ($("ab-engine-form")) {
+      $("ab-engine-form").addEventListener("submit", runStrategyAbEngine);
+      if ($("ab-engine-end")) $("ab-engine-end").value = new Date().toISOString().slice(0, 10);
+      if ($("ab-engine-start")) {
+        var abD0 = new Date();
+        abD0.setFullYear(abD0.getFullYear() - 1);
+        $("ab-engine-start").value = abD0.toISOString().slice(0, 10);
+      }
+    }
     if ($("backtest-form")) {
       $("backtest-form").addEventListener("submit", runRollingBacktest);
     }

@@ -79,6 +79,7 @@ from ..openapi_models import (
     PortfolioBacktestResponse,
     RecommendDefaultsResponse,
     RollingBacktestResponse,
+    StrategyAbEngineResponse,
     StrategyAbStatusResponse,
     StrategyCompareResponse,
     StrategyConfigsResponse,
@@ -1328,6 +1329,93 @@ def post_strategy_compare(request: Request, body: StrategyCompareRequest) -> dic
     if panel_note:
         out["panelNote"] = panel_note
     return out
+
+
+class StrategyAbEngineRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    config_a: str = Field(..., alias="configA", description="Config id or JSON path")
+    config_b: str = Field(..., alias="configB", description="Config id or JSON path")
+    start: date | None = Field(None, description="Window start YYYY-MM-DD")
+    end: date | None = Field(None, description="Window end YYYY-MM-DD")
+    universe: str = Field("stock", description="stock | etf | all")
+    initial_capital: float = Field(50000.0, alias="initialCapital")
+    max_positions: int = Field(15, alias="maxPositions")
+    symbols: str | None = None
+
+
+@router.post(
+    "/strategy/ab-engine",
+    summary="因子/闸门 A/B 同屏（同源引擎，S1）",
+    responses={**ok200(StrategyAbEngineResponse), **RESP_400, **RESP_404, **RESP_503},
+)
+def post_strategy_ab_engine(body: StrategyAbEngineRequest) -> dict[str, Any]:
+    """Run two strategy configs through the **same** portfolio engine (``S1``).
+
+    Both arms share one loop (:func:`book_replay.replay_book`, the ``X4`` single
+    definition) over one feature frame, so the two columns are comparable without
+    re-normalisation: full portfolio metrics + a 复盘 (review) block per arm and
+    ``delta = B - A``. Reads ``market.db`` read-only; 503 when there is no DB, 400
+    when the window has no bars. Default-off; never replaces primary picks.
+    SIMULATE only; not investment advice.
+    """
+    from stock_platform_providers.engine_sqlite import (
+        MSG_DB_MISSING,
+        resolve_engine_market_db,
+    )
+    from stock_platform_research.backtest import UNIVERSES
+    from stock_platform_research.backtest_cli import filter_universe, load_engine_bars
+    from stock_platform_research.book_replay import ReplayParams
+    from stock_platform_research.strategy_ab import compare_strategy_ab_from_bars
+
+    universe = str(body.universe or "stock").strip().lower()
+    if universe not in UNIVERSES:
+        raise HTTPException(status_code=400, detail=f"universe must be one of {UNIVERSES}")
+
+    start = body.start.isoformat() if body.start else None
+    end = body.end.isoformat() if body.end else None
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be <= end")
+
+    # Resolve the configs *before* the DB probe so an unknown config is a 404
+    # even in a DB-less environment (the resolver raises HTTPException(404)).
+    cfg_a = _resolve_config_ref(body.config_a)
+    cfg_b = _resolve_config_ref(body.config_b)
+
+    db_path = resolve_engine_market_db()
+    if db_path is None:
+        raise HTTPException(status_code=503, detail=MSG_DB_MISSING)
+    if not Path(db_path).is_file():
+        raise HTTPException(status_code=503, detail=f"market.db not found: {db_path}")
+
+    try:
+        bars = load_engine_bars(
+            db_path, start=start, end=end, codes=_parse_symbols(body.symbols)
+        )
+        bars = filter_universe(bars)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 - map to a 400, never a bare 500
+        raise HTTPException(status_code=400, detail=f"行情库读取失败：{exc}") from exc
+
+    if bars.empty:
+        raise HTTPException(status_code=400, detail="区间内无行情数据（fail-closed）")
+
+    result = compare_strategy_ab_from_bars(
+        bars,
+        cfg_a,
+        cfg_b,
+        universe=universe,
+        start=start,
+        end=end,
+        params=ReplayParams(
+            initial_capital=body.initial_capital, max_positions=body.max_positions
+        ),
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("reason") or "策略 A/B 失败")
+    result["dbSource"] = str(db_path)
+    return result
 
 
 class RollingBacktestRequest(BaseModel):

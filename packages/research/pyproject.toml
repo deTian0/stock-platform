@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-research"
-version = "4.0.5"
+version = "4.1.0"
 description = "Selection / backtest research kernels for stock-platform (lvrev, PIT)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,7 @@ stock-platform-market-universe = "stock_platform_research.market_universe_cli:ma
 stock-platform-rankings = "stock_platform_research.rankings_cli:main"
 stock-platform-hits = "stock_platform_research.hit_tracking_cli:main"
 stock-platform-picks-backtest = "stock_platform_research.picks_backtest_cli:main"
+stock-platform-strategy-ab = "stock_platform_research.strategy_ab_cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

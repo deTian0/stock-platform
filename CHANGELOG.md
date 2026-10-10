@@ -8,6 +8,37 @@
 
 - （无）
 
+## [4.1.0] - 2026-10-10
+
+### Added
+
+- **因子 / 闸门 A/B 完整版（`S1`，U7 遗留）**：让 A/B 与回测 / 推荐回放**同源** —— 两臂消费同一特征帧、跑**同一台** `book_replay.replay_book`（`X4` 单点定义），只由 entry provider 区分。ADR [`0060`](docs/architecture/0060-strategy-ab-full-engine.md)
+  - `StrategyConfig` 增 `gates`（`min_pick_score` 缺省 `0.80`；接受扁平别名 `min_pick_score` / `minPickScore`）→ **闸门变更可表达**；`load_strategy_config` 现接受**裸 id**（`<id>` / `<id>.json`）
+  - `strategy_ab` 新增 `config_entry_provider` / `run_config_book` / `compare_strategy_ab_engine` / `compare_strategy_ab_from_bars`
+  - 每臂附 **`review` 复盘块**（`directionAccuracy` / `settledCount` / `pendingCount`，口径对齐 `performance` / U3；空仓为 `null`，不填 0）
+  - `delta = B − A`（同口径无需二次归一）+ `sameDefinition` 身份块（`singleLoop` / `singleEntryProvider` / `singleMetrics` / `singleExitDefinition`）
+- CLI `stock-platform-strategy-ab`（`--config-a/--config-b --start --end --universe --json`，只读 `market.db`）
+- API `POST /api/research/strategy/ab-engine`（只读 `market.db`；未知配置 **404** / 无 DB **503** fail-closed）
+- Workbench `#strategy-compare` 面板内新增「**A/B 同屏**」区块（两列指标 + Δ 列 + 复盘表 + 双净值曲线，手写 SVG 零新依赖）
+- 契约 [`docs/contracts/strategy-ab.md`](docs/contracts/strategy-ab.md)；打包闸门演示臂 `lvrev-gate-strict-v1`
+
+### Changed
+
+- 打包策略配置 `lvrev-default-v1` / `lvrev-rev-heavy-v1` 补 `gates.min_pick_score = 0.80`
+- 版本号 `4.0.5` → **`4.1.0`**（`S` 域首版；目标 tag 由陈旧的 `v3.14.0` 顺延）
+
+### Verified
+
+- **同源一致性**：baseline 配置 vs `run_portfolio_backtest` —— 曲线 / 成交 / 指标 / 未平仓**逐位一致**（`tests/test_strategy_ab_engine.py`）
+- `sameDefinition` 四项全 `true`；严格闸门臂入场数 **≤** 宽松臂
+- 真机 `market.db` 端到端（1 年窗，143 万行 / 6761 码 / 243 日）：两臂 87 vs 93 笔，指标 + 复盘 + delta 齐全
+- 聚焦测试：research `19 passed`、workbench `145 passed`（端点目录 61 → **62**）
+
+### Docs
+
+- 新增 `docs/architecture/0060-strategy-ab-full-engine.md` + `docs/contracts/strategy-ab.md`（均已登记 `scripts/check_docs.ps1`）
+- 路线图 `S1` 标 `done（2026-10-10）`；版本映射 `S` 域改 `v4.1.0` → `v4.1.4`
+
 ## [4.0.5] - 2026-10-10
 
 ### Added

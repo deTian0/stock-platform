@@ -1,11 +1,11 @@
 {
-  "id": "lvrev-default-v1",
+  "id": "lvrev-gate-strict-v1",
   "version": "1",
   "top_n": 1,
   "reversal_q": 0.50,
   "value_factor": false,
   "weights": {"vol": 0.5, "rev": 0.5, "value": 0.0, "q": 0.0, "g": 0.0},
-  "gates": {"min_pick_score": 0.80},
+  "gates": {"min_pick_score": 0.85},
   "universe_ref": "fixtures/universe_cn_sample.json",
-  "description": "Baseline equal vol/rev weights; looser reversal gate for fixtures; default 0.80 score floor (S1 A/B baseline arm)."
+  "description": "闸门 arm of the A/B: factors identical to lvrev-default-v1, stricter 0.85 score floor (S1 闸门变更)."
 }
