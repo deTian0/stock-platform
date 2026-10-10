@@ -82,6 +82,42 @@ stock-platform-daily --asof 2026-09-12 --provider tushare --skip-refresh --settl
 
 同日重复跑会对同一 `asof` **幂等覆盖** DB 行与 JSON 导出。
 
+## X4：picks 账本与「推荐 ↔ 回测」对照
+
+流水线每次成功会在 `{out}/picks_ledger.jsonl` **追加**当日 ②A 头部（append-only，按 `(date, code)` 去重；
+同 `asof` 重跑不重复计数）。这是「每日 picks 自动进回测对照」的进料口，默认开启，
+`track_picks_ledger=False` 可关。
+
+要真正跑出对照，需再给一段**行情 DataFrame**（brief 自身没有前向窗口）：
+
+```powershell
+# CLI 方式（只读 market.db；--ledger 或 --briefs-dir 二选一）
+stock-platform-picks-backtest --ledger $env:TEMP\sp-daily\picks_ledger.jsonl `
+  --db D:\workspace\stock_trading\a-stock-engine\data_cache\market.db `
+  --start 2026-01-01 --end 2026-10-09
+
+# 与 lvrev 选股回测并排看（同一堆 bars，delta = picks 指标 − 回测指标）
+stock-platform-picks-backtest --briefs-dir $env:TEMP\sp-daily\briefs --compare `
+  --db D:\workspace\stock_trading\a-stock-engine\data_cache\market.db
+```
+
+代码侧：`run_daily_pipeline(..., replay_picks=True, replay_bars=<DataFrame>)` 会回放**累计账本**并写
+`{out}/briefs/{asof}/picks_replay.json`；再加 `replay_against_screener=True` 则返回选股侧与 `delta`
+（此时 `replay_kwargs` 形状为 `{"picks_kwargs": {...}, "screener_kwargs": {...}}`）。
+两个阶段都是 **best-effort**：失败只落 `report.picksReplay["error"]`，**不中断** brief。
+
+| 产物 | 说明 |
+|------|------|
+| `{out}/picks_ledger.jsonl` | 推荐账本（append-only，`(date, code)` 去重） |
+| `{out}/briefs/{asof}/picks_replay.json` | 完整回放/对照载荷（含净值曲线与成交明细） |
+| `report.picksReplay` | **裁剪摘要**（去 `equity_curve` / `trades`，加 `tradeCount` / `curvePoints`），避免撑爆 `manifest.json` |
+
+口径与规则见契约 [`docs/contracts/picks-backtest.md`](../contracts/picks-backtest.md) 与
+ADR [0059](../architecture/0059-picks-backtest-parity.md)：推荐侧与回测侧共用
+`book_replay.replay_book` 一台引擎（同 `rules.evaluate_exit` / 同 `CostModel` / 同 `compute_metrics`）。
+推荐侧默认 `universe=all`（推荐了 ETF 就按 ETF 回放），对照的选股侧保留 `stock` 基线 —— 差异在
+`params.universe` 双侧回显，**不隐藏**。
+
 ## 退出码
 
 | 码 | 含义 |

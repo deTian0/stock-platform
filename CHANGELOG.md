@@ -8,6 +8,36 @@
 
 - （无）
 
+## [4.0.4] - 2026-10-10
+
+### Added
+
+- **选股↔回测同引擎（`X4`）**：把逐日回放循环抽成**唯一定义** `research.book_replay.replay_book`（`entry_provider` 多态），`backtest.run_portfolio_backtest` 转薄封装、`picks_backtest.run_picks_backtest` 用**同一台引擎**跑推荐账本 —— 推荐绩效与回测口径**同源**（承接 B5）。ADR [`0059`](docs/architecture/0059-picks-backtest-parity.md)
+  - picks 账本 append-only JSONL `{out}/picks_ledger.jsonl`（`(date, code)` 去重；`normalize_picks` 冻结为 `{date, code, rank?, score?}`）；流水线默认 `track_picks_ledger=True` 自动写入 ②A 头部
+  - `replay_book` 新增 `open_positions[]` 出口（窗口结束仍持有的仓位：`code` / `entry_idx` / `entry_price` / `shares` / `target` / `peak` / `held_days`），两条路径都透出；`ok` 判据改为「形成至少一个持仓 = 已平仓 ∪ 未平仓」
+  - 对照 `compare_picks_vs_screener`：同堆 bars 跑两侧，`delta = picks 指标 − 回测指标`（同口径无需二次归一），附 `sameDefinition` 身份块
+- CLI `stock-platform-picks-backtest`（读 `--ledger` 或 `--briefs-dir`，只读 `market.db`）
+- 流水线可选回放对照：`replay_picks` / `replay_bars` / `replay_against_screener` → 写 `{asof}/picks_replay.json`，`report.picksReplay` 为裁剪摘要（不含曲线/成交）
+
+### Changed
+
+- `backtest.py` 内联回放循环抽走 → 薄封装（新增 `prepare_book_frame` 共享 bars→特征帧，含 universe 过滤 + 窗口切片）；**默认档全周期逐位不变**
+- `daily_pipeline` 默认自动写 picks 账本（`track_picks_ledger=True`；失败 best-effort，写进 `report.picksLedger` 绝不中断 brief）
+- 版本号 `4.0.3` → **`4.0.4`**
+
+### Verified
+
+- 全量 `pytest packages apps`（`replay`）= **786 passed / 0 failed**（761 → 786，**+25**）
+- research 新增 3 测试文件（`test_book_replay.py` / `test_picks_backtest.py` / `test_daily_pipeline.py` 的 X4 项）共 **32 passed**
+- **纯重构证据**：从重构前 `run_portfolio_backtest` 抓 8 场景（股票 / ETF / 混合 / 滑点 / 零费 / 冷静期 / 旧 `verbatim` 尺度 / 单码）曲线与成交 sha256 + 全部指标存 fixture，**8/8 逐位一致**
+- **同引擎证明**：把回测 `trades` + `open_positions` 回灌成 picks schedule 后，`trades` / `equity_curve` / `metrics` / `open_positions` **逐位相等**
+- `scripts/check_versions.ps1` / `scripts/check_docs.ps1` 双绿（VERSION=4.0.4）
+
+### Docs
+
+- 新增 ADR [`0059`](docs/architecture/0059-picks-backtest-parity.md) + 契约 [`docs/contracts/picks-backtest.md`](docs/contracts/picks-backtest.md)（均登记 `scripts/check_docs.ps1`）
+- `docs/ops/daily-pipeline.md` 新增「X4：picks 账本与推荐↔回测对照」段
+
 ## [4.0.3] - 2026-10-10
 
 ### Added

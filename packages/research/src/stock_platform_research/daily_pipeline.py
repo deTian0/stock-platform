@@ -11,7 +11,7 @@ import traceback
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import pandas as pd
 
@@ -19,7 +19,16 @@ from .brief import build_premarket_brief, write_brief_csv
 from .hit_tracking import PRE_MARKET, open_hit_repository, track_brief_hits
 from .market_universe import resolve_universe
 from .panel import build_cross_section_panel, panel_to_csv
+from .performance import append_jsonl  # noqa: F401 (ledger writer lives in picks_backtest)
 from .persistence import open_brief_repository
+from .picks_backtest import (
+    PICK_LEDGER_FILENAME,
+    append_picks_ledger,
+    compare_picks_vs_screener,
+    load_picks_ledger,
+    picks_from_brief,
+    run_picks_backtest,
+)
 from .refresh import RefreshReport, default_refresh_dir, run_refresh
 from .universe import UNIVERSE_SOURCES, default_universe_fixture_path
 
@@ -36,6 +45,9 @@ class DailyPipelineReport:
     brief_path: str | None = None
     panel_path: str | None = None
     hits: dict[str, Any] | None = None
+    picksLedger: dict[str, Any] | None = None
+    picksReplay: dict[str, Any] | None = None
+    picksReplayPath: str | None = None
     error: str | None = None
     failures: list[dict[str, Any]] = field(default_factory=list)
 
@@ -68,6 +80,12 @@ def run_daily_pipeline(
     persist_db: bool = True,
     track_hits: bool = True,
     hit_boards: list[str] | None = None,
+    track_picks_ledger: bool = True,
+    picks_ledger_path: str | Path | None = None,
+    replay_picks: bool = False,
+    replay_bars: pd.DataFrame | None = None,
+    replay_against_screener: bool = False,
+    replay_kwargs: dict[str, Any] | None = None,
     db_url: str | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
@@ -84,6 +102,16 @@ def run_daily_pipeline(
     ``X3``: ``track_hits`` (default on) records the ②A recommendation head into the
     hit cycle in the same SQLite (``hit_boards`` overrides the board set). Tracking
     is best-effort — a failure lands on ``report.hits["error"]``, never on the brief.
+
+    ``X4``: every session automatically appends the ②A head into the append-only
+    **picks ledger** (``track_picks_ledger``, default on; ``picks_ledger_path``
+    overrides ``{out}/picks_ledger.jsonl``), so the recommendations enter the
+    backtest-comparison data source without a second call. Pass ``replay_bars``
+    **and** ``replay_picks=True`` to also replay the accumulated ledger through the
+    *same* engine as the screener (:func:`picks_backtest.run_picks_backtest`) and
+    write ``{asof}/picks_replay.json``; ``replay_against_screener`` additionally
+    returns the screener side and the metric delta. Both stages are best-effort —
+    a failure lands on ``report.picksReplay["error"]`` and never breaks the brief.
     """
     if isinstance(asof, str):
         asof_d = date.fromisoformat(asof[:10])
@@ -198,6 +226,56 @@ def run_daily_pipeline(
             except Exception as exc:  # noqa: BLE001 — tracking is best-effort
                 hits_payload = {"recorded": 0, "error": f"{type(exc).__name__}: {exc}"}
 
+        # X4: every session appends the ②A head into the append-only picks ledger
+        # (deduped on (date, code)), so the recommendations enter the
+        # backtest-comparison data source with no extra call. Best-effort.
+        ledger_file = Path(picks_ledger_path) if picks_ledger_path else (root / PICK_LEDGER_FILENAME)
+        ledger_payload: dict[str, Any] | None = None
+        if track_picks_ledger:
+            try:
+                appended = append_picks_ledger(ledger_file, picks_from_brief(brief))
+                ledger_payload = {
+                    "path": str(ledger_file),
+                    "appended": len(appended),
+                    "total": len(load_picks_ledger(ledger_file)),
+                }
+            except Exception as exc:  # noqa: BLE001 — ledger is best-effort
+                ledger_payload = {
+                    "path": str(ledger_file),
+                    "appended": 0,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+
+        # X4: optional replay of the *accumulated* ledger through the same engine
+        # the screener backtest runs. Needs caller-supplied bars (the daily brief
+        # itself has no forward window). Best-effort, like the hit tracking.
+        replay_payload: dict[str, Any] | None = None
+        replay_path: str | None = None
+        if replay_picks and replay_bars is not None:
+            try:
+                ledger_rows = load_picks_ledger(ledger_file) if ledger_file.is_file() else []
+                if not ledger_rows:
+                    ledger_rows = picks_from_brief(brief)
+                kw = dict(replay_kwargs or {})
+                if replay_against_screener:
+                    replay_payload = compare_picks_vs_screener(ledger_rows, replay_bars, **kw)
+                else:
+                    replay_payload = run_picks_backtest(ledger_rows, replay_bars, **kw)
+                replay_payload["asof"] = asof_s
+                replay_payload["ledgerPath"] = str(ledger_file)
+                replay_file = day_dir / "picks_replay.json"
+                replay_file.write_text(
+                    json.dumps(replay_payload, ensure_ascii=False, indent=2, default=str) + "\n",
+                    encoding="utf-8",
+                )
+                replay_path = str(replay_file)
+            except Exception as exc:  # noqa: BLE001 — replay is best-effort
+                replay_payload = {
+                    "ok": False,
+                    "ledgerPath": str(ledger_file),
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+
         ok_report = DailyPipelineReport(
             asof=asof_s,
             ok=True,
@@ -216,6 +294,9 @@ def run_daily_pipeline(
             brief_path=str(brief_json),
             panel_path=str(panel_path),
             hits=hits_payload,
+            picksLedger=ledger_payload,
+            picksReplay=_replay_summary(replay_payload) if replay_payload else None,
+            picksReplayPath=replay_path,
         )
         latest = {
             "asof": asof_s,
@@ -244,6 +325,28 @@ def run_daily_pipeline(
         )
         _write_failure(day_dir, briefs_root, fail)
         return fail
+
+
+def _replay_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Trim a replay / comparison payload for the manifest.
+
+    The full payload (including the equity curve and the trade log) is written to
+    ``{asof}/picks_replay.json``; the manifest only needs the metrics, the params
+    and the counts, so a long replay cannot balloon ``manifest.json``.
+    """
+    if "picks" in payload and "screener" in payload:  # compare-shaped payload
+        return {
+            "mode": "compare",
+            "ok": payload.get("ok"),
+            "delta": payload.get("delta"),
+            "sameDefinition": payload.get("sameDefinition"),
+            "picks": _replay_summary(payload.get("picks") or {}),
+            "screener": _replay_summary(payload.get("screener") or {}),
+        }
+    out = {k: v for k, v in payload.items() if k not in {"equity_curve", "trades"}}
+    out["tradeCount"] = len(payload.get("trades") or [])
+    out["curvePoints"] = len(payload.get("equity_curve") or [])
+    return out
 
 
 def _write_failure(day_dir: Path, briefs_root: Path, report: DailyPipelineReport) -> None:
