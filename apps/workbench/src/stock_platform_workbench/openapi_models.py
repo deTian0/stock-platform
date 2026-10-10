@@ -391,6 +391,22 @@ class StrategyCompareResponse(ExtraAllowModel):
     liveTradingEnabled: bool | None = False
 
 
+class StrategyAbEngineResponse(ExtraAllowModel):
+    ok: bool = True
+    winner: str | None = None
+    universe: str | None = None
+    start: str | None = None
+    end: str | None = None
+    a: dict[str, Any] | None = None
+    b: dict[str, Any] | None = None
+    delta: dict[str, Any] | None = None
+    sameDefinition: dict[str, Any] | None = None
+    dbSource: str | None = None
+    metricNote: str | None = None
+    environment: str | None = "SIMULATE"
+    liveTradingEnabled: bool | None = False
+
+
 class WalkForwardResponse(ExtraAllowModel):
     ok: bool | None = None
     folds: list[dict[str, Any]] | None = None

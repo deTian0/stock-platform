@@ -121,12 +121,18 @@ def test_ui_index_shell(client: TestClient) -> None:
     assert "/api/research/intel-report/crosswalk" in _js
     assert "runIntelPrefill" in _js
     assert 'id="recommend-strategy-ab"' in body
+    assert 'id="ab-engine-form"' in body
+    assert 'id="ab-engine-table"' in body
+    assert 'id="ab-engine-chart"' in body
+    assert 'id="ab-engine-review-table"' in body
     assert 'id="recommend-tier"' in body
     assert 'id="recommend-perf-strip"' in body
     assert "recentDays" in client.get("/static/app.js").text
     assert "renderAccuracySparkline" in client.get("/static/app.js").text
     assert "runWalkForwardSummary" in client.get("/static/app.js").text
     assert "strategyAb" in client.get("/static/app.js").text
+    assert "runStrategyAbEngine" in client.get("/static/app.js").text
+    assert "/api/research/strategy/ab-engine" in client.get("/static/app.js").text
     assert "tsp-spark" in client.get("/static/app.css").text
     assert 'id="pref-preset"' in body
     assert 'id="recommend-review-block"' in body

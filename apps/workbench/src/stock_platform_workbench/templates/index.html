@@ -1358,6 +1358,80 @@
         <summary>原始 JSON</summary>
         <pre id="strategy-json" class="code"></pre>
       </details>
+      <div class="pf-block" id="ab-engine-root" style="margin-top:1.25rem">
+        <h3>因子 / 闸门 A/B 同屏（S1 · 同源引擎）</h3>
+        <p class="hint">
+          S1 完整版：两臂跑<strong>同一台引擎</strong>（<code>book_replay</code> 单点定义，与回测 /
+          推荐回放同源），输出组合指标 + 复盘方向准确率，<code>delta = B − A</code> 同屏两列可比。
+          只读 <code>STOCK_PLATFORM_ENGINE_MARKET_DB</code>；无 DB fail-closed；<strong>默认关闭</strong>；
+          SIMULATE；非投资建议。
+        </p>
+        <form id="ab-engine-form" class="row">
+          <label>configA
+            <input id="ab-engine-a" value="lvrev-default-v1" autocomplete="off" />
+          </label>
+          <label>configB
+            <input id="ab-engine-b" value="lvrev-rev-heavy-v1" autocomplete="off" />
+          </label>
+          <label>开始
+            <input id="ab-engine-start" type="date" />
+          </label>
+          <label>结束
+            <input id="ab-engine-end" type="date" />
+          </label>
+          <label>宇宙
+            <select id="ab-engine-universe">
+              <option value="stock" selected>stock</option>
+              <option value="etf">etf</option>
+              <option value="all">all</option>
+            </select>
+          </label>
+          <label>初始资金
+            <input id="ab-engine-capital" type="number" value="50000" />
+          </label>
+          <button type="submit">跑 A/B 同屏</button>
+        </form>
+        <p id="ab-engine-meta" class="status" aria-live="polite"></p>
+        <pre id="ab-engine-error" class="error" hidden></pre>
+        <div id="ab-engine-result" hidden>
+          <p id="ab-engine-winner" class="status"></p>
+          <svg id="ab-engine-chart" class="pf-chart" viewBox="0 0 720 240"
+               role="img" aria-label="A/B 权益曲线（各自归一到首日 1.0）"></svg>
+          <div class="table-wrap">
+            <table id="ab-engine-table">
+              <thead>
+                <tr>
+                  <th>指标</th>
+                  <th class="num">A</th>
+                  <th class="num">B</th>
+                  <th class="num">Δ(B−A)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="empty-row"><td colspan="4">尚未运行（默认关闭；无 DB 时 fail-closed）。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table id="ab-engine-review-table">
+              <thead>
+                <tr>
+                  <th>复盘</th>
+                  <th class="num">A</th>
+                  <th class="num">B</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="empty-row"><td colspan="3">方向准确率口径对齐 performance / U3。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <details class="raw-json">
+            <summary>原始 JSON</summary>
+            <pre id="ab-engine-json" class="code"></pre>
+          </details>
+        </div>
+      </div>
     </section>
 
       </div>

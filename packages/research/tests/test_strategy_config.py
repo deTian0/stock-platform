@@ -6,6 +6,8 @@ import pandas as pd
 import pytest
 
 from stock_platform_research.strategy_config import (
+    DEFAULT_MIN_PICK_SCORE,
+    StrategyConfig,
     compare_strategy_configs,
     default_strategy_config_dir,
     list_strategy_configs,
@@ -76,3 +78,36 @@ def test_run_strategy_pit_from_mapping() -> None:
     )
     assert result["finalEquity"] > 0
     assert result["config"]["id"] == "inline"
+
+
+def test_strategy_config_gates_round_trip() -> None:
+    cfg = StrategyConfig.from_mapping(
+        {
+            "id": "gated",
+            "version": "2",
+            "weights": {"vol": 0.5, "rev": 0.5},
+            "gates": {"min_pick_score": 0.88, "other_gate": 1},
+        }
+    )
+    assert cfg.gates["min_pick_score"] == pytest.approx(0.88)
+    assert cfg.min_pick_score == pytest.approx(0.88)
+    assert cfg.gate("other_gate") == pytest.approx(1.0)
+    assert cfg.gate("missing") is None
+    assert cfg.to_dict()["gates"]["min_pick_score"] == pytest.approx(0.88)
+
+
+def test_strategy_config_flat_gate_alias() -> None:
+    cfg = load_strategy_config({"id": "flat", "minPickScore": 0.77})
+    assert cfg.min_pick_score == pytest.approx(0.77)
+
+
+def test_packaged_gate_arm_present() -> None:
+    ids = {c["id"] for c in list_strategy_configs()}
+    assert "lvrev-gate-strict-v1" in ids
+    cfg = load_strategy_config("lvrev-gate-strict-v1")
+    assert cfg.min_pick_score > DEFAULT_MIN_PICK_SCORE
+
+
+def test_default_configs_carry_a_score_floor() -> None:
+    cfg = load_strategy_config("lvrev-default-v1")
+    assert cfg.min_pick_score == pytest.approx(DEFAULT_MIN_PICK_SCORE)

@@ -123,6 +123,7 @@ from .hit_tracking import (
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
+    DEFAULT_MIN_PICK_SCORE,
     StrategyConfig,
     compare_strategy_configs,
     list_strategy_configs,
@@ -131,6 +132,10 @@ from .strategy_config import (
 )
 from .strategy_ab import (
     attach_strategy_ab,
+    compare_strategy_ab_engine,
+    compare_strategy_ab_from_bars,
+    config_entry_provider,
+    run_config_book,
     run_strategy_ab_sidecar,
     strategy_ab_enabled,
     strategy_ab_status,
@@ -298,6 +303,11 @@ __all__ = [
     "replay_book",
     "run_picks_backtest",
     "screener_entry_provider",
+    "DEFAULT_MIN_PICK_SCORE",
+    "compare_strategy_ab_engine",
+    "compare_strategy_ab_from_bars",
+    "config_entry_provider",
+    "run_config_book",
 ]
 
-__version__ = "4.0.5"
+__version__ = "4.1.0"

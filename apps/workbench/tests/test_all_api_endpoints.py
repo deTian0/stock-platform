@@ -223,6 +223,16 @@ def _ok_compare(body: Any, status: int) -> None:
     assert body["liveTradingEnabled"] is False
 
 
+def _ok_ab_engine(body: Any, status: int) -> None:
+    if status == 503:
+        assert "detail" in body
+        return
+    assert status == 200
+    assert body["liveTradingEnabled"] is False
+    assert body["sameDefinition"]["singleLoop"] is True
+    assert "delta" in body and "review" in body["a"]
+
+
 def _ok_rolling(body: Any, status: int) -> None:
     assert (status == 200 and body.get("ok") is True) or (status == 503 and "detail" in body)
 
@@ -662,6 +672,16 @@ _reg(
 _reg(
     EndpointHit(
         "POST",
+        "/api/research/strategy/ab-engine",
+        # No engine market.db in CI -> 503 fail-closed (not fake data).
+        json={"configA": "lvrev-default-v1", "configB": "lvrev-rev-heavy-v1"},
+        expect_status=frozenset({200, 503}),
+        assert_body=_ok_ab_engine,
+    )
+)
+_reg(
+    EndpointHit(
+        "POST",
         "/api/research/backtest/rolling-review",
         # Explicit symbols stay within replay fixtures (broad tiers may 500 on missing files).
         json={
@@ -811,7 +831,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 61
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 62
 
 
 @pytest.mark.unit
@@ -859,4 +879,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 64
+    assert n_ops + n_extra == 65
