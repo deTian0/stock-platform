@@ -11,7 +11,7 @@ import traceback
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import pandas as pd
 
@@ -48,6 +48,7 @@ class DailyPipelineReport:
     picksLedger: dict[str, Any] | None = None
     picksReplay: dict[str, Any] | None = None
     picksReplayPath: str | None = None
+    debates: dict[str, Any] | None = None
     error: str | None = None
     failures: list[dict[str, Any]] = field(default_factory=list)
 
@@ -87,6 +88,9 @@ def run_daily_pipeline(
     replay_against_screener: bool = False,
     replay_kwargs: dict[str, Any] | None = None,
     db_url: str | None = None,
+    debate_runner: Callable[..., dict[str, Any]] | None = None,
+    debate_engine: str | None = None,
+    debate_max_picks: int | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
 
@@ -112,6 +116,14 @@ def run_daily_pipeline(
     write ``{asof}/picks_replay.json``; ``replay_against_screener`` additionally
     returns the screener side and the metric delta. Both stages are best-effort —
     a failure lands on ``report.picksReplay["error"]`` and never breaks the brief.
+
+    ``S5``: pass ``debate_runner`` **and** ``debate_engine`` (``deterministic`` /
+    ``llm``) to attach an *advisory* debate sidecar to the just-built picks, written
+    to ``{asof}/debates.json``. The runner is injected (the research package carries
+    no agents dependency), defaults to ``off`` (the runner is never called), and is
+    best-effort — a failure lands on ``report.debates["error"]``. The lane is
+    **read-only**: ``brief`` / the picks ledger / the hit cycle / the performance
+    JSONL are byte-identical whether or not the lane runs (误判不进绩效).
     """
     if isinstance(asof, str):
         asof_d = date.fromisoformat(asof[:10])
@@ -276,6 +288,37 @@ def run_daily_pipeline(
                     "error": f"{type(exc).__name__}: {exc}",
                 }
 
+        # S5: optional debate lane — an ADVISORY sidecar injected by the caller.
+        # Research stays agents-free; ``off`` means the runner is never called. The
+        # lane only *reads* the brief, so picks / ledger / hits above are unchanged.
+        debate_lane: dict[str, Any] | None = None
+        if debate_runner is not None and str(debate_engine or "off").strip().lower() not in {
+            "",
+            "none",
+            "off",
+        }:
+            try:
+                lane = dict(
+                    debate_runner(
+                        provider=provider,
+                        brief=brief,
+                        engine=debate_engine,
+                        max_picks=debate_max_picks,
+                    )
+                )
+                lane.setdefault("ok", True)
+                (day_dir / "debates.json").write_text(
+                    json.dumps(lane, ensure_ascii=False, indent=2, default=str) + "\n",
+                    encoding="utf-8",
+                )
+                debate_lane = _debate_summary(lane)
+            except Exception as exc:  # noqa: BLE001 — lane is best-effort
+                debate_lane = {
+                    "ok": False,
+                    "engine": debate_engine,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+
         ok_report = DailyPipelineReport(
             asof=asof_s,
             ok=True,
@@ -297,6 +340,7 @@ def run_daily_pipeline(
             picksLedger=ledger_payload,
             picksReplay=_replay_summary(replay_payload) if replay_payload else None,
             picksReplayPath=replay_path,
+            debates=debate_lane,
         )
         latest = {
             "asof": asof_s,
@@ -346,6 +390,25 @@ def _replay_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
     out = {k: v for k, v in payload.items() if k not in {"equity_curve", "trades"}}
     out["tradeCount"] = len(payload.get("trades") or [])
     out["curvePoints"] = len(payload.get("equity_curve") or [])
+    return out
+
+
+def _debate_summary(lane: Mapping[str, Any]) -> dict[str, Any]:
+    """Trim a debate-lane payload for the manifest (drop full round text)."""
+    verdicts: list[dict[str, Any]] = []
+    for item in lane.get("debates") or []:
+        report = (item or {}).get("debate") or {}
+        verdicts.append(
+            {
+                "rank": item.get("rank"),
+                "symbol": item.get("symbol"),
+                "verdict": report.get("verdict"),
+                "kind": report.get("kind"),
+            }
+        )
+    out = {k: v for k, v in lane.items() if k not in {"debates"}}
+    out["debateCount"] = len(lane.get("debates") or [])
+    out["verdicts"] = verdicts
     return out
 
 

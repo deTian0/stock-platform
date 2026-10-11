@@ -12,6 +12,36 @@
 
 - （无）
 
+## [4.1.5] - 2026-10-11
+
+### Added
+
+- **LLM 辩论进主路径（`S5`）—— 只读顾问侧车**：新增 `stock_platform_agents.debate_lane` **单点**
+  - `DEBATE_LANE_ENGINES = ("off", "deterministic", "llm")`，**默认 `off`**（零 LLM、零副作用）；`normalize_lane_engine()` 对未知名抛 `AgentError`（HTTP 层 → **400**，**不静默回落默认值**）
+  - `attach_debate_lane(provider, brief, *, engine, max_picks, budget, llm_call)` —— **只读** `brief`，返回车道载荷：`enabled`/`engine`/`requestedEngine`/`debates`/`debateCount`/`degraded`/`warnings`/`advisory`/`excludedFromPerformance`/`budget`
+  - `debate_lane_summary()` —— manifest 裁剪（丢弃回合全文）
+  - ADR [`0065`](docs/architecture/0065-llm-debate-lane.md)
+- **预算提为一等公民**：`llm_debate._LlmBudget` → 公开 **`LlmBudget(max_calls=None, max_tokens_soft=None)`**（显式覆盖环境变量，缺省回落 `STOCK_PLATFORM_LLM_MAX_CALLS` / `STOCK_PLATFORM_LLM_MAX_TOKENS`）；`debate_brief_picks` 增 `budget` 形参
+- **主链挂载走依赖注入**：`run_daily_pipeline(..., debate_runner=None, debate_engine=None, debate_max_picks=None)` —— `stock-platform-research` **不新增**对 `stock-platform-agents` 的依赖；产出 `{asof}/debates.json` + `manifest.debates` + `DailyPipelineReport.debates`；**best-effort**（异常落 `report.debates["error"]`，绝不破坏 brief）
+- CLI `stock-platform-daily --debate-engine {off,deterministic,llm}` / `--debate-max-picks`
+- API `POST /api/research/daily/debate`（**校验 400 先于面板探测 503**）
+- 契约 [`docs/contracts/debate-lane.md`](docs/contracts/debate-lane.md)
+
+### Changed
+
+- **无行为变更**：默认 `off` ⇒ 主链默认路径逐位不变（`run_daily_pipeline` 在 `off` 时**不调用 runner**）。
+
+### Verified
+
+- **「误判不进绩效」不变量**（对齐 M-A2 评级边界口径）：开/关辩论两轮的 `brief.json` **字节**、`picks_ledger.jsonl` **字节**与命中块**逐位相等**，唯一差异是多出 `debates.json`（`test_daily_debate_lane.py::test_lane_leaves_brief_ledger_and_hits_identical`）；判决归一为 `Buy|Hold|Sell` 但**不再往下走**、不转 decision 行 `rating`
+- 聚焦测试：agents `test_debate_lane`（10 项）+ research `test_daily_debate_lane`（5 项）+ workbench 端点/行为；全量 `pytest packages apps`（`replay`）**887 passed / 0 failed / 0 errors / 0 skipped**（junitxml 取证）
+
+### Docs
+
+- 新增 `docs/architecture/0065-llm-debate-lane.md` + `docs/contracts/debate-lane.md`（登记 `scripts/check_docs.ps1`，files 144 → 146）
+- 路线图 `S5` 行标记 `done（2026-10-11）` + 目标 tag 顺延 `v3.14.4` → `v4.1.5`；**S 域（S1–S5）全部收官**
+- **刻意不新增手动 UI 面板**：车道定位是主链自动化（CLI + API），手动面板会与既有 `TopN 辩论`（`/api/research/brief/debate`）重复
+
 ## [4.1.4] - 2026-10-11
 
 ### Added

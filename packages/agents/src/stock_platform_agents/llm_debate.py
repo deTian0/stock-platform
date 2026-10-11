@@ -156,14 +156,33 @@ def warn_if_truncated(response_meta: Mapping[str, Any] | None) -> list[str]:
     return [msg]
 
 
-class _LlmBudget:
-    """Per-session call + soft token budget."""
+class LlmBudget:
+    """Per-session call + soft token budget.
 
-    def __init__(self) -> None:
-        self.max_calls = _max_calls()
-        self.max_tokens = _max_tokens_soft()
+    ``max_calls`` / ``max_tokens_soft`` override the env-derived defaults
+    (``STOCK_PLATFORM_LLM_MAX_CALLS`` / ``STOCK_PLATFORM_LLM_MAX_TOKENS``) when
+    given, so the main path can budget an explicit lane call without env juggling.
+    """
+
+    def __init__(
+        self,
+        max_calls: int | None = None,
+        max_tokens_soft: int | None = None,
+    ) -> None:
+        self.max_calls = _max_calls() if max_calls is None else max(0, int(max_calls))
+        self.max_tokens = (
+            _max_tokens_soft() if max_tokens_soft is None else max(0, int(max_tokens_soft))
+        )
         self.calls = 0
         self.tokens_est = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "maxCalls": self.max_calls,
+            "maxTokensSoft": self.max_tokens,
+            "callsUsed": self.calls,
+            "tokensEst": self.tokens_est,
+        }
 
     def before_call(self, system: str, user: str) -> None:
         if self.calls >= self.max_calls:
@@ -184,6 +203,10 @@ class _LlmBudget:
         self.tokens_est += (
             _estimate_tokens(system) + _estimate_tokens(user) + _estimate_tokens(content)
         )
+
+
+#: Back-compat alias (the class used to be private ``_LlmBudget``).
+_LlmBudget = LlmBudget
 
 
 def _require_llm_env(*, llm_call: LlmCall | None) -> None:
@@ -314,7 +337,7 @@ def build_llm_debate_report(
     """Run Bull/Bear/Risk via optional LLM; market data only from ``provider``."""
     _require_llm_env(llm_call=llm_call)
     call = llm_call or _default_openai_call
-    session = budget or _LlmBudget()
+    session = budget or LlmBudget()
 
     code = normalize_symbol(symbol)
     asof_d = _parse_asof(asof)
@@ -441,6 +464,7 @@ def debate_brief_picks(
     engine: str = "deterministic",
     llm_call: LlmCall | None = None,
     max_picks: int | None = None,
+    budget: LlmBudget | None = None,
 ) -> dict[str, Any]:
     """Run debate for each TopN pick after a brief (default deterministic).
 
@@ -471,7 +495,7 @@ def debate_brief_picks(
     if max_picks is not None:
         picks = picks[: int(max_picks)]
     debates: list[dict[str, Any]] = []
-    budget = _LlmBudget() if eng in {"llm", "openai"} else None
+    budget = budget or (LlmBudget() if eng in {"llm", "openai"} else None)
     used_engine = "llm" if eng in {"llm", "openai"} else "deterministic"
     for pick in picks:
         sym = str(pick.get("symbol") or "").strip()
