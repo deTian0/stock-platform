@@ -13,7 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from stock_platform_execution import ActivationBlocked, DraftBlocked, ProfileBlocked
 from stock_platform_execution.timing import market_now
 from stock_platform_providers import get_market_strategy
-from stock_platform_agents import AgentError, LlmUnavailableError, debate_brief_picks
+from stock_platform_agents import (
+    AgentError,
+    LlmUnavailableError,
+    attach_debate_lane,
+    debate_brief_picks,
+    normalize_lane_engine,
+)
 from stock_platform_research import (
     HIT_SESSION_TYPES,
     PRE_MARKET,
@@ -69,6 +75,7 @@ from ..openapi_models import (
     BriefReviewResponse,
     BriefSaveResponse,
     BriefToPaperResponse,
+    DailyDebateResponse,
     FactorAdmissionResponse,
     FactorIcResponse,
     HitTrackingResponse,
@@ -1161,6 +1168,87 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (AgentError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class DailyDebateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asof: date | None = None
+    symbols: str | None = None
+    top_n: int = Field(5, ge=1, le=50, alias="topN")
+    value_factor: bool = Field(False, alias="valueFactor")
+    reversal_q: float = Field(0.30, alias="reversalQ")
+    adjust_kind: str | None = "qfq"
+    soft_gates: bool = Field(True, alias="softGates")
+    universe_tier: str | None = Field("watch", alias="universeTier")
+    engine: str = Field("off", description="off | deterministic | llm")
+    max_picks: int | None = Field(None, ge=1, le=50, alias="maxPicks")
+
+
+@router.post(
+    "/daily/debate",
+    summary="主链辩论车道（只读顾问侧车）",
+    responses={**ok200(DailyDebateResponse), **RESP_400, **RESP_RESEARCH},
+)
+def post_daily_debate(request: Request, body: DailyDebateRequest) -> dict[str, Any]:
+    """S5: attach an advisory debate lane to the main daily picks.
+
+    Engine validation runs **before** the panel probe, so a bad engine is a 400,
+    not a 503. The lane never mutates the picks and is excluded from the
+    performance / hit ledgers (``excludedFromPerformance=True``).
+    """
+    try:
+        engine = normalize_lane_engine(body.engine)
+    except AgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    kind = None if (body.adjust_kind or "").lower() in {"", "none", "raw"} else body.adjust_kind
+    brief = _build_brief_for_request(
+        request,
+        asof=body.asof,
+        symbols=_parse_symbols(body.symbols),
+        top_n=body.top_n,
+        value_factor=body.value_factor,
+        reversal_q=body.reversal_q,
+        adjust_kind=kind,
+        soft_gates=body.soft_gates,
+        universe_tier=body.universe_tier,
+    )
+    daily = request.app.state.workbench.resolve("daily")
+    try:
+        lane = attach_debate_lane(daily, brief, engine=engine, max_picks=body.max_picks)
+    except LlmUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (AgentError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    verdicts = [
+        {
+            "rank": item.get("rank"),
+            "symbol": item.get("symbol"),
+            "verdict": (item.get("debate") or {}).get("verdict"),
+            "kind": (item.get("debate") or {}).get("kind"),
+        }
+        for item in lane.get("debates") or []
+    ]
+    return {
+        "ok": True,
+        "asof": brief.get("asof"),
+        "engine": lane.get("engine"),
+        "requestedEngine": lane.get("requestedEngine"),
+        "pickCount": len(brief.get("picks") or []),
+        "picks": brief.get("picks") or [],
+        "debates": lane.get("debates") or [],
+        "verdicts": verdicts,
+        "advisory": True,
+        "excludedFromPerformance": True,
+        "degraded": bool(lane.get("degraded")),
+        "warnings": lane.get("warnings") or [],
+        "budget": lane.get("budget"),
+        "environment": "SIMULATE",
+        "liveTradingEnabled": False,
+        "disclaimer": "辩论为只读顾问侧车，不进选股/绩效/命中账本；非投资建议。",
+    }
 
 
 def _fixture_compare_panel() -> pd.DataFrame:

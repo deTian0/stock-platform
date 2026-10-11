@@ -267,6 +267,18 @@ def _ok_strategy_neutralization(body: Any, status: int) -> None:
     assert set(["final_equity", "n_trades"]) <= set(body["delta"])
 
 
+def _ok_daily_debate(body: Any, status: int) -> None:
+    if status == 503:
+        assert "detail" in body
+        return
+    assert status == 200
+    assert body["ok"] is True
+    assert body["liveTradingEnabled"] is False
+    assert body["excludedFromPerformance"] is True
+    assert isinstance(body["picks"], list)
+    assert isinstance(body["debates"], list)
+
+
 def _ok_rolling(body: Any, status: int) -> None:
     assert (status == 200 and body.get("ok") is True) or (status == 503 and "detail" in body)
 
@@ -693,6 +705,21 @@ _reg(
         assert_body=_ok_log_brief,
     )
 )
+_reg(
+    EndpointHit(
+        "POST",
+        "/api/research/daily/debate",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519",
+            "topN": 1,
+            "adjust_kind": "none",
+            "engine": "deterministic",
+        },
+        expect_status=frozenset({200, 503}),
+        assert_body=_ok_daily_debate,
+    )
+)
 _reg(EndpointHit("GET", "/api/research/strategy/configs", assert_body=_ok_strategy_configs))
 _reg(EndpointHit("GET", "/api/research/strategy/ab-status", assert_body=_ok_ab_status))
 _reg(
@@ -895,7 +922,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 65
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 66
 
 
 @pytest.mark.unit
@@ -943,4 +970,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 68
+    assert n_ops + n_extra == 69

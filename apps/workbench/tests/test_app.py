@@ -1777,3 +1777,47 @@ def test_portfolio_backtest_rejects_bad_universe(
     r = client.post("/api/research/backtest/portfolio", json={"universe": "crypto"})
     assert r.status_code == 400
     assert "universe" in (r.json().get("detail") or "")
+
+
+def test_daily_debate_lane_default_off(client: TestClient) -> None:
+    r = client.post(
+        "/api/research/daily/debate",
+        json={"asof": "2026-09-02", "symbols": "600519", "topN": 1, "adjust_kind": "none"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["engine"] == "off"
+    assert body["debates"] == []
+    assert body["excludedFromPerformance"] is True
+    assert body["liveTradingEnabled"] is False
+
+
+def test_daily_debate_lane_endpoint(client: TestClient) -> None:
+    r = client.post(
+        "/api/research/daily/debate",
+        json={
+            "asof": "2026-09-02",
+            "symbols": "600519,000001",
+            "topN": 2,
+            "adjust_kind": "none",
+            "engine": "deterministic",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["liveTradingEnabled"] is False
+    assert body["excludedFromPerformance"] is True
+    assert body["advisory"] is True
+    assert isinstance(body["picks"], list)
+    assert isinstance(body["debates"], list)
+    for item in body["debates"]:
+        assert item["debate"]["kind"] == "debate"
+
+    # A bad engine is a 400 (validation runs before the panel probe).
+    bad = client.post(
+        "/api/research/daily/debate",
+        json={"asof": "2026-09-02", "engine": "not-an-engine"},
+    )
+    assert bad.status_code == 400
+    assert "unknown debate lane engine" in bad.json()["detail"]

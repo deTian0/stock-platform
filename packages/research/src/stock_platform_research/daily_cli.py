@@ -161,6 +161,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="X3: 关闭命中追踪（默认开启：②A 头部记入命中周期，落平台 SQLite）",
     )
+    p.add_argument(
+        "--debate-engine",
+        default="off",
+        choices=["off", "deterministic", "llm"],
+        help=(
+            "S5: 主链可选辩论车道（默认 off=零 LLM）。deterministic 无需密钥；"
+            "llm 复用预算/降级（需 stock-platform-agents）"
+        ),
+    )
+    p.add_argument(
+        "--debate-max-picks",
+        type=int,
+        default=None,
+        help="S5: 参与辩论的 picks 上限（默认全部 TopN）",
+    )
     args = p.parse_args(argv)
 
     if args.provider == "replay" and not args.fixtures:
@@ -174,6 +189,12 @@ def main(argv: list[str] | None = None) -> int:
         from .position_review_cli import load_holdings  # single reader for holdings JSON
 
         holdings = load_holdings(args.holdings)
+    debate_engine = str(args.debate_engine or "off").strip().lower()
+    debate_runner = (
+        _build_debate_runner()
+        if debate_engine not in {"", "none", "off"}
+        else None
+    )
     report = run_daily_pipeline(
         asof=asof,
         provider=provider,
@@ -194,6 +215,9 @@ def main(argv: list[str] | None = None) -> int:
         skip_refresh=bool(args.skip_refresh),
         max_attempts=args.max_attempts,
         track_hits=not bool(args.no_track_hits),
+        debate_runner=debate_runner,
+        debate_engine=debate_engine,
+        debate_max_picks=args.debate_max_picks,
     )
     payload = report.to_dict()
     settle_meta: dict[str, Any] = {}
@@ -209,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
                 "briefPath": payload.get("brief_path"),
                 "rankingsCounts": (payload.get("brief") or {}).get("rankingsCounts") or None,
                 "hits": payload.get("hits") or None,
+                "debates": payload.get("debates") or None,
                 "provider": args.provider,
                 "error": payload.get("error"),
                 "settleAfter": settle_meta or None,
@@ -221,6 +246,24 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL {fail}", file=sys.stderr)
         return 1
     return 0
+
+
+def _build_debate_runner():
+    """S5: build the injected debate runner (soft import — research stays agents-free)."""
+    try:
+        from stock_platform_agents import attach_debate_lane
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit(
+            "--debate-engine requires stock-platform-agents. "
+            'Install with: pip install -e ".\\packages\\agents"'
+        ) from exc
+
+    def _run(**kwargs: Any) -> dict[str, Any]:
+        provider = kwargs.pop("provider")
+        brief = kwargs.pop("brief")
+        return attach_debate_lane(provider, brief, **kwargs)
+
+    return _run
 
 
 def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:

@@ -1,6 +1,12 @@
 """Thin agent plugins  - data only via stock_platform_providers."""
 
 from .debate import DebateReport, build_debate_report
+from .debate_lane import (
+    DEBATE_LANE_ENGINES,
+    attach_debate_lane,
+    debate_lane_summary,
+    normalize_lane_engine,
+)
 from .deep_llm_graph import (
     deep_llm_graph_enabled,
     deep_llm_graph_status,
@@ -8,6 +14,7 @@ from .deep_llm_graph import (
 )
 from .errors import AgentError
 from .llm_debate import (
+    LlmBudget,
     LlmBudgetExceeded,
     LlmUnavailableError,
     debate_brief_picks,
@@ -28,8 +35,10 @@ from .role_prompts import (
 
 __all__ = [
     "AgentError",
+    "DEBATE_LANE_ENGINES",
     "DebateAgentPlugin",
     "DebateReport",
+    "LlmBudget",
     "LlmBudgetExceeded",
     "LlmUnavailableError",
     "RATINGS_5_TIER",
@@ -39,19 +48,22 @@ __all__ = [
     "ReviewAgentPlugin",
     "RolePrompt",
     "assert_role_capabilities",
+    "attach_debate_lane",
     "build_debate_report",
     "build_research_report",
     "build_review_report",
     "debate_brief_picks",
+    "debate_lane_summary",
     "deep_llm_graph_enabled",
     "deep_llm_graph_status",
     "get_role_prompt",
     "list_role_prompts",
     "llm_debate_status",
+    "normalize_lane_engine",
     "parse_rating",
     "run_debate",
     "run_deep_llm_graph",
     "to_ternary_verdict",
     "warn_if_truncated",
 ]
-__version__ = "4.1.4"
+__version__ = "4.1.5"

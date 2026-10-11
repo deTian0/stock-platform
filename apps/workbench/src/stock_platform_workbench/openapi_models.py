@@ -331,6 +331,24 @@ class WizardDailyResponse(ExtraAllowModel):
     error: str | None = None
 
 
+class DailyDebateResponse(ExtraAllowModel):
+    ok: bool = True
+    asof: str | None = None
+    engine: str | None = None
+    requestedEngine: str | None = None
+    pickCount: int = 0
+    picks: list[dict[str, Any]] = Field(default_factory=list)
+    debates: list[dict[str, Any]] = Field(default_factory=list)
+    verdicts: list[dict[str, Any]] = Field(default_factory=list)
+    advisory: bool = True
+    excludedFromPerformance: bool = True
+    degraded: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    budget: dict[str, Any] | None = None
+    environment: str = "SIMULATE"
+    liveTradingEnabled: bool = False
+
+
 class PerformanceSummaryResponse(ExtraAllowModel):
     environment: str = "SIMULATE"
     liveTradingEnabled: bool = False
