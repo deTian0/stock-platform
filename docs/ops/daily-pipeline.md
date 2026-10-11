@@ -118,12 +118,29 @@ ADR [0059](../architecture/0059-picks-backtest-parity.md)：推荐侧与回测�
 推荐侧默认 `universe=all`（推荐了 ETF 就按 ETF 回放），对照的选股侧保留 `stock` 基线 —— 差异在
 `params.universe` 双侧回显，**不隐藏**。
 
+## 缺口容忍（`tolerate_gaps`，默认开）
+
+单只标的在窗口内**没有日线**是「数据缺口」，不是管道错误。默认不会否决整轮：
+
+| 情形 | 判定 | `ok` |
+|---|---|---|
+| 某标的无日线（薄票/停牌/ETF 窗口过期） | `gaps[]` | **否**（容忍） |
+| 传输/schema 错误 | `failures[]` | **是** |
+| 窗口内**所有**标的皆无日线 | `items` 为空 | **是**（fail-closed） |
+
+- 契约：[`docs/contracts/refresh-throughput.md`](../contracts/refresh-throughput.md) §6（`EMPTY_BARS_MARKER` 仅对 `daily` 抛；`TOLERABLE_GAP_DATASETS={"daily"}` 单点）。
+- 报告字段：`refresh.gapCount` / `refresh.gaps[]`；`refresh.failures[]` **只列真失败**（缺口不遮蔽真错误）。
+- CLI 逐条 `GAP <symbol> <dataset>: <error>` 写 stderr（区别于 `FAIL`），**退出码仍为 0**。
+- **严格模式**（验收/取证用）：`--no-refresh-tolerate-gaps`（`daily_cli`）/ `--no-tolerate-gaps`（`refresh_cli`）或 `STOCK_PLATFORM_REFRESH_TOLERATE_GAPS=0`；优先级 **显式 flag ＞ 环境变量 ＞ 默认 `True`**。
+
+> 真机坑（`v4.1.7`）：`510300`（沪深300ETF）在 `market.db` 最后 bar = `2026-09-08`（C2 ETF 退化，ADR `0058`）→ `asof=2026-10-09` 落入缺口。修复前整轮 fail-close；修复后默认档存活、`gaps[]` 照常记账。
+
 ## 退出码
 
 | 码 | 含义 |
 |----|------|
-| 0 | 成功 |
-| 1 | 流水线失败（refresh 或 brief） |
+| 0 | 成功（**含仅有缺口的情形**） |
+| 1 | 流水线失败（refresh 真失败 或 brief） |
 | 2 | 参数错误（如 replay 缺 `--fixtures`） |
 
 ## 调度入口

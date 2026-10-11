@@ -458,6 +458,81 @@ def test_effective_datasets_returns_none_when_nothing_supported() -> None:
     assert _effective_datasets(_NoCaps(), ["daily"]) is None
 
 
+# --- live-path regression: providers without ``capabilities`` ----------------
+#
+# Live HTTP providers (``tushare_http`` / ``cn_tushare_http``) implement only
+# ``get_daily`` and declare neither ``capabilities`` nor ``supports``. Before
+# this fix the pipeline requested all four datasets, failed three of them for
+# every symbol, and failed the whole run at ``stage="refresh"`` — on the very
+# path this machine runs in production. Live verification had only exercised
+# ``market_db``, so the regression shipped unnoticed.
+
+
+class _NamedNoCaps:
+    """Mimics a live HTTP provider: a name, no capability declaration."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def get_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
+        return []
+
+
+def test_live_provider_capabilities_come_from_the_registry() -> None:
+    """``tushare_http`` declares only ``daily`` — honoured without a 2nd list."""
+    provider = _NamedNoCaps("tushare_http")
+    assert _effective_datasets(provider, None) == ["daily"]
+    assert _effective_datasets(provider, ["daily", "fund_flow"]) == ["daily"]
+
+
+def test_replay_provider_declares_the_full_dataset_set() -> None:
+    provider = _NamedNoCaps("replay")
+    resolved = _effective_datasets(provider, None)
+    assert resolved is not None
+    assert {"daily", "adj_factor", "fund_flow", "full_minute"} <= set(resolved)
+
+
+def test_unknown_provider_name_keeps_requested_datasets() -> None:
+    """An unregistered name is 'no information' — never a silent narrowing."""
+    provider = _NamedNoCaps("totally_unregistered_provider")
+    assert _effective_datasets(provider, None) is None
+    assert _effective_datasets(provider, ["daily", "fund_flow"]) == ["daily", "fund_flow"]
+
+
+def test_nameless_provider_keeps_requested_datasets() -> None:
+    class _NoName:
+        pass
+
+    assert _effective_datasets(_NoName(), None) is None
+
+
+def test_live_provider_pipeline_no_longer_fails_on_extra_datasets(
+    tmp_path: Path,
+) -> None:
+    """End-to-end guard: a daily-only live provider must reach the brief."""
+
+    class _LiveLike(_PipelineProvider):
+        name = "tushare_http"  # registry says ``daily`` only
+
+    asof = date(2026, 9, 2)
+    provider = _LiveLike({"600519": _synth_bars("600519", asof, base=100.0)})
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519"],
+        top_n=1,
+        db_url=str(tmp_path / "p.db"),
+        track_hits=False,
+        track_picks_ledger=False,
+        persist_db=False,
+    )
+    assert report.ok, report.error
+    assert report.stage == "brief"
+    assert report.refresh is not None
+    assert report.refresh["datasets"] == ["daily"]  # not all four
+
+
 def test_pipeline_skips_unsupported_datasets_instead_of_failing(tmp_path: Path) -> None:
     """A `daily`-only provider must still produce a brief (P0-1 regression guard)."""
     asof = date(2026, 9, 2)
@@ -503,3 +578,134 @@ def test_pipeline_persist_false_skips_refresh_json(tmp_path: Path) -> None:
     # The manifest still records the successful item.
     assert report.refresh is not None
     assert report.refresh["okCount"] == 1
+
+
+# --- P0-4: gap tolerance on the live path ------------------------------------
+#
+# A thin symbol (an ETF whose bars stop before ``asof``) produces an empty
+# daily frame. That is a *gap*, not a transport error, and it must not abort
+# the whole daily run — the panel already tolerates an empty symbol.
+
+
+class _GapProvider(_PipelineProvider):
+    """Serves real bars for one symbol and nothing for another.
+
+    Mirrors the offline bulk provider: rows are returned as a flat list of
+    dicts (the pipeline builds a per-symbol frame from them). A symbol in
+    ``empty`` contributes no rows, which is exactly what a thin ETF looks
+    like downstream — an empty daily frame for that symbol.
+    """
+
+    capabilities = frozenset({"daily"})
+
+    def __init__(self, by_sym: dict[str, list[dict[str, Any]]], empty: set[str]) -> None:
+        super().__init__(by_sym)
+        self._empty = empty
+
+    def get_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
+        if self._empty:
+            symbols = [s for s in symbols if s not in self._empty]
+        return super().get_daily(symbols, start=start, end=end, asset_type=asset_type)
+
+
+def _gap_symbols(asof: date) -> dict[str, list[dict[str, Any]]]:
+    return {"600519": _synth_bars("600519", asof, base=100.0)}
+
+
+def test_pipeline_survives_a_thin_symbol_by_default(tmp_path: Path) -> None:
+    asof = date(2026, 9, 2)
+    provider = _GapProvider(_gap_symbols(asof), empty={"510300"})
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519", "510300"],
+        top_n=1,
+        db_url=str(tmp_path / "p.db"),
+        track_hits=False,
+        track_picks_ledger=False,
+        persist_db=False,
+    )
+    assert report.ok, report.error
+    assert report.stage == "brief"
+    assert report.refresh is not None
+    assert report.refresh["gapCount"] == 1
+    assert report.refresh["failCount"] == 0
+    assert report.refresh["tolerateGaps"] is True
+    assert report.refresh["gaps"][0]["symbol"] == "510300"
+    # A tolerated gap is not a failure, so nothing lands in ``failures``.
+    assert report.refresh["failures"] == []
+
+
+def test_pipeline_strict_gaps_fails_the_run(tmp_path: Path) -> None:
+    """``refresh_tolerate_gaps=False`` restores the old all-or-nothing gate."""
+    asof = date(2026, 9, 2)
+    provider = _GapProvider(_gap_symbols(asof), empty={"510300"})
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519", "510300"],
+        top_n=1,
+        db_url=str(tmp_path / "p.db"),
+        track_hits=False,
+        track_picks_ledger=False,
+        persist_db=False,
+        refresh_tolerate_gaps=False,
+    )
+    assert not report.ok
+    assert report.stage == "refresh"
+    assert report.refresh is not None
+    assert report.refresh["failCount"] == 1
+    assert report.refresh["tolerateGaps"] is False
+
+
+# --- P0-4: CLI flags ---------------------------------------------------------
+
+
+def test_daily_cli_gap_tolerance_defaults_on() -> None:
+    from stock_platform_research.daily_cli import _resolve_tolerate_gaps
+
+    class _A:
+        refresh_tolerate_gaps = None
+
+    assert _resolve_tolerate_gaps(_A()) is True
+
+
+def test_daily_cli_env_can_pin_strict_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stock_platform_research.daily_cli import _resolve_tolerate_gaps
+
+    class _A:
+        refresh_tolerate_gaps = None
+
+    monkeypatch.setenv("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS", "0")
+    assert _resolve_tolerate_gaps(_A()) is False
+    monkeypatch.setenv("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS", "false")
+    assert _resolve_tolerate_gaps(_A()) is False
+
+
+def test_daily_cli_explicit_flag_beats_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stock_platform_research.daily_cli import _resolve_tolerate_gaps
+
+    class _Strict:
+        refresh_tolerate_gaps = False
+
+    class _Loose:
+        refresh_tolerate_gaps = True
+
+    monkeypatch.setenv("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS", "0")
+    assert _resolve_tolerate_gaps(_Loose()) is True  # explicit --refresh-tolerate-gaps
+    monkeypatch.delenv("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS", raising=False)
+    assert _resolve_tolerate_gaps(_Strict()) is False  # explicit --no-refresh-tolerate-gaps
+
+
+def test_refresh_cli_exposes_gap_flags() -> None:
+    """Both directions exist and default to ``None`` (env-resolved)."""
+    import inspect
+
+    from stock_platform_research import refresh_cli
+
+    src = inspect.getsource(refresh_cli.main)
+    assert "--tolerate-gaps" in src
+    assert "--no-tolerate-gaps" in src
+    assert "tolerate_gaps" in src

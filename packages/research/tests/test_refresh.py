@@ -294,7 +294,13 @@ def test_bulk_path_uses_one_call(tmp_path: Path) -> None:
     assert (day / "daily_600036.json").is_file()
 
 
-def test_bulk_path_reports_missing_symbol_fail_closed(tmp_path: Path) -> None:
+def test_bulk_path_gap_is_reported_not_fatal(tmp_path: Path) -> None:
+    """A symbol with no bars is a *gap* (reported), not a run failure.
+
+    The cross-section panel already drops symbols lacking a bar on ``asof``
+    (strict PIT), so one thin symbol must not fail the whole daily run.
+    """
+
     class _PartialBulk(_Bulk):
         def bulk_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
             out = super().bulk_daily(symbols, start=start, end=end, asset_type=asset_type)
@@ -308,11 +314,137 @@ def test_bulk_path_reports_missing_symbol_fail_closed(tmp_path: Path) -> None:
         symbols=["600519", "000001"],
         datasets=["daily"],
     )
+    assert report.ok is True  # a gap does not fail the run
+    payload = report.to_dict()
+    assert payload["gapCount"] == 1
+    assert payload["failCount"] == 0
+    assert payload["failures"] == []
+    assert [g["symbol"] for g in payload["gaps"]] == ["000001"]
+    assert "empty daily bars" in payload["gaps"][0]["error"]
+
+
+def test_bulk_path_gap_strict_when_tolerance_disabled(tmp_path: Path) -> None:
+    """``tolerate_gaps=False`` restores all-or-nothing gating."""
+
+    class _PartialBulk(_Bulk):
+        def bulk_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
+            out = super().bulk_daily(symbols, start=start, end=end, asset_type=asset_type)
+            out.pop("000001", None)
+            return out
+
+    report = run_refresh(
+        asof="2026-09-02",
+        provider=_PartialBulk(),
+        out_dir=tmp_path,
+        symbols=["600519", "000001"],
+        datasets=["daily"],
+        tolerate_gaps=False,
+    )
     assert report.ok is False
-    fail = [i for i in report.items if not i.ok]
-    assert len(fail) == 1
-    assert fail[0].symbol == "000001"
-    assert "empty daily bars" in (fail[0].error or "")
+    payload = report.to_dict()
+    assert payload["failCount"] == 1
+    assert payload["tolerateGaps"] is False
+    assert payload["failures"][0]["symbol"] == "000001"
+
+
+def test_gap_classification_is_daily_only(tmp_path: Path) -> None:
+    """Only a ``daily`` empty-bar item is a tolerable gap.
+
+    An empty result on another dataset is not an error at all (the
+    ``empty daily bars`` marker is raised for ``daily`` only), so it can never
+    be laundered into a tolerated gap either.
+    """
+    from stock_platform_research.refresh import (
+        EMPTY_BARS_MARKER,
+        RefreshItemResult,
+    )
+
+    daily_gap = RefreshItemResult(
+        symbol="510300",
+        dataset="daily",
+        ok=False,
+        attempts=3,
+        error=f"RefreshError: {EMPTY_BARS_MARKER} (fail-closed)",
+    )
+    minute_gap = RefreshItemResult(
+        symbol="510300",
+        dataset="full_minute",
+        ok=False,
+        attempts=3,
+        error=f"RefreshError: {EMPTY_BARS_MARKER} (fail-closed)",
+    )
+    real_error = RefreshItemResult(
+        symbol="510300",
+        dataset="daily",
+        ok=False,
+        attempts=3,
+        error="RefreshError: connection reset",
+    )
+    ok_item = RefreshItemResult(
+        symbol="600519", dataset="daily", ok=True, attempts=1, rows=80
+    )
+
+    assert daily_gap.is_gap is True
+    assert minute_gap.is_gap is False  # not a tolerable dataset
+    assert real_error.is_gap is False  # transport error, not a data gap
+    assert ok_item.is_gap is False
+
+
+class _MixedPerSymbol:
+    """Per-symbol provider: one gap (empty daily) + one hard error."""
+
+    name = "mixed_fake"
+    capabilities = frozenset({"daily"})
+
+    def get_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
+        sym = symbols[0]
+        if sym == "000001":
+            return []  # -> "empty daily bars" gap
+        if sym == "600036":
+            raise RuntimeError("connection reset")  # hard error
+        return [{"symbol": sym, "date": "2026-09-02", "close": 10.0, "volume": 1}]
+
+
+def test_tolerated_gap_does_not_hide_other_failures(tmp_path: Path) -> None:
+    """A real error alongside a gap must still fail the run."""
+    report = run_refresh(
+        asof="2026-09-02",
+        provider=_MixedPerSymbol(),
+        out_dir=tmp_path,
+        symbols=["600519", "000001", "600036"],
+        datasets=["daily"],
+        workers=1,
+        max_attempts=1,
+        sleeper=lambda _s: None,
+    )
+    assert report.ok is False
+    payload = report.to_dict()
+    assert payload["gapCount"] == 1
+    assert payload["failCount"] == 1
+    assert payload["failures"][0]["symbol"] == "600036"
+    assert [g["symbol"] for g in payload["gaps"]] == ["000001"]
+
+
+def test_hard_error_is_never_a_gap(tmp_path: Path) -> None:
+    """A transport error must not be laundered into a tolerable gap."""
+
+    class _Boom(_Bulk):
+        def bulk_daily(self, symbols, *, start=None, end=None, asset_type="stock"):
+            raise RuntimeError("connection reset")
+
+    report = run_refresh(
+        asof="2026-09-02",
+        provider=_Boom(),
+        out_dir=tmp_path,
+        symbols=["600519"],
+        datasets=["daily"],
+        max_attempts=1,
+        sleeper=lambda _s: None,
+    )
+    assert report.ok is False
+    payload = report.to_dict()
+    assert payload["gapCount"] == 0
+    assert payload["failCount"] == 1
 
 
 def test_bulk_disabled_falls_back_to_per_symbol(tmp_path: Path) -> None:

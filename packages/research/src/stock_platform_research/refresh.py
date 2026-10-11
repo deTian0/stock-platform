@@ -64,6 +64,19 @@ class RefreshError(RuntimeError):
     """Raised when the job cannot start (empty universe / bad config)."""
 
 
+# Marker for a per-symbol data gap (no bars for the requested window).
+# This is a *data quality* signal, not a job failure: the cross-section panel
+# already drops symbols with no bar on ``asof`` (strict PIT), so one thin
+# symbol must not fail the whole daily run.
+EMPTY_BARS_MARKER = "empty daily bars"
+
+# Datasets whose per-symbol gap is tolerable for a daily *brief* run.
+# The brief only consumes ``daily``; a symbol with no daily bar is silently
+# skipped downstream (panel.py strict PIT), so a gap here is a warning, not a
+# failure. Other datasets keep fail-closed semantics (they signal real errors).
+TOLERABLE_GAP_DATASETS: frozenset[str] = frozenset({"daily"})
+
+
 @dataclass
 class RefreshItemResult:
     symbol: str
@@ -74,6 +87,21 @@ class RefreshItemResult:
     path: str | None = None
     error: str | None = None
 
+    @property
+    def is_gap(self) -> bool:
+        """True when this item has no bars but is otherwise a valid symbol.
+
+        Distinguishes "the provider answered, there is simply no data" from a
+        transport/schema error. ``ok`` stays ``False`` (it did not produce
+        rows), but a gap does not by itself fail the run.
+        """
+        return (
+            not self.ok
+            and self.error is not None
+            and EMPTY_BARS_MARKER in self.error
+            and self.dataset in TOLERABLE_GAP_DATASETS
+        )
+
 
 @dataclass
 class RefreshReport:
@@ -83,17 +111,44 @@ class RefreshReport:
     symbols: list[str]
     ok: bool
     items: list[RefreshItemResult] = field(default_factory=list)
+    # When True (default), a per-symbol empty-bar gap in a tolerable dataset
+    # does not fail the run. Set False to restore strict all-or-nothing gating.
+    tolerate_gaps: bool = True
+
+    @property
+    def gaps(self) -> list[RefreshItemResult]:
+        return [i for i in self.items if i.is_gap]
+
+    @property
+    def hard_failures(self) -> list[RefreshItemResult]:
+        """Items that fail the run: real errors, plus gaps when not tolerated."""
+        return [
+            i
+            for i in self.items
+            if not i.ok and not (self.tolerate_gaps and i.is_gap)
+        ]
 
     def to_dict(self) -> dict[str, Any]:
-        failed = [i for i in self.items if not i.ok]
+        failed = self.hard_failures
+        gaps = self.gaps
         return {
             "asof": self.asof,
             "outDir": self.out_dir,
             "datasets": list(self.datasets),
             "symbols": list(self.symbols),
             "ok": self.ok,
+            "tolerateGaps": self.tolerate_gaps,
             "okCount": sum(1 for i in self.items if i.ok),
+            "gapCount": len(gaps),
             "failCount": len(failed),
+            "gaps": [
+                {
+                    "symbol": i.symbol,
+                    "dataset": i.dataset,
+                    "error": i.error,
+                }
+                for i in gaps
+            ],
             "failures": [
                 {
                     "symbol": i.symbol,
@@ -436,11 +491,22 @@ def run_refresh(
     min_interval: float | None = None,
     bulk: bool | None = None,
     persist: bool = True,
+    tolerate_gaps: bool = True,
 ) -> RefreshReport:
     """Refresh CN datasets for a universe and persist Replay-compatible JSON.
 
     Empty universe fail-closed. Per-symbol/dataset errors are recorded; the
-    job continues. ``report.ok`` is False if any item failed.
+    job continues.
+
+    Gap vs failure
+    --------------
+    ``report.ok`` is False when any item failed **hard**. An item that answered
+    with no bars (``"empty daily bars"``) on a tolerable dataset (``daily``) is
+    classified as a *gap*: it is reported under ``gaps`` and counted in
+    ``gapCount``, but does not fail the run. That matches the downstream
+    consumer — the cross-section panel drops symbols lacking a bar on ``asof``
+    (strict PIT) rather than erroring. Pass ``tolerate_gaps=False`` for strict
+    all-or-nothing gating.
 
     Performance
     -----------
@@ -521,13 +587,23 @@ def run_refresh(
         out_dir=str(day_dir),
         datasets=ds,
         symbols=univ,
-        ok=all(i.ok for i in items) and bool(items),
+        ok=bool(items) and not _hard_failure_items(items, tolerate_gaps),
         items=items,
+        tolerate_gaps=tolerate_gaps,
     )
     payload = report.to_dict()
     _json_dump(day_dir / "manifest.json", payload)
     _json_dump(root / "latest.json", payload)
     return report
+
+
+def _hard_failure_items(
+    items: list[RefreshItemResult], tolerate_gaps: bool
+) -> list[RefreshItemResult]:
+    """Items that should fail the run (see :attr:`RefreshReport.hard_failures`)."""
+    return [
+        i for i in items if not i.ok and not (tolerate_gaps and i.is_gap)
+    ]
 
 
 def _call_with_retry(

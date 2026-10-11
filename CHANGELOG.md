@@ -12,6 +12,39 @@
 
 - （无）
 
+## [4.1.7] - 2026-10-10
+
+### Added
+
+- **缺口容忍（`P0-4` 修复）**：`RefreshItemResult.is_gap` / `RefreshReport.tolerate_gaps` / `gaps` / `hard_failures` —— 区分**数据缺口**与**真失败**
+  - `EMPTY_BARS_MARKER = "empty daily bars"`（仅对 `dataset == "daily"` 抛出）、`TOLERABLE_GAP_DATASETS = frozenset({"daily"})`（放行集合**单点**）
+  - `ok = bool(items) and not _hard_failure_items(items, tolerate_gaps)` —— **漏洞永不遮蔽真失败**（同轮内一缺口 + 一真错误 ⇒ `ok=False`）
+  - `to_dict()` 增 `tolerateGaps` / `gapCount` / `gaps[]`；`failures[]` **只列 `hard_failures`**
+- **能力注册表反查（`P0-4`）**：`daily_pipeline._declared_capabilities(provider)` —— 四级解析（`capabilities` → `supports()` → **`name` 查注册表** → `None`）
+  - 复用 `stock_platform_providers.build_capability_matrix()` 为**唯一真源**，不在流水线里重抄 provider→datasets 表
+  - 解析结果为空一律当 `None`（**永不静默收窄到零数据集**）
+- CLI 开关：`daily_cli --refresh-tolerate-gaps | --no-refresh-tolerate-gaps`、`refresh_cli --tolerate-gaps | --no-tolerate-gaps`；环境变量 `STOCK_PLATFORM_REFRESH_TOLERATE_GAPS`（`0/false/no/off` 关）
+  - 解析优先级：**显式 flag ＞ 环境变量 ＞ 默认 `True`**
+  - 输出：CLI 逐条 `GAP <symbol> <dataset>: <error>` 写 stderr（区别于 `FAIL`），退出码仍 0；`daily_cli` JSON 摘要回带完整 `refresh` 块
+
+### Changed
+
+- **真机缺陷修复（`P0-4`，线上路径）**：`_effective_datasets` 原仅认 provider 的 `capabilities` 属性；线上 HTTP provider（`tushare_http` / `cn_tushare_http`）**只实现 `get_daily`、不声明任何能力** → 流水线请求全部 4 个数据集，每只票失败 3 个，整轮在 `stage="refresh"` 失败 —— 而这正是本机生产路径。此前真机验证只覆盖 `market_db`，回归静默上线
+- **真机缺陷修复（`P0-4`，fail-closed 粒度）**：`RefreshReport.ok = all(i.ok for i in items)` —— 单只薄票（无当日 bar 的数据缺口）即否决整轮。下游 `panel.py` 本就容忍空数据（空 frame 跳过、严格 PIT 只要求 `asof` 当日有 bar），整轮 fail-close 与「生产可用」目标相悖
+- 严格模式（`tolerate_gaps=False`）**完整保留**给验收/取证（断言完整性时用）
+
+### Verified
+
+- **真机定位**：`510300`（沪深300ETF）在 `market.db` 仅 65 行、最后 bar = **`2026-09-08`**（C2 ETF 退化，见 ADR `0058`）——`asof=2026-10-09` 时落入缺口
+- **真机复现**：`lookback=5`（窗口内含 0 bar）默认档 `ok=True / gapCount=1 / failCount=0`（**整轮存活**）；严格档 `ok=False / failCount=1`（**旧行为保留**）；`lookback=120` 两档均 `ok=True`
+- **真机端到端**：`run_daily_pipeline`（`market_db` 快路径 + 3 标的含薄票）→ `ok=True / stage="brief"`，`refresh={datasets:["daily"], okCount:2, gapCount:1, failCount:0, tolerateGaps:true}`
+- **真机 CLI**：`refresh_cli --provider market_db` 返回 `{"ok": true, "failCount": 0, "gapCount": 0}`（`.env` 自动加载，免手动 export）
+- 全量 `pytest packages apps`（`replay`）**942 passed / 0 failed / 0 errors / 0 skipped**（927 → 942，+15）
+
+### Docs
+
+- 更新 [`docs/contracts/refresh-throughput.md`](docs/contracts/refresh-throughput.md) 至 `v4.1.7`：新增 §5（能力解析四级 + 不变量）与 §6（缺口 vs 真失败：判定单点 / 报告与门禁 / 开关矩阵 / 可观测性）；§7 验收基线补 `market_db` 有界跑（含薄票）数字
+
 ## [4.1.6] - 2026-10-10
 
 ### Added

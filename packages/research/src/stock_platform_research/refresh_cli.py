@@ -100,6 +100,22 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Replay fixtures dir (required when --provider=replay)",
     )
+    p.add_argument(
+        "--tolerate-gaps",
+        dest="tolerate_gaps",
+        action="store_true",
+        default=None,
+        help=(
+            "P0-4: treat 'no daily bars in window' as a data gap, not a failure "
+            "(default: on). Gaps are reported under gaps[] and never mask real errors"
+        ),
+    )
+    p.add_argument(
+        "--no-tolerate-gaps",
+        dest="tolerate_gaps",
+        action="store_false",
+        help="P0-4: strict mode — any symbol without daily bars fails the run (old behaviour)",
+    )
     args = p.parse_args(argv)
 
     if args.provider == "replay" and not args.fixtures:
@@ -108,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     datasets = [d.strip() for d in str(args.datasets).split(",") if d.strip()]
     provider = _build_provider(args)
     asof = date.fromisoformat(args.asof)
+    tolerate_gaps = args.tolerate_gaps
+    if tolerate_gaps is None:
+        raw = (os.environ.get("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS") or "").strip().lower()
+        tolerate_gaps = raw not in {"0", "false", "no", "off"}
     report = run_refresh(
         asof=asof,
         provider=provider,
@@ -119,9 +139,15 @@ def main(argv: list[str] | None = None) -> int:
         sleeper=None,
         workers=args.workers,
         min_interval=args.min_interval,
+        tolerate_gaps=bool(tolerate_gaps),
     )
     payload = report.to_dict()
-    print(json.dumps({"ok": payload["ok"], "asof": payload["asof"], "failCount": payload["failCount"], "outDir": payload["outDir"]}, ensure_ascii=False))
+    print(json.dumps({"ok": payload["ok"], "asof": payload["asof"], "failCount": payload["failCount"], "gapCount": payload["gapCount"], "outDir": payload["outDir"]}, ensure_ascii=False))
+    for gap in payload["gaps"]:
+        print(
+            f"GAP {gap['symbol']} {gap['dataset']}: {gap['error']}",
+            file=sys.stderr,
+        )
     for fail in payload["failures"]:
         print(
             f"FAIL {fail['symbol']} {fail['dataset']} attempts={fail['attempts']}: {fail['error']}",

@@ -398,4 +398,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.1.6"
+__version__ = "4.1.7"

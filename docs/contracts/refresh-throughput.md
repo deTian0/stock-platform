@@ -1,9 +1,10 @@
-# 取数吞吐契约（离线批量 provider / 并发 / 持久化）
+# 取数吞吐契约（离线批量 provider / 并发 / 持久化 / 缺口容忍）
 
-> 状态：Accepted｜目标 tag：`v4.1.6`（2026-10-10）
+> 状态：Accepted｜目标 tag：`v4.1.7`（2026-10-10）
 > 关联：`docs/architecture/0066-refresh-throughput-and-env-loading.md` · ADR `0058`（数据真相源）· ADR `0054`（适配层）
+> `v4.1.6` 建立前三节（吞吐）；`v4.1.7` 增加第 5 节（缺口容忍）与第 6 节（能力解析）。
 
-本契约锁定 `run_refresh` 的**吞吐行为**：批量取数入口、并发与节流、持久化开关。目的是让「08:30 盘前跑完全市场」成为**可复现的契约**，而不是依赖调参。
+本契约锁定 `run_refresh` 的**吞吐行为**与**失败判定**：批量取数入口、并发与节流、持久化开关、数据集裁剪、**缺口 vs 真失败**。目的是让「08:30 盘前跑完全市场」成为**可复现的契约**，而不是依赖调参，且单只票的薄数据不拖垮整轮。
 
 ---
 
@@ -79,16 +80,72 @@ class RateLimiter(min_interval, *, sleeper=time.sleep, clock=time.monotonic)
 
 ## 5. 流水线侧裁剪：`_effective_datasets`
 
-`daily_pipeline._effective_datasets(provider, datasets)`：
+`daily_pipeline._effective_datasets(provider, datasets)` 的解析顺序（`_declared_capabilities`，**首次命中即胜出**）：
 
-- provider **未声明** `capabilities` → 返回 `None`（**行为不变**，沿用历史数据集）。
-- 声明了 → 返回 `请求数据集 ∩ capabilities`；交集为空 → `None`（视为"无能力信息"，不 fail）。
+| 优先级 | 来源 | 结果 | 例子 |
+|---|---|---|---|
+| ① | provider 有显式 `capabilities` 属性 | 直接用该集合 | `MarketDbBulkProvider` → `{"daily"}` |
+| ② | provider 有 `supports(dataset)` 可调用 | 逐数据集试算 | 适配层 provider |
+| ③ | provider 有 `name`，且该名在**能力注册表**中 | 注册表声明的集合 | `tushare_http` → `{"daily"}`；`replay` → 13 项 |
+| ④ | 以上皆无 | `None` ＝「无能力信息」 | 匿名测试替身 |
 
-目的：让只有 `daily` 的批量 provider 不会因缺 `adj_factor` 而让整条流水线 fail-close。被裁掉的数据集是**显式裁剪**，不是静默丢数据。
+**关键不变量**：
+
+- 解析出的集合为**空** → 一律当作 `None`（**永不静默收窄到零数据集**）。
+- ③ 依赖 `stock_platform_providers.build_capability_matrix()`（**唯一真源**，见第 6 节）。**禁止**在 `daily_pipeline` 里再抄一份 provider→datasets 表。
+- 解析结果为 `None` → 沿用调用方请求的数据集（历史行为不变）。
+
+**为什么需要 ③**：线上 HTTP provider（`tushare_http` / `cn_tushare_http`）只实现 `get_daily`，**既不声明 `capabilities` 也没有 `supports`**。缺 ③ 时流水线会请求全部 4 个数据集，每只票失败 3 个，整轮在 `stage="refresh"` 失败 —— 而这正是本机生产路径。此前真机验证只覆盖 `market_db`，故该回归一度静默上线。
 
 ---
 
-## 6. 验收基线（真机实测）
+## 6. 缺口 vs 真失败（`tolerate_gaps`）
+
+### 6.1 判定单点
+
+`RefreshItemResult.is_gap` 为真 **当且仅当**：
+
+```python
+not ok  and  error 含 EMPTY_BARS_MARKER  and  dataset in TOLERABLE_GAP_DATASETS
+```
+
+- `EMPTY_BARS_MARKER = "empty daily bars"` —— 该串**仅对 `dataset == "daily"`** 抛出（`refresh.py`），故非日线数据集天然不会被判为缺口。
+- `TOLERABLE_GAP_DATASETS = frozenset({"daily"})` —— 未来要放行别的数据集，**只改这一个常量**。
+
+语义：provider **应答了**，只是没有数据（薄票/停牌/ETF 窗口过期）；区别于传输或 schema 错误。
+
+### 6.2 报告与门禁
+
+`RefreshReport(tolerate_gaps=True)` 下：
+
+| 概念 | 定义 | 影响 `ok` |
+|---|---|---|
+| `gaps` | `is_gap` 为真的项 | **否**（默认） |
+| `hard_failures` | `not ok and not (tolerate_gaps and is_gap)` | **是** |
+| `ok` | `bool(items) and not hard_failures` | — |
+
+`to_dict()` 新增字段：`tolerateGaps` / `gapCount` / `gaps[]`（`symbol,dataset,error`）；`failures[]` **只列 `hard_failures`**（不再被缺口污染）。
+
+**硬约束：缺口永不遮蔽真失败**。`test_tolerated_gap_does_not_hide_other_failures` 锁定：同轮内一个真错误 + 一个缺口 → `ok=False`、`failCount=1`、`gapCount=1`。
+
+### 6.3 开关（默认开，可显式关）
+
+| 入口 | 打开（默认） | 关闭（严格） | 环境变量 |
+|---|---|---|---|
+| `run_refresh` | `tolerate_gaps=True` | `tolerate_gaps=False` | — |
+| `daily_pipeline` | `refresh_tolerate_gaps=True` | `refresh_tolerate_gaps=False` | — |
+| `daily_cli` | 缺省 | `--no-refresh-tolerate-gaps` | `STOCK_PLATFORM_REFRESH_TOLERATE_GAPS=0/false/no/off` |
+| `refresh_cli` | 缺省 | `--no-tolerate-gaps` | 同上 |
+
+解析规则：**显式 flag ＞ 环境变量 ＞ 默认 `True`**。
+
+**为什么默认开**：下游 `panel.py` 本就容忍空数据（空 frame → 跳过；严格 PIT 只要求 `asof` 当日有 bar）。整轮 fail-close 会让一个薄票否决全市场选股 —— 与「生产可用」目标相悖。**严格模式保留**给验收/取证（断言完整性时用）。
+
+**可观测性**：CLI 逐条以 `GAP <symbol> <dataset>: <error>` 写 stderr（区别于 `FAIL ...`），退出码仍为 0；`daily_cli` 的 JSON 摘要回带完整 `refresh` 块。
+
+---
+
+## 7. 验收基线（真机实测）
 
 | 场景 | 数字 |
 |---|---|
@@ -98,3 +155,4 @@ class RateLimiter(min_interval, *, sleeper=time.sleep, clock=time.monotonic)
 | `daily_cli` 端到端（带持久化） | 129.94 s |
 | ops 脚本 `Invoke-DailyPipeline.ps1 -MarketDb` | **14.78 s** |
 | 修复前外推（HTTP 串行全市场） | ~3 h |
+| `market_db` 有界跑（含 1 只薄票） | `ok=True stage=brief gapCount=1 failCount=0` |
