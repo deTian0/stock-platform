@@ -1,6 +1,6 @@
 # 契约 — 合规边界（实盘门禁）
 
-- **状态**：**Proposed**（随 ADR [`0064`](../architecture/0064-live-trading-charter.md) 一并待显式确认）
+- **状态**：**Accepted**（随 ADR [`0064`](../architecture/0064-live-trading-charter.md) 于 2026-10-11 一并确认）
 - **适用**：`stock-platform` 全体模块／流水线／UI／自动化
 - **权威决议**：ADR [`0064`](../architecture/0064-live-trading-charter.md)（`L1`）
 - **相关**：[`docs/plans/dual-line-responsibility.md`](../plans/dual-line-responsibility.md) ·
@@ -62,9 +62,10 @@
 
 ---
 
-## 5. P0 名义参数（**Proposed，待确认**）
+## 5. P0 名义参数（**Confirmed**，2026-10-11）
 
-P0 无真实资金风险，以下参数用于**名义账本**与后续阶段延用；未确认前不写入任何代码常量。
+P0 无真实资金风险，以下参数用于**名义账本**与后续阶段延用；**已于 2026-10-11 确认**，
+可在后续里程碑按需调整（调整须改本文件并留痕）。
 
 | 维度 | 建议默认 | 理由 |
 |------|----------|------|
