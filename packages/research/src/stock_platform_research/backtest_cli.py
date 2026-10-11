@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .dotenv import load_dotenv
 from .backtest import UNIVERSES, run_portfolio_backtest
 from .portfolio import DEFAULT_COMMISSION_RATE, DEFAULT_STAMP_SELL_RATE
 
@@ -163,6 +164,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     args = build_parser().parse_args(argv)
     db = (args.db or "").strip()
     if not db:

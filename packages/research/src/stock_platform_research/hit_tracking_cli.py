@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .dotenv import load_dotenv
 from .hit_tracking import (
     HIT_SESSION_TYPES,
     PRE_MARKET,
@@ -28,6 +29,8 @@ from .hit_tracking import (
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     p = argparse.ArgumentParser(
         description="Hit tracking: a-stock-engine 10-session cycle on the platform SQLite (X3)"
     )

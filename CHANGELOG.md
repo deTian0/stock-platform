@@ -12,6 +12,47 @@
 
 - （无）
 
+## [4.1.6] - 2026-10-10
+
+### Added
+
+- **离线批量取数 provider（`P0-1` 修复）**：新增 `stock_platform_providers.market_db_bulk.MarketDbBulkProvider`
+  - `PROVIDER_NAME = "market_db_bulk"`、`capabilities = frozenset({"daily"})`、`MARKET_DB_BULK_UNSUPPORTED = ("adj_factor","fund_flow","full_minute")`
+  - 唯一入口 `bulk_daily(symbols, *, start, end, asset_type="stock") -> dict[str, list[dict]]` —— 对 `market.db` 的 `daily_price` 做**一趟分块 SQL**（`_CHUNK = 900`），行经 `normalize_daily_row` 归一；缺失 symbol → `[]`（**不报错**）
+  - 代码归一**复用** X1/ADR`0055` 单点：`_bare_codes`（去重保序）+ `_engine_code_map`（`600519.SH` / `sh600519` / `600519` 折叠同键）
+  - 包装 `EngineSqliteProvider`，**零网络**（延续 ADR `0054`：不直连 Markdown / 自然语言源）
+- **`run_refresh` 并发与限速（`P0-1`）**：`workers` / `min_interval` / `bulk` / `persist` 四参数
+  - `RateLimiter(min_interval, *, sleeper, clock)` —— **跨所有 worker 的共享锁**保证任意两次上游调用间隔 ≥ `min_interval`；**提高并发不得越过上游节流**（硬约束）；`min_interval <= 0` 为 noop
+  - `_bulk_daily_allowed(provider, datasets, bulk)` 为路径选择**单点**：要求有 `bulk_daily` **且** 请求数据集 ⊆ `capabilities`；`bulk=False` 强制关闭；任一数据集不支持即 fail-closed
+  - 默认 `workers=1` / `persist=True` —— **不改既有基线**；结果为 `(symbol, dataset)` 输入顺序（三条路径一致）
+  - 环境变量 `STOCK_PLATFORM_REFRESH_WORKERS` / `STOCK_PLATFORM_REFRESH_MIN_INTERVAL`（后者回落 `EM_MIN_INTERVAL`）
+- **`.env` 自动加载单点（`P0-2` 修复）**：新增 `stock_platform_research.dotenv`
+  - `load_dotenv(path=None, *, override=False, env=None, required=None, force=False)` / `find_dotenv_path` / `parse_dotenv_text`
+  - 路径优先级：显式 → `STOCK_PLATFORM_DOTENV` → 仓库根向上查找 → cwd；文件缺失**不报错**；**默认不覆盖**进程环境变量（调度器注入优先）
+  - **pytest 守卫**：`PYTEST_CURRENT_TEST` / `PYTEST_VERSION` / `STOCK_PLATFORM_DOTENV_DISABLE` 任一成立即**跳过隐式加载**（防开发者真实 `.env` 泄漏进测试）；`force=True` 供加载器自测
+  - 接入 **14 个 CLI** 的 `main()` 首行
+- **流水线能力裁剪（`P0-1`）**：`daily_pipeline._effective_datasets(provider, datasets)` —— 请求数据集 ∩ provider `capabilities`；provider 未声明 capabilities → `None`（**行为不变**）
+- `daily_cli` 新参数 `--refresh-workers` / `--refresh-min-interval` / `--refresh-persist|--no-refresh-persist`，并支持 `--provider market_db`
+- `refresh_cli` 新参数 `--workers` / `--min-interval` / `--market-db`
+- 契约 [`docs/contracts/refresh-throughput.md`](docs/contracts/refresh-throughput.md) · [`docs/contracts/dotenv-loading.md`](docs/contracts/dotenv-loading.md) · ADR [`0066`](docs/architecture/0066-refresh-throughput-and-env-loading.md)
+- 测试 +40：新增 `test_dotenv.py`（解析/优先级/`required`/守卫/`force`/发现）与 `test_market_db_bulk.py`（纯 helper + `@needs_db` 真库）；扩 `test_refresh.py`（串行默认/并发/限速节流/noop/环境默认/bulk 单次调用/缺失 fail-closed/`bulk=False` 回落/数据集不支持不批量/顺序稳定）与 `test_daily_pipeline.py`（`_effective_datasets` 裁剪/无能力不变/全不支持/跳过/persist）
+
+### Changed
+
+- **真机缺陷修复（`P0-1`）**：`run_refresh` 原为**双层串行同步 HTTP**（`for symbol: for dataset:` 逐个阻塞调用），真机实测 307 只样例 **11m48s**、CPU 仅 **9.7s**（100% 网络 I/O）→ 外推全市场 5213 只约 **3 小时**，08:30 盘前窗口不可行。根因**不是并发不足**，而是**用 HTTP 重新拉取已在本机 `market.db`（ADR `0058` 全市场真相源）的数据**
+- **真机缺陷修复（`P0-2`）**：`daily_cli._build_provider` 直读 `os.environ["STOCK_PLATFORM_TUSHARE_TOKEN"]`，而全仓仅 `start-workbench.bat` 注入 `.env` → 真机复现 `live provider='cn_tushare_http' requires STOCK_PLATFORM_TUSHARE_TOKEN`、**exit 1**；`schtasks` 不会注入环境变量 ⇒ **每日自动化必然失败**
+
+### Verified
+
+- **真机端到端**：全市场 5213 只 refresh = **115 s**（带 JSON）／`persist=False` ≈ 秒级；`daily_cli` 端到端 **12.78 s**（快路径）vs 129.94 s（带持久化，省 ≈117 s）；`Invoke-DailyPipeline.ps1 -MarketDb` = **14.78 s** —— 较外推 ~3 h 约 **94×–700×**
+- `.env` 自动加载真机验证：token 自动加载（56 字符），`TushareHttpProvider()` **免手动 export** 构造成功；`--provider market_db` 运行返回 `ok: true`
+- 全量 `pytest packages apps`（`replay`）**927 passed / 0 failed / 0 errors / 0 skipped**（887 → 927，+40）
+
+### Docs
+
+- 新增 `docs/architecture/0066-refresh-throughput-and-env-loading.md` + `docs/contracts/refresh-throughput.md` + `docs/contracts/dotenv-loading.md`（均登记 `scripts/check_docs.ps1`，files 146 → 149）
+- 更新 `docs/ops/scheduler.md` 至 `-MarketDb` 快路径（替代旧 `--provider replay` + `-SkipRefresh` 默认）
+
 ## [4.1.5] - 2026-10-11
 
 ### Added

@@ -10,12 +10,15 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from .dotenv import load_dotenv
 from .daily_pipeline import run_daily_pipeline
 from .refresh import default_refresh_dir
 from .universe import default_universe_fixture_path
 
 # Aliases accepted by --provider / STOCK_PLATFORM_DAILY_PROVIDER
 _LIVE_TUSHARE_ALIASES = frozenset({"tushare", "tushare_http", "cn_tushare_http"})
+# Offline bulk source over the local warehouse (P0-1): no per-symbol HTTP.
+_MARKET_DB_ALIASES = frozenset({"market_db", "market_db_bulk", "engine_sqlite"})
 
 
 def _build_provider(args: argparse.Namespace) -> object:
@@ -30,6 +33,23 @@ def _build_provider(args: argparse.Namespace) -> object:
             ) from exc
         fixtures = Path(args.fixtures)
         return ReplayProvider(ReplayTransport(fixtures))
+    if name in _MARKET_DB_ALIASES:
+        try:
+            from stock_platform_providers import MarketDbBulkProvider
+        except ImportError as exc:  # pragma: no cover
+            raise SystemExit(
+                "market_db provider requires stock-platform-providers. "
+                'Install with: pip install -e ".\\packages\\providers"'
+            ) from exc
+        db = str(
+            args.market_db or os.environ.get("STOCK_PLATFORM_ENGINE_MARKET_DB", "") or ""
+        ).strip()
+        if not db:
+            raise SystemExit(
+                "--provider=market_db requires --market-db or "
+                "STOCK_PLATFORM_ENGINE_MARKET_DB (read-only market.db path)"
+            )
+        return MarketDbBulkProvider(db)
     if name in _LIVE_TUSHARE_ALIASES:
         try:
             from stock_platform_providers import ENV_TUSHARE_TOKEN, TushareHttpProvider
@@ -78,7 +98,24 @@ def _build_market_symbol_source(args: argparse.Namespace) -> object | None:
     return EngineSqliteProvider(db)
 
 
+def _resolve_persist(args: argparse.Namespace) -> bool:
+    """Default the refresh-JSON dump by provider.
+
+    The offline bulk source serves the whole market in one SQL pass; writing
+    5.2k per-symbol JSON files (~110s) is pure overhead because the pipeline
+    reads bars back through the provider and never replays the refresh dir.
+    Live/replay providers keep the dump (default ``True``) so their output stays
+    replayable, and an explicit flag always wins.
+    """
+    if args.refresh_persist is not None:
+        return bool(args.refresh_persist)
+    return str(args.provider or "").strip().lower() not in _MARKET_DB_ALIASES
+
+
 def main(argv: list[str] | None = None) -> int:
+    # P0-2: load repo-root .env before argparse so env-derived defaults
+    # (provider, token, market.db) behave the same as a .bat launch.
+    load_dotenv()
     p = argparse.ArgumentParser(
         description="Daily pipeline: refresh → panel → premarket brief (fail-closed)"
     )
@@ -130,6 +167,37 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lookback-days", type=int, default=120)
     p.add_argument("--max-attempts", type=int, default=3)
     p.add_argument(
+        "--refresh-workers",
+        type=int,
+        default=None,
+        help=(
+            "P0-1: refresh 并发度（默认 1=串行；或 STOCK_PLATFORM_REFRESH_WORKERS）。"
+            ">1 时所有 worker 共用一个最小间隔闸门，不会超过上游限速"
+        ),
+    )
+    p.add_argument(
+        "--refresh-min-interval",
+        type=float,
+        default=None,
+        help=(
+            "P0-1: 并发刷新时两次上游调用之间的最小间隔秒数"
+            "（默认 EM_MIN_INTERVAL；0=不限速）"
+        ),
+    )
+    p.add_argument(
+        "--refresh-persist",
+        dest="refresh_persist",
+        action="store_true",
+        default=None,
+        help="P0-1: 强制写出每只票的 refresh JSON（默认：market_db 批量源关闭，其余开启）",
+    )
+    p.add_argument(
+        "--no-refresh-persist",
+        dest="refresh_persist",
+        action="store_false",
+        help="P0-1: 跳过每只票的 refresh JSON（全市场盘前推荐；省 ~110s）",
+    )
+    p.add_argument(
         "--skip-refresh",
         action="store_true",
         help="Build brief from provider only (skip refresh persist)",
@@ -140,7 +208,8 @@ def main(argv: list[str] | None = None) -> int:
         default=default_provider or "replay",
         help=(
             "Injected source. Default: replay (or STOCK_PLATFORM_DAILY_PROVIDER). "
-            "Live daily: tushare / cn_tushare_http (requires STOCK_PLATFORM_TUSHARE_TOKEN)."
+            "Live daily: tushare / cn_tushare_http (requires STOCK_PLATFORM_TUSHARE_TOKEN). "
+            "Offline bulk: market_db (whole market from market.db, single SQL pass)."
         ),
     )
     p.add_argument(
@@ -214,6 +283,9 @@ def main(argv: list[str] | None = None) -> int:
         lookback_days=args.lookback_days,
         skip_refresh=bool(args.skip_refresh),
         max_attempts=args.max_attempts,
+        refresh_workers=args.refresh_workers,
+        refresh_min_interval=args.refresh_min_interval,
+        refresh_persist=_resolve_persist(args),
         track_hits=not bool(args.no_track_hits),
         debate_runner=debate_runner,
         debate_engine=debate_engine,

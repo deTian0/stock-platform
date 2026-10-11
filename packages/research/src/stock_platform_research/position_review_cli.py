@@ -28,6 +28,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from .dotenv import load_dotenv
 from .backtest import compute_features
 from .position_review import format_review_markdown, review_positions
 from .rules import CooldownPolicy, DriftPolicy, ExitPolicy
@@ -168,6 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     args = build_parser().parse_args(argv)
     holdings = load_holdings(args.holdings)
     print(f"[holdings] {len(holdings)} rows", file=sys.stderr)
