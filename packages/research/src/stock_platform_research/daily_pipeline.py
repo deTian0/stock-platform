@@ -61,6 +61,67 @@ def default_briefs_dir(refresh_out: str | Path | None = None) -> Path:
     return root / "briefs"
 
 
+def _registry_capabilities(provider: Any) -> frozenset[str] | None:
+    """Declared refresh datasets for ``provider.name`` from the capability registry.
+
+    The providers package owns the *single* per-provider dataset declaration
+    (:data:`stock_platform_providers.capabilities` — the same table that renders
+    the capability matrix). Reusing it here means a live provider's declared
+    surface (e.g. ``tushare_http → {"daily"}``) is respected without a second
+    hand-maintained list. Soft import keeps research runnable without the
+    providers package (some tests inject fakes).
+    """
+    name = getattr(provider, "name", None)
+    if not name:
+        return None
+    try:
+        from stock_platform_providers import (  # type: ignore
+            build_capability_matrix,
+            register_builtin_providers,
+            reset_provider_registry,
+        )
+    except Exception:  # pragma: no cover - optional runtime dep
+        return None
+    reset_provider_registry()
+    register_builtin_providers()
+    declared: set[str] = set()
+    for row in build_capability_matrix():
+        if any(c.get("name") == name for c in row.get("candidates", [])):
+            declared.add(row["id"])
+    return frozenset(declared) or None
+
+
+def _declared_capabilities(provider: Any) -> frozenset[str] | None:
+    """Capability set the provider can serve for refresh.
+
+    Priority: an explicit ``capabilities`` attribute → a ``supports``
+    introspection method → the shared capability registry (by provider name) →
+    ``None``.
+
+    ``None`` means "no capability information" — callers then keep the
+    requested/default dataset set (unchanged pre-P0-1 behaviour).
+
+    Rationale (live-path defect caught 2026-10-10): live HTTP providers
+    (``cn_tushare_http`` / ``tushare``) only implement ``get_daily`` — they
+    declare neither ``capabilities`` nor ``supports``, so the pipeline kept
+    requesting all four datasets and failed three of them for every symbol,
+    failing the whole run closed at ``stage="refresh"`` on the very path this
+    box runs in production. Live verification had only exercised
+    ``market_db``, so the regression went unnoticed. An empty result is
+    treated as "no information" (``None``) rather than "serves nothing", so a
+    provider misusing ``supports`` can never silently narrow the brief to
+    nothing.
+    """
+    caps = getattr(provider, "capabilities", None)
+    if caps:
+        return frozenset(caps)
+    supports = getattr(provider, "supports", None)
+    if callable(supports):
+        ok = frozenset(d for d in REFRESH_DATASETS if supports(d))
+        return ok or None
+    return _registry_capabilities(provider)
+
+
 def _effective_datasets(provider: Any, datasets: list[str] | None) -> list[str] | None:
     """Narrow the requested refresh datasets to what ``provider`` can serve.
 
@@ -70,12 +131,12 @@ def _effective_datasets(provider: Any, datasets: list[str] | None) -> list[str] 
     fail the whole run closed — correct for the standalone refresh job, but
     wrong for a pipeline whose brief is perfectly buildable from ``daily``.
 
-    So: when the provider advertises ``capabilities``, intersect with them; when
-    the caller asked for nothing, use the provider's capability set directly.
-    A provider with no declared capabilities keeps the requested/default set
-    (unchanged pre-P0-1 behaviour).
+    So: when the provider advertises ``capabilities`` (or answers ``supports``),
+    intersect with them; when the caller asked for nothing, use the provider's
+    capability set directly. A provider with no capability information keeps
+    the requested/default set (unchanged pre-P0-1 behaviour).
     """
-    caps = getattr(provider, "capabilities", None)
+    caps = _declared_capabilities(provider)
     if not caps:
         return datasets
     allowed = [d for d in REFRESH_DATASETS if d in caps]
@@ -106,6 +167,7 @@ def run_daily_pipeline(
     refresh_min_interval: float | None = None,
     refresh_bulk: bool | None = None,
     refresh_persist: bool = True,
+    refresh_tolerate_gaps: bool = True,
     persist_db: bool = True,
     track_hits: bool = True,
     hit_boards: list[str] | None = None,
@@ -210,6 +272,7 @@ def run_daily_pipeline(
                 min_interval=refresh_min_interval,
                 bulk=refresh_bulk,
                 persist=refresh_persist,
+                tolerate_gaps=refresh_tolerate_gaps,
             )
             refresh_payload = report.to_dict()
             if not report.ok:

@@ -112,6 +112,22 @@ def _resolve_persist(args: argparse.Namespace) -> bool:
     return str(args.provider or "").strip().lower() not in _MARKET_DB_ALIASES
 
 
+def _resolve_tolerate_gaps(args: argparse.Namespace) -> bool:
+    """P0-4: gap tolerance defaults ON, but env can pin the strict path.
+
+    Production wants the daily run to survive a thin symbol (an ETF with a
+    stale bar window) instead of failing the whole brief. CI / acceptance
+    runs that assert on completeness keep the strict behaviour by exporting
+    ``STOCK_PLATFORM_REFRESH_TOLERATE_GAPS=0``. An explicit flag always wins.
+    """
+    if args.refresh_tolerate_gaps is not None:
+        return bool(args.refresh_tolerate_gaps)
+    raw = (os.environ.get("STOCK_PLATFORM_REFRESH_TOLERATE_GAPS") or "").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     # P0-2: load repo-root .env before argparse so env-derived defaults
     # (provider, token, market.db) behave the same as a .bat launch.
@@ -196,6 +212,25 @@ def main(argv: list[str] | None = None) -> int:
         dest="refresh_persist",
         action="store_false",
         help="P0-1: 跳过每只票的 refresh JSON（全市场盘前推荐；省 ~110s）",
+    )
+    p.add_argument(
+        "--refresh-tolerate-gaps",
+        dest="refresh_tolerate_gaps",
+        action="store_true",
+        default=None,
+        help=(
+            "P0-4: 把「标的在窗口内无日线」当作数据缺口而非失败（默认开启）。"
+            "缺口仍写入 refresh.gaps[]，不遮蔽其它真失败"
+        ),
+    )
+    p.add_argument(
+        "--no-refresh-tolerate-gaps",
+        dest="refresh_tolerate_gaps",
+        action="store_false",
+        help=(
+            "P0-4: 严格模式 —— 任一标的无日线即整轮 refresh 失败（旧行为，"
+            "适合验收/取证）"
+        ),
     )
     p.add_argument(
         "--skip-refresh",
@@ -286,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
         refresh_workers=args.refresh_workers,
         refresh_min_interval=args.refresh_min_interval,
         refresh_persist=_resolve_persist(args),
+        refresh_tolerate_gaps=_resolve_tolerate_gaps(args),
         track_hits=not bool(args.no_track_hits),
         debate_runner=debate_runner,
         debate_engine=debate_engine,
@@ -307,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
                 "hits": payload.get("hits") or None,
                 "debates": payload.get("debates") or None,
                 "provider": args.provider,
+                "refresh": payload.get("refresh") or None,
                 "error": payload.get("error"),
                 "settleAfter": settle_meta or None,
             },
@@ -317,6 +354,11 @@ def main(argv: list[str] | None = None) -> int:
         for fail in payload.get("failures") or []:
             print(f"FAIL {fail}", file=sys.stderr)
         return 1
+    for gap in (payload.get("refresh") or {}).get("gaps") or []:
+        print(
+            f"GAP {gap['symbol']} {gap['dataset']}: {gap['error']}",
+            file=sys.stderr,
+        )
     return 0
 
 
