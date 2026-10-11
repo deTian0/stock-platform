@@ -709,3 +709,95 @@ def test_refresh_cli_exposes_gap_flags() -> None:
     assert "--tolerate-gaps" in src
     assert "--no-tolerate-gaps" in src
     assert "tolerate_gaps" in src
+
+
+# --- workbuddy provider wiring (v4.1.8) -------------------------------------
+#
+# The `workbuddy` preset alone was not enough: `Invoke-DailyPipeline.ps1`
+# defaults `--provider` to `replay` and passes it explicitly, which overrides
+# any preset. The CLI therefore has to accept `--provider workbuddy` directly,
+# and the bridge has to have populated the cache first.
+
+
+def test_daily_cli_accepts_workbuddy_provider(tmp_path, monkeypatch) -> None:
+    """`--provider workbuddy` builds the cache-backed provider."""
+    import stock_platform_providers.workbuddy as wb
+    from stock_platform_research import daily_cli
+
+    cache = tmp_path / "wb_cache"
+    cache.mkdir()
+    (cache / "daily_600519.json").write_text(
+        json.dumps(
+            {
+                "symbol": "600519",
+                "bars": [
+                    {
+                        "date": "2026-09-02",
+                        "open": 1.0,
+                        "high": 1.1,
+                        "low": 0.9,
+                        "close": 1.05,
+                        "volume": 100,
+                        "amount": 105.0,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(wb.ENV_WORKBUDDY_CACHE_DIR, str(cache))
+
+    class _Args:
+        provider = "workbuddy"
+        fixtures = str(tmp_path)
+
+    provider = daily_cli._build_provider(_Args())
+    assert provider.name == "workbuddy"
+    assert provider.cache_dir == cache.resolve()
+
+
+def test_daily_cli_workbuddy_requires_cache_dir(tmp_path, monkeypatch) -> None:
+    import stock_platform_providers.workbuddy as wb
+    from stock_platform_research import daily_cli
+
+    monkeypatch.delenv(wb.ENV_WORKBUDDY_CACHE_DIR, raising=False)
+
+    class _Args:
+        provider = "workbuddy"
+        fixtures = str(tmp_path)
+
+    with pytest.raises(SystemExit) as exc:
+        daily_cli._build_provider(_Args())
+    assert wb.ENV_WORKBUDDY_CACHE_DIR in str(exc.value)
+
+
+def test_daily_cli_workbuddy_missing_cache_fails_with_actionable_message(
+    tmp_path, monkeypatch
+) -> None:
+    import stock_platform_providers.workbuddy as wb
+    from stock_platform_research import daily_cli
+
+    monkeypatch.setenv(wb.ENV_WORKBUDDY_CACHE_DIR, str(tmp_path / "does_not_exist"))
+
+    class _Args:
+        provider = "workbuddy"
+        fixtures = str(tmp_path)
+
+    with pytest.raises(SystemExit) as exc:
+        daily_cli._build_provider(_Args())
+    assert "workbuddy-bridge" in str(exc.value)
+
+
+def test_daily_cli_workbuddy_alias_accepted(tmp_path, monkeypatch) -> None:
+    import stock_platform_providers.workbuddy as wb
+    from stock_platform_research import daily_cli
+
+    cache = tmp_path / "wb_cache"
+    cache.mkdir()
+    monkeypatch.setenv(wb.ENV_WORKBUDDY_CACHE_DIR, str(cache))
+
+    class _Args:
+        provider = "workbuddy_mcp"
+        fixtures = str(tmp_path)
+
+    assert daily_cli._build_provider(_Args()).name == "workbuddy"

@@ -19,6 +19,8 @@ from .universe import default_universe_fixture_path
 _LIVE_TUSHARE_ALIASES = frozenset({"tushare", "tushare_http", "cn_tushare_http"})
 # Offline bulk source over the local warehouse (P0-1): no per-symbol HTTP.
 _MARKET_DB_ALIASES = frozenset({"market_db", "market_db_bulk", "engine_sqlite"})
+# WorkBuddy MCP JSON cache, populated by the bridge (stock-platform-workbuddy-bridge).
+_WORKBUDDY_ALIASES = frozenset({"workbuddy", "workbuddy_mcp"})
 
 
 def _build_provider(args: argparse.Namespace) -> object:
@@ -50,6 +52,31 @@ def _build_provider(args: argparse.Namespace) -> object:
                 "STOCK_PLATFORM_ENGINE_MARKET_DB (read-only market.db path)"
             )
         return MarketDbBulkProvider(db)
+    if name in _WORKBUDDY_ALIASES:
+        try:
+            from stock_platform_providers.workbuddy import (
+                ENV_WORKBUDDY_CACHE_DIR,
+                WorkbuddyProvider,
+            )
+        except ImportError as exc:  # pragma: no cover
+            raise SystemExit(
+                "workbuddy provider requires stock-platform-providers. "
+                'Install with: pip install -e ".\\packages\\providers"'
+            ) from exc
+        cache_dir = (os.environ.get(ENV_WORKBUDDY_CACHE_DIR) or "").strip()
+        if not cache_dir:
+            raise SystemExit(
+                "--provider=workbuddy requires STOCK_PLATFORM_WORKBUDDY_CACHE_DIR "
+                "(the JSON cache the bridge writes). Run "
+                "`stock-platform-workbuddy-bridge` first, or set the variable."
+            )
+        try:
+            return WorkbuddyProvider(cache_dir)
+        except FileNotFoundError as exc:
+            raise SystemExit(
+                f"workbuddy provider init failed: {exc} "
+                "(run stock-platform-workbuddy-bridge to populate the cache)"
+            ) from exc
     if name in _LIVE_TUSHARE_ALIASES:
         try:
             from stock_platform_providers import ENV_TUSHARE_TOKEN, TushareHttpProvider
@@ -72,7 +99,8 @@ def _build_provider(args: argparse.Namespace) -> object:
             raise SystemExit(f"tushare provider init failed: {exc}") from exc
     raise SystemExit(
         f"unsupported --provider {args.provider!r} "
-        f"(use replay for CI, or tushare / cn_tushare_http for live daily)"
+        f"(use replay for CI, workbuddy for the MCP cache, market_db for the "
+        f"offline warehouse, or tushare / cn_tushare_http for live daily)"
     )
 
 
