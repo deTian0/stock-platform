@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Sample Windows Task Scheduler task for M40 daily pipeline (M42 ops pack).
-  Default: replay fixtures; no secrets; liveTrading not enabled.
+  Windows Task Scheduler task for the daily pre-market pipeline (M40 / M42 ops pack).
+
+  Default action runs the **offline fast path** (-MarketDb): whole-market universe
+  straight from the engine market.db in a single SQL pass, refresh JSON dump off.
+  Measured end-to-end: ~15s for ~5.2k symbols (vs. hours when every symbol was an
+  HTTP call). No secrets, no liveTrading.
+
+  The CLI auto-loads the repo-root .env (P0-2), so the task needs no wrapper .bat
+  and no environment injection.
 
   Import (elevated PowerShell), after editing WorkingDirectory / paths:
     Register-ScheduledTask -Xml (Get-Content -Raw .\scripts\ops\stock-platform-daily.xml) `
@@ -48,7 +55,9 @@
     <Hidden>false</Hidden>
     <RunOnlyIfIdle>false</RunOnlyIfIdle>
     <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <!-- Fast offline path needs seconds; 15 min is a generous ceiling that still
+         kills a wedged run well before the next 08:30 fire. -->
+    <ExecutionTimeLimit>PT15M</ExecutionTimeLimit>
     <Priority>7</Priority>
   </Settings>
   <Actions Context="Author">
@@ -56,7 +65,7 @@
       <!-- Edit WorkingDirectory to your clone path before import.
            Prefer pwsh.exe when PowerShell 7+ is installed; else powershell.exe. -->
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -SkipRefresh</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb</Arguments>
       <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
     </Exec>
   </Actions>

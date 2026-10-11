@@ -18,6 +18,7 @@ import os
 import sys
 from pathlib import Path
 
+from .dotenv import load_dotenv
 from .backtest import UNIVERSES
 from .backtest_cli import filter_universe, load_engine_bars
 from .book_replay import ReplayParams
@@ -72,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     args = build_parser().parse_args(argv)
     db = (args.db or "").strip()
     if not db:

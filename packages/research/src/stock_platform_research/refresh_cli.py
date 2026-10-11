@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date
 from pathlib import Path
 
+from .dotenv import load_dotenv
 from .refresh import REFRESH_DATASETS, default_refresh_dir, run_refresh
 from .universe import default_universe_fixture_path
 
 
 def _build_provider(args: argparse.Namespace) -> object:
-    if args.provider == "replay":
+    name = str(args.provider or "replay").strip().lower()
+    if name == "replay":
         try:
             from stock_platform_providers import ReplayProvider, ReplayTransport
         except ImportError as exc:  # pragma: no cover
@@ -23,10 +26,29 @@ def _build_provider(args: argparse.Namespace) -> object:
             ) from exc
         fixtures = Path(args.fixtures)
         return ReplayProvider(ReplayTransport(fixtures))
-    raise SystemExit(f"unsupported --provider {args.provider!r} (use replay in CI)")
+    if name in {"market_db", "market_db_bulk", "engine_sqlite"}:
+        try:
+            from stock_platform_providers import MarketDbBulkProvider
+        except ImportError as exc:  # pragma: no cover
+            raise SystemExit(
+                "market_db provider requires stock-platform-providers. "
+                'Install with: pip install -e ".\\packages\\providers"'
+            ) from exc
+        db = str(
+            args.market_db or os.environ.get("STOCK_PLATFORM_ENGINE_MARKET_DB", "") or ""
+        ).strip()
+        if not db:
+            raise SystemExit(
+                "--provider=market_db requires --market-db or "
+                "STOCK_PLATFORM_ENGINE_MARKET_DB (read-only market.db path)"
+            )
+        return MarketDbBulkProvider(db)
+    raise SystemExit(f"unsupported --provider {args.provider!r} (use replay or market_db)")
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     p = argparse.ArgumentParser(
         description="Refresh CN panels / full_minute to local Replay-compatible JSON"
     )
@@ -49,9 +71,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lookback-days", type=int, default=120)
     p.add_argument("--max-attempts", type=int, default=3)
     p.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help=(
+            "P0-1: parallel workers (default 1 or STOCK_PLATFORM_REFRESH_WORKERS). "
+            ">1 shares one min-interval gate so upstream rate is never exceeded"
+        ),
+    )
+    p.add_argument(
+        "--min-interval",
+        type=float,
+        default=None,
+        help="P0-1: min seconds between upstream calls across workers (default EM_MIN_INTERVAL)",
+    )
+    p.add_argument(
+        "--market-db",
+        default=None,
+        help="market.db path for --provider=market_db (default STOCK_PLATFORM_ENGINE_MARKET_DB)",
+    )
+    p.add_argument(
         "--provider",
         default="replay",
-        help="Injected source name. CI/default: replay (fixtures). Live is opt-in elsewhere.",
+        help="Injected source: replay (fixtures) | market_db (offline bulk from market.db)",
     )
     p.add_argument(
         "--fixtures",
@@ -75,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
         lookback_days=args.lookback_days,
         max_attempts=args.max_attempts,
         sleeper=None,
+        workers=args.workers,
+        min_interval=args.min_interval,
     )
     payload = report.to_dict()
     print(json.dumps({"ok": payload["ok"], "asof": payload["asof"], "failCount": payload["failCount"], "outDir": payload["outDir"]}, ensure_ascii=False))

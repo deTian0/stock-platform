@@ -43,6 +43,7 @@ from .brief import (
 from .brief_review import review_stored_brief
 from .rolling_review import run_rolling_recommend_review
 from .daily_pipeline import DailyPipelineReport, run_daily_pipeline
+from .dotenv import find_dotenv_path, load_dotenv, parse_dotenv_text
 from .persistence import (
     BriefRecord,
     BriefRepository,
@@ -322,6 +323,9 @@ __all__ = [
     "run_daily_pipeline",
     "run_portfolio_pit",
     "run_refresh",
+    "load_dotenv",
+    "find_dotenv_path",
+    "parse_dotenv_text",
     "run_pit_long_only",
     "run_rolling_recommend_review",
     "run_strategy_ab_sidecar",
@@ -394,4 +398,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.1.5"
+__version__ = "4.1.6"

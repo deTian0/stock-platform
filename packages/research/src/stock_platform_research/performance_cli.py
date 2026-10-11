@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .dotenv import load_dotenv
 from .performance import (
     align_fills_to_performance,
     default_performance_log_path,
@@ -18,6 +19,8 @@ from .performance import (
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     p = argparse.ArgumentParser(
         description="Summarize settled recommend decisions (holding-period metrics)."
     )

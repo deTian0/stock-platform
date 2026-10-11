@@ -29,7 +29,7 @@ from .picks_backtest import (
     picks_from_brief,
     run_picks_backtest,
 )
-from .refresh import RefreshReport, default_refresh_dir, run_refresh
+from .refresh import REFRESH_DATASETS, RefreshReport, default_refresh_dir, run_refresh
 from .universe import UNIVERSE_SOURCES, default_universe_fixture_path
 
 
@@ -61,6 +61,30 @@ def default_briefs_dir(refresh_out: str | Path | None = None) -> Path:
     return root / "briefs"
 
 
+def _effective_datasets(provider: Any, datasets: list[str] | None) -> list[str] | None:
+    """Narrow the requested refresh datasets to what ``provider`` can serve.
+
+    The daily brief only needs ``daily``. Requesting the full four-dataset set
+    through a provider that carries just one (e.g. the offline
+    :class:`MarketDbBulkProvider`) would mark every other dataset as failed and
+    fail the whole run closed — correct for the standalone refresh job, but
+    wrong for a pipeline whose brief is perfectly buildable from ``daily``.
+
+    So: when the provider advertises ``capabilities``, intersect with them; when
+    the caller asked for nothing, use the provider's capability set directly.
+    A provider with no declared capabilities keeps the requested/default set
+    (unchanged pre-P0-1 behaviour).
+    """
+    caps = getattr(provider, "capabilities", None)
+    if not caps:
+        return datasets
+    allowed = [d for d in REFRESH_DATASETS if d in caps]
+    if datasets is None:
+        return allowed or None
+    narrowed = [d for d in datasets if d in caps]
+    return narrowed or None
+
+
 def run_daily_pipeline(
     *,
     asof: date | str,
@@ -78,6 +102,10 @@ def run_daily_pipeline(
     lookback_days: int = 120,
     skip_refresh: bool = False,
     max_attempts: int = 3,
+    refresh_workers: int | None = None,
+    refresh_min_interval: float | None = None,
+    refresh_bulk: bool | None = None,
+    refresh_persist: bool = True,
     persist_db: bool = True,
     track_hits: bool = True,
     hit_boards: list[str] | None = None,
@@ -124,6 +152,13 @@ def run_daily_pipeline(
     best-effort — a failure lands on ``report.debates["error"]``. The lane is
     **read-only**: ``brief`` / the picks ledger / the hit cycle / the performance
     JSONL are byte-identical whether or not the lane runs (误判不进绩效).
+
+    ``P0-1``: ``refresh_workers`` / ``refresh_min_interval`` / ``refresh_bulk`` /
+    ``refresh_persist`` are passed straight to :func:`refresh.run_refresh`. The
+    default (all ``None`` / ``persist=True``) is the pre-P0-1 serial behaviour.
+    Pass ``refresh_persist=False`` for the whole-market pre-market run: the JSON
+    refresh dir is never replayed by the pipeline and writing 5.2k files costs
+    ~110s, versus ~3s for the underlying single SQL pass.
     """
     if isinstance(asof, str):
         asof_d = date.fromisoformat(asof[:10])
@@ -168,9 +203,13 @@ def run_daily_pipeline(
                 out_dir=root,
                 universe_path=None,
                 symbols=resolved,
-                datasets=datasets,
+                datasets=_effective_datasets(provider, datasets),
                 lookback_days=lookback_days,
                 max_attempts=max_attempts,
+                workers=refresh_workers,
+                min_interval=refresh_min_interval,
+                bulk=refresh_bulk,
+                persist=refresh_persist,
             )
             refresh_payload = report.to_dict()
             if not report.ok:

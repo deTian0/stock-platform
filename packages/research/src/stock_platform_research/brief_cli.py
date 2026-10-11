@@ -8,11 +8,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from .dotenv import load_dotenv
 from .batch import score_cross_section_csv
 from .brief import build_premarket_brief, write_brief_csv
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     p = argparse.ArgumentParser(description="Build CN pre-market TopN brief (lvrev + gates)")
     p.add_argument("input_csv", help="Point-in-time cross-section CSV (panel columns)")
     p.add_argument("--asof", required=True, help="Signal trade date YYYY-MM-DD")

@@ -20,6 +20,7 @@ from typing import Any
 
 import pandas as pd
 
+from .dotenv import load_dotenv
 from .batch import score_cross_section
 from .position_review_cli import load_holdings
 from .rankings import (
@@ -50,6 +51,8 @@ def _scored(df: pd.DataFrame, *, value_factor: bool, reversal_q: float) -> pd.Da
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     p = argparse.ArgumentParser(
         description="Ranking boards: ②A 质量榜 / ②B 短线榜 / ③A 持仓 / ③B 操作建议 / ③C 观察名单"
     )

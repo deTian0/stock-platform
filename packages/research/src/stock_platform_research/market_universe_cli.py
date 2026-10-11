@@ -20,6 +20,7 @@ import time
 import tracemalloc
 from pathlib import Path
 
+from .dotenv import load_dotenv
 from .market_universe import (
     ASSET_TYPE_CHOICES,
     DEFAULT_MARKET_LOOKBACK_DAYS,
@@ -112,6 +113,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     args = build_parser().parse_args(argv)
     provider = _build_provider(args.db)
     db_path = Path(str(provider.db_path))

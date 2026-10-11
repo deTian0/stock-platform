@@ -26,6 +26,11 @@ from .engine_sqlite import (
     EngineSqliteProvider,
     resolve_engine_market_db,
 )
+from .market_db_bulk import (
+    SUPPORTED_DATASETS as MARKET_DB_BULK_DATASETS,
+    UNSUPPORTED_DATASETS as MARKET_DB_BULK_UNSUPPORTED,
+    MarketDbBulkProvider,
+)
 from .presets import (
     DEFAULT_STARTUP_PRESET,
     ENV_PROVIDER_PRESET,
@@ -98,6 +103,9 @@ __all__ = [
     "ENV_WORKBUDDY_CACHE_DIR",
     "EastmoneyClient",
     "EngineSqliteProvider",
+    "MarketDbBulkProvider",
+    "MARKET_DB_BULK_DATASETS",
+    "MARKET_DB_BULK_UNSUPPORTED",
     "FutuProvider",
     "GlobalHttpProvider",
     "GlobalHttpRouter",
@@ -154,4 +162,4 @@ __all__ = [
     "write_realtime_cache",
 ]
 
-__version__ = "4.1.5"
+__version__ = "4.1.6"

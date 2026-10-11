@@ -7,6 +7,10 @@
   then invokes stock-platform-daily. Default provider is replay (no liveTrading).
   No secrets. PowerShell 5.1+ compatible (no && chaining).
 
+  Uses the repo .venv interpreter when present (falls back to PATH `python`),
+  and the CLI itself now auto-loads repo-root `.env` (P0-2) — so a scheduled
+  task no longer needs the .env injected by a wrapper .bat.
+
 .PARAMETER Asof
   Trade date YYYY-MM-DD. Default: local calendar today.
 
@@ -17,29 +21,27 @@
   stock-platform-daily --provider. Default: env STOCK_PLATFORM_DAILY_PROVIDER
   or 'replay' (CI / offline). Live day-use: tushare / cn_tushare_http
   (requires STOCK_PLATFORM_TUSHARE_TOKEN; no silent fixture fallback).
+  Offline whole-market: market_db (single SQL pass over the engine warehouse).
 
 .PARAMETER LiveDay
   One-shot day-use: Provider=tushare (unless already set), SkipRefresh, SettleAfter.
   Does not change the script default for CI (still replay without this switch).
+
+.PARAMETER MarketDb
+  P0-1 fast path: Provider=market_db, whole-market universe, and refresh JSON
+  persistence off. The pre-market job finishes in seconds instead of hours.
 
 .PARAMETER SettleAfter
   After successful brief: log picks into performance JSONL and settle pending
   (engine market.db preferred). Maps to stock-platform-daily --settle-after.
 
 .EXAMPLE
-  .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02
-  # replay demo against repo fixtures (default universe + fixtures path)
+  .\scripts\ops\Invoke-DailyPipeline.ps1 -MarketDb
+  # 盘前推荐：全市场 + 本地 market.db 批量取数（默认快路径）
 
 .EXAMPLE
   .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02 -Provider tushare -SkipRefresh
-  # live daily via Tushare (token from env); skip refresh persist
-
-.EXAMPLE
-  .\scripts\ops\Invoke-DailyPipeline.ps1 -LiveDay -Asof 2026-09-12
-  # 一键日用：tushare + 跳过 refresh + 落库 + 记入/结算绩效
-
-.EXAMPLE
-  .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2028-01-05 -SkipRefresh
+  # live daily via Tushare (token from .env / env); skip refresh persist
 #>
 [CmdletBinding()]
 param(
@@ -53,6 +55,7 @@ param(
   [switch]$SkipRefresh,
   [switch]$SettleAfter,
   [switch]$LiveDay,
+  [switch]$MarketDb,
   [switch]$Force
 )
 
@@ -60,6 +63,19 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 Set-Location $repoRoot
+
+# Prefer the repo venv interpreter: a scheduled task has no activated shell and
+# may have no `python` on PATH at all (the old script assumed otherwise).
+$venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
+$python = if (Test-Path $venvPy) { $venvPy } else { 'python' }
+
+if ($MarketDb) {
+  $Provider = 'market_db'
+  if ([string]::IsNullOrWhiteSpace($Universe)) {
+    # Whole-market universe straight from the warehouse.
+    $Universe = ''
+  }
+}
 
 if ($LiveDay) {
   if ([string]::IsNullOrWhiteSpace($Provider)) {
@@ -108,7 +124,7 @@ cal = get_trading_calendar('$Market')
 print('1' if cal.is_trading_day(asof) else '0')
 "@
 
-$tradingFlag = & python -c $pyCheck
+$tradingFlag = & $python -c $pyCheck
 if ($LASTEXITCODE -ne 0) {
   Write-Error "TradingCalendar check failed (is stock-platform-providers installed?)"
   exit 1
@@ -137,6 +153,12 @@ if (-not [string]::IsNullOrWhiteSpace($Universe)) {
   $cliArgs += @('--universe', $Universe)
 }
 
+# P0-1: the offline bulk source serves the whole market in one SQL pass; skip the
+# per-symbol JSON dump (measured ~110s for 5.2k files with no consumer in the brief).
+if ($Provider -eq 'market_db') {
+  $cliArgs += @('--universe-source', 'market_db', '--no-refresh-persist')
+}
+
 if ($SkipRefresh) {
   $cliArgs += '--skip-refresh'
 }
@@ -145,7 +167,7 @@ if ($SettleAfter) {
   $cliArgs += '--settle-after'
 }
 
-Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay"
+Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb"
 $cmd = Get-Command stock-platform-daily -ErrorAction SilentlyContinue
 if ($null -ne $cmd) {
   & stock-platform-daily @cliArgs
@@ -153,5 +175,5 @@ if ($null -ne $cmd) {
 }
 
 # Fallback when console script is not on PATH (editable install / venv).
-& python -m stock_platform_research.daily_cli @cliArgs
+& $python -m stock_platform_research.daily_cli @cliArgs
 exit $LASTEXITCODE

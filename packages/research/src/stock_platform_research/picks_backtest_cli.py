@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .dotenv import load_dotenv
 from .backtest_cli import ENV_DB, filter_universe, load_engine_bars
 from .picks_backtest import (
     compare_picks_vs_screener,
@@ -93,6 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load repo-root .env so CLI == .bat behaviour (P0-2).
+    load_dotenv()
     args = build_parser().parse_args(argv)
 
     db = (args.db or "").strip()

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from stock_platform_research.daily_cli import main as daily_main
-from stock_platform_research.daily_pipeline import run_daily_pipeline
+from stock_platform_research.daily_pipeline import _effective_datasets, run_daily_pipeline
 
 
 def _synth_bars(symbol: str, asof: date, n: int = 70, base: float = 10.0) -> list[dict[str, Any]]:
@@ -428,3 +428,78 @@ def test_daily_pipeline_can_opt_out_of_the_ledger(tmp_path: Path) -> None:
     assert report.ok
     assert report.picksLedger is None
     assert not (tmp_path / "picks_ledger.jsonl").is_file()
+
+
+# --- P0-1: dataset narrowing + persist control ------------------------------
+
+
+class _DailyOnlyProvider(_PipelineProvider):
+    """Provider that advertises only `daily` (like the offline bulk source)."""
+
+    capabilities = frozenset({"daily"})
+
+
+def test_effective_datasets_narrows_to_provider_capabilities() -> None:
+    provider = _DailyOnlyProvider({})
+    assert _effective_datasets(provider, None) == ["daily"]
+    assert _effective_datasets(provider, ["daily", "adj_factor"]) == ["daily"]
+
+
+def test_effective_datasets_unchanged_for_capability_free_provider() -> None:
+    provider = _PipelineProvider({})  # no ``capabilities`` attribute
+    assert _effective_datasets(provider, None) is None
+    assert _effective_datasets(provider, ["daily", "fund_flow"]) == ["daily", "fund_flow"]
+
+
+def test_effective_datasets_returns_none_when_nothing_supported() -> None:
+    class _NoCaps:
+        capabilities = frozenset({"something_else"})
+
+    assert _effective_datasets(_NoCaps(), ["daily"]) is None
+
+
+def test_pipeline_skips_unsupported_datasets_instead_of_failing(tmp_path: Path) -> None:
+    """A `daily`-only provider must still produce a brief (P0-1 regression guard)."""
+    asof = date(2026, 9, 2)
+    provider = _DailyOnlyProvider(
+        {"600519": _synth_bars("600519", asof, base=100.0)}
+    )
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519"],
+        top_n=1,
+        db_url=str(tmp_path / "p.db"),
+        track_hits=False,
+        track_picks_ledger=False,
+        persist_db=False,
+    )
+    assert report.ok, report.error
+    assert report.stage == "brief"
+    # Only the supported dataset was attempted.
+    assert report.refresh is not None
+    assert report.refresh["datasets"] == ["daily"]
+
+
+def test_pipeline_persist_false_skips_refresh_json(tmp_path: Path) -> None:
+    asof = date(2026, 9, 2)
+    provider = _PipelineProvider({"600519": _synth_bars("600519", asof, base=100.0)})
+    report = run_daily_pipeline(
+        asof=asof,
+        provider=provider,
+        out_dir=tmp_path,
+        symbols=["600519"],
+        datasets=["daily"],
+        top_n=1,
+        db_url=str(tmp_path / "p.db"),
+        track_hits=False,
+        track_picks_ledger=False,
+        persist_db=False,
+        refresh_persist=False,
+    )
+    assert report.ok
+    assert not (tmp_path / "2026-09-02" / "daily_600519.json").is_file()
+    # The manifest still records the successful item.
+    assert report.refresh is not None
+    assert report.refresh["okCount"] == 1
