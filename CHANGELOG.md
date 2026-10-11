@@ -12,6 +12,45 @@
 
 - （无）
 
+## [4.1.8] - 2026-10-12
+
+### Added
+
+- **WorkBuddy MCP 桥接（补齐写缓存的那一半）**：新增 `packages/research/.../workbuddy_bridge.py` —— 调 `westock` CLI 取 `kline` / `quote`，解析其 Markdown 表，再经**已有的规范写入器** `write_daily_cache` / `write_realtime_cache` 落盘到 `STOCK_PLATFORM_WORKBUDDY_CACHE_DIR`
+  - **此前 `workbuddy` provider 只读缓存、但没有任何东西写入它**（docstring 提到一个从未实现的 "MCP bridge"）→ "workbuddy 模式"可启动、可路由，却永远拿不到真实数据
+  - **schema 单点**：桥不自己拼 JSON，交给规范写入器，与 provider 读路径共享同一定义点，杜绝格式漂移
+  - 字段映射：`last` → `close`（改名）；`change_pct` 为 percent 标度、带 `pct_unit="percent"`；**`exchange` 丢弃**（是换手率 %，不是交易所代码 —— 语义不同不得挪用）
+  - 批量：`westock` 支持逗号分隔代码列表，桥按 40/30 一批合并调用（避免数千次进程启动）
+  - **可单测**：解析与写入是纯函数；subprocess 经**可注入 runner**，测试零进程零网络
+- **三条守卫（防静默错误数据）**
+  - **无 `code` 列的多代码批** → 记 `warnings` 并**跳过**，绝不把 bar 静默安到第一个 symbol（只有单代码批允许无列归因）
+  - **裸码碰撞**（`sh000001` 指数 vs `sz000001` 平安银行，都归一为 `000001`）→ 抓取前**拒绝**歧义对，其余 symbol 照常桥接
+  - **显式 `--bin` 路径不存在** → 报错，绝不静默回落 PATH 上另一个二进制（裸命令名才走 PATH）
+- **CLI**：`stock-platform-workbuddy-bridge`（`--symbols` / `--symbols-file` / 默认取平台宇宙、`--datasets daily,realtime`、`--limit`/`--start`/`--end`/`--period`/`--adjust`/`--asof`/`--timeout`/`--dry-run`/`--json`/`--fail-on-error`）
+- **workbuddy 模式启动**
+  - `scripts/ops/Invoke-WorkbuddyBridge.ps1` —— 两步编排：先 bridge 刷缓存，再以 `--provider workbuddy` 跑 daily（`-FromMarketDb -Top N` 从 `market.db` 取成交额 Top-N；默认缓存目录 `data/workbuddy_cache`）
+  - `start-workbuddy.bat` —— 双击版，可选位置参数 `symbols` / `datasets`
+
+### Changed
+
+- **`daily_cli` 直接接受 `--provider workbuddy`**（别名 `workbuddy_mcp`），与 `market_db` 同一模式 —— 预设**本身不足以**让 daily 走 workbuddy：`Invoke-DailyPipeline.ps1` 把 `--provider` 默认成 `replay` 并显式传参，会覆盖 `STOCK_PLATFORM_PROVIDER_PRESET`（实测确认该覆盖）
+  - 缺 `STOCK_PLATFORM_WORKBUDDY_CACHE_DIR` 或目录不存在 → 中文 fail-closed 报错并指向 `stock-platform-workbuddy-bridge`
+  - `--provider` 白名单错误信息补上 `workbuddy` / `market_db`
+
+### Verified
+
+- **真机 CLI**：`westock 0.0.4 channel=workbuddy`（`~/.local/bin/westock.exe`，2,600,960 B，SHA256 校验装自官方发布源）
+- **真机桥接**：4 代码 × 2 数据集 → **8/8 ok / 124 bars / 0 failed**
+- **真机往返**：bridge → `WorkbuddyProvider` → **90 契约行**，跨度 `2026-08-21 → 2026-10-09`，`source="workbuddy"`；percent→decimal `0.5741405808` → `0.005741405808`
+- **真机碰撞守卫**：`sh000001`+`sz000001` → `WARN code collision on 000001` + 跳过，`600519` 照常桥接
+- **真机全链路**：`Invoke-WorkbuddyBridge.ps1` → bridge 6/6 ok / 183 bars → daily `provider="workbuddy"`、`ok: true`、`stage="brief"`
+- 全量 `pytest packages apps`（`replay`）**972 passed / 0 failed / 0 errors / 0 skipped**（943 → 972，+29）
+
+### Docs
+
+- 新增 ADR [`docs/architecture/0067-workbuddy-mcp-bridge.md`](docs/architecture/0067-workbuddy-mcp-bridge.md)
+- 扩写 [`docs/contracts/data-source-adapters.md`](docs/contracts/data-source-adapters.md)：新增 §1.4（桥接 + 字段映射表 + 三条守卫 + 实测证据）与 §4.1（workbuddy 模式启动）
+
 ## [4.1.7] - 2026-10-10
 
 ### Added
