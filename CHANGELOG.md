@@ -12,7 +12,45 @@
 
 - （无）
 
+## [4.3.1] - 2026-10-12
+
+### Fixed
+
+- **测试套件曾写入生产数据目录**（ADR [`0069`](docs/architecture/0069-test-data-isolation.md)）——
+  `test_daily_pipeline.py::test_daily_cli_settle_after_logs_performance` 驱动**整个 CLI** 却只钉住
+  `STOCK_PLATFORM_PERFORMANCE_LOG`，未钉 `STOCK_PLATFORM_DB_URL` → CLI 走 cwd 默认路径 +
+  `persist_db=True`，把 fixture brief（`asof=2026-09-02`、`universeSize=3`）**upsert 进生产
+  brief 存档** `./data/stock_platform.db`，并写入该 pick 的命中明细/汇总行。
+- **日报被污染行遮蔽而变空**：被写入的 `asof=2026-10-12` 行（`picks=[]`）日期最新，于是
+  `daily_digest` 的 `list_recent(limit=1)` 取到它 → `latest.md` 渲染「当日推荐（0 条）」，
+  **真实 brief（`2026-10-09`、5235 只、10 条 picks）被遮蔽**（该行本身并未被删）。
+- **命中汇总残留**：`hit_summary`（日报「命中追踪」实际读取的表）与 `hit_tracking`（周期明细）
+  是两张表，只清明细表会让 fixture 代码继续显示。
+
+### Added
+
+- **仓库根 `conftest.py`（会话级数据隔离）**：import 时把 `STOCK_PLATFORM_DB_URL` /
+  `STOCK_PLATFORM_PERFORMANCE_LOG` 重定向到会话临时目录，`atexit` 还原；
+  `STOCK_PLATFORM_TEST_DATA_DIR` 可保留现场。
+- **回归测试** `test_persistence.py::test_session_never_resolves_the_repo_data_dir`：
+  会话解析出的 brief 库 / 绩效台账若落在仓库根 `data/` 下即失败。
+
+### Changed
+
+- `test_daily_cli_settle_after_logs_performance` 再显式钉住 `STOCK_PLATFORM_DB_URL`
+  （**凡是驱动 CLI / pipeline / workbench 路由的测试都必须钉住存储位置**）。
+- `scripts/check_docs.ps1` 补登记 ADR `0067`（此前遗漏）与 `0069`、`handoff-v4.3.1.md`。
+
+### Verification
+
+- 全量 `pytest packages apps`（`replay`）**989 passed / 0 failed**（988→989，+1）；
+- 全量测试前后四类生产存储（`daily_briefs` / `hit_tracking` / `hit_summary` /
+  `recommend_decisions.jsonl`）**行级逐位不变**；
+- 数据清理（先备份、后独立复核）：brief 行 −2、命中明细 −2、命中汇总 −2；
+  `data/digests/latest.md` 恢复渲染真实 brief（`2026-10-09`，命中追踪 10 只）。
+
 ## [4.3.0] - 2026-10-12
+
 
 ### Added
 
