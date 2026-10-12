@@ -60,26 +60,61 @@ cd D:\workspace\stock_trading\stock-platform
 
 ## Windows Task Scheduler
 
-1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。
-2. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
-3. 导入（管理员或当前用户）：
+1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -Digest` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。
+2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest`，`ExecutionTimeLimit=PT30M`）。
+3. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
+4. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
 
 ```powershell
 cd D:\workspace\stock_trading\stock-platform
-$xml = Get-Content -Raw .\scripts\ops\stock-platform-daily.xml
-Register-ScheduledTask -TaskName 'stock-platform-daily' -Xml $xml
+.\scripts\ops\Register-ScheduledTasks.ps1            # 注册两个任务
+.\scripts\ops\Register-ScheduledTasks.ps1 -Status    # 查看注册状态 / 上次运行结果
+.\scripts\ops\Register-ScheduledTasks.ps1 -RunNow    # 注册后立即触发（验证用）
+.\scripts\ops\Register-ScheduledTasks.ps1 -Unregister
+```
+
+或手动导入（管理员或当前用户）：
+
+```powershell
+cd D:\workspace\stock_trading\stock-platform
+Register-ScheduledTask -TaskName 'stock-platform-daily' `
+  -Xml ([System.IO.File]::ReadAllText('.\scripts\ops\stock-platform-daily.xml') -replace '^\s*<\?xml[^>]*\?>\s*','') -Force
 ```
 
 或：任务计划程序 → 导入任务 → 选该 XML。
 
-样例触发：每日 08:30；真正是否执行由包装脚本读日历决定（周末/法定休市跳过）。
+样例触发：每日 08:30 / 15:30；真正是否执行由包装脚本读日历决定（周末/法定休市跳过）。
+
+### 两个注册坑（2026-10-12 实测）
+
+| 坑 | 现象 | 规避 |
+|----|------|------|
+| PS 5.1 编码 | `Get-Content -Raw` 把 UTF-8 无 BOM 的 XML 按 ANSI(GBK) 解码，中文 Description 乱码 → `任务 XML 格式错误` | 用 `[System.IO.File]::ReadAllText()`（`Register-ScheduledTasks.ps1` 已内置） |
+| `-Xml` 参数拒绝编码声明 | `(1,40)::错误: 无法切换编码` | 注册前剥掉 `<?xml … ?>` 声明（文件里保留，供 GUI 导入） |
+
+### PrevSession：为什么 asof 是前一交易日
+
+market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar**——直接用今天会得到空面板
+（实测 asof=2026-10-12 brief `panelSize=0` 的废档即此因）。`-PrevSession` 让包装脚本用
+`TradingCalendar` 把 asof 解析为**前一交易日**（T-1 收盘截面 = 正确的 PIT 选股时点）。
+
+## 用户可读日报（digest）
+
+每日流水线成功后自动渲染人读版 Markdown（`-Digest`）：
+
+- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...]`
+- 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针）
+- 内容：环境/数据源/宇宙概览、当日推荐表（综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+- 数据源：**权威 SQLite brief 仓库**（ADR 0049），绝不并行解析 JSON 导出；查无 brief 时 fail-closed 输出占位说明，不编造数字
 
 ## cron
 
 见 `scripts/ops/cron-daily.example`。推荐每日调用包装脚本，由日历决定 skip：
 
 ```text
-30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb
+# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -Digest
+
+# 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest
 ```
 
 （cron 行里的 `&&` 仅出现在 Linux crontab 示例中；Windows PowerShell 运维脚本本身不使用 `&&`。）
@@ -92,8 +127,6 @@ Register-ScheduledTask -TaskName 'stock-platform-daily' -Xml $xml
 Invoke-RestMethod http://127.0.0.1:3018/api/ops/health
 ```
 
-关注 `marketDb` 覆盖裁决（`ok` / `thin` / `stale` / `empty` / `missing_table`，见 ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）以及 brief 指针文件：
-
-`{out}/briefs/latest.json`（见 [daily-pipeline.md](daily-pipeline.md)）。
+关注 `marketDb` 覆盖裁决（`ok` / `thin` / `stale` / `empty` / `missing_table`，见 ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）、brief 指针文件 `{out}/briefs/latest.json`（见 [daily-pipeline.md](daily-pipeline.md)）与 `Register-ScheduledTasks.ps1 -Status` 的 `lastResult`。
 
 `liveTradingEnabled` 恒为 false。

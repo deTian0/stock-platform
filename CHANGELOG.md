@@ -12,6 +12,27 @@
 
 - （无）
 
+## [4.2.0] - 2026-10-12
+
+### Added
+
+- **每日调度正式上线（双任务，本机已注册并实测触发成功）**
+  - 盘前 `stock-platform-daily`（08:30）：`-MarketDb -PrevSession -Digest` —— 整市快路径选股 + 人读日报
+  - 盘后 `stock-platform-postmarket`（15:30，新 XML）：`-MarketDb -PrevSession -SettleAfter -Digest` —— 绩效记账/结算 + 命中追踪 + 日报
+  - `scripts/ops/Register-ScheduledTasks.ps1`：注册 / `-Status` / `-Unregister` / `-RunNow` 一体化，幂等可重跑，当前用户（InteractiveToken + LeastPrivilege）**无需管理员**
+  - **实测**：任务计划器按需触发 → `result=0x0`；整市 brief（5210 行截面 / Top10）+ digest 全链产出
+- **`-PrevSession`（调度必用）**：包装脚本用 `TradingCalendar` 把 asof 解析为**前一交易日** —— market.db 由生产侧晚间回补，早/午后时点绝无当日 bar，直接用今天必得空面板（实测 asof=2026-10-12 废 brief `panelSize=0` 即此因）
+- **用户可读日报（第 2 块砖）**：新增 `daily_digest.py` + CLI `stock-platform-digest`
+  - 从**权威 SQLite brief 仓库**（ADR 0049）渲染 Markdown：环境/数据源/宇宙概览、当日推荐表（综合分/收盘/理由）、五榜概览、命中追踪（X3 `format_hit_report` 单点渲染）、绩效台账 pending/settled 计数
+  - 产物 `data/digests/{asof}.md` + `latest.md` 指针；查无 brief 时 **fail-closed 占位说明，不编造数字**
+  - 绩效 JSONL 读取为 best-effort：缺失/损坏不阻断日报
+  - 包装脚本 `-Digest` 开关接入；日报渲染失败**不翻转**流水线退出码
+- 调度文档 `docs/ops/scheduler.md` 重写：双任务、注册脚本、digest、PrevSession 决策、**两个实测注册坑**（PS 5.1 GBK 误读 UTF-8 XML → 用 `ReadAllText`；`-Xml` 参数拒绝编码声明 → 剥 `<?xml … ?>`）
+
+### Fixed
+
+- `Invoke-DailyPipeline.ps1`：CLI 非零退出时此前仍可能走 digest 分支 / 错误透传 exit code —— 现在显式捕获 `cliEc`，失败即退出，成功才渲染 digest
+
 ## [4.1.8] - 2026-10-12
 
 ### Added

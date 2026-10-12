@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Windows Task Scheduler task for the daily post-market review (15:30).
+
+  Runs the same offline fast path as the pre-market task, plus:
+    -SettleAfter  — log picks into the performance JSONL and settle pending
+                    samples against engine market.db (paper only).
+    -PrevSession  — asof = previous CN trading day (market.db is backfilled in
+                    the evening; today's bars do not exist at 15:30 either).
+    -Digest       — render data/digests/{asof}.md (+ latest.md).
+
+  No secrets, no liveTrading. Import (current user, no elevation needed):
+    Register-ScheduledTask -Xml (Get-Content -Raw .\scripts\ops\stock-platform-postmarket.xml) `
+      -TaskName "stock-platform-postmarket"
+  See docs/ops/scheduler.md.
+-->
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Date>2026-10-12T00:00:00</Date>
+    <Author>stock-platform</Author>
+    <Description>Post-market review: settle performance + render digest on CN trading days (asof = previous session).</Description>
+    <URI>\stock-platform-postmarket</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-10-13T15:30:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <!-- Settle can scan a 3.14 GB market.db; 30 min is a generous ceiling. -->
+    <ExecutionTimeLimit>PT30M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <!-- Edit WorkingDirectory to your clone path before import. -->
+      <Command>powershell.exe</Command>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest</Arguments>
+      <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

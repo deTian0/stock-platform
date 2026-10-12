@@ -1,0 +1,279 @@
+"""User-readable daily digest (markdown) rendered from the brief archive.
+
+The pipeline's outputs (brief.json / SQLite / JSONL) are machine-first. This
+module answers the "人能一眼看懂" gap: one markdown file per asof, rendered
+from the **authoritative SQLite brief repository** (ADR 0049) — never from a
+parallel parse of JSON exports.
+
+Data sources, all read-only:
+  - brief:      ``SqliteBriefRepository`` (latest or by asof)
+  - hit tracking: ``format_hit_report`` (X3 single point)
+  - performance: pending/settled counts from the recommendations JSONL
+
+Outputs ``{out_dir}/{asof}.md`` plus a ``latest.md`` pointer copy. Fail-closed:
+no brief found → a stub digest that says so (never fabricated numbers).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+from datetime import date
+from pathlib import Path
+from typing import Any, Mapping
+
+from .hit_tracking import format_hit_report, open_hit_repository
+from .persistence import BriefRecord, open_brief_repository
+
+ENV_PERF_LOG = "STOCK_PLATFORM_PERFORMANCE_LOG"
+DEFAULT_PERF_LOG = "./data/recommend_decisions.jsonl"
+DEFAULT_OUT_DIR = "./data/digests"
+
+_DISCLAIMER = "研究简报，非投资建议；环境 SIMULATE，liveTradingEnabled 恒为 false。"
+
+
+def _perf_log_path() -> Path:
+    raw = (os.environ.get(ENV_PERF_LOG) or DEFAULT_PERF_LOG).strip()
+    return Path(raw)
+
+
+def performance_summary(asof: str | None = None) -> dict[str, Any]:
+    """Count pending / settled rows in the recommendations JSONL (best-effort).
+
+    Never raises: a missing or unreadable file yields ``{"available": False}``
+    so a digest is never blocked by the log.
+    """
+    out: dict[str, Any] = {"available": False}
+    path = _perf_log_path()
+    if not path.is_file():
+        return out
+    total = pending = settled = asof_pending = 0
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, Mapping):
+                    continue
+                total += 1
+                if row.get("pending"):
+                    pending += 1
+                else:
+                    settled += 1
+                if asof and str(row.get("date") or "")[:10] == asof and row.get("pending"):
+                    asof_pending += 1
+    except OSError:
+        return out
+    out = {
+        "available": True,
+        "path": str(path),
+        "total": total,
+        "pending": pending,
+        "settled": settled,
+    }
+    if asof:
+        out["asofPending"] = asof_pending
+    return out
+
+
+def _fmt_score(value: Any) -> str:
+    if value is None:
+        return "-"
+    try:
+        return f"{float(value):.4f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _fmt_price(value: Any) -> str:
+    if value is None:
+        return "-"
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _picks_table(picks: list[Mapping[str, Any]]) -> list[str]:
+    lines = ["| # | 代码 | 综合分 | 收盘 | 理由 |", "|---|---|---|---|---|"]
+    for p in picks:
+        reason = str(p.get("reasonSummary") or p.get("reason") or "").replace("|", "\\|")
+        if len(reason) > 80:
+            reason = reason[:77] + "..."
+        lines.append(
+            f"| {p.get('rank', '-')} | {p.get('symbol', '-')} "
+            f"| {_fmt_score(p.get('composite_score'))} "
+            f"| {_fmt_price(p.get('close'))} | {reason or '-'} |"
+        )
+    return lines
+
+
+def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
+    rankings = payload.get("rankings") or {}
+    boards = rankings.get("boards") or {}
+    if not boards:
+        return []
+    lines = ["## 五榜概览", ""]
+    order = [
+        ("quality", "②A 质量榜"),
+        ("short_term", "②B 短线榜"),
+        ("holdings", "③A 持仓"),
+        ("actions", "③B 操作建议"),
+        ("watchlist", "③C 观察名单"),
+    ]
+    for slug, label in order:
+        board = boards.get(slug) or {}
+        items = board.get("items") or []
+        lines.append(f"### {label}（{len(items)} 条）")
+        lines.append("")
+        if not items:
+            lines.append("_空（fail-closed，不生成占位条目）_")
+            lines.append("")
+            continue
+        lines.append("| # | 代码 | 名称 | 备注 |")
+        lines.append("|---|---|---|---|")
+        for i, it in enumerate(items[:10], start=1):
+            note = str(
+                it.get("reason") or it.get("belowMedian") and "低于中位（只读提示）" or ""
+            ).replace("|", "\\|")
+            lines.append(
+                f"| {i} | {it.get('symbol', '-')} | {it.get('name') or '-'} "
+                f"| {note[:60] or '-'} |"
+            )
+        lines.append("")
+    return lines
+
+
+def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> str:
+    """Render one BriefRecord as the human-readable markdown digest."""
+    payload = record.payload or {}
+    asof = record.asof
+    lines: list[str] = []
+    lines.append(f"# 每日简报 · {asof}")
+    lines.append("")
+    lines.append(f"- 环境：{record.environment}（{_DISCLAIMER}）")
+    provider = record.provider or payload.get("provider") or "未记录"
+    lines.append(f"- 数据源：`{provider}`")
+    tier = record.universe_tier or payload.get("universeTier") or "-"
+    lines.append(
+        f"- 宇宙：{payload.get('universeSize', '-')} 只（档位 {tier}），"
+        f"截面 {payload.get('panelSize', '-')} 行，TopN {payload.get('topN', '-')}"
+    )
+    if record.data_note:
+        lines.append(f"- 数据备注：{record.data_note}")
+    if payload.get("softGates"):
+        lines.append("- 闸门：softGates 开启" + ("（闸门放宽）" if payload.get("gatesRelaxed") else ""))
+    lines.append(f"- 生成时间：{record.generated_at or '-'}")
+    lines.append("")
+
+    picks = record.picks or []
+    lines.append(f"## 当日推荐（{len(picks)} 条）")
+    lines.append("")
+    if not picks:
+        msg = payload.get("emptyPicksMessage") or "当日无推荐"
+        tip = payload.get("emptyPicksTip")
+        lines.append(f"**{msg}**")
+        if tip:
+            lines.append("")
+            lines.append(f"> {tip}")
+        lines.append("")
+    else:
+        lines.extend(_picks_table(picks))
+        lines.append("")
+
+    lines.extend(_rankings_section(payload))
+
+    # ---- hit tracking (X3 single point rendering) ----
+    if hits_repo is not None:
+        lines.append("## 命中追踪")
+        lines.append("")
+        try:
+            lines.append(format_hit_report(hits_repo, asof=asof))
+        except Exception as exc:  # pragma: no cover - defensive, digest never crashes
+            lines.append(f"_命中追踪暂不可用：{exc}_")
+            lines.append("")
+
+    perf = performance_summary(asof)
+    lines.append("## 绩效台账")
+    lines.append("")
+    if not perf.get("available"):
+        lines.append("_绩效 JSONL 未配置或不存在（best-effort，不阻断简报）_")
+    else:
+        lines.append(
+            f"- 累计决策 {perf.get('total', 0)} 条：待结算 {perf.get('pending', 0)}，"
+            f"已结算 {perf.get('settled', 0)}"
+        )
+        if asof:
+            lines.append(f"- 其中 {asof} 新增待结算 {perf.get('asofPending', 0)} 条")
+    lines.append("")
+
+    lines.append("---")
+    lines.append(f"*digest 由 `stock-platform-digest` 于 {date.today().isoformat()} 渲染；"
+                 "权威数据以 SQLite brief 仓库为准。*")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _stub_text(asof: str) -> str:
+    return (
+        f"# 每日简报 · {asof}\n\n"
+        f"**未找到该日期的 brief 存档**（fail-closed：不生成编造内容）。\n\n"
+        f"可先运行 `stock-platform-daily`（或调度包装脚本）生成 brief，再渲染 digest。\n"
+    )
+
+
+def build_digest(
+    *,
+    asof: str | None = None,
+    db_url: str | Path | None = None,
+    hit_db_url: str | Path | None = None,
+    out_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Render the digest for ``asof`` (or the latest brief) and write files.
+
+    Returns ``{"asof", "found", "digestPath", "latestPath"}``. Writes
+    ``{asof}.md`` plus a ``latest.md`` pointer copy when a brief was found;
+    a stub ``{asof}.md`` (and latest copy) when not.
+    """
+    repo = open_brief_repository(db_url)
+    record = repo.get_by_asof(asof) if asof else None
+    if record is None and not asof:
+        recent = repo.list_recent(limit=1)
+        record = recent[0] if recent else None
+    if record is None and asof:
+        text = _stub_text(asof)
+    elif record is None:
+        text = _stub_text(date.today().isoformat())
+    else:
+        hits_repo = open_hit_repository(hit_db_url) if hit_db_url is not None else open_hit_repository()
+        text = build_digest_text(record, hits_repo=hits_repo)
+
+    root = Path(out_dir) if out_dir is not None else Path(DEFAULT_OUT_DIR)
+    root.mkdir(parents=True, exist_ok=True)
+    target_asof = (record.asof if record is not None else (asof or date.today().isoformat()))
+    digest_path = root / f"{target_asof}.md"
+    latest_path = root / "latest.md"
+    digest_path.write_text(text, encoding="utf-8")
+    shutil.copyfile(digest_path, latest_path)
+    return {
+        "asof": target_asof,
+        "found": record is not None,
+        "digestPath": str(digest_path),
+        "latestPath": str(latest_path),
+    }
+
+
+__all__ = [
+    "DEFAULT_OUT_DIR",
+    "DEFAULT_PERF_LOG",
+    "ENV_PERF_LOG",
+    "build_digest",
+    "build_digest_text",
+    "performance_summary",
+]
