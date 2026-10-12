@@ -413,6 +413,7 @@ def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:
     from .performance import (
         default_performance_log_path,
         log_brief_decisions,
+        resolve_benchmark_symbol,
         settle_performance_log,
     )
     from .performance_cli import _build_settle_get_daily
@@ -432,7 +433,7 @@ def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:
         return meta
     brief = json.loads(path.read_text(encoding="utf-8"))
     log_path = default_performance_log_path()
-    appended = log_brief_decisions(log_path, brief, holding="1d", skip_existing=True)
+    appended = log_brief_decisions(log_path, brief, skip_existing=True)
     meta["logged"] = len(appended)
     meta["logPath"] = str(log_path)
 
@@ -455,8 +456,14 @@ def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:
         meta["ok"] = meta["logged"] > 0
         return meta
 
-    summary = settle_performance_log(log_path, get_daily=get_daily)
+    summary = settle_performance_log(
+        log_path,
+        get_daily=get_daily,
+        benchmark_get_daily=get_daily,
+        benchmark_symbol=resolve_benchmark_symbol(),
+    )
     meta["settledNewly"] = int(summary.get("settledNewly") or 0)
+    meta["alphaSettledNewly"] = int(summary.get("alphaSettledNewly") or 0)
     meta["settledCount"] = int(summary.get("settledCount") or 0)
     meta["pendingCount"] = int(summary.get("pendingCount") or 0)
     metrics = summary.get("metrics") or {}

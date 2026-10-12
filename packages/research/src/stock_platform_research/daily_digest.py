@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .hit_tracking import format_hit_report, open_hit_repository
+from .performance import build_attribution, format_pct, settled_records
 from .persistence import BriefRecord, open_brief_repository
 
 ENV_PERF_LOG = "STOCK_PLATFORM_PERFORMANCE_LOG"
@@ -39,16 +40,21 @@ def _perf_log_path() -> Path:
 
 
 def performance_summary(asof: str | None = None) -> dict[str, Any]:
-    """Count pending / settled rows in the recommendations JSONL (best-effort).
+    """Count pending / settled rows + a returns overview (best-effort).
 
     Never raises: a missing or unreadable file yields ``{"available": False}``
-    so a digest is never blocked by the log.
+    so a digest is never blocked by the log. Counts are computed from a tolerant
+    line-by-line parse (a corrupt line is skipped, not fatal); the returns block
+    reuses the single-point 口径 in :mod:`stock_platform_research.performance`
+    (``settled_records`` + ``build_attribution``) so the digest numbers and the
+    performance CLI never drift.
     """
     out: dict[str, Any] = {"available": False}
     path = _perf_log_path()
     if not path.is_file():
         return out
     total = pending = settled = asof_pending = 0
+    parsed: list[Mapping[str, Any]] = []
     try:
         with path.open("r", encoding="utf-8") as fh:
             for line in fh:
@@ -61,6 +67,7 @@ def performance_summary(asof: str | None = None) -> dict[str, Any]:
                     continue
                 if not isinstance(row, Mapping):
                     continue
+                parsed.append(row)
                 total += 1
                 if row.get("pending"):
                     pending += 1
@@ -76,6 +83,7 @@ def performance_summary(asof: str | None = None) -> dict[str, Any]:
         "total": total,
         "pending": pending,
         "settled": settled,
+        "returns": build_attribution(settled_records(parsed)),
     }
     if asof:
         out["asofPending"] = asof_pending
@@ -211,6 +219,29 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
         )
         if asof:
             lines.append(f"- 其中 {asof} 新增待结算 {perf.get('asofPending', 0)} 条")
+        ret = perf.get("returns") or {}
+        if ret.get("count"):
+            win = ret.get("winRate")
+            avg = ret.get("avgReturn")
+            bench = ret.get("benchmarkSymbol") or "-"
+            beat = ret.get("beatBenchmarkRate")
+            best, worst = ret.get("best"), ret.get("worst")
+            avg_txt = format_pct(float(avg)) if avg is not None else "-"
+            win_txt = f"{float(win) * 100:.1f}%" if win is not None else "-"
+            beat_txt = f"{float(beat) * 100:.1f}%" if beat is not None else "-"
+            best_txt = format_pct(float(best)) if best is not None else "-"
+            worst_txt = format_pct(float(worst)) if worst is not None else "-"
+            lines.append(
+                f"- 收益概览（已结算 {ret['count']} 条 / 基准 {bench}）："
+                f"胜率 {win_txt}，平均收益 {avg_txt}，跑赢基准 {beat_txt}，"
+                f"最好 {best_txt}、最差 {worst_txt}"
+            )
+            if ret.get("avgAlpha") is None:
+                lines.append("  - 超额（alpha）暂缺：结算时未带基准日线")
+        elif perf.get("settled", 0):
+            lines.append("- 已结算样本缺可解析收益（raw 全空），暂无收益数字")
+        else:
+            lines.append("- 暂无已结算样本，暂无收益数字（待持有期到期后结算）")
     lines.append("")
 
     lines.append("---")

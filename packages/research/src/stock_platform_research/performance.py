@@ -33,6 +33,24 @@ _RATING_DIRECTION: dict[str, int] = {
 
 MIN_MEANINGFUL_SAMPLE = 20
 
+# Single point for the default holding tag, shared by log / settle / digest so the
+# 记账口径 never drifts (the daily CLI used to log "1d" while the workbench used "5d").
+DEFAULT_HOLDING = "5d"
+
+# Alpha benchmark. ``market.db`` stores index series with an SZ suffix (the engine maps
+# every 0-prefixed code to SZ), e.g. 中证500 = ``000905.SZ``; 沪深300 (000300) is absent
+# from the warehouse, so 中证500 is the default proxy. Override via env.
+DEFAULT_BENCHMARK_SYMBOL = "000905"
+ENV_BENCHMARK_SYMBOL = "STOCK_PLATFORM_BENCHMARK_SYMBOL"
+
+
+def resolve_benchmark_symbol() -> str:
+    """Benchmark symbol for alpha: env override, else :data:`DEFAULT_BENCHMARK_SYMBOL`."""
+    import os
+
+    raw = str(os.environ.get(ENV_BENCHMARK_SYMBOL) or "").strip()
+    return raw or DEFAULT_BENCHMARK_SYMBOL
+
 
 def _parse_pct(value: Any) -> float | None:
     if value is None:
@@ -114,7 +132,7 @@ def append_jsonl(path: str | Path, record: Mapping[str, Any]) -> Path:
 def brief_picks_to_pending(
     brief: Mapping[str, Any],
     *,
-    holding: str = "5d",
+    holding: str = DEFAULT_HOLDING,
     rating: str = "Buy",
     source: str = "brief",
 ) -> list[dict[str, Any]]:
@@ -146,7 +164,7 @@ def log_brief_decisions(
     path: str | Path,
     brief: Mapping[str, Any],
     *,
-    holding: str = "5d",
+    holding: str = DEFAULT_HOLDING,
     rating: str = "Buy",
     skip_existing: bool = True,
 ) -> list[dict[str, Any]]:
@@ -257,6 +275,8 @@ def performance_summary(
         "settledCount": stats.count,
         "avgHoldingDays": statistics.fmean(holdings) if holdings else None,
         "metrics": stats.as_dict(),
+        "attribution": build_attribution(records),
+        "benchmarkSymbol": resolve_benchmark_symbol(),
         "recentDays": recent,
         "metricDefinitions": {
             "direction_accuracy": (
@@ -269,6 +289,12 @@ def performance_summary(
             "recentDays": (
                 "Per-day direction_accuracy for the latest N distinct settled dates "
                 "(same 口径 as metrics.direction_accuracy)."
+            ),
+            "winRate": (
+                "attribution.winRate — share of positive raw returns across settled rows."
+            ),
+            "beatBenchmarkRate": (
+                "attribution.beatBenchmarkRate — share of positive alpha (raw − benchmark)."
             ),
         },
         "disclaimer": "Research metrics only; not investment advice; overlapping windows; no costs.",
@@ -301,13 +327,18 @@ def _recent_direction_accuracy(
 GetDaily = Callable[..., list[dict[str, Any]]]
 
 
-def _trading_closes(
+def _holding_window(
     bars: Sequence[Mapping[str, Any]],
     *,
     start: date,
     holding_days: int,
-) -> tuple[float, float, int] | None:
-    """Return (entry_close, exit_close, actual_days) for holding_days sessions after start."""
+) -> tuple[str, float, str, float] | None:
+    """(entry_date, entry_close, exit_date, exit_close) for a holding window.
+
+    Entry = first bar on/after ``start``; exit = ``holding_days`` sessions later.
+    Reusing this single definition for both the stock and the benchmark is what
+    keeps ``raw`` and ``alpha`` on the *same* session window (ADR 0068).
+    """
     ordered = sorted(
         (b for b in bars if str(b.get("date", ""))[:10] >= start.isoformat()),
         key=lambda b: str(b.get("date", ""))[:10],
@@ -318,7 +349,6 @@ def _trading_closes(
         if c is None:
             continue
         closes.append((str(b.get("date", ""))[:10], float(c)))
-    # Prefer bar on signal date as entry; else first available on/after.
     entry_idx = None
     for i, (d, _) in enumerate(closes):
         if d >= start.isoformat():
@@ -329,7 +359,77 @@ def _trading_closes(
     exit_idx = entry_idx + int(holding_days)
     if exit_idx >= len(closes):
         return None
-    return closes[entry_idx][1], closes[exit_idx][1], holding_days
+    return (
+        closes[entry_idx][0],
+        closes[entry_idx][1],
+        closes[exit_idx][0],
+        closes[exit_idx][1],
+    )
+
+
+def _trading_closes(
+    bars: Sequence[Mapping[str, Any]],
+    *,
+    start: date,
+    holding_days: int,
+) -> tuple[float, float, int] | None:
+    """Return (entry_close, exit_close, actual_days); thin view over _holding_window."""
+    window = _holding_window(bars, start=start, holding_days=holding_days)
+    if window is None:
+        return None
+    _, entry_c, _, exit_c = window
+    return entry_c, exit_c, int(holding_days)
+
+
+def _safe_daily(
+    get_daily: GetDaily, symbol: str, start: date, end: date
+) -> list[dict[str, Any]]:
+    """Best-effort daily fetch — never raises (missing bars ⇒ empty list)."""
+    try:
+        return list(get_daily([symbol], start=start, end=end) or [])
+    except Exception:  # noqa: BLE001 — any provider failure ⇒ treat as no data
+        return []
+
+
+def _close_on_or_before(bars: Sequence[Mapping[str, Any]], target: str) -> float | None:
+    best_date: str | None = None
+    best_close: float | None = None
+    for b in bars:
+        c = b.get("close")
+        d = str(b.get("date", ""))[:10]
+        if c is None or not d or d > target:
+            continue
+        if best_date is None or d > best_date:
+            best_date, best_close = d, float(c)
+    return best_close
+
+
+def _benchmark_return_for_window(
+    bench_bars: Sequence[Mapping[str, Any]],
+    *,
+    entry_date: str,
+    exit_date: str,
+) -> float | None:
+    """Benchmark return between the entry/exit dates (nearest close on/before each)."""
+    entry_c = _close_on_or_before(bench_bars, entry_date)
+    exit_c = _close_on_or_before(bench_bars, exit_date)
+    if not entry_c or exit_c is None:
+        return None
+    return exit_c / entry_c - 1.0
+
+
+def _window_alpha(
+    *,
+    raw_f: float,
+    entry_date: str,
+    exit_date: str,
+    bench_bars: Sequence[Mapping[str, Any]],
+) -> float | None:
+    """``alpha = raw − benchmark`` over the same window; None when benchmark missing."""
+    bench_ret = _benchmark_return_for_window(
+        bench_bars, entry_date=entry_date, exit_date=exit_date
+    )
+    return None if bench_ret is None else raw_f - bench_ret
 
 
 def settle_pending_entries(
@@ -338,42 +438,88 @@ def settle_pending_entries(
     get_daily: GetDaily | None = None,
     returns: Mapping[tuple[str, str], float] | None = None,
     alpha_returns: Mapping[tuple[str, str], float] | None = None,
+    benchmark_get_daily: GetDaily | None = None,
+    benchmark_symbol: str | None = None,
     end_buffer_calendar_days: int = 40,
 ) -> list[dict[str, Any]]:
     """Settle pending rows using injected returns map or get_daily closes.
 
     ``returns`` keys are ``(date, symbol)`` → raw holding-period return as float.
+
+    When ``benchmark_get_daily`` is supplied, ``alpha = raw − benchmark`` is computed
+    over the **same entry/exit dates** (single window definition, ``_holding_window``).
+    Already-settled rows whose ``alpha`` is still null are back-filled the same way, so
+    a JSONL written before the benchmark existed catches up on the next settle.
     """
+    bench_sym = benchmark_symbol or resolve_benchmark_symbol()
     out: list[dict[str, Any]] = []
     for e in entries:
         row = dict(e)
+        holding = parse_holding_days(row.get("holding")) or 5
+        key = (str(row.get("date") or "")[:10], str(row.get("symbol") or ""))
         if not row.get("pending"):
+            if (
+                benchmark_get_daily is not None
+                and get_daily is not None
+                and row.get("alpha") is None
+                and key[0]
+            ):
+                raw_existing = _parse_pct(row.get("raw"))
+                if raw_existing is not None:
+                    asof0 = date.fromisoformat(key[0])
+                    end0 = asof0 + timedelta(days=end_buffer_calendar_days)
+                    win0 = _holding_window(
+                        _safe_daily(get_daily, key[1], asof0, end0),
+                        start=asof0,
+                        holding_days=holding,
+                    )
+                    if win0 is not None:
+                        entry_d0, _, exit_d0, _ = win0
+                        alpha0 = _window_alpha(
+                            raw_f=raw_existing,
+                            entry_date=entry_d0,
+                            exit_date=exit_d0,
+                            bench_bars=_safe_daily(
+                                benchmark_get_daily, bench_sym, asof0, end0
+                            ),
+                        )
+                        if alpha0 is not None:
+                            row["alpha"] = format_pct(alpha0)
             out.append(row)
             continue
-        key = (str(row.get("date") or "")[:10], str(row.get("symbol") or ""))
         raw_f: float | None = None
+        alpha_f: float | None = None
         if returns is not None and key in returns:
             raw_f = float(returns[key])
-        elif get_daily is not None:
-            holding = parse_holding_days(row.get("holding")) or 5
+        elif get_daily is not None and key[0]:
             asof = date.fromisoformat(key[0])
             end = asof + timedelta(days=end_buffer_calendar_days)
-            try:
-                bars = get_daily([key[1]], start=asof, end=end)
-            except Exception:  # noqa: BLE001 — missing bars / fixture → stay pending
-                out.append(row)
-                continue
-            pair = _trading_closes(bars, start=asof, holding_days=holding)
-            if pair is not None:
-                entry_c, exit_c, _ = pair
+            win = _holding_window(
+                _safe_daily(get_daily, key[1], asof, end),
+                start=asof,
+                holding_days=holding,
+            )
+            if win is not None:
+                entry_d, entry_c, exit_d, exit_c = win
                 if entry_c:
                     raw_f = exit_c / entry_c - 1.0
+                    if benchmark_get_daily is not None:
+                        alpha_f = _window_alpha(
+                            raw_f=raw_f,
+                            entry_date=entry_d,
+                            exit_date=exit_d,
+                            bench_bars=_safe_daily(
+                                benchmark_get_daily, bench_sym, asof, end
+                            ),
+                        )
         if raw_f is None:
             out.append(row)
             continue
         row["raw"] = format_pct(raw_f)
         if alpha_returns is not None and key in alpha_returns:
             row["alpha"] = format_pct(float(alpha_returns[key]))
+        elif alpha_f is not None:
+            row["alpha"] = format_pct(alpha_f)
         row["pending"] = False
         out.append(row)
     return out
@@ -393,27 +539,35 @@ def settle_performance_log(
     get_daily: GetDaily | None = None,
     returns: Mapping[tuple[str, str], float] | None = None,
     alpha_returns: Mapping[tuple[str, str], float] | None = None,
+    benchmark_get_daily: GetDaily | None = None,
+    benchmark_symbol: str | None = None,
     end_buffer_calendar_days: int = 40,
     recent_days: int = 5,
 ) -> dict[str, Any]:
     """Settle pending JSONL rows in-place when subsequent bars exist.
 
     Reuses ``settle_pending_entries`` + ``direction_accuracy`` 口径; never invents
-    returns when bars are missing (rows stay pending).
+    returns when bars are missing (rows stay pending). ``benchmark_get_daily`` adds
+    ``alpha`` (raw − benchmark) and back-fills alpha on rows settled without it.
     """
     log_path = Path(path)
     entries = load_jsonl(log_path)
     before_pending = sum(1 for e in entries if e.get("pending"))
+    before_alpha = sum(1 for e in entries if e.get("alpha") is not None)
     settled = settle_pending_entries(
         entries,
         get_daily=get_daily,
         returns=returns,
         alpha_returns=alpha_returns,
+        benchmark_get_daily=benchmark_get_daily,
+        benchmark_symbol=benchmark_symbol,
         end_buffer_calendar_days=end_buffer_calendar_days,
     )
     after_pending = sum(1 for e in settled if e.get("pending"))
+    after_alpha = sum(1 for e in settled if e.get("alpha") is not None)
     newly = max(0, before_pending - after_pending)
-    if newly > 0:
+    alpha_newly = max(0, after_alpha - before_alpha)
+    if newly > 0 or alpha_newly > 0:
         rewrite_jsonl(log_path, settled)
     summary = performance_summary(
         log_path, entries=settled, recent_days=recent_days
@@ -421,6 +575,8 @@ def settle_performance_log(
     summary["settledNewly"] = newly
     summary["autoSettled"] = newly > 0
     summary["pendingBefore"] = before_pending
+    summary["alphaSettledNewly"] = alpha_newly
+    summary["benchmarkSymbol"] = benchmark_symbol or resolve_benchmark_symbol()
     return summary
 
 
@@ -478,7 +634,7 @@ def _rating_for_side(side: str) -> str | None:
 def align_fills_to_performance(
     fills: Sequence[Any],
     *,
-    holding: str = "5d",
+    holding: str = DEFAULT_HOLDING,
     log_path: str | Path | None = None,
     source: str = "paper_fill",
 ) -> list[dict[str, Any]]:
@@ -524,3 +680,167 @@ def align_fills_to_performance(
         append_jsonl(path, row)
         rows.append(row)
     return rows
+
+
+# --------------------------------------------------------------------------- #
+# PnL attribution (milestone v4.3.0): settled decisions → user-visible returns.
+# --------------------------------------------------------------------------- #
+
+
+def _group_stats(records: Sequence[DecisionRecord]) -> dict[str, Any]:
+    if not records:
+        return {
+            "count": 0,
+            "up_rate": None,
+            "avg_return": None,
+            "median_return": None,
+            "avg_alpha": None,
+            "outperform_rate": None,
+            "best": None,
+            "worst": None,
+        }
+    raws = [r.raw_return for r in records]
+    alphas = [r.alpha_return for r in records if r.alpha_return is not None]
+    return {
+        "count": len(records),
+        "up_rate": sum(1 for v in raws if v > 0) / len(raws),
+        "avg_return": statistics.fmean(raws),
+        "median_return": statistics.median(raws),
+        "avg_alpha": statistics.fmean(alphas) if alphas else None,
+        "outperform_rate": (
+            sum(1 for v in alphas if v > 0) / len(alphas) if alphas else None
+        ),
+        "best": max(raws),
+        "worst": min(raws),
+    }
+
+
+def bucket_by_rank(records: Sequence[DecisionRecord]) -> list[dict[str, Any]]:
+    """Settled stats grouped by recommendation ``rank`` (1 = top pick)."""
+    groups: dict[int, list[DecisionRecord]] = {}
+    for r in records:
+        groups.setdefault(r.rank if r.rank is not None else -1, []).append(r)
+    out: list[dict[str, Any]] = []
+    for rank in sorted(groups):
+        label = "未标 rank" if rank < 0 else f"rank {rank}"
+        out.append(
+            {
+                "rank": rank if rank >= 0 else None,
+                "label": label,
+                **_group_stats(groups[rank]),
+            }
+        )
+    return out
+
+
+def bucket_by_score(
+    records: Sequence[DecisionRecord], *, n_buckets: int = 3
+) -> list[dict[str, Any]]:
+    """Settled stats grouped by equal-count ``score`` buckets (low → high)."""
+    scored = [r for r in records if r.score is not None]
+    if not scored:
+        return []
+    scored.sort(key=lambda r: (r.score, r.date, r.symbol))
+    n = max(1, int(n_buckets))
+    total = len(scored)
+    out: list[dict[str, Any]] = []
+    for i in range(n):
+        lo = i * total // n
+        hi = (i + 1) * total // n
+        chunk = scored[lo:hi]
+        if not chunk:
+            continue
+        lo_s = float(chunk[0].score)
+        hi_s = float(chunk[-1].score)
+        out.append(
+            {
+                "bucket": i,
+                "label": f"[{lo_s:.4f},{hi_s:.4f}]",
+                "minScore": lo_s,
+                "maxScore": hi_s,
+                **_group_stats(chunk),
+            }
+        )
+    return out
+
+
+def bucket_by_date(records: Sequence[DecisionRecord]) -> list[dict[str, Any]]:
+    """Settled stats per decision date (chronological)."""
+    groups: dict[str, list[DecisionRecord]] = {}
+    for r in records:
+        groups.setdefault(r.date, []).append(r)
+    return [{"date": d, **_group_stats(groups[d])} for d in sorted(groups)]
+
+
+def equity_curve(records: Sequence[DecisionRecord]) -> list[dict[str, Any]]:
+    """Per-decision equal-weight cumulative return, chronological.
+
+    Holding windows overlap at the decision level, so this is **not** a tradable
+    portfolio curve — it answers "is the recommendation logic directionally
+    profitable?" (ADR 0068 caveat), not "what would my account look like?".
+    """
+    ordered = sorted(records, key=lambda r: (r.date, r.symbol))
+    cum = 1.0
+    out: list[dict[str, Any]] = []
+    for r in ordered:
+        cum *= 1.0 + r.raw_return
+        out.append(
+            {
+                "date": r.date,
+                "symbol": r.symbol,
+                "cumulative": cum - 1.0,
+            }
+        )
+    return out
+
+
+def build_attribution(records: Sequence[DecisionRecord]) -> dict[str, Any]:
+    """Return attribution: win rate / avg return / alpha / buckets / equity curve."""
+    if not records:
+        return {
+            "count": 0,
+            "winRate": None,
+            "avgReturn": None,
+            "medianReturn": None,
+            "avgAlpha": None,
+            "beatBenchmarkRate": None,
+            "best": None,
+            "worst": None,
+            "byRank": [],
+            "byScore": [],
+            "byDate": [],
+            "equityCurve": [],
+            "benchmarkSymbol": resolve_benchmark_symbol(),
+            "notes": ["no settled decisions"],
+        }
+    base = _group_stats(records)
+    notes: list[str] = []
+    if base["count"] < MIN_MEANINGFUL_SAMPLE:
+        notes.append(
+            f"sample_size={base['count']} < {MIN_MEANINGFUL_SAMPLE}; ratios are noisy "
+            "— do not over-interpret"
+        )
+    if base["avg_alpha"] is None:
+        notes.append(
+            "alpha 全为 null：settle 时未提供基准（benchmark_get_daily）；"
+            f"基准默认 {DEFAULT_BENCHMARK_SYMBOL}，可用 {ENV_BENCHMARK_SYMBOL} 覆盖"
+        )
+    notes.append(
+        "equityCurve 为决策序列等权累计，持有窗口重叠，非可交易组合曲线（不含成本）"
+    )
+    return {
+        "count": base["count"],
+        "winRate": base["up_rate"],
+        "avgReturn": base["avg_return"],
+        "medianReturn": base["median_return"],
+        "avgAlpha": base["avg_alpha"],
+        "beatBenchmarkRate": base["outperform_rate"],
+        "best": base["best"],
+        "worst": base["worst"],
+        "byRank": bucket_by_rank(records),
+        "byScore": bucket_by_score(records),
+        "byDate": bucket_by_date(records),
+        "equityCurve": equity_curve(records),
+        "benchmarkSymbol": resolve_benchmark_symbol(),
+        "notes": notes,
+    }

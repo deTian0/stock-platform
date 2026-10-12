@@ -12,6 +12,7 @@ from .performance import (
     default_performance_log_path,
     load_jsonl,
     performance_summary,
+    resolve_benchmark_symbol,
     rewrite_jsonl,
     settle_pending_entries,
     settle_performance_log,
@@ -53,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
         default="5d",
         help="Holding tag for --align-fills pending rows (default 5d)",
     )
+    p.add_argument("--benchmark", default=None,
+        help="Benchmark symbol for alpha (default env STOCK_PLATFORM_BENCHMARK_SYMBOL or 000905)",
+    )
+    p.add_argument("--no-benchmark", action="store_true",
+        help="Skip alpha computation (settle raw returns only)",
+    )
     p.add_argument("--json-out", type=Path, help="Write summary JSON")
     args = p.parse_args(argv)
 
@@ -76,7 +83,13 @@ def main(argv: list[str] | None = None) -> int:
         rewrite_jsonl(log_path, entries)
     elif args.settle_daily:
         get_daily = _build_settle_get_daily()
-        summary = settle_performance_log(log_path, get_daily=get_daily)
+        benchmark_get_daily = None if args.no_benchmark else get_daily
+        summary = settle_performance_log(
+            log_path,
+            get_daily=get_daily,
+            benchmark_get_daily=benchmark_get_daily,
+            benchmark_symbol=args.benchmark or resolve_benchmark_symbol(),
+        )
         entries = load_jsonl(log_path)
 
     if summary is None:
@@ -87,12 +100,21 @@ def main(argv: list[str] | None = None) -> int:
         args.json_out.write_text(text, encoding="utf-8")
     print(text)
     m = summary["metrics"]
+    attr = summary.get("attribution") or {}
     print(
         f"settled={summary['settledCount']} "
         f"direction_accuracy={m.get('direction_accuracy')} "
         f"avg_return={m.get('avg_return')} "
-        f"settledNewly={summary.get('settledNewly', 0)}"
+        f"settledNewly={summary.get('settledNewly', 0)} "
+        f"alphaNewly={summary.get('alphaSettledNewly', 0)}"
     )
+    if attr.get("count"):
+        print(
+            f"attribution: winRate={attr.get('winRate')} "
+            f"avgReturn={attr.get('avgReturn')} "
+            f"beatBenchmarkRate={attr.get('beatBenchmarkRate')} "
+            f"benchmark={attr.get('benchmarkSymbol')}"
+        )
     return 0
 
 

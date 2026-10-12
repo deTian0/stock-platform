@@ -12,6 +12,37 @@
 
 - （无）
 
+## [4.3.0] - 2026-10-12
+
+### Added
+
+- **绩效 PnL 闭环（收益归因）** —— 从「计数」推进到「用户可见收益数字」，回答"这套推荐逻辑赚不赚钱"：
+  - **基准 alpha**：`alpha = raw − benchmark`，基准默认 **中证500 `000905`**（`market.db` 无
+    `000300`，`000905`/`000852` 完整）→ 环境变量 `STOCK_PLATFORM_BENCHMARK_SYMBOL` 可覆盖；
+    `raw` 与 `alpha` 共用**同一** `_holding_window`（入场/出场日期一致，杜绝口径错配）
+  - **alpha 回填**：已结算但 `alpha` 为 `null` 的历史台账，在下一次带基准的结算中补齐（`alphaSettledNewly`）
+  - **收益归因 `build_attribution`**：`winRate` / `avgReturn` / `medianReturn` / `avgAlpha` /
+    `beatBenchmarkRate` / `best` / `worst` + `byRank[]` / `byScore[]`（等数量分桶）/ `byDate[]` /
+    `equityCurve[]`；`performance_summary` 增 `attribution` + `benchmarkSymbol`（原键不变）
+  - **持有期单点** `DEFAULT_HOLDING = "5d"`：`brief_picks_to_pending` / `log_brief_decisions` /
+    `align_fills_to_performance` 统一引用；`daily_cli` 不再硬写 `"1d"`（记账=结算=日报三口径合一）
+  - **日报显示真数字**：`daily_digest.performance_summary` 增 `returns`（复用 research 单点 口径），
+    「绩效台账」新增「收益概览（已结算 N 条 / 基准 …）：胜率 …，平均收益 …，跑赢基准 …，最好 …、最差 …」
+  - **出口**：CLI `stock-platform-performance`（`--settle-daily` / `--benchmark` / `--no-benchmark`）·
+    盘后任务 `-SettleAfter` 带基准结算 · `GET/POST /api/research/performance[/settle]`
+  - **真机实测**：3 条 pending → `settledNewly=3`（`+0.38%` / `+2.96%` / `-1.76%`）；
+    再结算 `alphaSettledNewly=3`（`+2.41%` / `+4.99%` / `-7.72%`）；`avgReturn` +0.53% /
+    `beatBenchmarkRate` 0.667；日报出现真实收益行
+  - 契约 [`docs/contracts/performance-pnl.md`](docs/contracts/performance-pnl.md) + ADR
+    [`0068`](docs/architecture/0068-performance-pnl-closed-loop.md)；ADR `0033` 补「修订」节
+
+### Changed
+
+- `performance_summary` 返回体新增 `attribution` / `benchmarkSymbol` 键（**向后兼容**，旧键不变）；
+  `settle_pending_entries` / `settle_performance_log` 新增 `benchmark_get_daily` / `benchmark_symbol`
+  可选参数（缺省行为与 `v4.2.0` 逐位一致）
+- 记账持有期统一为 `DEFAULT_HOLDING`（`5d`）：`daily_cli --settle-after` 原写 `1d`，本轮修正
+
 ## [4.2.0] - 2026-10-12
 
 ### Added

@@ -213,3 +213,292 @@ def test_settle_performance_log_rewrites_when_bars_ready(tmp_path: Path) -> None
     rows = load_jsonl(log)
     assert rows[0]["pending"] is False
     assert rows[0]["raw"] == "+3.00%"
+
+
+def test_settle_computes_alpha_from_benchmark() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "alpha": None,
+            "holding": "1d",
+            "pending": True,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        assert symbols == ["600519"]
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    def bench(symbols, *, start, end):
+        assert symbols == ["000905"]
+        return [
+            {"date": "2026-09-01", "close": 200.0},
+            {"date": "2026-09-02", "close": 202.0},
+        ]
+
+    settled = settle_pending_entries(
+        entries,
+        get_daily=get_daily,
+        benchmark_get_daily=bench,
+        benchmark_symbol="000905",
+    )
+    row = settled[0]
+    assert row["pending"] is False
+    assert row["raw"] == "+10.00%"
+    assert row["alpha"] == "+9.00%"  # raw +10% − benchmark +1%
+
+
+def test_alpha_backfilled_on_already_settled_row() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": "+10.00%",
+            "alpha": None,
+            "holding": "1d",
+            "pending": False,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    def bench(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 200.0},
+            {"date": "2026-09-02", "close": 202.0},
+        ]
+
+    settled = settle_pending_entries(
+        entries, get_daily=get_daily, benchmark_get_daily=bench
+    )
+    assert settled[0]["pending"] is False
+    assert settled[0]["alpha"] == "+9.00%"
+
+
+def test_settle_without_benchmark_keeps_alpha_null() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "alpha": None,
+            "holding": "1d",
+            "pending": True,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    settled = settle_pending_entries(entries, get_daily=get_daily)
+    assert settled[0]["pending"] is False
+    assert settled[0]["raw"] == "+10.00%"
+    assert settled[0]["alpha"] is None
+
+
+def test_build_attribution_buckets_and_curve() -> None:
+    from stock_platform_research.performance import build_attribution
+
+    entries = [
+        {"date": "2026-09-01", "symbol": "A", "rating": "Buy", "raw": "+10.00%",
+         "alpha": "+5.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.9},
+        {"date": "2026-09-01", "symbol": "B", "rating": "Buy", "raw": "-5.00%",
+         "alpha": "-8.00%", "holding": "1d", "pending": False, "rank": 2, "score": 0.5},
+        {"date": "2026-09-02", "symbol": "C", "rating": "Buy", "raw": "+2.00%",
+         "alpha": "+1.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.7},
+    ]
+    attr = build_attribution(settled_records(entries))
+    assert attr["count"] == 3
+    assert attr["winRate"] == pytest.approx(2 / 3)
+    assert attr["beatBenchmarkRate"] == pytest.approx(2 / 3)
+    assert attr["avgReturn"] == pytest.approx((0.10 - 0.05 + 0.02) / 3)
+    assert [b["rank"] for b in attr["byRank"]] == [1, 2]
+    assert len(attr["byScore"]) == 3
+    assert [d["date"] for d in attr["byDate"]] == ["2026-09-01", "2026-09-02"]
+    curve = attr["equityCurve"]
+    assert curve[-1]["cumulative"] == pytest.approx(1.10 * 0.95 * 1.02 - 1.0)
+    assert attr["benchmarkSymbol"]
+    assert any("equityCurve" in n or "非可交易" in n for n in attr["notes"])
+
+
+def test_resolve_benchmark_symbol_env_override(monkeypatch) -> None:
+    from stock_platform_research.performance import (
+        DEFAULT_BENCHMARK_SYMBOL,
+        resolve_benchmark_symbol,
+    )
+
+    monkeypatch.delenv("STOCK_PLATFORM_BENCHMARK_SYMBOL", raising=False)
+    assert resolve_benchmark_symbol() == DEFAULT_BENCHMARK_SYMBOL
+    monkeypatch.setenv("STOCK_PLATFORM_BENCHMARK_SYMBOL", "000852")
+    assert resolve_benchmark_symbol() == "000852"
+
+
+def test_performance_summary_exposes_attribution() -> None:
+    entries = [
+        {"date": "2026-09-01", "symbol": "A", "rating": "Buy", "raw": "+3.00%",
+         "alpha": "+1.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.9},
+    ]
+    summary = performance_summary(entries=entries)
+    assert summary["attribution"]["count"] == 1
+    assert summary["benchmarkSymbol"]
+    assert "winRate" in summary["metricDefinitions"]
+
+
+def test_settle_computes_alpha_from_benchmark() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "alpha": None,
+            "holding": "1d",
+            "pending": True,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        assert symbols == ["600519"]
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    def bench(symbols, *, start, end):
+        assert symbols == ["000905"]
+        return [
+            {"date": "2026-09-01", "close": 200.0},
+            {"date": "2026-09-02", "close": 202.0},
+        ]
+
+    settled = settle_pending_entries(
+        entries,
+        get_daily=get_daily,
+        benchmark_get_daily=bench,
+        benchmark_symbol="000905",
+    )
+    row = settled[0]
+    assert row["pending"] is False
+    assert row["raw"] == "+10.00%"
+    assert row["alpha"] == "+9.00%"  # raw +10% − benchmark +1%
+
+
+def test_alpha_backfilled_on_already_settled_row() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": "+10.00%",
+            "alpha": None,
+            "holding": "1d",
+            "pending": False,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    def bench(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 200.0},
+            {"date": "2026-09-02", "close": 202.0},
+        ]
+
+    settled = settle_pending_entries(
+        entries, get_daily=get_daily, benchmark_get_daily=bench
+    )
+    assert settled[0]["pending"] is False
+    assert settled[0]["alpha"] == "+9.00%"
+
+
+def test_settle_without_benchmark_keeps_alpha_null() -> None:
+    entries = [
+        {
+            "date": "2026-09-01",
+            "symbol": "600519",
+            "rating": "Buy",
+            "raw": None,
+            "alpha": None,
+            "holding": "1d",
+            "pending": True,
+        }
+    ]
+
+    def get_daily(symbols, *, start, end):
+        return [
+            {"date": "2026-09-01", "close": 100.0},
+            {"date": "2026-09-02", "close": 110.0},
+        ]
+
+    settled = settle_pending_entries(entries, get_daily=get_daily)
+    assert settled[0]["pending"] is False
+    assert settled[0]["raw"] == "+10.00%"
+    assert settled[0]["alpha"] is None
+
+
+def test_build_attribution_buckets_and_curve() -> None:
+    from stock_platform_research.performance import build_attribution
+
+    entries = [
+        {"date": "2026-09-01", "symbol": "A", "rating": "Buy", "raw": "+10.00%",
+         "alpha": "+5.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.9},
+        {"date": "2026-09-01", "symbol": "B", "rating": "Buy", "raw": "-5.00%",
+         "alpha": "-8.00%", "holding": "1d", "pending": False, "rank": 2, "score": 0.5},
+        {"date": "2026-09-02", "symbol": "C", "rating": "Buy", "raw": "+2.00%",
+         "alpha": "+1.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.7},
+    ]
+    attr = build_attribution(settled_records(entries))
+    assert attr["count"] == 3
+    assert attr["winRate"] == pytest.approx(2 / 3)
+    assert attr["beatBenchmarkRate"] == pytest.approx(2 / 3)
+    assert attr["avgReturn"] == pytest.approx((0.10 - 0.05 + 0.02) / 3)
+    assert [b["rank"] for b in attr["byRank"]] == [1, 2]
+    assert len(attr["byScore"]) == 3
+    assert [d["date"] for d in attr["byDate"]] == ["2026-09-01", "2026-09-02"]
+    curve = attr["equityCurve"]
+    assert curve[-1]["cumulative"] == pytest.approx(1.10 * 0.95 * 1.02 - 1.0)
+    assert attr["benchmarkSymbol"]
+    assert any("equityCurve" in n or "非可交易" in n for n in attr["notes"])
+
+
+def test_resolve_benchmark_symbol_env_override(monkeypatch) -> None:
+    from stock_platform_research.performance import (
+        DEFAULT_BENCHMARK_SYMBOL,
+        resolve_benchmark_symbol,
+    )
+
+    monkeypatch.delenv("STOCK_PLATFORM_BENCHMARK_SYMBOL", raising=False)
+    assert resolve_benchmark_symbol() == DEFAULT_BENCHMARK_SYMBOL
+    monkeypatch.setenv("STOCK_PLATFORM_BENCHMARK_SYMBOL", "000852")
+    assert resolve_benchmark_symbol() == "000852"
+
+
+def test_performance_summary_exposes_attribution() -> None:
+    entries = [
+        {"date": "2026-09-01", "symbol": "A", "rating": "Buy", "raw": "+3.00%",
+         "alpha": "+1.00%", "holding": "1d", "pending": False, "rank": 1, "score": 0.9},
+    ]
+    summary = performance_summary(entries=entries)
+    assert summary["attribution"]["count"] == 1
+    assert summary["benchmarkSymbol"]
+    assert "winRate" in summary["metricDefinitions"]
+

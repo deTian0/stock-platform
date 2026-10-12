@@ -932,7 +932,10 @@ def get_performance(
         get_daily, settle_source = _settle_get_daily(request)
         if get_daily is not None:
             summary = settle_performance_log(
-                path, get_daily=get_daily, recent_days=recent_days
+                path,
+                get_daily=get_daily,
+                benchmark_get_daily=get_daily,
+                recent_days=recent_days,
             )
             summary["settleSource"] = settle_source
             return summary
@@ -963,7 +966,9 @@ def post_settle_performance(
         )
     if not path.is_file():
         raise HTTPException(status_code=404, detail=f"绩效日志不存在：{path}")
-    summary = settle_performance_log(path, get_daily=get_daily)
+    summary = settle_performance_log(
+        path, get_daily=get_daily, benchmark_get_daily=get_daily
+    )
     summary["settleSource"] = settle_source
     return summary
 
