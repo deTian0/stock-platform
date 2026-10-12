@@ -115,6 +115,25 @@ def load_engine_industry(
     return dict(zip(df["code"].astype(str), df[column].astype(str)))
 
 
+def load_engine_names(
+    db_path: str | Path,
+    *,
+    table: str = "fundamentals",
+    column: str = "name",
+) -> dict[str, str]:
+    """Best-effort ``code → 中文名`` map from the engine DB (decorative).
+
+    Unlike :func:`load_engine_industry` (fail-closed — a silent empty map would
+    disable neutralization), a display name is *cosmetic*: a missing table or
+    column must never break a brief, so this returns ``{}`` instead of raising.
+    Keys are the engine's raw ``fundamentals.code`` values (bare 6-digit).
+    """
+    try:
+        return load_engine_industry(db_path, table=table, column=column)
+    except (KeyError, sqlite3.Error, OSError):
+        return {}
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stock-platform-backtest",

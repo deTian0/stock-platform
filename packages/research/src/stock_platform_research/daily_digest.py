@@ -109,13 +109,17 @@ def _fmt_price(value: Any) -> str:
 
 
 def _picks_table(picks: list[Mapping[str, Any]]) -> list[str]:
-    lines = ["| # | 代码 | 综合分 | 收盘 | 理由 |", "|---|---|---|---|---|"]
+    lines = [
+        "| # | 代码 | 名称 | 综合分 | 收盘 | 理由 |",
+        "|---|---|---|---|---|---|",
+    ]
     for p in picks:
         reason = str(p.get("reasonSummary") or p.get("reason") or "").replace("|", "\\|")
         if len(reason) > 80:
             reason = reason[:77] + "..."
+        name = str(p.get("name") or "-").replace("|", "\\|")
         lines.append(
-            f"| {p.get('rank', '-')} | {p.get('symbol', '-')} "
+            f"| {p.get('rank', '-')} | {p.get('symbol', '-')} | {name} "
             f"| {_fmt_score(p.get('composite_score'))} "
             f"| {_fmt_price(p.get('close'))} | {reason or '-'} |"
         )

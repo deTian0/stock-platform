@@ -159,6 +159,7 @@ def run_daily_pipeline(
     symbols: list[str] | None = None,
     datasets: list[str] | None = None,
     holdings: list[dict[str, Any]] | None = None,
+    name_map: Mapping[str, str] | None = None,
     top_n: int = 10,
     lookback_days: int = 120,
     skip_refresh: bool = False,
@@ -308,7 +309,11 @@ def run_daily_pipeline(
             top_n=top_n,
             universe_tier=universe_tier,
             holdings=holdings,
+            name_map=name_map,
         )
+        # Label the data source on the brief itself: ``payload["provider"]`` is
+        # what the digest falls back to when the archive row carries no provider.
+        brief.setdefault("provider", getattr(provider, "name", type(provider).__name__))
         brief_json = day_dir / "brief.json"
         brief_csv = day_dir / "brief.csv"
         brief_json.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

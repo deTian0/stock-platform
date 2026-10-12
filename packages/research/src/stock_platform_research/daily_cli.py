@@ -126,6 +126,32 @@ def _build_market_symbol_source(args: argparse.Namespace) -> object | None:
     return EngineSqliteProvider(db)
 
 
+def _build_name_map(args: argparse.Namespace) -> dict[str, str] | None:
+    """Best-effort ``6位码 → 中文名`` map from the engine ``market.db`` (装饰性).
+
+    名称只影响可读性，绝不影响选股 / 评分 / 结算：取不到就返回 ``None``，brief
+    里对应的 ``name`` 键直接不写入（既有字节级契约不变）。``replay`` 走 fixtures，
+    与引擎库无关，直接跳过。
+    """
+    if str(args.provider or "").strip().lower() == "replay":
+        return None
+    db = str(
+        args.market_db or os.environ.get("STOCK_PLATFORM_ENGINE_MARKET_DB", "") or ""
+    ).strip()
+    if not db or not Path(db).is_file():
+        return None
+    from .backtest_cli import load_engine_names
+    from .rankings import code_key
+
+    out: dict[str, str] = {}
+    for code, name in load_engine_names(db).items():
+        key = code_key(code)
+        text = str(name or "").strip()
+        if key and text and text.lower() != "nan":
+            out.setdefault(key, text)
+    return out or None
+
+
 def _resolve_persist(args: argparse.Namespace) -> bool:
     """Default the refresh-JSON dump by provider.
 
@@ -315,6 +341,7 @@ def main(argv: list[str] | None = None) -> int:
 
     provider = _build_provider(args)
     market_source = _build_market_symbol_source(args)
+    name_map = _build_name_map(args)
     asof = date.fromisoformat(args.asof)
     holdings: list[dict[str, Any]] | None = None
     if args.holdings:
@@ -331,6 +358,7 @@ def main(argv: list[str] | None = None) -> int:
         asof=asof,
         provider=provider,
         holdings=holdings,
+        name_map=name_map,
         out_dir=args.out,
         universe_path=args.universe,
         universe_tier=args.tier,

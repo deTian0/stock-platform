@@ -18,6 +18,13 @@ Redirect both stores for the whole session **at import time** — before any tes
 module body (or ``.env`` load) can capture the production defaults — and hand
 the scratch dir back at exit. Set ``STOCK_PLATFORM_TEST_DATA_DIR`` to keep a copy
 of the scratch files for debugging instead of discarding them.
+
+Import-time setup alone proved insufficient: a test that assigns or deletes these
+variables directly (instead of using ``monkeypatch``) re-points *every later test*
+at the repo ``data/`` — one new test did exactly that and re-introduced the very
+pollution this file exists to prevent. So the redirect is also **re-asserted
+before every test** by an autouse fixture, which makes the guard idempotent and
+self-healing (``ADR 0070``).
 """
 
 from __future__ import annotations
@@ -28,16 +35,27 @@ import shutil
 import tempfile
 from pathlib import Path
 
+import pytest
+
 #: Env vars that decide where the *runtime* stores live.
 GUARDED_ENV = ("STOCK_PLATFORM_DB_URL", "STOCK_PLATFORM_PERFORMANCE_LOG")
 
 _scratch = Path(tempfile.mkdtemp(prefix="stock-platform-tests-"))
 _saved: dict[str, str | None] = {key: os.environ.get(key) for key in GUARDED_ENV}
 
-os.environ["STOCK_PLATFORM_DB_URL"] = f"sqlite:///{(_scratch / 'briefs.db').as_posix()}"
-os.environ["STOCK_PLATFORM_PERFORMANCE_LOG"] = str(
-    _scratch / "recommend_decisions.jsonl"
-)
+_REDIRECT: dict[str, str] = {
+    "STOCK_PLATFORM_DB_URL": f"sqlite:///{(_scratch / 'briefs.db').as_posix()}",
+    "STOCK_PLATFORM_PERFORMANCE_LOG": str(_scratch / "recommend_decisions.jsonl"),
+}
+os.environ.update(_REDIRECT)
+
+
+@pytest.fixture(autouse=True)
+def _enforce_test_data_isolation() -> None:
+    """Re-assert the redirect before **every** test (self-healing guard)."""
+    for key, value in _REDIRECT.items():
+        os.environ[key] = value
+    yield
 
 
 def _restore() -> None:

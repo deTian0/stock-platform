@@ -45,6 +45,22 @@
   After successful brief: log picks into performance JSONL and settle pending
   (engine market.db preferred). Maps to stock-platform-daily --settle-after.
 
+.PARAMETER Holdings
+  Holdings JSON for the ③A 持仓 / ③B 操作建议 boards (a list or {"holdings":[...]},
+  each row ``code`` / ``entry_price``). Default: repo ``data\holdings.json`` when it
+  exists — so the scheduled task picks up the real book with **no XML change**.
+  Missing file -> both boards stay empty (fail-closed, never guessed).
+
+.PARAMETER NoHoldings
+  Explicitly skip holdings even when ``data\holdings.json`` exists.
+
+.PARAMETER StrictCoverage
+  market_db only. When the engine warehouse does not cover the resolved asof, FAIL
+  instead of falling back to the newest covered trading day. Acceptance / forensics
+  runs use this; the scheduled tasks keep the fallback so a lagging feed degrades
+  to a slightly older (still real) cross-section instead of an empty brief that
+  would shadow the newest real one in the digest.
+
 .EXAMPLE
   .\scripts\ops\Invoke-DailyPipeline.ps1 -MarketDb
   # 盘前推荐：全市场 + 本地 market.db 批量取数（默认快路径）
@@ -62,12 +78,15 @@ param(
   [string]$Fixtures = '',
   [string]$Out = '',
   [string]$Universe = '',
+  [string]$Holdings = '',
   [switch]$SkipRefresh,
   [switch]$SettleAfter,
   [switch]$LiveDay,
   [switch]$MarketDb,
   [switch]$PrevSession,
   [switch]$Digest,
+  [switch]$NoHoldings,
+  [switch]$StrictCoverage,
   [switch]$Force
 )
 
@@ -80,6 +99,17 @@ Set-Location $repoRoot
 # may have no `python` on PATH at all (the old script assumed otherwise).
 $venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPy) { $venvPy } else { 'python' }
+
+# ISO dates compare correctly as strings, so no [datetime] parsing is needed.
+function Test-MarketDbCovered {
+  param([string]$Day, [string]$Latest, $Missing, $Thin)
+  if ([string]::IsNullOrWhiteSpace($Day)) { return $false }
+  if ([string]::IsNullOrWhiteSpace($Latest)) { return $false }
+  if ($Day -gt $Latest) { return $false }
+  if ($Missing -contains $Day) { return $false }
+  if ($Thin -contains $Day) { return $false }
+  return $true
+}
 
 if ($MarketDb) {
   $Provider = 'market_db'
@@ -136,6 +166,67 @@ if ([string]::IsNullOrWhiteSpace($Provider)) {
   }
   else {
     $Provider = 'replay'
+  }
+}
+
+# ---- Coverage guard: never build a brief on an uncovered asof ---------------
+# -PrevSession resolves T-1 from the calendar alone. If the production side has
+# not backfilled that day yet, the panel is empty and the pipeline writes an
+# EMPTY brief whose asof is newest -> the digest (newest wins) silently shows
+# nothing. Guard: confirm the warehouse actually carries the resolved day; else
+# fall back to the newest covered trading day, or fail loudly.
+if ($Provider -eq 'market_db') {
+  $pyCoverage = @"
+import json, os
+from stock_platform_research.dotenv import load_dotenv
+load_dotenv()
+from stock_platform_providers import EngineSqliteProvider
+db = (os.environ.get('STOCK_PLATFORM_ENGINE_MARKET_DB') or '').strip()
+if not db:
+    print(json.dumps({'status': 'no_db'}))
+    raise SystemExit(0)
+snap = EngineSqliteProvider(db).coverage_snapshot(asof='$Asof')
+print(json.dumps({
+    'status': snap.get('status'),
+    'latestTradeDate': snap.get('latestTradeDate'),
+    'lagTradingDays': snap.get('lagTradingDays'),
+    'missingDays': snap.get('missingDays') or [],
+    'thinDays': [t.get('date') for t in (snap.get('thinDays') or [])],
+    'dbPath': snap.get('dbPath'),
+}))
+"@
+  $covLine = & $python -c $pyCoverage
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Coverage guard could not read market.db coverage (is stock-platform-providers installed?)"
+    exit 1
+  }
+  $covLine = ($covLine | Select-Object -Last 1).ToString().Trim()
+  try { $cov = $covLine | ConvertFrom-Json }
+  catch {
+    Write-Error "Coverage guard returned unparseable JSON: $covLine"
+    exit 1
+  }
+  if ($cov.status -eq 'no_db') {
+    Write-Error "Provider=market_db but STOCK_PLATFORM_ENGINE_MARKET_DB is unset (check repo .env)."
+    exit 1
+  }
+  $latest = "$($cov.latestTradeDate)"
+  $missing = @($cov.missingDays)
+  $thin = @($cov.thinDays)
+  if (Test-MarketDbCovered -Day $Asof -Latest $latest -Missing $missing -Thin $thin) {
+    Write-Host "COVERAGE asof=$Asof ok (status=$($cov.status), latest=$latest)"
+  }
+  elseif ($StrictCoverage) {
+    Write-Error "market.db does not cover asof=$Asof (latest=$latest missing=[$($missing -join ',')] thin=[$($thin -join ',')]); -StrictCoverage set -> refusing to write a brief."
+    exit 1
+  }
+  elseif (Test-MarketDbCovered -Day $latest -Latest $latest -Missing $missing -Thin $thin) {
+    Write-Host "COVERAGE asof=$Asof NOT covered -> fallback to latestTradeDate=$latest (lag=$($cov.lagTradingDays) trading day(s))"
+    $Asof = $latest
+  }
+  else {
+    Write-Error "market.db has no usable trading day (asof=$Asof latest=$latest). Backfill the warehouse first: scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode apply"
+    exit 1
   }
 }
 
@@ -208,7 +299,29 @@ if ($SettleAfter) {
   $cliArgs += '--settle-after'
 }
 
-Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb prevSession=$PrevSession digest=$Digest"
+# X2: ③A 持仓 / ③B 操作建议 need a holdings file. Default to the repo-local book
+# so the scheduled tasks are wired with zero XML change; fail-closed when absent.
+if (-not $NoHoldings) {
+  if ([string]::IsNullOrWhiteSpace($Holdings)) {
+    $defaultHoldings = Join-Path $repoRoot 'data\holdings.json'
+    if (Test-Path $defaultHoldings) { $Holdings = $defaultHoldings }
+  }
+  if (-not [string]::IsNullOrWhiteSpace($Holdings)) {
+    if (Test-Path $Holdings) {
+      $resolvedHoldings = (Resolve-Path $Holdings).Path
+      $cliArgs += @('--holdings', $resolvedHoldings)
+      Write-Host "HOLDINGS using $resolvedHoldings"
+    }
+    else {
+      Write-Warning "Holdings file not found: $Holdings (③A/③B will be empty)"
+    }
+  }
+  else {
+    Write-Host "HOLDINGS none (data\holdings.json absent) -> ③A/③B empty (fail-closed)"
+  }
+}
+
+Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb prevSession=$PrevSession digest=$Digest holdings=$Holdings"
 $cmd = Get-Command stock-platform-daily -ErrorAction SilentlyContinue
 if ($null -ne $cmd) {
   & stock-platform-daily @cliArgs

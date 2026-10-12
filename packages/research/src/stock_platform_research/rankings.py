@@ -102,11 +102,33 @@ def _sym_of(row: pd.Series) -> str:
     return ""
 
 
-def _item_from_row(row: pd.Series, rank: int, *, gated: bool) -> dict[str, Any]:
+def _display_name(row: Any, name_map: Mapping[str, str] | None) -> str:
+    """中文名 for a board row: own ``name`` first, else ``name_map`` by 6-digit core.
+
+    ``name`` is **decorative**: callers only write the key when this returns a
+    non-empty string, so a missing name map changes no existing payload at all.
+    """
+    own = row.get("name") if hasattr(row, "get") else None
+    if own is not None:
+        text = str(own).strip()
+        if text and text.lower() != "nan":
+            return text
+    if not name_map:
+        return ""
+    return str(name_map.get(code_key(_sym_of(row))) or "").strip()
+
+
+def _item_from_row(
+    row: pd.Series,
+    rank: int,
+    *,
+    gated: bool,
+    name_map: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
     from .brief import build_reasons_for_row, reason_summary  # local: avoid import cycle
 
     reasons = build_reasons_for_row(row, gated=gated)
-    return {
+    item = {
         "rank": rank,
         "symbol": _sym_of(row),
         "composite_score": float(row["composite_score"])
@@ -116,12 +138,24 @@ def _item_from_row(row: pd.Series, rank: int, *, gated: bool) -> dict[str, Any]:
         "reasons": reasons,
         "reasonSummary": reason_summary(reasons),
     }
+    display = _display_name(row, name_map)
+    if display:
+        item["name"] = display
+    return item
 
 
-def _items_from_frame(frame: pd.DataFrame, *, gated: bool = True) -> list[dict[str, Any]]:
+def _items_from_frame(
+    frame: pd.DataFrame,
+    *,
+    gated: bool = True,
+    name_map: Mapping[str, str] | None = None,
+) -> list[dict[str, Any]]:
     if frame is None or len(frame) == 0:
         return []
-    return [_item_from_row(row, i, gated=gated) for i, (_, row) in enumerate(frame.iterrows(), start=1)]
+    return [
+        _item_from_row(row, i, gated=gated, name_map=name_map)
+        for i, (_, row) in enumerate(frame.iterrows(), start=1)
+    ]
 
 
 def apply_score_floor(scored: pd.DataFrame, min_score: float) -> tuple[pd.DataFrame, int]:
@@ -180,6 +214,7 @@ def build_rankings(
     panel: pd.DataFrame | None = None,
     asof: str | None = None,
     gated: bool = True,
+    name_map: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Split a scored cross-section into the five boards.
 
@@ -265,7 +300,7 @@ def build_rankings(
         in_book = rec.loc[keys.isin(book_keys)].copy() if book_keys else rec.iloc[0:0].copy()
         for i, (_, row) in enumerate(in_book.iterrows(), start=1):
             k = code_key(_sym_of(row))
-            item = _item_from_row(row, i, gated=gated)
+            item = _item_from_row(row, i, gated=gated, name_map=name_map)
             item["belowMedian"] = bool(
                 median_score is not None and item["composite_score"] is not None
                 and item["composite_score"] < median_score
@@ -282,20 +317,22 @@ def build_rankings(
                 k = code_key(_sym_of(prow))
                 if not k or k in seen_keys or k not in book_keys:
                     continue
-                holding_items.append(
-                    {
-                        "rank": len(holding_items) + 1,
-                        "symbol": _sym_of(prow),
-                        "composite_score": None,
-                        "close": float(prow["close"])
-                        if "close" in prow.index and pd.notna(prow["close"])
-                        else None,
-                        "reasons": [],
-                        "reasonSummary": "未过今日入场闸门（仅列示持仓，不参与推荐排名）",
-                        "belowMedian": False,
-                        "crossSectionRank": None,
-                    }
-                )
+                entry = {
+                    "rank": len(holding_items) + 1,
+                    "symbol": _sym_of(prow),
+                    "composite_score": None,
+                    "close": float(prow["close"])
+                    if "close" in prow.index and pd.notna(prow["close"])
+                    else None,
+                    "reasons": [],
+                    "reasonSummary": "未过今日入场闸门（仅列示持仓，不参与推荐排名）",
+                    "belowMedian": False,
+                    "crossSectionRank": None,
+                }
+                display = _display_name(prow, name_map)
+                if display:
+                    entry["name"] = display
+                holding_items.append(entry)
                 seen_keys.add(k)
 
         review = review_positions(book, asof=asof)
@@ -303,19 +340,21 @@ def build_rankings(
             if row.get("action") not in REDUCE_ACTIONS:
                 continue
             k = code_key(row.get("code"))
-            action_items.append(
-                {
-                    "rank": len(action_items) + 1,
-                    "symbol": row.get("code") or "",
-                    "action": row.get("action"),
-                    "reason": row.get("reason"),
-                    "ret_pct": row.get("ret_pct"),
-                    "deferred": bool(row.get("deferred")),
-                    "assetClass": row.get("asset_class"),
-                    "compositeScore": score_by_key.get(k),
-                    "crossSectionRank": rank_by_key.get(k),
-                }
-            )
+            entry = {
+                "rank": len(action_items) + 1,
+                "symbol": row.get("code") or "",
+                "action": row.get("action"),
+                "reason": row.get("reason"),
+                "ret_pct": row.get("ret_pct"),
+                "deferred": bool(row.get("deferred")),
+                "assetClass": row.get("asset_class"),
+                "compositeScore": score_by_key.get(k),
+                "crossSectionRank": rank_by_key.get(k),
+            }
+            display = _display_name(row, name_map)
+            if display:
+                entry["name"] = display
+            action_items.append(entry)
         if not action_items:
             notes.append(
                 "持仓无需减仓：B5 规则（退出/冷静期/偏差）未对当日持仓触发 exit/trim"
@@ -335,7 +374,7 @@ def build_rankings(
     for key in BOARD_KEYS:
         slug = BOARD_SLUGS[key]
         if key in frames:
-            items = _items_from_frame(frames[key], gated=gated)
+            items = _items_from_frame(frames[key], gated=gated, name_map=name_map)
         elif key == HOLDINGS_KEY:
             items = holding_items
         else:
