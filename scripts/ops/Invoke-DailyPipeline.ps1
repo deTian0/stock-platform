@@ -31,6 +31,16 @@
   P0-1 fast path: Provider=market_db, whole-market universe, and refresh JSON
   persistence off. The pre-market job finishes in seconds instead of hours.
 
+.PARAMETER PrevSession
+  Resolve -Asof as the **previous CN trading day** before local today.
+  Scheduled runs should use this: market.db is backfilled by the production
+  side in the evening, so a morning run for *today* would hit an empty panel
+  (today's bars do not exist yet). T-1 close is the correct PIT cross-section.
+
+.PARAMETER Digest
+  After a successful pipeline run, render the human-readable markdown digest
+  (stock-platform-digest) for the same asof into data/digests/.
+
 .PARAMETER SettleAfter
   After successful brief: log picks into performance JSONL and settle pending
   (engine market.db preferred). Maps to stock-platform-daily --settle-after.
@@ -56,6 +66,8 @@ param(
   [switch]$SettleAfter,
   [switch]$LiveDay,
   [switch]$MarketDb,
+  [switch]$PrevSession,
+  [switch]$Digest,
   [switch]$Force
 )
 
@@ -87,6 +99,35 @@ if ($LiveDay) {
 
 if ([string]::IsNullOrWhiteSpace($Asof)) {
   $Asof = (Get-Date).ToString('yyyy-MM-dd')
+}
+
+# -PrevSession: scheduled runs must review T-1, not today (see .PARAMETER notes).
+if ($PrevSession) {
+  $pyPrev = @"
+from datetime import date, timedelta
+from stock_platform_providers import get_trading_calendar
+today = date.fromisoformat('$Asof')
+cal = get_trading_calendar('$Market')
+day = today - timedelta(days=1)
+for _ in range(30):
+    if cal.is_trading_day(day):
+        print(day.isoformat()); break
+    day -= timedelta(days=1)
+else:
+    raise SystemExit('no trading day found within 30 days before ' + today.isoformat())
+"@
+  $prev = & $python -c $pyPrev
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "PrevSession resolution failed (TradingCalendar import or data issue)."
+    exit 1
+  }
+  $prev = ($prev | Select-Object -Last 1).ToString().Trim()
+  if (-not $prev) {
+    Write-Error "PrevSession resolution returned an empty date."
+    exit 1
+  }
+  Write-Host "PREVSESSION asof=$Asof -> $prev"
+  $Asof = $prev
 }
 
 if ([string]::IsNullOrWhiteSpace($Provider)) {
@@ -167,13 +208,29 @@ if ($SettleAfter) {
   $cliArgs += '--settle-after'
 }
 
-Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb"
+Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb prevSession=$PrevSession digest=$Digest"
 $cmd = Get-Command stock-platform-daily -ErrorAction SilentlyContinue
 if ($null -ne $cmd) {
   & stock-platform-daily @cliArgs
-  exit $LASTEXITCODE
+  $cliEc = $LASTEXITCODE
+}
+else {
+  # Fallback when console script is not on PATH (editable install / venv).
+  & $python -m stock_platform_research.daily_cli @cliArgs
+  $cliEc = $LASTEXITCODE
 }
 
-# Fallback when console script is not on PATH (editable install / venv).
-& $python -m stock_platform_research.daily_cli @cliArgs
-exit $LASTEXITCODE
+if ($cliEc -ne 0) {
+  exit $cliEc
+}
+
+if ($Digest) {
+  Write-Host "DIGEST rendering markdown digest for asof=$Asof"
+  $digestArgs = @('-m', 'stock_platform_research.daily_digest_cli', '--asof', $Asof)
+  & $python @digestArgs
+  if ($LASTEXITCODE -ne 0) {
+    # Digest is best-effort: a rendering failure must not flip the pipeline result.
+    Write-Host "WARN digest rendering failed (pipeline result unchanged)"
+  }
+}
+exit $cliEc
