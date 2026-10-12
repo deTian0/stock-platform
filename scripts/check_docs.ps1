@@ -110,6 +110,7 @@ $required = @(
   'docs/plans/trading-system-roadmap.md',
   'docs/plans/b3-cost-model-milestone.md',
   'docs/plans/dual-line-responsibility.md',
+  'docs/plans/handoff-v4.2.0.md',
   'docs/engineering/README.md',
   'docs/engineering/openapi-testing-ci.md',
   'docs/upstream/README.md',
