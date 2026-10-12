@@ -11,6 +11,8 @@ import pytest
 
 from stock_platform_research.daily_cli import main as daily_main
 from stock_platform_research.daily_pipeline import _effective_datasets, run_daily_pipeline
+from stock_platform_research.hit_tracking import reset_hit_repository_cache
+from stock_platform_research.persistence import reset_brief_repository_cache
 
 
 def _synth_bars(symbol: str, asof: date, n: int = 70, base: float = 10.0) -> list[dict[str, Any]]:
@@ -201,6 +203,14 @@ def test_daily_cli_settle_after_logs_performance(
     fixtures = repo / "packages" / "providers" / "tests" / "fixtures"
     log_path = tmp_path / "perf.jsonl"
     monkeypatch.setenv("STOCK_PLATFORM_PERFORMANCE_LOG", str(log_path))
+    # This drives the whole CLI, so it must never inherit ambient config: pin the
+    # brief archive to tmp too. Without this the run upserted a fixture brief into
+    # the production ./data/stock_platform.db and blanked the daily digest (ADR 0069).
+    monkeypatch.setenv(
+        "STOCK_PLATFORM_DB_URL", f"sqlite:///{(tmp_path / 'briefs.db').as_posix()}"
+    )
+    reset_brief_repository_cache()
+    reset_hit_repository_cache()
     # Avoid engine settle path requiring real market.db in CI
     monkeypatch.setattr(
         "stock_platform_research.performance_cli._build_settle_get_daily",
