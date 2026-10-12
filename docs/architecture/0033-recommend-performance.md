@@ -27,3 +27,13 @@ Phase A 已有盘前简报 TopN 与纸面草稿，但缺少「推荐事后准不
 
 - 可用 fixtures 确定性验收；生产可把 brief TopN 落 pending 后再结算。
 - 与 PIT 组合回测（M34）分离：本 ADR 是离散决策点统计，不是可交易组合曲线。
+
+## 修订
+
+- **2026-10-12（ADR [0068](0068-performance-pnl-closed-loop.md)）**：本 ADR 的
+  **指标口径不变**，新增的是**闭环**：① 基准 alpha（`alpha = raw − benchmark`，
+  默认中证500 `000905`，可环境变量覆盖）；② 收益归因 `build_attribution`
+  （`byRank`/`byScore`/`byDate`/`equityCurve`）；③ 持有期单点 `DEFAULT_HOLDING`
+  （消除 `daily_cli` 的 `1d` 与其它处 `5d` 漂移）；④ 日报显示真实收益数字。
+  `alpha` 字段此前因**无任何调用方构造基准**而结构性恒 `null`，本轮打通（含历史行回填）。
+  退出该 ADR 的红线仍然有效：**不算夏普/年化、样本 < 20 标噪音、SIMULATE 不接实盘**。

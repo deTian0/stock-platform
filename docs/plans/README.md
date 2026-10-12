@@ -11,9 +11,11 @@
 | [m-d1-capability-gap-matrix.md](m-d1-capability-gap-matrix.md) | M-D1：能力矩阵 × Skill 端点缺口对照 | done |
 | [m-r1-tsp-backtest-first-knife.md](m-r1-tsp-backtest-first-knife.md) | M-R1：TSP 回测首刀选型（walk-forward） | done |
 | [m-a1-tradingagents-portability.md](m-a1-tradingagents-portability.md) | M-A1：TradingAgents 可移植清单 | done |
-| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C 六域） | `G1`·`G2`·`G3`·`B1`–`B6`·`X1`–`X4`·`C1`·`C2` done；`L1` 门禁 |
+| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C 六域） | `G`/`B`/`X`/`S`/`C` 域全 done；`P0` 生产可用 + 调度 + 日报 + 绩效 PnL 闭环 done（`v4.3.0`）；`L1` P0 纯模拟盘 |
 | [dual-line-responsibility.md](dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） | done |
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |
+| [handoff-v4.2.0.md](handoff-v4.2.0.md) | 交接：v4.2.0 → 下一块砖（绩效 PnL 闭环） | 历史交接 |
+| [handoff-v4.3.0.md](handoff-v4.3.0.md) | 交接：v4.3.0 → 下一块砖（闭环每日自然累积） | 当前交接 |
 
 ## 与其它文档的关系
 
