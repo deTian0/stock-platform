@@ -12,6 +12,52 @@
 
 - （无）
 
+## [4.4.0] - 2026-10-12
+
+### Added
+
+- **供数覆盖率守卫（默认开启）**（ADR [`0070`](docs/architecture/0070-daily-loop-self-sufficiency.md)）——
+  `scripts/ops/Invoke-DailyPipeline.ps1` 在跑流水线**之前**复用 C2 单点
+  `EngineSqliteProvider.coverage_snapshot()` 校验解析出的 `asof`：可用 → 照常；不可用 →
+  **回落到 `latestTradeDate` 并 WARN**；回落目标也不可用 → **退出 1，拒绝写 brief**；
+  `-StrictCoverage` → 不回退、直接失败（验收 / 取证用）。守卫只防「静默写空」，不改 CLI / 策略语义。
+- **行情回补计划任务（成因端）** —— `scripts/ops/Invoke-MarketDbBackfill.ps1`（包一层引擎自己的
+  `empirical/backfill_market_daily.py`，幂等 + 严格顺序 + CPU-safe）+ `stock-platform-marketdb-backfill.xml`
+  （每日 **18:30**，`ExecutionTimeLimit=PT20M`）+ `Register-ScheduledTasks.ps1 -Backfill`。
+  **边界不变**：写库的仍是引擎脚本、平台仅只读（ADR 0058）。
+- **中文名直出（装饰性契约）** —— `backtest_cli.load_engine_names()`（读 `fundamentals.name`，**fail-open**）
+  → `daily_cli._build_name_map()`（key 归一到 6 位核）→ `run_daily_pipeline(name_map=…)` →
+  `build_premarket_brief` / `build_rankings`。**只有确实取到名称时才写 `item["name"]`**，取不到不写键
+  ⇒ 「无 map」与「有 map 但未命中」两条路径下 brief、picks ledger、命中周期、绩效 JSONL **逐字节不变**。
+- **持仓自动探测** —— `Invoke-DailyPipeline.ps1` 新增 `-Holdings` / `-NoHoldings`，默认探测
+  `data\holdings.json`：存在则追加 `--holdings`，不存在则不传（③A / ③B 保持空，fail-closed 不猜）；
+  `data/` 已 gitignore ⇒ 真实持仓天然不入库，计划任务 XML **零改动**。
+
+### Fixed
+
+- **「静默空 brief 遮蔽真 brief」** —— 此前供数滞后时面板为空，仍会写出一份 `picks=[]` 且 `asof`
+  最新的 brief；日报 `list_recent(limit=1)` 取到它 ⇒ 早上看到「当日无推荐」，而真相是「数据没到」。
+  覆盖率守卫在**写盘之前**拦下：回落到可用旧截面或响亮失败，**绝不写空**（ADR 0070 §P1）。
+- **测试隔离守卫不自愈** —— 会话级 `conftest.py` 守卫原只在 import 时设一次；一个测试用
+  `os.environ.pop` 收尾即让后续测试全部回落仓库 `data/`。改为 autouse 函数级 fixture **每个测试前
+  重新断言**，并把该测试改用 `monkeypatch`（ADR 0069 修订）。
+
+### Changed
+
+- `daily_digest` 推荐表新增「名称」列（`| # | 代码 | 名称 | 综合分 | 收盘 | 理由 |`）。
+- `scripts/check_docs.ps1` 登记 ADR `0070`。
+
+### Verification
+
+- 全量 `pytest packages apps`（`replay`）**995 passed / 0 failed**（989→995，**+6**）；
+- 全量测试前后四类生产存储（`daily_briefs` / `hit_tracking` / `hit_summary` /
+  `recommend_decisions.jsonl`）**行级逐位不变**；
+- 守卫真机：`asof=2026-10-12`（已回补 / 5224 行）→ `COVERAGE ok` 照常；asof 超出库尾
+  （`2026-10-13`）→ 回落 `latestTradeDate=2026-10-12` 且 `EXIT=0`；同输入 `-StrictCoverage` →
+  `Write-Error` + `EXIT=1`（拒绝写 brief）；
+- 日报重渲染 `data/digests/2026-10-12.md`：推荐表与五榜均带中文名（如 `000801 四川九洲`、
+  `601318 中国平安`）。
+
 ## [4.3.1] - 2026-10-12
 
 ### Fixed

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Windows Task Scheduler task: nightly warehouse backfill (data-supply guard).
+
+  Runs the a-stock-engine's own `empirical/backfill_market_daily.py --apply`, which
+  re-fetches CN trading days whose daily_price row count is below the full-market
+  threshold. The platform never writes market.db (ADR 0058); this task simply makes
+  sure the production feed keeps the warehouse current, so the 08:30 pre-market job
+  never resolves an asof that market.db does not cover.
+
+  Idempotent + CPU-safe (strictly sequential, one API call per missing day, sleep
+  between calls): a no-op evening costs a single trade_cal call. 18:30 gives the
+  upstream daily bars time to settle after the 15:00 close.
+
+  This task needs the engine checkout at D:\workspace\stock_trading\a-stock-engine
+  (see -EngineRoot on scripts\ops\Invoke-MarketDbBackfill.ps1 to relocate).
+
+  Import (elevated PowerShell), after editing WorkingDirectory / paths:
+    Register-ScheduledTask -Xml (Get-Content -Raw .\scripts\ops\stock-platform-marketdb-backfill.xml) `
+      -TaskName "stock-platform-marketdb-backfill"
+
+  Or: Task Scheduler GUI -> Import Task -> select this file.
+  See docs/ops/scheduler.md.
+-->
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Date>2026-10-12T00:00:00</Date>
+    <Author>stock-platform</Author>
+    <Description>Nightly a-stock-engine market.db backfill via Invoke-MarketDbBackfill.ps1 (idempotent, CPU-safe).</Description>
+    <URI>\stock-platform-marketdb-backfill</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-10-13T18:30:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <!-- One API call per missing day + 0.5s sleep; a long weekend gap is a few
+         minutes. 20 min kills a wedged relay call without touching the 08:30 job. -->
+    <ExecutionTimeLimit>PT20M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <!-- Edit WorkingDirectory to your clone path before import. -->
+      <Command>powershell.exe</Command>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-MarketDbBackfill.ps1" -Mode apply</Arguments>
+      <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

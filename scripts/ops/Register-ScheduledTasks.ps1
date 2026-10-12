@@ -1,12 +1,18 @@
 <#
 .SYNOPSIS
-  Register / inspect / remove the two stock-platform scheduled tasks
-  (pre-market 08:30 + post-market 15:30).
+  Register / inspect / remove the three stock-platform scheduled tasks
+  (pre-market 08:30 + post-market 15:30 + warehouse backfill 18:30).
 
 .DESCRIPTION
   Wraps Register-ScheduledTask from the versioned XML files in scripts/ops:
     stock-platform-daily.xml      -> task "stock-platform-daily"      (08:30, -MarketDb -PrevSession -Digest)
     stock-platform-postmarket.xml -> task "stock-platform-postmarket" (15:30, -MarketDb -PrevSession -SettleAfter -Digest)
+    stock-platform-marketdb-backfill.xml -> task "stock-platform-marketdb-backfill" (18:30, engine backfill --apply)
+
+  The backfill task closes the data-supply gap: without it nothing fed the
+  warehouse, so the morning job could resolve an asof that market.db did not
+  cover yet. It runs the *engine's own* script (the platform never writes
+  market.db — ADR 0058) and is idempotent (INSERT OR REPLACE, only thin days).
 
   Tasks run as the current user (InteractiveToken, LeastPrivilege) — no admin
   needed. Non-trading days are skipped by the wrapper (exit 0 via calendar).
@@ -20,6 +26,9 @@
 .PARAMETER PostMarket
   Register only the post-market task.
 
+.PARAMETER Backfill
+  Register only the warehouse backfill task.
+
 .PARAMETER Status
   Show registration state + last/next run info; change nothing.
 
@@ -30,7 +39,8 @@
   After registration, start the selected tasks immediately (verification).
 
 .EXAMPLE
-  .\scripts\ops\Register-ScheduledTasks.ps1                 # register both
+  .\scripts\ops\Register-ScheduledTasks.ps1                 # register all three
+  .\scripts\ops\Register-ScheduledTasks.ps1 -Backfill
   .\scripts\ops\Register-ScheduledTasks.ps1 -Status
   .\scripts\ops\Register-ScheduledTasks.ps1 -Unregister
 #>
@@ -38,6 +48,7 @@
 param(
   [switch]$PreMarket,
   [switch]$PostMarket,
+  [switch]$Backfill,
   [switch]$All,
   [switch]$Status,
   [switch]$Unregister,
@@ -58,13 +69,19 @@ $tasks = @(
     Name = 'stock-platform-postmarket'
     Xml  = 'scripts\ops\stock-platform-postmarket.xml'
     Slot = 'PostMarket'
+  },
+  @{
+    Name = 'stock-platform-marketdb-backfill'
+    Xml  = 'scripts\ops\stock-platform-marketdb-backfill.xml'
+    Slot = 'Backfill'
   }
 )
 
 $selected = $tasks | Where-Object {
   if ($PreMarket -and $_.Slot -eq 'PreMarket') { return $true }
   if ($PostMarket -and $_.Slot -eq 'PostMarket') { return $true }
-  return ($All -or (-not $PreMarket -and -not $PostMarket))
+  if ($Backfill -and $_.Slot -eq 'Backfill') { return $true }
+  return ($All -or (-not $PreMarket -and -not $PostMarket -and -not $Backfill))
 }
 
 function Show-Status {

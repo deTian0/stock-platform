@@ -14,7 +14,7 @@ import pandas as pd
 
 from .batch import score_cross_section
 from .panel import build_cross_section_panel, panel_to_csv
-from .rankings import RankingConfig, build_rankings
+from .rankings import RankingConfig, build_rankings, code_key
 from .universe import load_universe
 
 
@@ -162,6 +162,17 @@ def reason_summary(reasons: list[dict[str, Any]]) -> str:
     return "；".join(summaries) if summaries else "通过闸门"
 
 
+def _lookup_name(symbol: str, name_map: Mapping[str, str] | None) -> str:
+    """Best-effort 中文名 for a symbol; ``""`` when unknown (never a placeholder).
+
+    ``name_map`` keys are 6-digit cores (see :func:`daily_cli._build_name_map`);
+    lookups normalise the (suffixed) panel symbol through ``code_key``.
+    """
+    if not name_map:
+        return ""
+    return str(name_map.get(code_key(symbol)) or "").strip()
+
+
 _EMPTY_PANEL_ZH = (
     "截面为空：所选 asof 当天无可用日线（replay 样例仅覆盖到 2026-09-02；"
     "live 请用最近交易日）。"
@@ -193,6 +204,7 @@ def build_premarket_brief(
     lookback_calendar_days: int = 120,
     soft_gates: bool = False,
     holdings: Sequence[Mapping[str, Any]] | None = None,
+    name_map: Mapping[str, str] | None = None,
     ranking_config: RankingConfig | None = None,
     rankings: bool = True,
 ) -> dict[str, Any]:
@@ -262,9 +274,10 @@ def build_premarket_brief(
     picks: list[dict[str, Any]] = []
     for rank, (_, row) in enumerate(picks_df.iterrows(), start=1):
         reasons = build_reasons_for_row(row, gated=not gates_relaxed)
+        symbol = str(row.get("symbol") or row.get("code") or "")
         item = {
             "rank": rank,
-            "symbol": str(row.get("symbol") or row.get("code") or ""),
+            "symbol": symbol,
             "composite_score": float(row["composite_score"])
             if "composite_score" in row and pd.notna(row["composite_score"])
             else None,
@@ -277,6 +290,9 @@ def build_premarket_brief(
             "reasonSummary": reason_summary(reasons),
             "reason": reasons_to_legacy_string(reasons),
         }
+        display = _lookup_name(symbol, name_map)
+        if display:
+            item["name"] = display
         picks.append(item)
 
     out: dict[str, Any] = {
@@ -302,6 +318,7 @@ def build_premarket_brief(
             panel=panel,
             asof=asof_s,
             gated=not gates_relaxed,
+            name_map=name_map,
         )
         out["rankings"] = boards
         out["rankingsCounts"] = boards.get("counts") or {}

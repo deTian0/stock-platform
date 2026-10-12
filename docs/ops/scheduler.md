@@ -39,6 +39,18 @@
 | `-Out` / `STOCK_PLATFORM_REFRESH_DIR` | 落盘根；默认 `%TEMP%\stock-platform-daily` |
 | `-SkipRefresh` / `-SettleAfter` / `-LiveDay` | 传给 CLI（`-LiveDay` = tushare + `-SkipRefresh` + `-SettleAfter`） |
 | `-Force` | 休市日仍跑（仅排障） |
+| `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
+| `-Digest` | 流水线成功后渲染人读日报（`data/digests/`） |
+| `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
+| `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
+
+> **供数覆盖率守卫（`v4.4.0`，ADR [`0070`](../architecture/0070-daily-loop-self-sufficiency.md)）**：
+> 跑流水线**之前**复用 C2 单点 `EngineSqliteProvider.coverage_snapshot()` 校验解析出的 `asof`
+> ——**可用** → 照常；**不可用** → **回落到 `latestTradeDate` 并 WARN**（用一份更旧但真实的截面）；
+> **回落目标也不可用**（或库里没有任何可用交易日）→ **退出 1，拒绝写 brief**；`-StrictCoverage`
+> → 不回退、直接失败。守卫只防「静默写空」：空 brief 的 asof 最新，会**遮蔽**上一份真 brief，
+> 让日报显示「当日无推荐」而真相是「数据没到」。守卫让 asof **不再是严格 T-1**（供数滞后时更旧）
+> —— 报表里的 asof 就是真 asof，不撒谎。
 
 > **快路径需要 `STOCK_PLATFORM_ENGINE_MARKET_DB`**：`-MarketDb` 让 CLI 用 `--provider market_db`，而 `market_db` provider 要求 `--market-db` 或该环境变量指向 `market.db` 绝对路径。CLI 会自动从仓库根 `.env` 读到它（`P0-2`）。
 
@@ -62,14 +74,16 @@ cd D:\workspace\stock_trading\stock-platform
 
 1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -Digest` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。
 2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest`，`ExecutionTimeLimit=PT30M`）。
-3. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
-4. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
+3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。
+4. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
+5. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
 
 ```powershell
 cd D:\workspace\stock_trading\stock-platform
-.\scripts\ops\Register-ScheduledTasks.ps1            # 注册两个任务
+.\scripts\ops\Register-ScheduledTasks.ps1            # 注册三个任务（daily / postmarket / backfill）
 .\scripts\ops\Register-ScheduledTasks.ps1 -Status    # 查看注册状态 / 上次运行结果
 .\scripts\ops\Register-ScheduledTasks.ps1 -RunNow    # 注册后立即触发（验证用）
+.\scripts\ops\Register-ScheduledTasks.ps1 -Backfill  # 只注册 / 触发回补任务
 .\scripts\ops\Register-ScheduledTasks.ps1 -Unregister
 ```
 
@@ -104,7 +118,8 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 - CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...]`
 - 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针）
-- 内容：环境/数据源/宇宙概览、当日推荐表（综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+- 内容：环境/数据源/宇宙概览、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+  - **名称（`v4.4.0`）**：读 `fundamentals.name`（`load_engine_names`，**fail-open**），key 归一到 6 位核；**装饰性、可缺省** —— 取不到名就不写 `name` 键（brief / ledger / 命中 / 绩效 JSONL 逐字节不变）
 - 数据源：**权威 SQLite brief 仓库**（ADR 0049），绝不并行解析 JSON 导出；查无 brief 时 fail-closed 输出占位说明，不编造数字
 
 ## cron
