@@ -5,6 +5,10 @@ Examples::
     stock-platform-digest                    # latest brief -> data/digests/latest.md
     stock-platform-digest --asof 2026-10-09  # specific day
     stock-platform-digest --out-dir D:/tmp/digests
+    stock-platform-digest --no-html --no-ths # markdown only
+
+By default this also emits the styled ``.html`` (ADR 0071) and the 同花顺
+import txt (``data/ths_import/latest.txt``); ``--no-html`` / ``--no-ths`` opt out.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .daily_digest import DEFAULT_OUT_DIR, build_digest
+from .daily_digest import DEFAULT_OUT_DIR, DEFAULT_THS_DIR, build_digest
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +36,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Only write markdown (default: also render the styled .html alongside)",
     )
     parser.set_defaults(html=True)
+    parser.add_argument(
+        "--no-ths",
+        dest="ths",
+        action="store_false",
+        help="Skip the 同花顺 import txt (default: also emit {asof}.txt + latest.txt)",
+    )
+    parser.add_argument(
+        "--ths-dir",
+        default=None,
+        help=f"同花顺 import txt directory (default: a 'ths_import' sibling of --out-dir, or {DEFAULT_THS_DIR})",
+    )
+    parser.set_defaults(ths=True)
     args = parser.parse_args(argv)
 
     try:
@@ -41,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
             hit_db_url=args.hit_db_url,
             out_dir=Path(args.out_dir) if args.out_dir else None,
             emit_html=args.html,
+            emit_ths=args.ths,
+            ths_dir=Path(args.ths_dir) if args.ths_dir else None,
         )
     except Exception as exc:
         print(f"digest failed: {exc}", file=sys.stderr)
@@ -50,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"latest pointer: {result['latestPath']}")
     if result.get("htmlPath"):
         print(f"digest html: {result['htmlPath']} (latest: {result['latestHtmlPath']})")
+    if result.get("thsPath"):
+        print(f"同花顺导入 ({result['thsCount']} 只): {result['thsPath']} (latest: {result['latestThsPath']})")
     return 0
 
 

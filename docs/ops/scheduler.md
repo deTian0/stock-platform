@@ -40,7 +40,7 @@
 | `-SkipRefresh` / `-SettleAfter` / `-LiveDay` | 传给 CLI（`-LiveDay` = tushare + `-SkipRefresh` + `-SettleAfter`） |
 | `-Force` | 休市日仍跑（仅排障） |
 | `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
-| `-Digest` | 流水线成功后渲染人读日报（`data/digests/`，**Markdown + HTML 双份**） |
+| `-Digest` | 流水线成功后渲染人读日报（`data/digests/` **Markdown + HTML**），并产出同花顺导入 `data/ths_import/latest.txt` |
 | `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
 | `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
 
@@ -116,10 +116,11 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 每日流水线成功后自动渲染人读版日报（`-Digest`），**Markdown + 同主题 HTML 双份**（ADR [`0071`](../architecture/0071-report-html-theme.md)）：
 
-- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html]`
+- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...]`
 - 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针），**并默认同时输出** `{asof}.html` + `latest.html`（主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown）
 - 内容：环境/数据源/宇宙概览、**同花顺导入行**（见下）、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
   - **同花顺导入行（`v4.5.1`）**：当日推荐顶部给出可**整块复制**的 6 位代码行，直接粘进同花顺手机版「自选 → 导入」。**手机版一次仅支持导入 5 只**，故按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`）、按推荐序去重、仅保留合法 6 位码；无有效代码则整块省略（fail-closed）
+  - **同花顺导入文件（`v4.5.2`）**：同一份代码另落成 `data/ths_import/{asof}.txt` + `latest.txt`（每行 1 个 6 位码，无表头无名称），供同花顺「导入自选 → 选择文件」直接导入（用户实测 txt 通道可用）。目录默认取 digest 目录的**同级** `ths_import`（`--ths-dir` 可覆盖）；无推荐则不产出（fail-closed），并顺带清理目录内遗留的 `*.sel`（项目已统一只用 txt）
   - **名称（`v4.4.0`）**：读 `fundamentals.name`（`load_engine_names`，**fail-open**），key 归一到 6 位核；**装饰性、可缺省** —— 取不到名就不写 `name` 键（brief / ledger / 命中 / 绩效 JSONL 逐字节不变）
 - 数据源：**权威 SQLite brief 仓库**（ADR 0049），绝不并行解析 JSON 导出；查无 brief 时 fail-closed 输出占位说明，不编造数字
 

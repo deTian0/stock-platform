@@ -37,6 +37,9 @@ _DISCLAIMER = "研究简报，非投资建议；环境 SIMULATE，liveTradingEna
 # 同花顺手机版一次导入上限 = 5 只；digest 的「同花顺导入」块据此分组（超出须分批粘贴）。
 THS_IMPORT_PER_LINE = 5
 
+# 同花顺「导入自选」txt 落盘目录（每行 1 个 6 位码）。默认与 data/digests 同级。
+DEFAULT_THS_DIR = "./data/ths_import"
+
 
 def _perf_log_path() -> Path:
     raw = (os.environ.get(ENV_PERF_LOG) or DEFAULT_PERF_LOG).strip()
@@ -143,6 +146,22 @@ def _ths_code(symbol: Any) -> str:
     return digits if len(digits) == 6 else ""
 
 
+def _ths_codes(picks: list[Mapping[str, Any]]) -> list[str]:
+    """Ordered, de-duplicated list of bare 6-digit codes for 同花顺 import.
+
+    Keeps recommendation order (rank ascending); only clean 6-digit codes pass
+    (:func:`_ths_code`), so dirty upstream rows never pollute the output.
+    """
+    codes: list[str] = []
+    seen: set[str] = set()
+    for p in picks:
+        code = _ths_code(p.get("symbol"))
+        if code and code not in seen:
+            seen.add(code)
+            codes.append(code)
+    return codes
+
+
 def _ths_import_section(
     picks: list[Mapping[str, Any]], *, per_line: int = THS_IMPORT_PER_LINE
 ) -> list[str]:
@@ -152,13 +171,7 @@ def _ths_import_section(
     代码按推荐序（rank 升序）保留，去重 + 归一化为 6 位。无有效代码则整块省略
     （与全篇 fail-closed 一致，不生成占位行）。
     """
-    codes: list[str] = []
-    seen: set[str] = set()
-    for p in picks:
-        code = _ths_code(p.get("symbol"))
-        if code and code not in seen:
-            seen.add(code)
-            codes.append(code)
+    codes = _ths_codes(picks)
     if not codes:
         return []
     out = [f"**同花顺导入（每行 {per_line} 只，逐行复制到「自选 → 导入」）：**", ""]
@@ -168,6 +181,39 @@ def _ths_import_section(
     out.append("```")
     out.append("")
     return out
+
+
+def write_ths_import(
+    codes: list[str], *, asof: str, out_dir: str | Path | None = None
+) -> dict[str, Any] | None:
+    """Emit the 同花顺 (THS) watchlist import txt for ``asof``.
+
+    Writes ``{out_dir}/{asof}.txt`` plus a ``latest.txt`` pointer copy -- one
+    bare 6-digit code per line, no header, no names (exactly what 同花顺's
+    「导入自选」 dialog wants; the user confirmed this import path works).
+    Returns ``{"thsPath", "latestThsPath", "thsCount"}``, or ``None`` when there
+    are no codes (fail-closed: no placeholder file). Stale ``*.sel`` files in
+    the same directory are removed -- the project standardised on txt only.
+    """
+    if not codes:
+        return None
+    root = Path(out_dir) if out_dir is not None else Path(DEFAULT_THS_DIR)
+    root.mkdir(parents=True, exist_ok=True)
+    for stale in sorted(root.glob("*.sel")):
+        try:
+            stale.unlink()
+        except OSError:  # pragma: no cover - best effort
+            pass
+    text = "\n".join(codes) + "\n"
+    dated = root / f"{asof}.txt"
+    latest = root / "latest.txt"
+    dated.write_text(text, encoding="utf-8")
+    shutil.copyfile(dated, latest)
+    return {
+        "thsPath": str(dated),
+        "latestThsPath": str(latest),
+        "thsCount": len(codes),
+    }
 
 
 def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
@@ -315,6 +361,8 @@ def build_digest(
     hit_db_url: str | Path | None = None,
     out_dir: str | Path | None = None,
     emit_html: bool = False,
+    emit_ths: bool = False,
+    ths_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Render the digest for ``asof`` (or the latest brief) and write files.
 
@@ -324,6 +372,9 @@ def build_digest(
     ``{asof}.md`` (and latest copy) when not. ``emit_html`` additionally renders
     the same text through :mod:`stock_platform_research.report_html` so the
     scheduled runs ship markdown **and** the local report-template HTML.
+    ``emit_ths`` additionally emits the 同花顺 import txt (``{asof}.txt`` +
+    ``latest.txt``); its directory defaults to a ``ths_import`` sibling of the
+    digest dir, or ``DEFAULT_THS_DIR`` when ``out_dir`` is not given.
     """
     repo = open_brief_repository(db_url)
     record = repo.get_by_asof(asof) if asof else None
@@ -367,15 +418,28 @@ def build_digest(
         shutil.copyfile(html_path, latest_html_path)
         result["htmlPath"] = str(html_path)
         result["latestHtmlPath"] = str(latest_html_path)
+    if emit_ths:
+        codes = _ths_codes(record.picks or []) if record is not None else []
+        if ths_dir is not None:
+            ths_root = Path(ths_dir)
+        elif out_dir is not None:
+            ths_root = root.parent / "ths_import"
+        else:
+            ths_root = Path(DEFAULT_THS_DIR)
+        ths = write_ths_import(codes, asof=target_asof, out_dir=ths_root)
+        if ths:
+            result.update(ths)
     return result
 
 
 __all__ = [
     "DEFAULT_OUT_DIR",
     "DEFAULT_PERF_LOG",
+    "DEFAULT_THS_DIR",
     "ENV_PERF_LOG",
     "THS_IMPORT_PER_LINE",
     "build_digest",
     "build_digest_text",
     "performance_summary",
+    "write_ths_import",
 ]

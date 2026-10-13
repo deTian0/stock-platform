@@ -12,6 +12,33 @@
 
 - （无）
 
+## [4.5.2] - 2026-10-13
+
+### Added
+
+- **同花顺导入文件（txt）** —— `daily_digest` 新增单点 `write_ths_import(codes, *, asof, out_dir)`，
+  在跑批时把当日推荐另落成 `data/ths_import/{asof}.txt` + `latest.txt`：**每行 1 个 6 位码**、无表头无名称，
+  供同花顺「导入自选 → 选择文件」直接导入（用户实测 txt 通道可用）。`build_digest` 新增 `emit_ths`
+  （**库默认 `False`**）+ `ths_dir`；CLI 默认产出（`--no-ths` 退回、`--ths-dir` 覆盖目录）。
+  目录默认取 digest 目录的**同级** `ths_import`（`data/digests` ↔ `data/ths_import`）。无推荐则不产出
+  （fail-closed，不生成占位文件）；并顺带清理目录内遗留的 `*.sel`（项目已统一只用 txt）。
+  代码归一化复用 `_ths_codes`（同一去重/6 位裸码规则，与日报「同花顺导入」行**同源**）。
+
+### Changed
+
+- `scripts/ops/Invoke-DailyPipeline.ps1`：`-Digest` 语义不变但产物增加 ths txt；设 `PYTHONIOENCODING=utf-8`
+  使子进程日志保持 UTF-8。
+
+### Docs
+
+- [`docs/ops/scheduler.md`](docs/ops/scheduler.md) / [`docs/ops/daily-pipeline.md`](docs/ops/daily-pipeline.md)：
+  `-Digest` 行与「用户可读日报」小节补 ths 导入文件说明。
+
+### Verified
+
+- `packages/research/tests/test_daily_digest.py` 新增 **7 项**：`emit_ths` 产出 `{asof}.txt`+`latest.txt` /
+  默认不产出 / `--ths-dir` 覆盖 / 清理遗留 `.sel` / 无代码返回 `None` / CLI 默认产出 / `--no-ths` 关闭。
+
 ## [4.5.1] - 2026-10-13
 
 ### Added
