@@ -223,3 +223,60 @@ def test_digest_renders_returns_overview(env):
     text = build_digest_text(record, hits_repo=None)
     assert "收益概览" in text
     assert "胜率" in text
+
+
+def test_digest_has_ths_import_line(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    record = open_brief_repository().save(BRIEF, symbols=BRIEF["symbols"])
+    text = build_digest_text(record, hits_repo=None)
+    assert "同花顺导入" in text
+    seg = text.split("```text", 1)[1].split("```", 1)[0].strip()
+    assert seg == "600519 000001"  # bare 6-digit codes, single-space separated
+
+
+def test_digest_ths_import_chunks_by_five(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    picks = [
+        {
+            "rank": i,
+            "symbol": f"{i:06d}",
+            "composite_score": 1.0 - i / 100.0,
+            "close": 10.0 + i,
+            "reasonSummary": "x",
+        }
+        for i in range(1, 13)
+    ]
+    brief = {**BRIEF, "picks": picks, "topN": 12}
+    open_brief_repository().save(brief, symbols=brief["symbols"])
+    result = build_digest(out_dir=env / "digests")
+    text = Path(result["digestPath"]).read_text(encoding="utf-8")
+    assert "000001 000002 000003 000004 000005" in text
+    assert "000006 000007 000008 000009 000010" in text
+    assert "000011 000012" in text
+
+
+def test_ths_import_strips_exchange_suffix(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    picks = [
+        {"rank": 1, "symbol": "600519.SH", "composite_score": 0.9, "close": 1.0,
+         "reasonSummary": "x"}
+    ]
+    brief = {**BRIEF, "picks": picks}
+    open_brief_repository().save(brief, symbols=brief["symbols"])
+    result = build_digest(out_dir=env / "digests")
+    text = Path(result["digestPath"]).read_text(encoding="utf-8")
+    seg = text.split("```text", 1)[1].split("```", 1)[0].strip()
+    assert seg == "600519"
+
+
+def test_ths_import_absent_when_no_picks(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    brief = {**BRIEF, "picks": [], "emptyPicksMessage": "当日无推荐（截面为空）"}
+    open_brief_repository().save(brief, symbols=brief["symbols"])
+    result = build_digest(out_dir=env / "digests")
+    text = Path(result["digestPath"]).read_text(encoding="utf-8")
+    assert "同花顺导入" not in text
