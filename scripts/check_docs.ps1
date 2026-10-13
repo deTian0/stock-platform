@@ -89,6 +89,7 @@ $required = @(
   'docs/architecture/0068-performance-pnl-closed-loop.md',
   'docs/architecture/0069-test-data-isolation.md',
   'docs/architecture/0070-daily-loop-self-sufficiency.md',
+  'docs/architecture/0071-report-html-theme.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

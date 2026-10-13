@@ -26,6 +26,7 @@ from typing import Any, Mapping
 from .hit_tracking import format_hit_report, open_hit_repository
 from .performance import build_attribution, format_pct, settled_records
 from .persistence import BriefRecord, open_brief_repository
+from .report_html import render_report_html
 
 ENV_PERF_LOG = "STOCK_PLATFORM_PERFORMANCE_LOG"
 DEFAULT_PERF_LOG = "./data/recommend_decisions.jsonl"
@@ -269,12 +270,16 @@ def build_digest(
     db_url: str | Path | None = None,
     hit_db_url: str | Path | None = None,
     out_dir: str | Path | None = None,
+    emit_html: bool = False,
 ) -> dict[str, Any]:
     """Render the digest for ``asof`` (or the latest brief) and write files.
 
-    Returns ``{"asof", "found", "digestPath", "latestPath"}``. Writes
-    ``{asof}.md`` plus a ``latest.md`` pointer copy when a brief was found;
-    a stub ``{asof}.md`` (and latest copy) when not.
+    Returns ``{"asof", "found", "digestPath", "latestPath"}`` (plus
+    ``htmlPath`` / ``latestHtmlPath`` when ``emit_html``). Writes ``{asof}.md``
+    plus a ``latest.md`` pointer copy when a brief was found; a stub
+    ``{asof}.md`` (and latest copy) when not. ``emit_html`` additionally renders
+    the same text through :mod:`stock_platform_research.report_html` so the
+    scheduled runs ship markdown **and** the local report-template HTML.
     """
     repo = open_brief_repository(db_url)
     record = repo.get_by_asof(asof) if asof else None
@@ -296,12 +301,29 @@ def build_digest(
     latest_path = root / "latest.md"
     digest_path.write_text(text, encoding="utf-8")
     shutil.copyfile(digest_path, latest_path)
-    return {
+
+    result: dict[str, Any] = {
         "asof": target_asof,
         "found": record is not None,
         "digestPath": str(digest_path),
         "latestPath": str(latest_path),
     }
+    if emit_html:
+        env_note = f"环境 {record.environment}" if record is not None else "无该日 brief 存档（stub）"
+        doc = render_report_html(
+            text,
+            title=f"每日简报 · {target_asof}",
+            subtitle=f"asof {target_asof} · {env_note}",
+            source="数据来源：SQLite brief 仓库（只读）+ 命中追踪 + 绩效 JSONL",
+            badge="DAILY DIGEST",
+        )
+        html_path = root / f"{target_asof}.html"
+        latest_html_path = root / "latest.html"
+        html_path.write_text(doc, encoding="utf-8")
+        shutil.copyfile(html_path, latest_html_path)
+        result["htmlPath"] = str(html_path)
+        result["latestHtmlPath"] = str(latest_html_path)
+    return result
 
 
 __all__ = [
