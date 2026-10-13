@@ -118,7 +118,8 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 - CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html]`
 - 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针），**并默认同时输出** `{asof}.html` + `latest.html`（主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown）
-- 内容：环境/数据源/宇宙概览、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+- 内容：环境/数据源/宇宙概览、**同花顺导入行**（见下）、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+  - **同花顺导入行（`v4.5.1`）**：当日推荐顶部给出可**整块复制**的 6 位代码行，直接粘进同花顺手机版「自选 → 导入」。**手机版一次仅支持导入 5 只**，故按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`）、按推荐序去重、仅保留合法 6 位码；无有效代码则整块省略（fail-closed）
   - **名称（`v4.4.0`）**：读 `fundamentals.name`（`load_engine_names`，**fail-open**），key 归一到 6 位核；**装饰性、可缺省** —— 取不到名就不写 `name` 键（brief / ledger / 命中 / 绩效 JSONL 逐字节不变）
 - 数据源：**权威 SQLite brief 仓库**（ADR 0049），绝不并行解析 JSON 导出；查无 brief 时 fail-closed 输出占位说明，不编造数字
 

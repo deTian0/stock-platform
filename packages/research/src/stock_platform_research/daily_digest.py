@@ -34,6 +34,9 @@ DEFAULT_OUT_DIR = "./data/digests"
 
 _DISCLAIMER = "研究简报，非投资建议；环境 SIMULATE，liveTradingEnabled 恒为 false。"
 
+# 同花顺手机版一次导入上限 = 5 只；digest 的「同花顺导入」块据此分组（超出须分批粘贴）。
+THS_IMPORT_PER_LINE = 5
+
 
 def _perf_log_path() -> Path:
     raw = (os.environ.get(ENV_PERF_LOG) or DEFAULT_PERF_LOG).strip()
@@ -127,6 +130,46 @@ def _picks_table(picks: list[Mapping[str, Any]]) -> list[str]:
     return lines
 
 
+def _ths_code(symbol: Any) -> str:
+    """Bare 6-digit code that 同花顺 expects (drop any ``.SZ`` / ``.SH`` suffix).
+
+    Only a clean 6-digit code is returned; anything else (e.g. dirty upstream
+    rows) yields ``""`` so it never pollutes the paste-ready import line.
+    """
+    if symbol is None:
+        return ""
+    base = str(symbol).strip().split(".")[0].strip()
+    digits = "".join(ch for ch in base if ch.isdigit())
+    return digits if len(digits) == 6 else ""
+
+
+def _ths_import_section(
+    picks: list[Mapping[str, Any]], *, per_line: int = THS_IMPORT_PER_LINE
+) -> list[str]:
+    """Copy-paste block for 同花顺 (THS) self-select import.
+
+    同花顺手机版**一次最多导入 5 只**，故按 ``per_line`` 分组：每行一组、逐行粘贴。
+    代码按推荐序（rank 升序）保留，去重 + 归一化为 6 位。无有效代码则整块省略
+    （与全篇 fail-closed 一致，不生成占位行）。
+    """
+    codes: list[str] = []
+    seen: set[str] = set()
+    for p in picks:
+        code = _ths_code(p.get("symbol"))
+        if code and code not in seen:
+            seen.add(code)
+            codes.append(code)
+    if not codes:
+        return []
+    out = [f"**同花顺导入（每行 {per_line} 只，逐行复制到「自选 → 导入」）：**", ""]
+    out.append("```text")
+    for i in range(0, len(codes), per_line):
+        out.append(" ".join(codes[i : i + per_line]))
+    out.append("```")
+    out.append("")
+    return out
+
+
 def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
     rankings = payload.get("rankings") or {}
     boards = rankings.get("boards") or {}
@@ -197,6 +240,7 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
             lines.append(f"> {tip}")
         lines.append("")
     else:
+        lines.extend(_ths_import_section(picks))
         lines.extend(_picks_table(picks))
         lines.append("")
 
@@ -330,6 +374,7 @@ __all__ = [
     "DEFAULT_OUT_DIR",
     "DEFAULT_PERF_LOG",
     "ENV_PERF_LOG",
+    "THS_IMPORT_PER_LINE",
     "build_digest",
     "build_digest_text",
     "performance_summary",
