@@ -66,4 +66,4 @@ __all__ = [
     "to_ternary_verdict",
     "warn_if_truncated",
 ]
-__version__ = "4.4.0"
+__version__ = "4.5.0"

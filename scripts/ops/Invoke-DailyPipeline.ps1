@@ -338,7 +338,7 @@ if ($cliEc -ne 0) {
 }
 
 if ($Digest) {
-  Write-Host "DIGEST rendering markdown digest for asof=$Asof"
+  Write-Host "DIGEST rendering markdown + html digest for asof=$Asof"
   $digestArgs = @('-m', 'stock_platform_research.daily_digest_cli', '--asof', $Asof)
   & $python @digestArgs
   if ($LASTEXITCODE -ne 0) {

@@ -12,6 +12,41 @@
 
 - （无）
 
+## [4.5.0] - 2026-10-13
+
+### Added
+
+- **报告 HTML 化（ADR [`0071`](docs/architecture/0071-report-html-theme.md)）** —— 新增**零依赖**渲染器
+  `research/report_html.py`（`markdown_to_body` / `render_report_html` / `render_markdown_file`）：
+  仅用 stdlib（**不引入 `markdown` / `jinja2`**），**先 `html.escape` 再套标签** ⇒ 用户文本永不产生原始
+  HTML；畸形 Markdown fail-open，渲染永不抛。主题 `LOCAL_THEME` 的 `:root` 配色与仓内
+  `static/report-templates/a-share-preopen.html` **逐 token 相同**（`--bg:#0b0e14` / `--accent:#4d8dff` /
+  `--gold:#f5c451` / `--up:#ff4d4f` / `--down:#00b578`），并有测试直接读模板比对焊死防漂移。
+  行内**带符号百分比**按 A 股约定自动着色（`+x%` 红 / `-x%` 绿，`(?<![\w>])` 反向断言避免误吞区间），
+  `--no-color` / `colorize=False` 可关。
+- **新 CLI `stock-platform-report-html`** —— `--in FILE` 单文件或 `--dir DIR` 整目录把 `.md` 重渲染为
+  模板样式 `.html`；另有 `--title` / `--subtitle` / `--source` / `--badge` / `--theme`。
+- **digest 双格式产出** —— `stock-platform-digest` **默认同时写** `{asof}.html` 与 `latest.html`
+  （新增 `--no-html` 退回只写 Markdown）；`build_digest(emit_html=…)` 库默认仍为 `False`（纯增量），
+  返回值新增 `htmlPath` / `latestHtmlPath`（**旧键全部保留**）。⇒ 两个计划任务与
+  `Invoke-DailyPipeline.ps1 -Digest` **XML / 参数零改动**即开始出 HTML。
+
+### Changed
+
+- **报告跑批器改用单点** —— `stock-platform-report-sweep` 的跑批脚本删除私有浅色主题渲染器
+  （`_CSS` / `md_to_html`），改为 import `stock_platform_research.report_html` ⇒ **样式只此一处定义**。
+- `Invoke-DailyPipeline.ps1 -Digest` 的 trace 文案更新为「markdown + html」。
+
+### Docs
+
+- ADR [`0071`](docs/architecture/0071-report-html-theme.md)（新增，已登记进 `scripts/check_docs.ps1`）。
+
+### Verified
+
+- `packages/research/tests/test_report_html.py` 共 **8 项**：核心块渲染 / 用户文本转义 / 红涨绿跌 /
+  hero+block+footer 结构 / 未知主题回落 `local` / **主题 token == 报告模板** / 单文件与整目录 CLI。
+- 历史报告按新主题**重渲染**，每项 `.md` 与 `.html` 同目录、可离线打开（无 CDN / 无外链）。
+
 ## [4.4.0] - 2026-10-12
 
 ### Added

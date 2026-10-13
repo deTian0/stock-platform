@@ -25,6 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-dir", default=None, help=f"Output directory (default {DEFAULT_OUT_DIR})")
     parser.add_argument("--db-url", default=None, help="Brief SQLite URL (default STOCK_PLATFORM_DB_URL)")
     parser.add_argument("--hit-db-url", default=None, help="Hit-tracking SQLite URL (default same DB)")
+    parser.add_argument(
+        "--no-html",
+        dest="html",
+        action="store_false",
+        help="Only write markdown (default: also render the styled .html alongside)",
+    )
+    parser.set_defaults(html=True)
     args = parser.parse_args(argv)
 
     try:
@@ -33,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
             db_url=args.db_url,
             hit_db_url=args.hit_db_url,
             out_dir=Path(args.out_dir) if args.out_dir else None,
+            emit_html=args.html,
         )
     except Exception as exc:
         print(f"digest failed: {exc}", file=sys.stderr)
@@ -40,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     status = "OK" if result.get("found") else "STUB (no brief archived for this date)"
     print(f"digest {status}: asof={result['asof']} -> {result['digestPath']}")
     print(f"latest pointer: {result['latestPath']}")
+    if result.get("htmlPath"):
+        print(f"digest html: {result['htmlPath']} (latest: {result['latestHtmlPath']})")
     return 0
 
 

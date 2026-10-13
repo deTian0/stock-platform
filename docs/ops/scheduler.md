@@ -40,7 +40,7 @@
 | `-SkipRefresh` / `-SettleAfter` / `-LiveDay` | 传给 CLI（`-LiveDay` = tushare + `-SkipRefresh` + `-SettleAfter`） |
 | `-Force` | 休市日仍跑（仅排障） |
 | `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
-| `-Digest` | 流水线成功后渲染人读日报（`data/digests/`） |
+| `-Digest` | 流水线成功后渲染人读日报（`data/digests/`，**Markdown + HTML 双份**） |
 | `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
 | `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
 
@@ -114,10 +114,10 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 ## 用户可读日报（digest）
 
-每日流水线成功后自动渲染人读版 Markdown（`-Digest`）：
+每日流水线成功后自动渲染人读版日报（`-Digest`），**Markdown + 同主题 HTML 双份**（ADR [`0071`](../architecture/0071-report-html-theme.md)）：
 
-- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...]`
-- 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针）
+- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html]`
+- 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针），**并默认同时输出** `{asof}.html` + `latest.html`（主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown）
 - 内容：环境/数据源/宇宙概览、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
   - **名称（`v4.4.0`）**：读 `fundamentals.name`（`load_engine_names`，**fail-open**），key 归一到 6 位核；**装饰性、可缺省** —— 取不到名就不写 `name` 键（brief / ledger / 命中 / 绩效 JSONL 逐字节不变）
 - 数据源：**权威 SQLite brief 仓库**（ADR 0049），绝不并行解析 JSON 导出；查无 brief 时 fail-closed 输出占位说明，不编造数字
