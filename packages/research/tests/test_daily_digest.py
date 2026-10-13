@@ -11,6 +11,7 @@ from stock_platform_research.daily_digest import (
     build_digest,
     build_digest_text,
     performance_summary,
+    write_ths_import,
 )
 from stock_platform_research.persistence import reset_brief_repository_cache
 from stock_platform_research.hit_tracking import reset_hit_repository_cache
@@ -280,3 +281,64 @@ def test_ths_import_absent_when_no_picks(env):
     result = build_digest(out_dir=env / "digests")
     text = Path(result["digestPath"]).read_text(encoding="utf-8")
     assert "同花顺导入" not in text
+
+
+def test_build_digest_emits_ths_txt(env):
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests", emit_ths=True)
+    # default dir = a ths_import **sibling** of the digest dir (mirrors data/digests + data/ths_import)
+    ths = Path(result["thsPath"])
+    latest = Path(result["latestThsPath"])
+    assert ths == env / "ths_import" / "2026-10-09.txt"
+    assert ths.is_file() and latest.is_file()
+    assert ths.read_text(encoding="utf-8") == "600519\n000001\n"
+    assert latest.read_text(encoding="utf-8") == "600519\n000001\n"
+    assert result["thsCount"] == 2
+
+
+def test_build_digest_ths_off_by_default(env):
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests")
+    assert "thsPath" not in result
+    assert not (env / "ths_import").exists()
+
+
+def test_build_digest_ths_dir_override(env):
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests", emit_ths=True, ths_dir=env / "custom_ths")
+    assert Path(result["thsPath"]) == env / "custom_ths" / "2026-10-09.txt"
+
+
+def test_write_ths_import_removes_stale_sel(tmp_path):
+    out = tmp_path / "ths_import"
+    out.mkdir()
+    (out / "old.sel").write_bytes(b"\x00\x00")
+    res = write_ths_import(["600519"], asof="2026-10-09", out_dir=out)
+    assert res is not None
+    assert not list(out.glob("*.sel"))
+    assert (out / "latest.txt").read_text(encoding="utf-8") == "600519\n"
+
+
+def test_write_ths_import_none_when_no_codes(tmp_path):
+    assert write_ths_import([], asof="2026-10-09", out_dir=tmp_path) is None
+    assert not (tmp_path / "latest.txt").exists()
+
+
+def test_digest_cli_emits_ths_by_default(env):
+    _save_brief(env)
+    from stock_platform_research.daily_digest_cli import main as cli_main
+
+    rc = cli_main(["--out-dir", str(env / "digests"), "--no-html"])
+    assert rc == 0
+    latest = env / "ths_import" / "latest.txt"
+    assert latest.is_file()
+    assert latest.read_text(encoding="utf-8") == "600519\n000001\n"
+
+
+def test_digest_cli_no_ths_flag(env):
+    _save_brief(env)
+    from stock_platform_research.daily_digest_cli import main as cli_main
+
+    rc = cli_main(["--out-dir", str(env / "digests"), "--no-html", "--no-ths"])
+    assert rc == 0
+    assert not (env / "ths_import").exists()

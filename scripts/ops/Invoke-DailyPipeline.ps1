@@ -38,8 +38,9 @@
   (today's bars do not exist yet). T-1 close is the correct PIT cross-section.
 
 .PARAMETER Digest
-  After a successful pipeline run, render the human-readable markdown digest
-  (stock-platform-digest) for the same asof into data/digests/.
+  After a successful pipeline run, render the human-readable digest
+  (stock-platform-digest) for the same asof: markdown + themed HTML into
+  data/digests/, and the THS import txt (latest.txt) into data/ths_import/.
 
 .PARAMETER SettleAfter
   After successful brief: log picks into performance JSONL and settle pending
@@ -99,6 +100,10 @@ Set-Location $repoRoot
 # may have no `python` on PATH at all (the old script assumed otherwise).
 $venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPy) { $venvPy } else { 'python' }
+
+# Child python writes UTF-8 to stdout/stderr (digest prints a Chinese label);
+# keep scheduled-task logs UTF-8 instead of the console codepage.
+$env:PYTHONIOENCODING = 'utf-8'
 
 # ISO dates compare correctly as strings, so no [datetime] parsing is needed.
 function Test-MarketDbCovered {
@@ -338,7 +343,7 @@ if ($cliEc -ne 0) {
 }
 
 if ($Digest) {
-  Write-Host "DIGEST rendering markdown + html digest for asof=$Asof"
+  Write-Host "DIGEST rendering markdown + html + THS import txt for asof=$Asof"
   $digestArgs = @('-m', 'stock_platform_research.daily_digest_cli', '--asof', $Asof)
   & $python @digestArgs
   if ($LASTEXITCODE -ne 0) {
