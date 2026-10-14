@@ -28,7 +28,7 @@
       <a href="#intel-report" title="情报报告模板（只读配方）">情报报告</a>
       <a href="#market-tools">行情工具</a>
       <a href="#ops">运维</a>
-      <a href="#health" title="日用循环健康度（六路只读信号一个裁决 + 趋势）">体检</a>
+      <a href="#health" title="日用循环健康度（只读信号一个裁决 + 趋势 + 执行台账）">体检</a>
       <a href="#capability">能力矩阵</a>
       <a href="#lab">实验</a>
     </nav>
@@ -948,7 +948,7 @@
 
     <section id="health" class="panel">
       <h2>日用循环体检</h2>
-      <p class="hint">六路只读信号（供数 / 最新 brief / 命中记账 / 绩效闭环 / 名称主表 / 下一个结算日）聚合成<strong>一个裁决</strong>（ok / degraded / blocked）；趋势台账只写 <code>data/health/history.jsonl</code>，不写任何库。同源报告 <code>data/health/loop_health.{json,md,html}</code>；口径见 docs/contracts/loop-health.md（ADR 0075）。</p>
+      <p class="hint">只读信号（供数 / 最新 brief / brief 连续性 / 命中记账 / 绩效闭环 / 名称主表 / 调度执行台账 / 下一个结算日）聚合成<strong>一个裁决</strong>（ok / degraded / blocked）；趋势台账只写 <code>data/health/history.jsonl</code>、执行台账只写 <code>data/logs/runs.jsonl</code>，都不写任何库。同源报告 <code>data/health/loop_health.{json,md,html}</code>；口径见 docs/contracts/loop-health.md（ADR 0075 / 0076）。</p>
       <button type="button" id="btn-loop-health">刷新体检</button>
       <p id="loop-health-badge" class="hint" hidden></p>
       <dl id="loop-health-kv" class="kv" hidden></dl>

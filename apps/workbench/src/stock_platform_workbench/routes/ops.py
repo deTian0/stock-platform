@@ -81,15 +81,17 @@ def _load_last_refresh() -> dict[str, Any] | None:
     "/loop-health",
     summary="日用循环健康度体检",
     response_model=LoopHealthResponse,
-    responses={**ok200(LoopHealthResponse, "六路只读信号 + 裁决 + 趋势台账"), **RESP_503},
+    responses={**ok200(LoopHealthResponse, "只读信号 + 裁决 + 趋势 + 执行台账"), **RESP_503},
 )
 def ops_loop_health() -> dict[str, Any]:
-    """只读转发 ``research.loop_health.collect_loop_health``（T1 / ADR 0075）。
+    """只读转发 ``research.loop_health.collect_loop_health``（T1/T2 / ADR 0075 · 0076）。
 
     供数段落在 ``COVERAGE_HARD_FAIL``（``unavailable`` / ``empty`` / ``missing_table`` /
     ``error`` / ``unconfigured``）→ **503 fail-closed** —— 没有供数就没有可判的循环，
     不用假数据兜底。其余降级一律 200，裁决在 ``verdict.status``
     （``ok`` / ``degraded`` / ``blocked``）里，**不用 5xx 掩盖「能跑但要打折看」**。
+    T2 追加两路信号：``briefContinuity``（近 N 交易日 brief 缺日）与 ``opsLedger``
+    （调度执行台账 / 任务连续失败）—— 缺日或连续失败 → ``degraded``，但**都不阻断**。
     本接口零业务逻辑、零写库。
     """
     payload = collect_loop_health()

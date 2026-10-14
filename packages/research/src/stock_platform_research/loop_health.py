@@ -10,14 +10,16 @@
     本模块把这些**已存在的只读信号**聚合成一份可机读（JSON）+ 可人读（Markdown）的
     体检报告，并给出一个**规则化**的裁决（``ok`` / ``degraded`` / ``blocked``）。
 
-聚合的六路信号（全部**只读**）
+聚合的信号（全部**只读**）
 
-1. ``coverage``       —— 复用 ``EngineSqliteProvider.coverage_snapshot``（C2 单点，**懒导入**）
-2. ``latestBrief``    —— 平台 SQLite ``daily_briefs`` 最新一行（ADR 0049）
-3. ``hits``           —— 命中记账三累计（ADR 0057 / X3）
-4. ``performance``    —— ``recommend_decisions.jsonl`` 的 settled / pending（ADR 0068）
-5. ``symbolMaster``   —— 本地名称主表行数（ADR 0072）
-6. ``nextSettlement`` —— 由 brief asof + ``holding`` 推出下一个预期结算日（**提示**，非承诺）
+1. ``coverage``        —— 复用 ``EngineSqliteProvider.coverage_snapshot``（C2 单点，**懒导入**）
+2. ``latestBrief``     —— 平台 SQLite ``daily_briefs`` 最新一行（ADR 0049）
+3. ``briefContinuity`` —— 近 N 个交易日的 brief 覆盖，**缺日逐个列出**（T2 / v4.9.1）
+4. ``hits``            —— 命中记账三累计（ADR 0057 / X3）
+5. ``performance``     —— ``recommend_decisions.jsonl`` 的 settled / pending（ADR 0068）
+6. ``symbolMaster``    —— 本地名称主表行数（ADR 0072）
+7. ``opsLedger``       —— 调度执行台账汇总（任务 / 退出码 / 连续失败；T2 / v4.9.1）
+8. ``nextSettlement``  —— 由 brief asof + ``holding`` 推出下一个预期结算日（**提示**，非承诺）
 
 口径（硬约束）
 
@@ -33,8 +35,15 @@
 ``collect_loop_health`` 额外读一段 **``history``**：来自 ``<dir>/history.jsonl``
 （``append_history`` 追加，CLI 落盘时写），给出 ``degradedStreak`` / ``blockedStreak`` /
 ``notOkStreak``（**含本次**；同一天重跑只算一次，本次覆盖当天旧记录）与近 N 天裁决。
-**``history`` 不参与裁决** —— 裁决仍只看六路信号的当下快照，历史只回答「这次降级是持续还是偶发」。
+**``history`` 不参与裁决** —— 裁决仍只看各路信号的当下快照，历史只回答「这次降级是持续还是偶发」。
 台账只写平台自有 ``data/``，绝不写 ``market.db`` 或任何库。
+
+调度执行台账（T2 / v4.9.1）
+
+``briefContinuity`` 与 ``opsLedger`` 两路信号回答「**任务到底跑没跑**」——
+前者看 brief 有没有按交易日连续产出（缺日逐个列出），后者看计划任务的执行痕迹
+（``data/logs/runs.jsonl``，由 ``scripts/ops/Invoke-ScheduledRun.ps1`` 追加，见 ADR 0076）。
+二者**都参与裁决**：brief 缺日、或任务连续失败 → ``degraded``，但**都不阻断**日用循环。
 
 SIMULATE only. Not investment advice.
 """
@@ -49,6 +58,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from .hit_tracking import HIT_SESSION_TYPES, open_hit_repository
+from .ops_ledger import DEFAULT_RUNS_RECENT, collect_ops_ledger
 from .performance import (
     MIN_MEANINGFUL_SAMPLE,
     default_performance_log_path,
@@ -69,10 +79,15 @@ ENV_LOOP_HEALTH_DIR = "STOCK_PLATFORM_LOOP_HEALTH_DIR"
 DEFAULT_HISTORY_RECENT = 7
 HISTORY_MAX_RECORDS = 400
 
+# brief 连续性（T2 / v4.9.1）—— 近 N 个交易日里 brief 的覆盖情况，缺日逐个列出。
+DEFAULT_BRIEF_WINDOW_DAYS = 5
+
 # 各段 status 取值（fail-closed 的显式词表）。
 SECTION_OK = "ok"
 SECTION_EMPTY = "empty"
 SECTION_UNAVAILABLE = "unavailable"
+# brief 连续性专用：窗口内缺日（可跑但要打折看）。
+SECTION_INCOMPLETE = "incomplete"
 
 # 供数段「不可判」的硬失败档 —— 没有供数就是物理上选不出票，不许当「正常」。
 # 含 ``error``（库存在但不可读）与 ``unconfigured``（未配置路径）：
@@ -168,6 +183,79 @@ def _collect_latest_brief(db_url: str | Path | None) -> dict[str, Any]:
         "generatedAt": rec.generated_at,
         "updatedAt": rec.updated_at,
     }
+
+
+# --------------------------------------------------------------------------- #
+# 2b. brief 连续性（T2 / v4.9.1）
+# --------------------------------------------------------------------------- #
+def _recent_trading_days(end: str, count: int) -> list[str] | None:
+    """``end``（含）往前 ``count`` 个交易日（升序）；日历不可用 → ``None``。"""
+    try:
+        from stock_platform_providers import get_trading_calendar  # type: ignore
+
+        cal = get_trading_calendar("CN")
+        cursor = date.fromisoformat(str(end)[:10])
+        want = max(1, int(count))
+        days: list[str] = []
+        for _ in range(want * 4 + 40):  # 防御性上限（含长假 / 缺日）
+            if cal.is_trading_day(cursor):
+                days.append(cursor.isoformat())
+                if len(days) >= want:
+                    break
+            cursor -= timedelta(days=1)
+        days.reverse()
+        return days
+    except Exception:  # noqa: BLE001 — 日历不可用 → 无法判定，不猜
+        return None
+
+
+def _collect_brief_continuity(
+    db_url: str | Path | None, *, end_day: str, window_days: int
+) -> dict[str, Any]:
+    """近 ``window_days`` 个交易日的 brief 覆盖，**缺日逐个列出**。
+
+    ``end_day`` 取**供数最新交易日**（有供数才有截面可对照），供数不可用时退化为体检时点。
+    """
+    days = _recent_trading_days(end_day, int(window_days))
+    if days is None:
+        return {
+            "status": SECTION_UNAVAILABLE,
+            "windowDays": int(window_days),
+            "endDay": str(end_day)[:10],
+            "reason": "交易日历不可用，无法判定 brief 连续性。",
+        }
+    repo = open_brief_repository(db_url)
+    recent = list(repo.list_recent(limit=max(len(days) * 4, 40)) or [])
+    brief_asofs = {str(getattr(r, "asof", "") or "")[:10] for r in recent}
+    brief_asofs.discard("")
+    covered = [d for d in days if d in brief_asofs]
+    missing = [d for d in days if d not in brief_asofs]
+    latest = max(brief_asofs, default="") or None
+    reason: str | None
+    if not brief_asofs:
+        status = SECTION_EMPTY
+        reason = "尚无任何归档 brief。"
+    elif missing:
+        status = SECTION_INCOMPLETE
+        reason = "近 {n} 个交易日 brief 缺 {m} 日：{d}".format(
+            n=len(days), m=len(missing), d=", ".join(missing)
+        )
+    else:
+        status = SECTION_OK
+        reason = None
+    out: dict[str, Any] = {
+        "status": status,
+        "windowDays": len(days),
+        "endDay": days[-1] if days else str(end_day)[:10],
+        "expectedDays": days,
+        "coveredDays": covered,
+        "missingDays": missing,
+        "coverageRatio": round(len(covered) / len(days), 4) if days else 0.0,
+        "latestBriefAsof": latest,
+    }
+    if reason:
+        out["reason"] = reason
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -325,7 +413,7 @@ def _next_settlement_hint(
 # 裁决
 # --------------------------------------------------------------------------- #
 def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
-    """把五段信号卷成一个裁决（**纯函数**，便于单测与复用）。
+    """把各路信号卷成一个裁决（**纯函数**，便于单测与复用）。
 
     ``ok``        —— 全部检查项通过；
     ``degraded``  —— 至少一项 ``warn``（可跑，但结果需打折看）；
@@ -342,6 +430,10 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
     - performance：``unavailable`` → warn；``empty`` → warn；
       样本 < ``MIN_MEANINGFUL_SAMPLE`` → warn；否则 ok
     - symbolMaster：``unavailable`` → warn；``empty``（``total==0``）→ warn；否则 ok
+    - briefContinuity（T2）：``unavailable`` → warn；``empty``（无任何 brief）→ warn；
+      窗口内**有缺日**（``incomplete``）→ warn；否则 ok
+    - opsLedger（T2）：``unavailable`` / ``empty`` → warn（观测面缺口，**不**判 blocked）；
+      有任务**连续失败**（``failingTasks`` 非空）→ warn；否则 ok
     """
     checks: list[dict[str, Any]] = []
 
@@ -374,6 +466,28 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
             add("latestBrief", _LEVEL_OK, f"brief asof={brief.get('asof')}（滞后未判定）")
         else:
             add("latestBrief", _LEVEL_OK, f"brief asof={brief.get('asof')} 与供数同步")
+
+    bc = sections.get("briefContinuity") or {}
+    bc_status = str(bc.get("status") or SECTION_UNAVAILABLE)
+    bc_missing = [str(x) for x in (bc.get("missingDays") or [])]
+    if bc_status == SECTION_UNAVAILABLE:
+        add("briefContinuity", _LEVEL_WARN, "brief 连续性不可判定（交易日历不可用）")
+    elif bc_status == SECTION_EMPTY:
+        add("briefContinuity", _LEVEL_WARN, "尚无任何 brief（连续覆盖为空）")
+    elif bc_missing:
+        add(
+            "briefContinuity",
+            _LEVEL_WARN,
+            "近 {n} 个交易日 brief 缺 {m} 日：{d}".format(
+                n=bc.get("windowDays"), m=len(bc_missing), d=", ".join(bc_missing)
+            ),
+        )
+    else:
+        add(
+            "briefContinuity",
+            _LEVEL_OK,
+            f"近 {bc.get('windowDays')} 个交易日 brief 无缺日",
+        )
 
     hits = sections.get("hits") or {}
     hits_status = str(hits.get("status") or SECTION_UNAVAILABLE)
@@ -412,6 +526,26 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
         add("symbolMaster", _LEVEL_WARN, "名称主表为空（名称将显示「—」）")
     else:
         add("symbolMaster", _LEVEL_OK, f"{sm.get('total')} 行名称")
+
+    ops = sections.get("opsLedger") or {}
+    ops_status = str(ops.get("status") or SECTION_UNAVAILABLE)
+    ops_failing = [str(x) for x in (ops.get("failingTasks") or [])]
+    if ops_status == SECTION_UNAVAILABLE:
+        add("opsLedger", _LEVEL_WARN, "尚无调度执行台账（首次调度运行后建立）")
+    elif ops_status == SECTION_EMPTY:
+        add("opsLedger", _LEVEL_WARN, "调度执行台账为空")
+    elif ops_failing:
+        add(
+            "opsLedger",
+            _LEVEL_WARN,
+            "任务连续失败 {n} 个：{t}".format(n=len(ops_failing), t=", ".join(ops_failing)),
+        )
+    else:
+        add(
+            "opsLedger",
+            _LEVEL_OK,
+            f"{ops.get('taskCount')} 个任务 / {ops.get('totalRuns')} 次执行无连续失败",
+        )
 
     failed = [c["id"] for c in checks if c["level"] == _LEVEL_FAIL]
     warned = [c["id"] for c in checks if c["level"] == _LEVEL_WARN]
@@ -597,6 +731,9 @@ def collect_loop_health(
     coverage_min_rows: int | None = None,
     history_path: str | Path | None = None,
     history_recent: int = DEFAULT_HISTORY_RECENT,
+    ops_ledger_path: str | Path | None = None,
+    ops_recent: int = DEFAULT_RUNS_RECENT,
+    brief_window_days: int = DEFAULT_BRIEF_WINDOW_DAYS,
 ) -> dict[str, Any]:
     """聚合一次日用循环健康度快照（**永不抛**）。
 
@@ -605,7 +742,11 @@ def collect_loop_health(
 
     额外给出一段 **``history``（趋势面，T1 / v4.9.0）**：读 ``history.jsonl`` 并算
     ``degradedStreak`` / ``blockedStreak`` / ``notOkStreak``（**含本次**，同一天重跑只算一次）。
-    ``history`` **不参与裁决** —— 裁决仍只看六路信号的当下快照，历史只解释「是持续还是偶发」。
+    ``history`` **不参与裁决** —— 裁决仍只看各路信号的当下快照，历史只解释「是持续还是偶发」。
+
+    ``briefContinuity``（T2 / v4.9.1）：近 ``brief_window_days`` 个交易日的 brief 覆盖，缺日逐个列出；
+    ``opsLedger``（T2）：调度执行台账汇总（任务 / 退出码 / 连续失败）。两者都**参与裁决**
+    （缺日或任务连续失败 → ``degraded``，但**不阻断**）。
     """
     asof_day = str(asof or date.today().isoformat())[:10]
 
@@ -624,18 +765,29 @@ def collect_loop_health(
         )
     )
     latest_brief = _safe(lambda: _collect_latest_brief(db_url))
+    supply_day = str(coverage.get("latestTradeDate") or "").strip()[:10] or asof_day
+    brief_continuity = _safe(
+        lambda: _collect_brief_continuity(
+            db_url, end_day=supply_day, window_days=int(brief_window_days)
+        )
+    )
     hits = _safe(lambda: _collect_hits(db_url))
     performance = _safe(
         lambda: _collect_performance(perf_log, holding_days=int(holding_days))
     )
     symbol_master = _safe(lambda: _collect_symbol_master(db_url))
+    ops_ledger = _safe(
+        lambda: collect_ops_ledger(path=ops_ledger_path, recent_limit=int(ops_recent))
+    )
 
     sections = {
         "coverage": coverage,
         "latestBrief": latest_brief,
+        "briefContinuity": brief_continuity,
         "hits": hits,
         "performance": performance,
         "symbolMaster": symbol_master,
+        "opsLedger": ops_ledger,
         "nextSettlement": _next_settlement_hint(
             latest_brief.get("asof"), int(holding_days)
         ),
@@ -672,6 +824,7 @@ _STATUS_ZH: dict[str, str] = {
     SECTION_OK: "正常",
     SECTION_EMPTY: "空",
     SECTION_UNAVAILABLE: "不可用",
+    SECTION_INCOMPLETE: "缺日",
     "stale": "滞后",
     "thin": "偏薄",
     "missing_table": "缺表",
@@ -710,6 +863,8 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
     perf = payload.get("performance") or {}
     sm = payload.get("symbolMaster") or {}
     nxt = payload.get("nextSettlement") or {}
+    bc = payload.get("briefContinuity") or {}
+    ops = payload.get("opsLedger") or {}
 
     lines = [
         "# 日用循环健康度（loop health）",
@@ -734,7 +889,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
         )
     lines += [
         "",
-        "## 六路信号",
+        "## 信号明细",
         "",
         "| 段 | 状态 | 关键指标 |",
         "|---|---|---|",
@@ -749,6 +904,16 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             a=_cell(brief.get("asof")),
             p=_cell(brief.get("pickCount")),
             pv=_cell(brief.get("provider")),
+        ),
+        "| brief 连续性 | {s} | 近 {w} 个交易日缺 {m} 日{gaps} |".format(
+            s=_status_zh(bc.get("status")),
+            w=_cell(bc.get("windowDays")),
+            m=len(bc.get("missingDays") or []),
+            gaps=(
+                "：`" + "`, `".join(str(x) for x in (bc.get("missingDays") or [])) + "`"
+                if bc.get("missingDays")
+                else ""
+            ),
         ),
         "| 命中记账 | {s} | {c} 码 · 累计 {h} 次 · 最近选日 `{d}` |".format(
             s=_status_zh(hits.get("status")),
@@ -766,6 +931,16 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
         "| 名称主表 | {s} | {n} 行 |".format(
             s=_status_zh(sm.get("status")), n=_cell(sm.get("total"))
         ),
+        "| 调度执行台账 | {s} | {t} 个任务 / {r} 次执行{g} |".format(
+            s=_status_zh(ops.get("status")),
+            t=_cell(ops.get("taskCount")),
+            r=_cell(ops.get("totalRuns")),
+            g=(
+                " · 连续失败：" + ", ".join(str(x) for x in (ops.get("failingTasks") or []))
+                if ops.get("failingTasks")
+                else ""
+            ),
+        ),
         "| 下一个结算日 | {s} | {d} |".format(
             s="有" if nxt.get("available") else "未知",
             d=_cell(nxt.get("expectedSettlementDate")),
@@ -782,9 +957,11 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
         for name, sec in (
             ("供数覆盖率", cov),
             ("最新 brief", brief),
+            ("brief 连续性", bc),
             ("命中记账", hits),
             ("绩效闭环", perf),
             ("名称主表", sm),
+            ("调度执行台账", ops),
         )
         if sec.get("reason")
     ]
@@ -794,15 +971,79 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             lines.append(f"- **{name}**：{reason}")
         lines.append("")
 
+    lines += _render_continuity_block(bc)
+    lines += _render_ops_ledger_block(ops)
     lines += _render_history_block(payload.get("history") or {})
 
     lines += [
         "> 说明：本报告只**汇总既有只读信号**，不抓数、不写库、不改口径；",
         "> 供数覆盖与结算口径分别见 ADR 0058 / ADR 0068，供数守卫见 ADR 0070；",
-        "> 趋势台账只写平台自有 `data/health/history.jsonl`，不写任何库（T1 / ADR 0075）。",
+        "> 趋势台账只写平台自有 `data/health/history.jsonl`，不写任何库（T1 / ADR 0075）；",
+        "> 执行台账只写平台自有 `data/logs/runs.jsonl`，不写任何库（T2 / ADR 0076）。",
         "",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _render_continuity_block(bc: Mapping[str, Any]) -> list[str]:
+    """brief 连续性块：近 N 个交易日的覆盖与**缺日逐个列出**（T2）。"""
+    if not bc:
+        return []
+    out = ["## brief 连续性（近 N 个交易日）", ""]
+    if str(bc.get("status") or "") == SECTION_UNAVAILABLE:
+        out += [f"- 不可判定：{bc.get('reason')}", ""]
+        return out
+    missing = [str(x) for x in (bc.get("missingDays") or [])]
+    out += [
+        "- 窗口：`{a}` ~ `{b}`（{n} 个交易日）· 状态 {s} · 覆盖率 {r}".format(
+            a=_cell((bc.get("expectedDays") or [None])[0]),
+            b=_cell(bc.get("endDay")),
+            n=_cell(bc.get("windowDays")),
+            s=_status_zh(bc.get("status")),
+            r=_cell(bc.get("coverageRatio")),
+        ),
+        "- 缺日：{m}".format(m="、".join(f"`{d}`" for d in missing) if missing else "无"),
+        "",
+    ]
+    return out
+
+
+def _render_ops_ledger_block(ops: Mapping[str, Any]) -> list[str]:
+    """调度执行台账块：逐任务最近一次执行 + 连续失败（T2）。"""
+    if not ops:
+        return []
+    out = ["## 调度执行台账", ""]
+    if str(ops.get("status") or "") == SECTION_UNAVAILABLE:
+        out += [f"- 台账不可用：{ops.get('reason')}", ""]
+        return out
+    out += [
+        "- 台账：`{p}`（{n} 次执行 / {t} 个任务）".format(
+            p=_cell(ops.get("path")),
+            n=_cell(ops.get("totalRuns")),
+            t=_cell(ops.get("taskCount")),
+        ),
+        "",
+        "| 任务 | 计划 | 次数 | 最近执行 | 退出码 | 连续失败 |",
+        "|---|---|---|---|---|---|",
+    ]
+    tasks = list(ops.get("tasks") or [])
+    if not tasks:
+        out.append("| — | — | — | — | — | — |")
+    for t in tasks:
+        streak = int(t.get("failureStreak") or 0)
+        out.append(
+            "| {label}（{task}） | {p} | {r} | {ts} | {ec} | {s} |".format(
+                label=_cell(t.get("label")),
+                task=_cell(t.get("task")),
+                p=_cell(t.get("plannedAt")),
+                r=_cell(t.get("runs")),
+                ts=_cell(t.get("lastRunAt")),
+                ec=_cell(t.get("lastExitCode")),
+                s=(f"**{streak}**" if streak else "0"),
+            )
+        )
+    out.append("")
+    return out
 
 
 def _render_history_block(hist: Mapping[str, Any]) -> list[str]:
@@ -852,12 +1093,14 @@ def default_loop_health_out_dir() -> Path:
 __all__ = [
     "COVERAGE_HARD_FAIL",
     "COVERAGE_WARN",
+    "DEFAULT_BRIEF_WINDOW_DAYS",
     "DEFAULT_HISTORY_RECENT",
     "DEFAULT_LOOP_HEALTH_OUT_DIR",
     "ENV_LOOP_HEALTH_DIR",
     "HISTORY_MAX_RECORDS",
     "LOOP_HEALTH_HISTORY_FILENAME",
     "SECTION_EMPTY",
+    "SECTION_INCOMPLETE",
     "SECTION_OK",
     "SECTION_UNAVAILABLE",
     "VERDICT_BLOCKED",

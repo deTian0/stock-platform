@@ -150,6 +150,24 @@ from .loop_health import (
     roll_up_verdict,
     summarize_history,
 )
+from .ops_ledger import (
+    DEFAULT_OPS_LEDGER_OUT_DIR,
+    DEFAULT_RUNS_RECENT,
+    ENV_OPS_LEDGER_DIR,
+    OPERATIONAL_FAILURE_STREAK,
+    OPS_LEDGER_FILENAME,
+    RUNS_MAX_RECORDS,
+    TASK_SCHEDULES,
+    collect_ops_ledger,
+    default_ops_ledger_dir,
+    default_ops_ledger_path,
+    read_runs,
+    record_run,
+    render_ops_ledger_markdown,
+    summarize_runs,
+    task_label,
+    task_planned_at,
+)
 from .performance_proxy import (
     DEFAULT_PROXY_OUT_DIR,
     PROXY_LEDGER_FILENAME,
@@ -319,6 +337,22 @@ __all__ = [
     "render_loop_health_markdown",
     "roll_up_verdict",
     "summarize_history",
+    "DEFAULT_OPS_LEDGER_OUT_DIR",
+    "DEFAULT_RUNS_RECENT",
+    "ENV_OPS_LEDGER_DIR",
+    "OPERATIONAL_FAILURE_STREAK",
+    "OPS_LEDGER_FILENAME",
+    "RUNS_MAX_RECORDS",
+    "TASK_SCHEDULES",
+    "collect_ops_ledger",
+    "default_ops_ledger_dir",
+    "default_ops_ledger_path",
+    "read_runs",
+    "record_run",
+    "render_ops_ledger_markdown",
+    "summarize_runs",
+    "task_label",
+    "task_planned_at",
     "DEFAULT_PROXY_OUT_DIR",
     "PROXY_LEDGER_FILENAME",
     "PROXY_SOURCE",
@@ -490,4 +524,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.9.0"
+__version__ = "4.9.1"

@@ -126,7 +126,7 @@ class OpsHealthResponse(ExtraAllowModel):
 
 
 class LoopHealthResponse(ExtraAllowModel):
-    """T1: 日用循环健康度体检 —— 只读转发 `research.loop_health`（ADR 0075）。"""
+    """T1/T2: 日用循环健康度体检 —— 只读转发 `research.loop_health`（ADR 0075 / 0076）。"""
 
     environment: str = Field("SIMULATE", description="Always SIMULATE")
     liveTradingEnabled: bool = False
@@ -142,9 +142,23 @@ class LoopHealthResponse(ExtraAllowModel):
         description="供数覆盖率（复用 C2 coverage_snapshot）；unavailable → 本接口 503",
     )
     latestBrief: dict[str, Any] = Field(default_factory=dict)
+    briefContinuity: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "T2: 近 N 个交易日的 brief 覆盖（windowDays / expectedDays / coveredDays / "
+            "missingDays[] / coverageRatio）；缺日 → verdict degraded（不阻断）"
+        ),
+    )
     hits: dict[str, Any] = Field(default_factory=dict)
     performance: dict[str, Any] = Field(default_factory=dict)
     symbolMaster: dict[str, Any] = Field(default_factory=dict)
+    opsLedger: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "T2: 调度执行台账（tasks[] / failingTasks[] / totalRuns / recent[]；"
+            "缺台账或不写库时 status=unavailable）；任务连续失败 → verdict degraded（不阻断）"
+        ),
+    )
     nextSettlement: dict[str, Any] = Field(default_factory=dict)
     history: dict[str, Any] = Field(
         default_factory=dict,

@@ -2887,21 +2887,30 @@
       }
       var cov = data.coverage || {};
       var brief = data.latestBrief || {};
+      var bc = data.briefContinuity || {};
       var hits = data.hits || {};
       var perf = data.performance || {};
       var sm = data.symbolMaster || {};
+      var ops = data.opsLedger || {};
       var nxt = data.nextSettlement || {};
       var hist = data.history || {};
+      var bcMissing = bc.missingDays || [];
       renderKv(kv, [
         ["供数覆盖率", dash(cov.status) + " · 最新 " + dash(cov.latestTradeDate) +
           " · " + dash(cov.latestRows) + " 行 · 滞后 " + dash(cov.lagTradingDays) + " 个交易日"],
         ["最新 brief", dash(brief.status) + " · asof " + dash(brief.asof) +
           " · " + dash(brief.pickCount) + " 只"],
+        ["brief 连续性", dash(bc.status) + " · 近 " + dash(bc.windowDays) + " 个交易日缺 " +
+          bcMissing.length + " 日" + (bcMissing.length ? "：" + bcMissing.join("、") : "")],
         ["命中记账", dash(hits.status) + " · " + dash(hits.totalCodeCount) +
           " 码 / 累计 " + dash(hits.totalCumulativeHits) + " 次"],
         ["绩效闭环", dash(perf.status) + " · 台账 " + dash(perf.totalEntries) +
           " / 已结算 " + dash(perf.settledCount) + " / 待结算 " + dash(perf.pendingCount)],
         ["名称主表", dash(sm.status) + " · " + dash(sm.total) + " 行"],
+        ["调度执行台账", dash(ops.status) + " · " + dash(ops.taskCount) + " 个任务 / " +
+          dash(ops.totalRuns) + " 次执行" +
+          (ops.failingTasks && ops.failingTasks.length
+            ? " · 连续失败：" + ops.failingTasks.join("、") : "")],
         ["下一个结算日", nxt.available ? dash(nxt.expectedSettlementDate) : "未知"],
         ["连续非正常", dash(hist.notOkStreak) + " 天（degraded " + dash(hist.degradedStreak) +
           " · blocked " + dash(hist.blockedStreak) + "）"],

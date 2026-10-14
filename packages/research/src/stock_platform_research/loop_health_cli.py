@@ -24,12 +24,14 @@ from pathlib import Path
 
 from .dotenv import load_dotenv
 from .loop_health import (
+    DEFAULT_BRIEF_WINDOW_DAYS,
     DEFAULT_LOOP_HEALTH_OUT_DIR,
     LOOP_HEALTH_HISTORY_FILENAME,
     append_history,
     collect_loop_health,
     render_loop_health_markdown,
 )
+from .ops_ledger import DEFAULT_RUNS_RECENT
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,6 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--history-path", type=Path, default=None,
                    help=f"趋势台账路径（默认 <out-dir>/{LOOP_HEALTH_HISTORY_FILENAME}）")
     p.add_argument("--no-history", action="store_true", help="不追加趋势台账")
+    p.add_argument("--ops-ledger", type=Path, default=None,
+                   help="调度执行台账路径（默认 STOCK_PLATFORM_OPS_LEDGER_DIR 或 ./data/logs/runs.jsonl）")
+    p.add_argument("--ops-recent", type=int, default=DEFAULT_RUNS_RECENT,
+                   help=f"执行台账保留最近多少次（默认 {DEFAULT_RUNS_RECENT}）")
+    p.add_argument("--brief-window", type=int, default=DEFAULT_BRIEF_WINDOW_DAYS,
+                   help=f"brief 连续性窗口（交易日，默认 {DEFAULT_BRIEF_WINDOW_DAYS}）")
     p.add_argument("--no-write", action="store_true", help="只打印，不写文件（含台账）")
     args = p.parse_args(argv)
 
@@ -74,6 +82,9 @@ def main(argv: list[str] | None = None) -> int:
         coverage_lookback_days=args.coverage_lookback_days,
         coverage_min_rows=args.coverage_min_rows,
         history_path=history_path,
+        ops_ledger_path=args.ops_ledger,
+        ops_recent=int(args.ops_recent),
+        brief_window_days=int(args.brief_window),
     )
     md = render_loop_health_markdown(payload)
 
