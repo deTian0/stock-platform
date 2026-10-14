@@ -60,6 +60,8 @@
 | **X** | Selector 选股 | P2 | 无 |
 | **L** | Live 实盘 | P3 门禁 | 无（既有 `M-E*` 不混） |
 | **C** | Consolidation 双线收口 | 贯穿 | 无 |
+| **R** | Remediation 收尾与加固 | P0/P1 | 无 |
+| **T** | Trust & Ops 循环可信度与运营 | P0/P1 | 无 |
 
 量级：**S**（≤1–2 人日） / **M**（3–5 人日） / **L**（需拆子项）。
 
@@ -170,6 +172,24 @@
 
 **约束（承接 C 域）**：R 域只做「补文档 + 补裁决面 + 补样本」，**不做大规模代码合并、不做 ETF 生产侧写库**；任何触库改动一律走既有只读路径。
 
+### 3.8 T — 循环可信度与运营（Trust & Ops，P0/P1）
+
+**背景**：`R3`（`v4.7.0`）已把日用循环五段信号聚合成**一个裁决**（`ok`/`degraded`/`blocked`），但裁决的**出口面与时间面**仍是空白：
+① 裁决只在本地 `data/health/*` 落地，**Workbench 无出口**（人要看必须去翻文件）；
+② 裁决是**当下快照**，无历史台账 ⇒ 分不清「持续退化」还是「偶发一次」；
+③ 供数滞后已成**常态**（真机实测 `latestTradeDate` 滞后 2 个交易日），且 `latestBrief` 已出现**缺日**（`10-13`/`10-14` 无 brief），但**调度任务与 18:30 回补任务的执行记录没有任何结构化入口** ⇒ 「到底是不是任务没跑」无法自证；
+④ 数据侧只在 `X1`/`B4` 里**偶然发现**过单位口径（`pct_chg` 小数 vs 百分点）、ETF·指数日线缺口、原始池脏数据，**缺一份可复跑的体检**。
+
+**定位**：T 域只做「**把已有信号接到人眼前 + 补执行台账 + 补数据体检**」，**不新增交易能力、不改任何选股/回测口径、不写行情库**（承接 ADR 0058 只读、C 域「只定边界」约束）。
+
+| ID | 名称 | 量级 | 目标 tag | 验收标准 |
+|----|------|------|----------|----------|
+| **T1** | 循环健康度出口与趋势台账 | M | `v4.9.0`（大） | Workbench 新增 `GET /api/ops/loop-health`（只读转发 `research.loop_health.collect_loop_health`，无 DB → 503 fail-closed）+ `#health` 面板（裁决徽标 + 六段表 + 体检时刻）；`loop_health` 增 **`history` 追加台账** `data/health/history.jsonl`（每次体检一行 `{ts,status,warned}`）+ `degradedStreak`（连续 degraded 次数）；**裁决与渲染仍归 `loop_health` 单点**，API/面板零业务逻辑 |
+| **T2** | 调度与回补执行台账 + brief 连续性守卫 | M | `v4.9.1`（小） | 新增 `research.ops_ledger` 单点：读**平台可读**的计划任务执行痕迹（`data/logs/**` 或任务输出目录；缺失 → `unavailable` fail-closed）汇总「最近 N 次：任务名 / 计划时刻 / 实际落地时刻 / 退出码 / 耗时」；`loop_health` 增一路 `briefContinuity` 信号（最近 N 个交易日的 brief 覆盖，**缺日逐个列出**）；**brief 缺日 / 回补任务连续失败 → degraded** |
+| **T3** | 数据质量体检单点 | M | `v4.10.0`（大） | 新增 `research.data_quality` 单点 + CLI `stock-platform-data-quality`：**零网络只读**扫 `market.db` —— 单位口径一致性（复用 `pct_scale` 拟合投票，标出疑似 小数/百分点 混用的码）/ 停牌与零成交占比 / 除权跳变（`close` 单日跳变超阈值且无对应复权）/ 脏码（非 6 位码、ETF 前缀表外）/ 指数·ETF 覆盖缺口 → JSON + Markdown；并入 `loop_health` 作为**第七路**信号（严重项 → degraded，但**永不阻断**选股） |
+
+**约束（承接 R 域 / C 域 / ADR 0058）**：T 域**只读** —— 体检与台账只读 `market.db`（`mode=ro`）与平台自有 `data/`；**不做生产侧回补、不写行情库**；面板不引入前端框架（手写 SVG，对齐 `B6` 口径）。
+
 ---
 
 ## 4. 依赖关系
@@ -193,6 +213,7 @@ L2 ← L1 Accepted；L3 ← L2
 
 C2 ← B1；C3 ← S1（C3 收口归 `R2`）
 R1 ← `v4.6.0`（文档债）；R2 ← R1；R3 ← C2；R4 ← B1；R5 ← B4
+T1 ← R3（复用 `loop_health` 单点）；T2 ← R3 + T1；T3 ← C2（复用 `coverage_snapshot`）
 ```
 
 **关键路径**：`G1 → B1 → B5 → X4 → L1`。这条链上的每一项都是后者不可绕过的前置。
@@ -209,6 +230,7 @@ R1 ← `v4.6.0`（文档债）；R2 ← R1；R3 ← C2；R4 ← B1；R5 ← B4
 | X | X1–X4 | `v4.0.0` → `v4.0.4` | **major**（能力边界从 watch 扩到全市场） |
 | C | C2（穿插） | `v4.0.3` | patch（数据治理：真相源统一 + 覆盖守卫） |
 | R | R1–R2 / R3 / R4 / R5 | `v4.6.1` → `v4.6.2` / `v4.7.0` / `v4.7.1` / `v4.8.0` | patch（收尾/条款）与 minor（R3/R5 新能力）混编 |
+| T | T1 / T2 / T3 | `v4.9.0` / `v4.9.1` / `v4.10.0` | minor（新能力）与 patch（加固）混编 |
 | L | L1–L3 | `v5.0.0` → `v5.0.2` | **major**（解禁实盘红线）；`L1` 为「立项（不解除能力）」故实际发布 `v4.1.4`，`v5.0.0` 保留给真正解除红线的那次（P1/P2 立项复核）|
 
 每个里程碑收口时按既有流程：勾选本文件 → 更新 `CHANGELOG.md` → 更新 `VERSION` → `scripts/release_tag.ps1` → `git push --follow-tags`。
@@ -318,3 +340,4 @@ R1 ← `v4.6.0`（文档债）；R2 ← R1；R3 ← C2；R4 ← B1；R5 ← B4
 | 2026-10-14 | **`R1` 完成（名称权威文档债收口，`v4.6.1`）**：补 `v4.6.0` 名称根治遗留的文档债 —— 新增 ADR `0072`（代码↔名称主数据表 `symbol_master` 为名称解析**唯一权威** + 回退语义 + 「源 `fundamentals` 无英文字段、故不做中英双语」的诚实边界）与契约 `docs/contracts/symbol-naming.md`（存储只存真名 / 展示走 `display_name` / 未知 `—` / 解析优先级四档）；`check_docs.ps1` 登记两份新文档；`release_tag.ps1` 增加 `-MessageFile`（UTF-8 读入 + `git tag -F`）以支持**中文 tag 注释** |
 | 2026-10-14 | **`R2` 完成（`C3` 重复实现收敛清单，`v4.6.2`）**：新增 `docs/plans/duplicate-implementation-convergence.md` —— 逐项登记 选股打分 / 因子库 / 闸门 / 回测引擎 / 交易规则 / 费用 / 资产类型 / 榜单 / 命中追踪 / 行情抓取 / 真相源 / 基本面名称 / 多 Agent / 报告渲染 / 交易日历 / `.env` / 调度 / 报告跑批 **18 项**，每条标「平台侧权威单点｜引擎/上游参考｜判据｜处置」（**16 项已收敛、2 项按边界保留**）；逐条给出收敛证据（同一性断言 / sha256 逐位一致 / 跨线静态互测 / 只读派生）；**只定边界、不删代码**（承接 C 域约束）。`C3` 由此闭合 → **C 域（C1/C2/C3）全部收官** |
 | 2026-10-14 | **`R3` 完成（日用循环健康度单点，`v4.7.0`）**：新增 `research.loop_health`（`collect_loop_health` / `roll_up_verdict` / `render_loop_health_markdown`）+ CLI `stock-platform-loop-health`（默认写 `data/health/loop_health.{json,md,html}`；退出码恒 0，门禁看 `verdict.status`）。把「供数 → 选股 → 命中 → 绩效 → 名称」**五段的既有只读信号**聚合成**一个裁决**：`coverage`（复用 C2 `coverage_snapshot`，引擎库不可用→`unavailable`）/ `latestBrief`（`list_recent(1)`）/ `hits`（两类 session 汇总）/ `performance`（`settledCount` vs `MIN_MEANINGFUL_SAMPLE`）/ `symbolMaster`（行数）/ `nextSettlement`（日历推算**提示**）。**裁决规则**（写进契约）：coverage 的 `unavailable/missing_table/empty` → **blocked**，`stale/thin` → degraded；brief 落后供数（按交易日）→ degraded；绩效样本 <20 → degraded；其余 warn 不 fail。**硬约束**：零网络 / 只读 / fail-closed / **每段独立 try-except（方法永不抛）** / `providers` 仅函数内导入。新增 ADR `0073` + 契约 `docs/contracts/loop-health.md`；新测试 `test_loop_health.py` **19 项**；真机一次 → 裁决 `degraded`（`warned=['coverage','performance']`：`latestTradeDate=2026-10-12` 滞后 2 交易日、样本 3<20）；`hits=14 码/20 次`、`symbolMaster=5237`、`nextSettlement=2026-10-19` 正常 |
+| 2026-10-14 | **`T` 域开局（循环可信度与运营）**：`R3` 交付后新增 **T — Trust & Ops** 域三项 —— `T1` 循环健康度出口与趋势台账（`v4.9.0`）/ `T2` 调度与回补执行台账 + brief 连续性守卫（`v4.9.1`）/ `T3` 数据质量体检单点（`v4.10.0`）；把「裁决无出口 / 无时间面 / 执行记录无入口 / 数据质量无体检」四个可观测性缺口显式立项；**只读、不新增交易能力、不写库**（承接 ADR 0058 + C 域约束） |
