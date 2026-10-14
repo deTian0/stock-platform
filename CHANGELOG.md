@@ -8,6 +8,38 @@
 
 - （无）
 
+## [4.9.0] - 2026-10-14
+
+### Added
+
+- **循环健康度出口与趋势台账（`T1`）—— 裁决可看、可追溯**
+  —— R3 的 `research.loop_health` 只有 CLI 出口、且**无时间维度**（每次都是当下快照），
+  日用循环「今天这样子是不正常，还是本来就是常态」无法回答。新增两块：
+  - **只读 API 出口** `GET /api/ops/loop-health` —— 直接转发 `collect_loop_health()`；
+    当 `coverage.status` 落在硬失败集合时 **fail-closed 返回 503**
+    （`reason=loop_health_no_market_db`、`liveTradingEnabled=false`），不在无库时假装健康；
+  - **趋势台账** `data/health/history.jsonl` —— 每次体检追加一行
+    `{ts,asof,status,failed,warned}`；`summarize_history()` 按 `asof` 去重（同日重跑只算一次，
+    取最新 `ts`）后给出 `daysRecorded` / `degradedStreak` / `blockedStreak` / `notOkStreak` /
+    `streakSince` / `recent`，「连续几天 degraded」这类问题首次有数据可答。
+- **Workbench `#health` 面板** —— 一键体检：绿/黄/红 裁决徽标 + 关键指标表 + 趋势文本 + 原始 JSON，
+  失败时 fail-closed 显示中文提示。
+- **新公开面**：`loop_health.default_loop_health_dir` / `default_loop_health_history_path` /
+  `read_history` / `append_history` / `summarize_history`。
+- **架构 / 契约**：ADR [`0075`](docs/architecture/0075-loop-health-export-and-history.md)；
+  契约 [`loop-health`](docs/contracts/loop-health.md) 扩写（§4.6 趋势面字段 / §8 台账格式与读写规则 /
+  §2 新增「台账例外（唯一写）」/ §5 coverage 判定表补 `error`+`unconfigured`）。
+
+### Changed
+
+- **裁决口径修复：`coverage` 硬失败集合补全**。v4.7.0 里 `coverage.status ∈ {error, unconfigured}`
+  既不属于 fail 也不属于 warn，落入 `else` 分支被判 `ok` —— 即「**行情库打不开，却报供数正常**」。
+  新增 `COVERAGE_HARD_FAIL`（`unavailable` / `empty` / `missing_table` / `error` / `unconfigured`）
+  与 `COVERAGE_WARN`（`stale` / `thin`）常量，`roll_up_verdict()` 与 API 的 503 判定统一引用。
+- **口径硬条款：台账是 `loop_health` 模块唯一的写操作**，只写平台自有 `data/` 目录，
+  **永不触碰 `market.db`**；写失败 **fail-open**（不阻断体检），读失败 **不影响裁决**
+  （`history` 不参与 `verdict` 计算，裁决仍只依赖六路信号快照）。
+
 ## [4.7.1] - 2026-10-14
 
 ### Added

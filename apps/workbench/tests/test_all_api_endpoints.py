@@ -80,6 +80,18 @@ def _ok_ops_health(body: Any, status: int) -> None:
     assert body["providerPreset"] == "replay"
 
 
+def _ok_loop_health(body: Any, status: int) -> None:
+    """T1: 无 market.db 时 503 fail-closed；有库时是完整体检 payload。"""
+    if status == 503:
+        assert body["detail"]["reason"] == "loop_health_no_market_db"
+        return
+    assert status == 200
+    assert body["liveTradingEnabled"] is False
+    assert body["environment"] == "SIMULATE"
+    assert body["verdict"]["status"] in {"ok", "degraded", "blocked"}
+    assert isinstance(body["history"], dict)
+
+
 def _ok_matrix(body: Any, status: int) -> None:
     assert status == 200
     assert isinstance(body, list) and len(body) >= 1
@@ -327,6 +339,15 @@ _SYM = {"symbols": "600519"}
 _reg(EndpointHit("GET", "/health", assert_body=_ok_health))
 _reg(EndpointHit("GET", "/version", assert_body=_ok_version))
 _reg(EndpointHit("GET", "/api/ops/health", assert_body=_ok_ops_health))
+_reg(
+    EndpointHit(
+        "GET",
+        "/api/ops/loop-health",
+        # No engine market.db in CI → 503 fail-closed (not fake data).
+        expect_status=frozenset({200, 503}),
+        assert_body=_ok_loop_health,
+    )
+)
 
 # settings
 _reg(EndpointHit("GET", "/api/settings/capability-matrix", assert_body=_ok_matrix))
@@ -922,7 +943,7 @@ def test_openapi_catalog_covers_every_operation(openapi_ops: list[tuple[str, str
     extra = sorted(catalog - openapi)
     assert not missing, f"OpenAPI ops without EndpointHit: {missing}"
     assert not extra, f"EndpointHit for unknown OpenAPI ops: {extra}"
-    assert len(openapi_ops) == len(ENDPOINT_HITS) == 66
+    assert len(openapi_ops) == len(ENDPOINT_HITS) == 67
 
 
 @pytest.mark.unit
@@ -970,4 +991,4 @@ def test_coverage_report_counts(openapi_ops: list[tuple[str, str]]) -> None:
     n_hits = len(ENDPOINT_HITS)
     n_extra = len(EXTRA_META_PATHS)
     assert n_ops == n_hits
-    assert n_ops + n_extra == 69
+    assert n_ops + n_extra == 70

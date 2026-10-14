@@ -93,6 +93,7 @@ $required = @(
   'docs/architecture/0072-symbol-master-name-authority.md',
   'docs/architecture/0073-daily-loop-health-single-point.md',
   'docs/architecture/0074-performance-proxy-ledger.md',
+  'docs/architecture/0075-loop-health-export-and-history.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',
