@@ -8,6 +8,28 @@
 
 - （无）
 
+## [4.6.2] - 2026-10-14
+
+### Added
+
+- **`C3` 重复实现收敛清单（[`docs/plans/duplicate-implementation-convergence.md`](docs/plans/duplicate-implementation-convergence.md)）**
+  —— 承接 `C1` 双线边界，把「选股打分 / 因子库 / 入场闸门 / 回测引擎 / 交易规则 / 费用模型 / 资产类型 /
+  榜单 / 命中追踪 / 行情抓取 / 行情真相源 / 基本面名称 / 多 Agent / 报告渲染 / 交易日历 / `.env` /
+  调度 / 报告跑批」**18 项**逐条登记，每项标注 **平台侧权威单点｜引擎/上游参考实现｜判据｜处置**
+  （**16 项已收敛、2 项按边界保留**）。**只定边界、不删代码**（承接 C 域约束）；收敛证据逐条给出
+  （对象同一性断言 / 8 场景 sha256 逐位一致 / 跨线静态互测 / 只读派生）。
+
+### Changed
+
+- 路线图：`C3` 行标 done（由 `R2` 收口）—— **C 域（C1/C2/C3）全部收官**；`R2` 行标 done；
+  修订记录追加一行。
+- 新文档登记进 `scripts/check_docs.ps1` 的 `$required` 与 `docs/plans/README.md` 索引表。
+
+### Verified
+
+- `scripts/check_versions.ps1` OK；`scripts/check_docs.ps1` OK（新文档全部登记、无断链）。
+- 全量 `pytest packages apps`（`replay`）**1037 passed / 0 failed**（R2 为纯文档收口，无新增测试）。
+
 ## [4.6.1] - 2026-10-14
 
 ### Added

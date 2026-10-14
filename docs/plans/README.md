@@ -13,6 +13,7 @@
 | [m-a1-tradingagents-portability.md](m-a1-tradingagents-portability.md) | M-A1：TradingAgents 可移植清单 | done |
 | [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R 七域） | `G`/`B`/`X`/`S` 域全 done；`C` 域仅剩 `C3`；`P0` 生产可用线 done 至 `v4.6.0`（调度 + 日报 + 绩效 PnL + 循环自足 + 报告 HTML + THS 导入 + 名称根治）；**`R` 域（收尾与加固）开局**：`R1` 名称权威文档债 / `R2` `C3` 收敛清单 / `R3` 循环健康度 / `R4` 绩效代理样本 / `R5` ETF 进宇宙；`L1` P0 纯模拟盘（`L2`/`L3` 门禁） |
 | [dual-line-responsibility.md](dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） | done |
+| [duplicate-implementation-convergence.md](duplicate-implementation-convergence.md) | `C3` 双线重复实现收敛清单（18 项，只定边界不删代码） | done（`v4.6.2`，由 `R2` 收口） |
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |
 | [handoff-v4.2.0.md](handoff-v4.2.0.md) | 交接：v4.2.0 → 下一块砖（绩效 PnL 闭环） | 历史交接 |
 | [handoff-v4.3.0.md](handoff-v4.3.0.md) | 交接：v4.3.0 → 下一块砖（闭环每日自然累积） | 历史交接 |
