@@ -9,6 +9,22 @@ import pandas as pd
 from .gates import apply_entry_gates, apply_risk_gates
 from .lvrev import score_lvrev
 
+#: Code columns must stay text. A bare ``pd.read_csv`` infers ``int64`` for a
+#: column of zero-padded A-share codes and silently drops the leading zeros
+#: (``000001`` → ``1``); that mangles every printed code and makes holdings
+#: matching (③A / ③B) miss its panel row.
+_CODE_COLUMNS = ("symbol", "code", "ts_code")
+
+
+def load_panel_csv(path: str | Path) -> pd.DataFrame:
+    """Read a point-in-time cross-section CSV, keeping code columns as ``str``.
+
+    Single definition for every CLI that ingests a panel CSV
+    (``stock-platform-rankings`` / ``stock-platform-brief`` / score batch), so
+    the zero-padding bug cannot come back through one path while another is fixed.
+    """
+    return pd.read_csv(path, dtype={c: str for c in _CODE_COLUMNS})
+
 
 def score_cross_section(
     df: pd.DataFrame,
@@ -43,7 +59,7 @@ def score_cross_section_csv(
     top_n: int | None = 50,
 ) -> pd.DataFrame:
     """Load CSV → score → optional write. Used by pre-market batch jobs."""
-    df = pd.read_csv(path)
+    df = load_panel_csv(path)
     out = score_cross_section(
         df,
         value_factor=value_factor,
