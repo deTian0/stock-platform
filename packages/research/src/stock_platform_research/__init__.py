@@ -121,6 +121,21 @@ from .hit_tracking import (
     reset_hit_repository_cache,
     track_brief_hits,
 )
+from .sameday import (
+    MIN_MEANINGFUL_SAMPLE,
+    render_sameday_markdown,
+    summarize_sameday,
+)
+from .symbol_master import (
+    UNKNOWN_NAME,
+    SymbolMasterRepository,
+    display_name,
+    lookup_name,
+    name_map_from_master,
+    open_symbol_master,
+    refresh_from_engine,
+    reset_symbol_master_cache,
+)
 from .refresh import REFRESH_DATASETS, RefreshReport, run_refresh
 from .pit import assert_no_lookahead_columns, run_pit_long_only
 from .strategy_config import (
@@ -236,6 +251,17 @@ __all__ = [
     "open_hit_repository",
     "reset_hit_repository_cache",
     "track_brief_hits",
+    "UNKNOWN_NAME",
+    "SymbolMasterRepository",
+    "display_name",
+    "lookup_name",
+    "name_map_from_master",
+    "open_symbol_master",
+    "refresh_from_engine",
+    "reset_symbol_master_cache",
+    "MIN_MEANINGFUL_SAMPLE",
+    "render_sameday_markdown",
+    "summarize_sameday",
     "StrategyConfig",
     "UniverseEmptyError",
     "WalkForwardFold",
@@ -398,4 +424,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.5.2"
+__version__ = "4.6.0"

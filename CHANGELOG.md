@@ -8,6 +8,33 @@
 
 - （无）
 
+## [4.6.0] - 2026-10-14
+
+### Added
+
+- **本地「代码 ↔ 名称」主数据表 `symbol_master`（名称显示根治）** —— 新增模块
+  `stock_platform_research.symbol_master` + CLI `stock-platform-symbol-master`
+  （`--refresh` / `--stats` / `--lookup` / `--list`）。表存平台 SQLite（与 brief 归档同库），
+  数据源为引擎**只读** `market.db.fundamentals`（当前 5237/5237 代码全覆盖），刷新幂等。
+  `display_name()` 是名称解析的**唯一入口**，优先级 = 记录里的真实名称 > 显式 `name_map`
+  > 本地表 > 占位符 `—`；`daily_cli` 每次跑批顺带刷新该表（失败静默，名称是装饰性的）。
+  `stock-platform-hits --backfill-names` 可回填历史行。
+
+- **当日战绩报告（选股 → 次日收盘 · 1 日窗口）** —— 新增 `stock_platform_research.sameday`
+  + CLI `stock-platform-sameday`：对归档 brief（当日实际下发的榜单）按 `holding=1d`
+  结算，给出平均收益 / 胜率 / 最好最差 / `avgAlpha` / 跑赢基准率（基准默认中证500 000905）。
+  `rolling_review` 同步补齐 `avgRawReturn` / `upRate` / `best` / `worst` / `avgAlpha` /
+  `beatBenchmarkRate`（纯新增键，既有调用不变）。报告位 `A5_sameday`。
+
+### Fixed
+
+- **命中追踪「名称 = 代码」** —— `hit_tracking._clean_name()` 过去在名称缺失时**回退成代码**，
+  于是「未知」被渲染成「看起来正确」的错值（A3 报告印 `000801 | 000801` / `601318 | 601318`）；
+  又因 `hit_tracking` 按 `UNIQUE(code, session_type, pick_date)` 去重，后续跑批补齐的名称
+  **永远写不回去**。现在：存储层只存真实名称（未知存空，绝不写代码），展示层统一走
+  `display_name()`（未知显示 `—`）；已回填历史 14 行 `hit_summary` / 20 行 `hit_tracking`。
+  修复后 A3 正确显示「四川九洲 / 中国平安 / 一拖股份」等中文名。
+
 ### Changed
 
 - **panel CSV 代码前导零丢失修复（读取单点）** —— 新增 `batch.load_panel_csv()`，把 `symbol` / `code` /
@@ -19,7 +46,10 @@
 ### Verified
 
 - `packages/research/tests/test_batch.py` 新增 `test_load_panel_csv_keeps_zero_padded_codes`
-  （回归锁：`000533` 不被读成 `533`，写回仍保留前导零）；全量 `pytest` **1015 passed**。
+  （回归锁：`000533` 不被读成 `533`，写回仍保留前导零）。
+- 新增 `test_symbol_master.py`（12 例）、`test_sameday.py`（4 例）与 `test_hit_tracking.py`
+  名称回归 6 例（含「未收录 → 占位符，绝不回显代码」「回填幂等」）。全量 `pytest`
+  **1037 passed**；`scripts/check_versions.ps1` OK（VERSION=4.6.0, packages=5）。
 
 ## [4.5.2] - 2026-10-13
 

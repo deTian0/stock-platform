@@ -162,4 +162,4 @@ __all__ = [
     "write_realtime_cache",
 ]
 
-__version__ = "4.5.2"
+__version__ = "4.6.0"
