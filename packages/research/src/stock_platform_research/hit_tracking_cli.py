@@ -72,6 +72,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, default=None, help="Cap rows")
     p.add_argument("--top", type=int, default=10, help="Report/detail rows per view")
     p.add_argument("--asof", default=None, help="Reference day for cycle-window views")
+    p.add_argument(
+        "--backfill-names",
+        action="store_true",
+        help="把历史行里「缺失 / 等于代码」的名称按本地 symbol_master 补齐（幂等）",
+    )
     p.add_argument("--json-out", type=Path, help="Write the structured payload JSON")
     args = p.parse_args(argv)
 
@@ -83,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     did_track = False
+    if args.backfill_names:
+        # 只读 symbol_master 补齐历史名称；不复用 did_track，保证仍输出报告。
+        out["backfilledNames"] = repo.backfill_names()
     if args.track_brief is not None:
         brief = json.loads(Path(args.track_brief).read_text(encoding="utf-8"))
         boards = tuple(b.strip() for b in str(args.boards).split(",") if b.strip())
