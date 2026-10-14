@@ -21,7 +21,7 @@ from typing import Any
 import pandas as pd
 
 from .dotenv import load_dotenv
-from .batch import score_cross_section
+from .batch import load_panel_csv, score_cross_section
 from .position_review_cli import load_holdings
 from .rankings import (
     RankingConfig,
@@ -32,7 +32,7 @@ from .rankings import (
 
 
 def _load_panel(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
+    df = load_panel_csv(path)
     if df.empty:
         return df
     return df

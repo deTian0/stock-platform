@@ -10,7 +10,16 @@
 
 ### Changed
 
-- （无）
+- **panel CSV 代码前导零丢失修复（读取单点）** —— 新增 `batch.load_panel_csv()`，把 `symbol` / `code` /
+  `ts_code` 固定按文本读入。此前 `stock-platform-rankings`、`stock-platform-brief`、
+  `batch.score_cross_section_csv` 走裸 `pd.read_csv`，代码列被推断为 `int64`，**前导零被静默吃掉**
+  （A2 报告印出 `801` / `2658` 而非 `000801` / `002658`），并使 ③A/③B 持仓匹配找不到截面行
+  （例：持仓 `000533` 与 `588080` 无法进入 ③A）。三处调用统一改走该单点。
+
+### Verified
+
+- `packages/research/tests/test_batch.py` 新增 `test_load_panel_csv_keeps_zero_padded_codes`
+  （回归锁：`000533` 不被读成 `533`，写回仍保留前导零）；全量 `pytest` **1015 passed**。
 
 ## [4.5.2] - 2026-10-13
 

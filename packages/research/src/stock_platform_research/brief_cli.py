@@ -6,10 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
-import pandas as pd
-
 from .dotenv import load_dotenv
-from .batch import score_cross_section_csv
+from .batch import load_panel_csv, score_cross_section_csv
 from .brief import build_premarket_brief, write_brief_csv
 
 
@@ -26,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--reversal-q", type=float, default=0.30)
     args = p.parse_args(argv)
 
-    panel = pd.read_csv(args.input_csv)
+    panel = load_panel_csv(args.input_csv)
     brief = build_premarket_brief(
         asof=args.asof,
         panel=panel,
