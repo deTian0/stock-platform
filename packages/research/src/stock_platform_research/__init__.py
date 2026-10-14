@@ -264,6 +264,23 @@ from .neutralization_ab import (
     neutralization_ab_from_bars,
     run_neutralization_book,
 )
+from .adoption_gate import (
+    BASELINE_SPEC,
+    CANDIDATE_REGISTRY,
+    DEFAULT_ADOPTION_OUT_DIR,
+    DEFAULT_CANDIDATES,
+    DEFAULT_RULE,
+    DEFAULT_WINDOW_COUNT,
+    DEFAULT_WINDOW_YEARS,
+    AdoptionRule,
+    CandidateSpec,
+    build_windows,
+    decide_adoption,
+    evaluate_adoption,
+    render_adoption_markdown,
+    run_candidate,
+    slice_window,
+)
 from .sensitivity import (
     DEFAULT_GRIDS,
     DEFAULT_OBJECTIVE,
@@ -522,6 +539,21 @@ __all__ = [
     "compare_neutralization_ab",
     "neutralization_ab_from_bars",
     "run_neutralization_book",
+    "AdoptionRule",
+    "BASELINE_SPEC",
+    "CANDIDATE_REGISTRY",
+    "DEFAULT_ADOPTION_OUT_DIR",
+    "DEFAULT_CANDIDATES",
+    "DEFAULT_RULE",
+    "DEFAULT_WINDOW_COUNT",
+    "DEFAULT_WINDOW_YEARS",
+    "CandidateSpec",
+    "build_windows",
+    "decide_adoption",
+    "evaluate_adoption",
+    "render_adoption_markdown",
+    "run_candidate",
+    "slice_window",
 ]
 
-__version__ = "4.9.1"
+__version__ = "4.10.0"

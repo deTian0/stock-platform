@@ -38,7 +38,7 @@
                             双线收口 (C) 贯穿全程
 ```
 
-**产品目标**：把 `stock-platform` 从「里程碑全绿的研究平台」推进到「回测可信、策略可迭代、选股可日用」的状态；实盘作为门禁项在 `L1` 立项后才启动。
+**产品目标**：把 `stock-platform` 从「里程碑全绿的研究平台」推进到「回测可信、策略可迭代、选股可日用」的状态；**`Y` 域（收益增强）**补上「**收益落地**」这一环 —— 把已验证的改进经**样本外闸门**送进生产（`Y1`）；实盘作为门禁项在 `L1` 立项后才启动。
 
 **本轮明确不做**（继承既有红线）：
 
@@ -62,6 +62,7 @@
 | **C** | Consolidation 双线收口 | 贯穿 | 无 |
 | **R** | Remediation 收尾与加固 | P0/P1 | 无 |
 | **T** | Trust & Ops 循环可信度与运营 | P0/P1 | 无 |
+| **Y** | Yield 收益增强（研究 → 生产采纳） | P0 | 无 |
 
 量级：**S**（≤1–2 人日） / **M**（3–5 人日） / **L**（需拆子项）。
 
@@ -186,9 +187,35 @@
 |----|------|------|----------|----------|
 | **T1** | 循环健康度出口与趋势台账 | M | `v4.9.0`（大） | **done（2026-10-14）** Workbench 新增 `GET /api/ops/loop-health`（只读转发 `collect_loop_health`，**零业务逻辑**；供数段落在 `COVERAGE_HARD_FAIL` → 503 fail-closed，其余降级仍 200）+ `#health` 面板（导航「体检」：裁决徽标 + 六段表 + 近 N 天趋势 + 原始 JSON）；`loop_health` 增**趋势面** `history` —— `history.jsonl` 追加台账（`append_history`，fail-open、超 400 行裁剪）+ `read_history` / `summarize_history`（按 `asof` 去重、**含本次**）给出 `degradedStreak` / `blockedStreak` / `notOkStreak` / `streakSince` / `recent`；**`history` 不参与裁决**（裁决仍只看六路信号当下快照）；同轮修正 `coverage` 硬失败档 —— `error`（库不可读）/ `unconfigured` 曾在 `v4.7.0` 被误判 `ok`，现已并入 `COVERAGE_HARD_FAIL`；ADR `0075` + 契约 `docs/contracts/loop-health.md` 扩写（新增 §4.6 / §8）；真机实测裁决 `degraded`（brief 停更 + 真实样本 3<20，供数已恢复 ✅）、`degradedStreak=1` |
 | **T2** | 调度与回补执行台账 + brief 连续性守卫 | M | `v4.9.1`（小） | **done（2026-10-14）** 新增 `research.ops_ledger` 单点 + CLI `stock-platform-ops-ledger`：append-only 台账 `data/logs/runs.jsonl`（`record_run` 唯一写、**fail-open**、`task` 为空拒绝、超 400 行裁旧）汇总「每任务最近一次 时刻/退出码/耗时/**连续失败** + 最近 N 次」（`read_runs` / `summarize_runs` 纯函数 / `collect_ops_ledger` 段形状，缺失 → `unavailable` fail-closed）；新增**调度包装器** `scripts/ops/Invoke-ScheduledRun.ps1`（任务预设 `daily` 08:30 / `postmarket` 15:30 / `marketdb-backfill` 18:30，**子进程**运行目标保证总能记行、best-effort 记账不改退出码、退出码原样透传），三个既有自动化已切到包装器；`loop_health` 增两路信号 —— `briefContinuity`（近 5 个**交易日**的 brief 覆盖，**缺日逐个列出** + `coverageRatio`）与 `opsLedger`（只读汇总）；**brief 缺日 / 任务连续失败 ≥2 次 → degraded**（观测面信号，**永不阻断**）；ADR `0076` + 契约 `docs/contracts/ops-ledger.md`；真机实测台账 `status=ok`、`briefContinuity` 标出 3 个缺日（`10-08`/`10-13`/`10-14`） |
-| **T3** | 数据质量体检单点 | M | `v4.10.0`（大） | 新增 `research.data_quality` 单点 + CLI `stock-platform-data-quality`：**零网络只读**扫 `market.db` —— 单位口径一致性（复用 `pct_scale` 拟合投票，标出疑似 小数/百分点 混用的码）/ 停牌与零成交占比 / 除权跳变（`close` 单日跳变超阈值且无对应复权）/ 脏码（非 6 位码、ETF 前缀表外）/ 指数·ETF 覆盖缺口 → JSON + Markdown；并入 `loop_health` 作为**又一路**信号（严重项 → degraded，但**永不阻断**选股） |
+| **T3** | 数据质量体检单点 | M | `v4.11.0`（大，**因 `Y1` 先落地而顺延**） | 新增 `research.data_quality` 单点 + CLI `stock-platform-data-quality`：**零网络只读**扫 `market.db` —— 单位口径一致性（复用 `pct_scale` 拟合投票，标出疑似 小数/百分点 混用的码）/ 停牌与零成交占比 / 除权跳变（`close` 单日跳变超阈值且无对应复权）/ 脏码（非 6 位码、ETF 前缀表外）/ 指数·ETF 覆盖缺口 → JSON + Markdown；并入 `loop_health` 作为**又一路**信号（严重项 → degraded，但**永不阻断**选股） |
 
 **约束（承接 R 域 / C 域 / ADR 0058）**：T 域**只读** —— 体检与台账只读 `market.db`（`mode=ro`）与平台自有 `data/`；**不做生产侧回补、不写行情库**；面板不引入前端框架（手写 SVG，对齐 `B6` 口径）。
+
+### 3.9 Y — 收益增强（Yield，P0）
+
+**背景**：`G/B/S/X/C/R/T` 七域把**研究侧**做到了相当完整（回测可信、策略可迭代、选股可日用、循环可观测），
+但**研究结论与生产默认档之间没有桥**。三个实测事实：
+
+| 事实 | 数字 | 当时处置 |
+|------|------|----------|
+| `S4` 行业中性化 | `total_return` 0.3029 → **0.5257**、`sharpe` 1.06 → **1.14**（叠加 `max_per_industry=3` → **0.5850 / 1.2492**） | **只诊断不改档** |
+| `S3` 闸门敏感性 | 出厂 `min_pick_score=0.80` 的 `sharpe` **1.060 是全网格最差**（`0.5/0.6/0.7` = 1.253/1.129/1.157） | **只诊断不改档** |
+| `R4` 绩效代理（近一年） | `winRate=0.3735`、`avgReturn=−0.38%` | 记录，不处置 |
+
+「不采纳」当时是**对的**（单窗口最优点可能是噪声），但由此产生更坏的结果 —— **没有任何机制**
+能把「多窗口稳健成立」的改进送进生产 ⇒ 研究永远停在报告里，**平台不改进 = 赚不到钱**。
+
+**定位**：Y 域做「**研究 → 生产的采纳闸门**」——只出**建议**，采纳是**独立的人工签核步骤**
+（承接本仓「改行为必须同步 ADR / 契约 + 人工签核」硬规则）；**不改任何生产默认档**。
+
+| ID | 名称 | 量级 | 目标 tag | 验收标准 |
+|----|------|------|----------|----------|
+| **Y1** | 策略采纳闸门 | M | `v4.10.0`（大） | **done（2026-10-14）** 新增 `research.adoption_gate` 单点 + CLI `stock-platform-strategy-adoption`：基线档（`neutralize=None` 的生产档）与候选档**共用同一引擎**（`run_neutralization_book` → `X4` 单点 `book_replay.replay_book`），在 `build_windows`（默认近 3 个**互不重叠**的 1 年窗口）各跑一遍；**特征只算一次**（全跨度 `prepare_book_frame` 含 `ma20`/`ma60` 预热后按日期 `slice_window` 切窗，边界**不损失**预热）；**事前登记** `AdoptionRule`（`min_sharpe_margin=0.05` / `max_drawdown_tolerance=0.05` / `max_winrate_drop=0.05` / `min_trades=8` / `require_all_windows=True`）+ **纯函数** `decide_adoption` 给 `adopt` / `reject` / `insufficient`（**样本不足不做结论**）；窗口 `pass` 需「夏普边际 + 回撤容差 + 胜率容差」**三项全过**，任一指标缺失判否；报告 `data/strategy/adoption_gate.{json,md,html}` 含逐窗 `blockingChecks`（落选原因可读）；**只出建议** —— `adoptionNote` 显式声明不动生产默认档；ADR `0077` + 契约 `docs/contracts/adoption-gate.md` |
+| **Y2** | 采纳落地（命名档案 + 出厂档切换） | M | `v4.10.1`（**待人工签核**） | 把 `Y1` 判 `adopt` 的候选写进命名档案 / 出厂闸门常量；同步 ADR + 契约 + 权重**单点定义**；**无证据不落档、不签核不落档** |
+| **Y3** | 近期负收益根因诊断 | L | `v4.11.x`（待定） | 解释 `R4` 近一年 `avgReturn=−0.38%` / `winRate=0.3735`：是 regime（中证500 同期涨跌）/ 过拟合 / 数据口径，还是选股逻辑本身失效；产出可复跑诊断报告与结论 |
+
+**约束（承接 R / T 域 / ADR 0058）**：Y 域**只读行情**（`market.db` 仍 `mode=ro`）；
+报告只写平台自有 `data/strategy/`；**不改生产默认档、不写 brief / picks、不做生产侧回补、不触实盘红线**。
 
 ---
 
@@ -214,6 +241,7 @@ L2 ← L1 Accepted；L3 ← L2
 C2 ← B1；C3 ← S1（C3 收口归 `R2`）
 R1 ← `v4.6.0`（文档债）；R2 ← R1；R3 ← C2；R4 ← B1；R5 ← B4
 T1 ← R3（复用 `loop_health` 单点）；T2 ← R3 + T1；T3 ← C2（复用 `coverage_snapshot`）
+Y1 ← B5（规则单点）+ X4（回放单点）+ S3/S4（候选来源）；Y2 ← Y1（须签核）；Y3 ← R4（代理样本）
 ```
 
 **关键路径**：`G1 → B1 → B5 → X4 → L1`。这条链上的每一项都是后者不可绕过的前置。
@@ -230,7 +258,8 @@ T1 ← R3（复用 `loop_health` 单点）；T2 ← R3 + T1；T3 ← C2（复用
 | X | X1–X4 | `v4.0.0` → `v4.0.4` | **major**（能力边界从 watch 扩到全市场） |
 | C | C2（穿插） | `v4.0.3` | patch（数据治理：真相源统一 + 覆盖守卫） |
 | R | R1–R2 / R3 / R4 / R5 | `v4.6.1` → `v4.6.2` / `v4.7.0` / `v4.7.1` / `v4.8.0` | patch（收尾/条款）与 minor（R3/R5 新能力）混编 |
-| T | T1 / T2 / T3 | `v4.9.0` / `v4.9.1` / `v4.10.0` | minor（新能力）与 patch（加固）混编；**`v4.8.0`（`R5` ETF 进宇宙）被生产侧 ETF 回补卡住而顺延**，T 域按完成顺序直接编号 |
+| T | T1 / T2 / T3 | `v4.9.0` / `v4.9.1` / `v4.11.0` | minor（新能力）与 patch（加固）混编；**`v4.8.0`（`R5` ETF 进宇宙）被生产侧 ETF 回补卡住而顺延**；`T3` 因 `Y1` 先落地而顺延至 `v4.11.0` |
+| Y | Y1 / Y2 / Y3 | `v4.10.0` / `v4.10.1` / `v4.11.x` | minor（新能力：研究 → 生产采纳闸门）与 patch（落档）混编；**Y 域按完成顺序编号，`R5` 仍顺延** |
 | L | L1–L3 | `v5.0.0` → `v5.0.2` | **major**（解禁实盘红线）；`L1` 为「立项（不解除能力）」故实际发布 `v4.1.4`，`v5.0.0` 保留给真正解除红线的那次（P1/P2 立项复核）|
 
 每个里程碑收口时按既有流程：勾选本文件 → 更新 `CHANGELOG.md` → 更新 `VERSION` → `scripts/release_tag.ps1` → `git push --follow-tags`。
@@ -344,3 +373,5 @@ T1 ← R3（复用 `loop_health` 单点）；T2 ← R3 + T1；T3 ← C2（复用
 | 2026-10-14 | **`T` 域开局（循环可信度与运营）**：`R3` 交付后新增 **T — Trust & Ops** 域三项 —— `T1` 循环健康度出口与趋势台账（`v4.9.0`）/ `T2` 调度与回补执行台账 + brief 连续性守卫（`v4.9.1`）/ `T3` 数据质量体检单点（`v4.10.0`）；把「裁决无出口 / 无时间面 / 执行记录无入口 / 数据质量无体检」四个可观测性缺口显式立项；**只读、不新增交易能力、不写库**（承接 ADR 0058 + C 域约束） |
 | 2026-10-14 | **`T1` 完成（循环健康度出口与趋势台账，`v4.9.0`）**：① **出口面** —— Workbench 新增 `GET /api/ops/loop-health`（`routes/ops.py`）**只读转发** `collect_loop_health`，自身零业务逻辑/零写库；**503 fail-closed** 判据 = 供数段落在 `COVERAGE_HARD_FAIL`，其余降级一律 200（裁决留在 `verdict.status`，不用 5xx 掩盖「能跑但要打折看」）；响应模型 `LoopHealthResponse` 纳入 OpenAPI 目录测（`ENDPOINT_HITS` 66→67、`n_ops+n_extra` 69→70）。主模板加 `#health` 面板（导航「体检」：裁决徽标 + 六段 `kv` 表 + 近 N 天趋势 + 原始 JSON；手写 HTML/JS，不引前端框架）。② **时间面** —— `loop_health` 增 `history` 趋势面：`read_history`（缺文件→`[]`、**读失败向上抛** → `unavailable`、坏行跳过）/ `summarize_history`（**纯函数**：按 `asof` 去重 → 并入本次 → `degradedStreak` / `blockedStreak` / `notOkStreak` / `streakSince` / `recent`）/ `append_history`（**追加**一行五字段审计记录，**fail-open**，超 `HISTORY_MAX_RECORDS=400` 裁剪最旧）；目录由 `STOCK_PLATFORM_LOOP_HEALTH_DIR` 优先、否则 `./data/health`；CLI 增 `--history-path` / `--no-history`（`--no-write` 同时不写台账）。**台账是本模块唯一写动作，只写平台自有 `data/`**；**`history` 不参与裁决**（裁决仍只看六路信号当下快照），加段不改任何既有段语义。③ **同轮修正裁决漏洞**：`coverage` 的 `error`（库存在但不可读）与 `unconfigured`（未配置路径）在 `v4.7.0` 既非 fail 也非 warn ⇒ 落到 `else` 被判 **`ok`**（「仓库打不开」被报成「供数正常」）；新增 `COVERAGE_HARD_FAIL`（含这两档）与 `COVERAGE_WARN` 常量并用于裁决。④ 文档：ADR `0075` + 契约 `docs/contracts/loop-health.md` **扩写**（新增 §4.6 趋势面 / §8 台账格式与连续段口径、§2 增「台账例外（唯一写）」、§5 表更新 coverage 档位并标注 T1 修正、§7 出口表加 API 与面板）；`check_docs` 登记（166→167）。⑤ 测试：`test_loop_health.py` 增 §9 **14 项**（台账/连续段表驱动/裁剪/坏行/隔离/渲染/CLI）+ 新文件 `test_ops_loop_health.py` **4 项**（503 fail-closed ×2 / 满窗 200 + 趋势 / thin 降级仍 200）。⑥ **真机实测**（本次重跑）：裁决 `degraded`，`warned=['latestBrief','performance']` —— 供数已恢复 ✅（`latestTradeDate=2026-10-14` / 5225 行 / lag=0，18:32 回补生效），仍告警的是 **brief 停在 `10-12`（落后 2 个交易日）** 与**真实样本 3<20**；`degradedStreak=1`、`data/health/history.jsonl` 已落首行 |
 | 2026-10-14 | **`T2` 完成（调度与回补执行台账 + brief 连续性守卫，`v4.9.1`）**：① **执行台账单点** `research.ops_ledger` —— append-only `data/logs/runs.jsonl`；`record_run`（**唯一写**、**fail-open**、`task` 为空拒绝、超 `RUNS_MAX_RECORDS=400` 裁旧）/ `read_runs`（缺文件→`[]`、**读失败向上抛**、坏行跳过）/ `summarize_runs`（**纯函数**：逐任务 `failureStreak` 从最新往回数、`failingTasks` ≥ `OPERATIONAL_FAILURE_STREAK=2`、`recent`）/ `collect_ops_ledger`（段形状，缺失→`unavailable` fail-closed）/ `render_ops_ledger_markdown`；`TASK_SCHEDULES`（`daily` 08:30 / `postmarket` 15:30 / `marketdb-backfill` 18:30）**仅用于展示**，未知任务名原样保留。② **调度包装器** `scripts/ops/Invoke-ScheduledRun.ps1` —— 调度任务统一入口：预设解析目标脚本与规范参数 → **子进程**运行（目标的 `exit` 无法绕过本层，**总能记到一行**）→ best-effort 追加台账（**只报告、绝不改退出码**）→ **原样透传**目标退出码；`TargetArgs` 为**空格分隔字符串**（`powershell -File` 会把数组参数静默退化成一个 token）；未登记任务必须显式 `-Script` 否则 `exit 2`。三个既有自动化（盘前/盘后/回补）prompt 已切到包装器。③ **`loop_health` 增两路信号** —— `briefContinuity`（`_recent_trading_days` 取近 `window_days=5` 个**交易日**，`end_day` 取 `coverage.latestTradeDate`、无供数退化为 `asof`；`missingDays` **逐个列出** + `coverageRatio`，`status∈{ok,incomplete,empty,unavailable}`）与 `opsLedger`（**只读** `collect_ops_ledger`，本模块不写台账）；两路**都参与裁决但只 warn**（缺 brief 日 / 任务连续失败 → degraded，**永不 blocked** —— 观测面信号，不同于 `coverage` 的物理硬前提）。④ 文档：ADR `0076` + 契约 `docs/contracts/ops-ledger.md`；`docs/contracts/loop-health.md` 扩写（§4.7/§4.8 段定义 + §5 裁决表两行 + §1 目的「任务到底跑没跑」）；`check_docs` 登记（167→169）。⑤ 测试：新文件 `test_ops_ledger.py` + `test_loop_health.py` §10（连续性/裁决 warn-不阻断/常量对齐/段读取）+ `test_ops_loop_health.py`（连续失败降级但仍 200）。⑥ **真机实测**：跑包装器 `marketdb-backfill -Mode dry-run` → 台账 `status=ok totalRuns=1`；`loop_health` 裁决 `degraded`、`briefContinuity` 标出 3 个缺日（`2026-10-08`/`10-13`/`10-14`）。**跳号**：承接 `v4.9.0`，`v4.8.0`（`R5`）因生产侧 ETF 回补未完成而顺延 |
+| 2026-10-14 | **`Y` 域开局（收益增强）**：新增 **Y — 收益增强** 域三项 —— `Y1` 策略采纳闸门（`v4.10.0`）/ `Y2` 采纳落地（`v4.10.1`，须人工签核）/ `Y3` 近期负收益根因诊断（`v4.11.x`）；把「**研究结论与生产默认档之间没有桥**」这一结构性问题显式立项 —— `S4` 中性化与 `S3` 闸门均已实测改善却「只诊断不改档」，`R4` 近一年 `avgReturn=−0.38%` 无出口；`T3` 目标 tag 顺延至 `v4.11.0` |
+| 2026-10-14 | **`Y1` 完成（策略采纳闸门，`v4.10.0`）**：新增 `research.adoption_gate` 单点 + CLI `stock-platform-strategy-adoption` —— 基线档（生产档，`neutralize=None`）与候选档**共用同一引擎**，在多个**互不重叠**的样本外窗口（`build_windows`，默认近 3 × 1 年）各跑一遍；**特征全跨度算一次**再 `slice_window` 切窗（边界不损失 `ma20`/`ma60` 预热）；`AdoptionRule` **事前登记**阈值 + `decide_adoption` **纯函数**给 `adopt`/`reject`/`insufficient`（**样本不足不做结论**）；窗口 `pass` 需三项风险闸门全过、指标缺失判否；报告 `data/strategy/adoption_gate.{json,md,html}` 列逐窗 `blockingChecks`；**只出建议**（`adoptionNote`）—— **不改任何生产默认档**；ADR `0077` + 契约 `docs/contracts/adoption-gate.md`；`check_docs` 登记（169→171）。**真机实测（3 个互不重叠 1 年窗口）**：`行业中性化` **0/3 通过**（Δ夏普均 **−0.241**、Δ收益均 **−2.61%**、Δ回撤均 −0.090）⇒ **`S4` 的单窗结论未在样本外复现**（与 2024-09→2026-09 连续 2 年的 0.3029→0.5257 **相反**，差异待归因）；`闸门 0.70` **2/3 通过**（Δ夏普均 **+0.274**、Δ收益均 **+5.90%**，仅 w1 未达标）⇒ 唯一有正向证据的候选，被「全窗口要求」如实拦下；**结论：维持生产基线** —— 本次价值在于**拦住了一个单窗看起来赢、样本外实际输的改动** |
