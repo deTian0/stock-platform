@@ -8,6 +8,40 @@
 
 - （无）
 
+## [4.6.1] - 2026-10-14
+
+### Added
+
+- **ADR [`0072`](docs/architecture/0072-symbol-master-name-authority.md) —— 代码 ↔ 名称主数据表
+  `symbol_master` 为名称解析的唯一权威**：补齐 `v4.6.0` 能力落地时缺失的架构决策记录
+  （三层根因 / 存储只存真名 / 展示走 `display_name` / 未知 `—` / 四档优先级 / 历史回填）。
+- **契约 [`symbol-naming`](docs/contracts/symbol-naming.md)**：`symbol_master` 表结构、解析优先级、
+  出口清单，以及「**不做中英双语**」的诚实边界（只读源 `fundamentals` 实测无英文字段，
+  故映射为 6 位代码 ↔ 中文简称，需要英文名须另找数据源、**不得臆造**）。
+
+### Changed
+
+- **`scripts/release_tag.ps1` 支持中文 tag 注释**：新增 `-MessageFile`（按 UTF-8 读入，经
+  `git tag -a -F <utf8-tempfile>` 建 tag），绕开 PowerShell 5.1 原生参数按 ANSI/GBK 编码导致的
+  中文乱码；`-Message` 亦改走同一 UTF-8 临时文件路径（向后兼容）。临时文件写在**仓库外**
+  （`$env:TEMP`），不污染工作树、不影响 `release_tag.ps1` 的「工作树必须干净」前置检查。
+- **路线图新增 `R` 域（收尾与加固）**：把「文档债 / 唯一未闭合的 `C3` / 绩效样本不足（3 条 < 20 = 噪音）/
+  循环裁决面缺失」四个收尾项显式立项（`R1`–`R5`）；补 `v4.6.0` 修订记录行；
+  `docs/plans/README.md` 状态列刷新为「G/B/S/X/L/C/**R** 七域」。
+
+### Fixed
+
+- **`v4.6.0` 文档债** —— 名称根治此前只改 `CHANGELOG`，**未落 ADR / 契约 / 路线图**
+  （全库 grep `symbol_master` / `4.6.0` 零命中），违反本仓「改行为必须同步文档」硬规则；本次补齐。
+
+### Verified
+
+- `scripts/check_docs.ps1` 登记两份新文档（`$required` 160 → 162）。
+- 全量 `pytest packages apps`（`replay`）**1037 passed / 0 failed**（R1 为纯文档 + 工具收口，
+  无新增测试）。
+- `release_tag.ps1 -MessageFile` 编码自检：`git cat-file tag` 以 UTF-8 解码，中文正文与 `tagger`
+  姓名**均无乱码**。
+
 ## [4.6.0] - 2026-10-14
 
 ### Added
