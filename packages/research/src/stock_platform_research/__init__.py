@@ -136,6 +136,17 @@ from .loop_health import (
     render_loop_health_markdown,
     roll_up_verdict,
 )
+from .performance_proxy import (
+    DEFAULT_PROXY_OUT_DIR,
+    PROXY_LEDGER_FILENAME,
+    PROXY_SOURCE,
+    build_proxy_view,
+    default_proxy_log_path,
+    load_proxy_ledger,
+    render_proxy_markdown,
+    trades_to_decision_rows,
+    write_proxy_ledger,
+)
 from .symbol_master import (
     UNKNOWN_NAME,
     SymbolMasterRepository,
@@ -280,6 +291,15 @@ __all__ = [
     "default_loop_health_out_dir",
     "render_loop_health_markdown",
     "roll_up_verdict",
+    "DEFAULT_PROXY_OUT_DIR",
+    "PROXY_LEDGER_FILENAME",
+    "PROXY_SOURCE",
+    "build_proxy_view",
+    "default_proxy_log_path",
+    "load_proxy_ledger",
+    "render_proxy_markdown",
+    "trades_to_decision_rows",
+    "write_proxy_ledger",
     "StrategyConfig",
     "UniverseEmptyError",
     "WalkForwardFold",
@@ -442,4 +462,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.7.0"
+__version__ = "4.7.1"

@@ -8,6 +8,39 @@
 
 - （无）
 
+## [4.7.1] - 2026-10-14
+
+### Added
+
+- **绩效代理台账（`R4`）—— `research.performance_proxy` + CLI `stock-platform-performance-proxy`**
+  —— 真实台账（`recommend_decisions.jsonl`）的 settled 样本受**日历硬约束**（每交易日 ≤ N 条
+  + 必须等持有窗口走完），长期停在个位数 = `MIN_MEANINGFUL_SAMPLE(=20)` 的噪音区，
+  「这套选股逻辑赚不赚钱」无法回答。新增只读单点把**回测成交**翻译成与真实台账
+  **逐字段同形状**的决策行，一个 ≥1 年长窗即产出 ≥ 门槛的 settled 样本：
+  - `trades_to_decision_rows()` —— `date`=建仓日（`equity_curve[entry_idx].date`）、
+    `symbol`=`code`、`raw`=**扣费** `net_ret`（百分数字符串）、`holding`=`f"{held_days}d"`、
+    `pending=false`、`source="backtest_proxy"`、`alpha=null`（**不编造**）；
+  - `write_proxy_ledger()` —— **覆盖写**（代理是「一次回测的完整派生」，追加会重复计数）；
+  - `build_proxy_view()` —— 真实 / 代理**并排视图**，两侧各跑一次 `performance_summary`
+    （ADR 0068 单算术），各带 `ledgerKind` 与 `scale`；
+  - `render_proxy_markdown()` —— 样本充分性 / 两侧指标 / **口径差异表**。
+- **架构 / 契约**：ADR [`0074`](docs/architecture/0074-performance-proxy-ledger.md)、
+  契约 [`performance-proxy`](docs/contracts/performance-proxy.md)（行形状 / **禁止混算**硬条款 /
+  覆盖写语义 / CLI 出口）。
+- 新增 CLI `stock-platform-performance-proxy`（`--years` 默认 1 / `--start` / `--end` /
+  `--ledger` / `--briefs-dir` / `--universe` / `--real-log` / `--proxy-log` / `--out-dir` /
+  `--no-write` / `--json`；只读 `market.db`），产出代理台账 + `data/performance/proxy_vs_real.{json,md,html}`。
+
+### Changed
+
+- **口径硬条款：真实与代理台账分栏陈列、禁止混算**。两者四维全不同（信号源 / 出场规则 /
+  成本 / 窗口关系），`build_proxy_view` 顶层**不得出现**任何跨侧合并字段
+  （`total` / `combined` / `merged` / `all` / `sum`），并显式 `comparability.combinable=false`；
+  测试 `test_build_proxy_view_is_never_combinable` 逐名断言。
+- 引擎与算术**零新增**：代理侧复用 `book_replay.replay_book`（ADR 0059 单循环）与
+  `performance.performance_summary`（ADR 0068 单算术），本模块只做**翻译与呈现**。
+- 路线图：`R4` 行标 done（`v4.7.1`）+ 修订记录；`docs/plans/README.md` 状态行推进到 `v4.7.1`。
+
 ## [4.7.0] - 2026-10-14
 
 ### Added
