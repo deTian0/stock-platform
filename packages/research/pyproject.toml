@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-platform-research"
-version = "4.6.2"
+version = "4.7.0"
 description = "Selection / backtest research kernels for stock-platform (lvrev, PIT)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,7 @@ stock-platform-strategy-neutralization = "stock_platform_research.neutralization
 stock-platform-workbuddy-bridge = "stock_platform_research.workbuddy_bridge_cli:main"
 stock-platform-digest = "stock_platform_research.daily_digest_cli:main"
 stock-platform-sameday = "stock_platform_research.sameday_cli:main"
+stock-platform-loop-health = "stock_platform_research.loop_health_cli:main"
 stock-platform-report-html = "stock_platform_research.report_html_cli:main"
 
 [project.optional-dependencies]

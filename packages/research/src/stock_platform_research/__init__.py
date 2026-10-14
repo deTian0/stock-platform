@@ -126,6 +126,16 @@ from .sameday import (
     render_sameday_markdown,
     summarize_sameday,
 )
+from .loop_health import (
+    DEFAULT_LOOP_HEALTH_OUT_DIR,
+    VERDICT_BLOCKED,
+    VERDICT_DEGRADED,
+    VERDICT_OK,
+    collect_loop_health,
+    default_loop_health_out_dir,
+    render_loop_health_markdown,
+    roll_up_verdict,
+)
 from .symbol_master import (
     UNKNOWN_NAME,
     SymbolMasterRepository,
@@ -262,6 +272,14 @@ __all__ = [
     "MIN_MEANINGFUL_SAMPLE",
     "render_sameday_markdown",
     "summarize_sameday",
+    "DEFAULT_LOOP_HEALTH_OUT_DIR",
+    "VERDICT_BLOCKED",
+    "VERDICT_DEGRADED",
+    "VERDICT_OK",
+    "collect_loop_health",
+    "default_loop_health_out_dir",
+    "render_loop_health_markdown",
+    "roll_up_verdict",
     "StrategyConfig",
     "UniverseEmptyError",
     "WalkForwardFold",
@@ -424,4 +442,4 @@ __all__ = [
     "run_neutralization_book",
 ]
 
-__version__ = "4.6.2"
+__version__ = "4.7.0"
