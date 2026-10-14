@@ -116,6 +116,7 @@ $required = @(
   'docs/plans/trading-system-roadmap.md',
   'docs/plans/b3-cost-model-milestone.md',
   'docs/plans/dual-line-responsibility.md',
+  'docs/plans/duplicate-implementation-convergence.md',
   'docs/plans/handoff-v4.2.0.md',
   'docs/plans/handoff-v4.3.0.md',
   'docs/plans/handoff-v4.3.1.md',
