@@ -2865,6 +2865,70 @@
     }
   }
 
+  var LOOP_VERDICT_ZH = { ok: "✅ 正常", degraded: "⚠️ 需留意", blocked: "⛔ 阻断" };
+
+  async function loadLoopHealth() {
+    var kv = $("loop-health-kv");
+    var badge = $("loop-health-badge");
+    var trend = $("loop-health-trend");
+    if (!kv) return;
+    try {
+      var data = await fetchJson("/api/ops/loop-health");
+      var v = data.verdict || {};
+      var status = v.status || "unknown";
+      if (badge) {
+        badge.hidden = false;
+        badge.textContent =
+          "裁决：" + (LOOP_VERDICT_ZH[status] || dash(status)) +
+          " · 时点 " + dash(data.asof) +
+          " · 生成于 " + dash(data.generatedAt) +
+          " · fail=[" + ((v.failed || []).join(",") || "空") + "]" +
+          " warn=[" + ((v.warned || []).join(",") || "空") + "]";
+      }
+      var cov = data.coverage || {};
+      var brief = data.latestBrief || {};
+      var hits = data.hits || {};
+      var perf = data.performance || {};
+      var sm = data.symbolMaster || {};
+      var nxt = data.nextSettlement || {};
+      var hist = data.history || {};
+      renderKv(kv, [
+        ["供数覆盖率", dash(cov.status) + " · 最新 " + dash(cov.latestTradeDate) +
+          " · " + dash(cov.latestRows) + " 行 · 滞后 " + dash(cov.lagTradingDays) + " 个交易日"],
+        ["最新 brief", dash(brief.status) + " · asof " + dash(brief.asof) +
+          " · " + dash(brief.pickCount) + " 只"],
+        ["命中记账", dash(hits.status) + " · " + dash(hits.totalCodeCount) +
+          " 码 / 累计 " + dash(hits.totalCumulativeHits) + " 次"],
+        ["绩效闭环", dash(perf.status) + " · 台账 " + dash(perf.totalEntries) +
+          " / 已结算 " + dash(perf.settledCount) + " / 待结算 " + dash(perf.pendingCount)],
+        ["名称主表", dash(sm.status) + " · " + dash(sm.total) + " 行"],
+        ["下一个结算日", nxt.available ? dash(nxt.expectedSettlementDate) : "未知"],
+        ["连续非正常", dash(hist.notOkStreak) + " 天（degraded " + dash(hist.degradedStreak) +
+          " · blocked " + dash(hist.blockedStreak) + "）"],
+      ]);
+      kv.hidden = false;
+      if (trend) {
+        var recent = hist.recent || [];
+        if (recent.length) {
+          trend.hidden = false;
+          trend.textContent = recent.map(function (r) {
+            return dash(r.asof) + "  " + (LOOP_VERDICT_ZH[r.status] || dash(r.status)) +
+              "  warn=" + ((r.warned || []).join(",") || "—");
+          }).join("\n");
+        } else {
+          trend.hidden = true;
+        }
+      }
+      $("loop-health-json").textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      if (badge) {
+        badge.hidden = false;
+        badge.textContent = "体检失败（fail-closed）：" + String(e);
+      }
+      $("loop-health-json").textContent = String(e);
+    }
+  }
+
   async function loadIntelCrosswalk() {
     var strip = $("intel-crosswalk-strip");
     if (!strip) return;
@@ -4086,6 +4150,9 @@
     }
     $("wizard-form").addEventListener("submit", runWizard);
     $("btn-ops-health").addEventListener("click", loadOpsHealth);
+    if ($("btn-loop-health")) {
+      $("btn-loop-health").addEventListener("click", loadLoopHealth);
+    }
     if ($("intel-prefill-form")) {
       $("intel-prefill-form").addEventListener("submit", runIntelPrefill);
     }
@@ -4105,6 +4172,7 @@
     loadPaper();
     loadBroker();
     loadHits();
+    loadLoopHealth();
   }
 
   if (document.readyState === "loading") {

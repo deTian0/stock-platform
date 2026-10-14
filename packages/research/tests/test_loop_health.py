@@ -19,12 +19,17 @@ import pytest
 
 from stock_platform_research import loop_health as lh
 from stock_platform_research.loop_health import (
+    SECTION_EMPTY,
+    SECTION_UNAVAILABLE,
     VERDICT_BLOCKED,
     VERDICT_DEGRADED,
     VERDICT_OK,
+    append_history,
     collect_loop_health,
+    read_history,
     render_loop_health_markdown,
     roll_up_verdict,
+    summarize_history,
 )
 from stock_platform_research.persistence import SqliteBriefRepository
 from stock_platform_research.symbol_master import SymbolMasterRepository
@@ -227,6 +232,16 @@ def test_verdict_coverage_hard_failures_block(cov_status: str) -> None:
     assert "coverage" in verdict["failed"]
 
 
+@pytest.mark.parametrize("cov_status", ["error", "unconfigured"])
+def test_verdict_coverage_error_and_unconfigured_block(cov_status: str) -> None:
+    """T1 / v4.9.0 修正：``error``（库不可读）与 ``unconfigured`` 曾被误判为 ok。"""
+    verdict = roll_up_verdict(_sections(coverage={"status": cov_status}))
+    assert verdict["status"] == VERDICT_BLOCKED
+    assert "coverage" in verdict["failed"]
+    check = next(c for c in verdict["checks"] if c["id"] == "coverage")
+    assert check["level"] == "fail"
+
+
 def test_verdict_brief_lag_warns() -> None:
     verdict = roll_up_verdict(
         _sections(
@@ -344,3 +359,178 @@ def test_cli_no_write_writes_nothing(tmp_path: Path) -> None:
     )
     assert rc == 0
     assert not out_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# 9. 趋势台账（T1 / v4.9.0）—— 追加只是锦上添花，摘要含本次、同日去重
+# ---------------------------------------------------------------------------
+
+
+def _collect(tmp_path: Path, asof: str, history_path: Path | None):
+    return collect_loop_health(
+        db_url=tmp_path / "platform.db",
+        market_db=tmp_path / "nope.db",
+        perf_log=tmp_path / "missing.jsonl",
+        asof=asof,
+        history_path=history_path,
+    )
+
+
+def _hist_path(tmp_path: Path) -> Path:
+    return tmp_path / "health" / "history.jsonl"
+
+
+def test_history_empty_then_first_record(tmp_path: Path) -> None:
+    hp = _hist_path(tmp_path)
+    payload = _collect(tmp_path, "2026-10-10", hp)
+    hist = payload["history"]
+    assert hist["status"] == SECTION_EMPTY
+    assert hist["daysRecorded"] == 0
+    assert hist["notOkStreak"] == 1  # 含本次（空库 → blocked）
+    assert str(hist["path"]).endswith("history.jsonl")
+
+    result = append_history(payload, hp)
+    assert result["appended"] is True
+    assert hp.is_file()
+    assert len(read_history(hp)) == 1
+    rec = read_history(hp)[0]
+    assert rec["asof"] == "2026-10-10"
+    assert rec["status"] == VERDICT_BLOCKED
+    assert rec["failed"] == ["coverage", "latestBrief"]
+
+
+def test_history_streak_dedupes_same_day(tmp_path: Path) -> None:
+    hp = _hist_path(tmp_path)
+    for day in ("2026-10-09", "2026-10-12", "2026-10-13"):
+        append_history(_collect(tmp_path, day, hp), hp)
+    payload = _collect(tmp_path, "2026-10-13", hp)  # 同日重跑
+    hist = payload["history"]
+    assert hist["daysRecorded"] == 3  # 去重后仍 3 天
+    assert hist["notOkStreak"] == 3
+    assert len(read_history(hp)) == 3  # 摘要层去重，不重写已落行
+    append_history(payload, hp)
+    assert len(read_history(hp)) == 4
+    assert _collect(tmp_path, "2026-10-13", hp)["history"]["notOkStreak"] == 3
+
+
+@pytest.mark.parametrize(
+    "records,asof,status,degraded,not_ok,since",
+    [
+        ([], "2026-10-14", "ok", 0, 0, None),
+        ([], "2026-10-14", "degraded", 1, 1, "2026-10-14"),
+        (
+            [{"asof": "2026-10-13", "ts": "1", "status": "ok"}],
+            "2026-10-14", "degraded", 1, 1, "2026-10-14",
+        ),
+        (
+            [{"asof": "2026-10-13", "ts": "1", "status": "degraded"}],
+            "2026-10-14", "degraded", 2, 2, "2026-10-13",
+        ),
+        (
+            [
+                {"asof": "2026-10-12", "ts": "1", "status": "degraded"},
+                {"asof": "2026-10-13", "ts": "2", "status": "blocked"},
+            ],
+            "2026-10-14", "degraded", 1, 3, "2026-10-12",
+        ),
+        (
+            [{"asof": "2026-10-13", "ts": "1", "status": "degraded"}],
+            "2026-10-14", "ok", 0, 0, None,
+        ),
+    ],
+)
+def test_summarize_history_is_pure_table(
+    records: list[dict], asof: str, status: str, degraded: int, not_ok: int, since: str | None
+) -> None:
+    summary = summarize_history(records, asof=asof, status=status)
+    assert summary["degradedStreak"] == degraded
+    assert summary["notOkStreak"] == not_ok
+    assert summary["streakSince"] == since
+    assert summary["recent"][0]["asof"] == asof
+
+
+def test_append_history_never_raises_on_unwritable_target(tmp_path: Path) -> None:
+    as_dir = tmp_path / "as_dir"
+    as_dir.mkdir()
+    result = append_history({"asof": "2026-10-14", "verdict": {"status": "ok"}}, as_dir)
+    assert result["appended"] is False
+    assert result["reason"]
+
+
+def test_append_history_trims_to_max(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(lh, "HISTORY_MAX_RECORDS", 3)
+    hp = _hist_path(tmp_path)
+    for i in range(5):
+        append_history({"asof": f"2026-10-{i + 1:02d}", "verdict": {"status": "ok"}}, hp)
+    records = read_history(hp)
+    assert len(records) == 3
+    assert records[-1]["asof"] == "2026-10-05"  # 保留最近
+    assert records[0]["asof"] == "2026-10-03"
+
+
+def test_read_history_tolerates_junk_lines(tmp_path: Path) -> None:
+    hp = _hist_path(tmp_path)
+    hp.parent.mkdir(parents=True, exist_ok=True)
+    hp.write_text(
+        '{"asof":"2026-10-14","status":"ok"}\nnot json\n\n{"nope":1}\n',
+        encoding="utf-8",
+    )
+    records = read_history(hp)
+    assert len(records) == 1
+    assert records[0]["asof"] == "2026-10-14"
+
+
+def test_read_history_missing_file_is_empty(tmp_path: Path) -> None:
+    assert read_history(tmp_path / "nope" / "history.jsonl") == []
+
+
+def test_history_failure_is_isolated_from_verdict(monkeypatch, tmp_path: Path) -> None:
+    def _boom(*_a, **_k):
+        raise RuntimeError("history exploded")
+
+    monkeypatch.setattr(lh, "read_history", _boom)
+    payload = _collect(tmp_path, "2026-10-14", _hist_path(tmp_path))
+    assert payload["history"]["status"] == SECTION_UNAVAILABLE
+    assert "history exploded" in payload["history"]["reason"]
+    # 裁决仍只看六路信号
+    assert payload["verdict"]["status"] == VERDICT_BLOCKED
+    assert payload["verdict"]["failed"] == ["coverage", "latestBrief"]
+
+
+def test_render_includes_history_trend(tmp_path: Path) -> None:
+    hp = _hist_path(tmp_path)
+    payload = _collect(tmp_path, "2026-10-14", hp)
+    append_history(payload, hp)
+    md = render_loop_health_markdown(payload)
+    assert "## 趋势（历史台账）" in md
+    assert "连续：degraded" in md
+    assert "| 时点 | 裁决 | warn |" in md
+
+
+def test_render_history_unavailable_branch(tmp_path: Path) -> None:
+    md = render_loop_health_markdown({"history": {"status": SECTION_UNAVAILABLE, "reason": "炸了"}})
+    assert "历史台账不可用" in md
+
+
+def test_cli_appends_history_unless_disabled(tmp_path: Path) -> None:
+    from stock_platform_research.loop_health_cli import main
+
+    out_dir = tmp_path / "health"
+    base = [
+        "--db", str(tmp_path / "platform.db"),
+        "--market-db", str(tmp_path / "nope.db"),
+        "--perf-log", str(tmp_path / "missing.jsonl"),
+        "--asof", "2026-10-14",
+        "--out-dir", str(out_dir),
+    ]
+    assert main(base) == 0
+    hp = out_dir / "history.jsonl"
+    assert hp.is_file()
+    assert len(read_history(hp)) == 1
+
+    assert main(base) == 0
+    assert len(read_history(hp)) == 2  # 台账只追加，不去重（去重在摘要层）
+    assert main(base + ["--no-history"]) == 0
+    assert len(read_history(hp)) == 2
+    assert main(base + ["--no-write"]) == 0
+    assert len(read_history(hp)) == 2

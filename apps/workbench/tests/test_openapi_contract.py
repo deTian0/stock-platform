@@ -18,6 +18,7 @@ REQUIRED_PATHS: dict[str, set[str]] = {
         "/health",
         "/version",
         "/api/ops/health",
+        "/api/ops/loop-health",
         "/api/settings/capability-matrix",
         "/api/settings/preferences",
         "/api/settings/presets",

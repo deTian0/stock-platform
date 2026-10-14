@@ -1,4 +1,9 @@
-"""Ops health — liveness plus throttle/refresh snapshot (no public net)."""
+"""Ops health — liveness plus throttle/refresh snapshot (no public net).
+
+Also exposes the **daily-loop health single point** (T1 / ADR 0075) as a read-only
+passthrough to ``stock_platform_research.loop_health.collect_loop_health`` so the
+verdict stops living only in ``data/health/*``.
+"""
 
 from __future__ import annotations
 
@@ -7,16 +12,25 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from stock_platform_providers.eastmoney import get_default_client
 from stock_platform_providers.engine_sqlite import (
     EngineSqliteProvider,
     resolve_engine_market_db,
 )
+from stock_platform_research.loop_health import (
+    COVERAGE_HARD_FAIL,
+    collect_loop_health,
+)
 from stock_platform_workbench import __version__
 from stock_platform_workbench.brief_ux import ops_data_visibility
-from stock_platform_workbench.openapi_models import OpsHealthResponse, RESP_503, ok200
+from stock_platform_workbench.openapi_models import (
+    LoopHealthResponse,
+    OpsHealthResponse,
+    RESP_503,
+    ok200,
+)
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 
@@ -61,6 +75,36 @@ def _load_last_refresh() -> dict[str, Any] | None:
         "failCount": data.get("failCount"),
         "outDir": data.get("outDir"),
     }
+
+
+@router.get(
+    "/loop-health",
+    summary="日用循环健康度体检",
+    response_model=LoopHealthResponse,
+    responses={**ok200(LoopHealthResponse, "六路只读信号 + 裁决 + 趋势台账"), **RESP_503},
+)
+def ops_loop_health() -> dict[str, Any]:
+    """只读转发 ``research.loop_health.collect_loop_health``（T1 / ADR 0075）。
+
+    供数段落在 ``COVERAGE_HARD_FAIL``（``unavailable`` / ``empty`` / ``missing_table`` /
+    ``error`` / ``unconfigured``）→ **503 fail-closed** —— 没有供数就没有可判的循环，
+    不用假数据兜底。其余降级一律 200，裁决在 ``verdict.status``
+    （``ok`` / ``degraded`` / ``blocked``）里，**不用 5xx 掩盖「能跑但要打折看」**。
+    本接口零业务逻辑、零写库。
+    """
+    payload = collect_loop_health()
+    coverage = payload.get("coverage") or {}
+    if str(coverage.get("status") or "") in COVERAGE_HARD_FAIL:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "reason": "loop_health_no_market_db",
+                "detail": str(coverage.get("reason") or ""),
+                "coverageStatus": str(coverage.get("status") or ""),
+                "liveTradingEnabled": False,
+            },
+        )
+    return payload
 
 
 @router.get(

@@ -125,6 +125,37 @@ class OpsHealthResponse(ExtraAllowModel):
     lastRefresh: dict[str, Any] | None = None
 
 
+class LoopHealthResponse(ExtraAllowModel):
+    """T1: 日用循环健康度体检 —— 只读转发 `research.loop_health`（ADR 0075）。"""
+
+    environment: str = Field("SIMULATE", description="Always SIMULATE")
+    liveTradingEnabled: bool = False
+    asof: str = Field(..., description="体检时点 YYYY-MM-DD")
+    generatedAt: str | None = Field(None, description="体检生成时刻（UTC ISO8601）")
+    holdingDays: int = Field(5, description="持有窗口（交易日）")
+    verdict: dict[str, Any] = Field(
+        default_factory=dict,
+        description="裁决 {status: ok|degraded|blocked, failed[], warned[], checks[]}",
+    )
+    coverage: dict[str, Any] = Field(
+        default_factory=dict,
+        description="供数覆盖率（复用 C2 coverage_snapshot）；unavailable → 本接口 503",
+    )
+    latestBrief: dict[str, Any] = Field(default_factory=dict)
+    hits: dict[str, Any] = Field(default_factory=dict)
+    performance: dict[str, Any] = Field(default_factory=dict)
+    symbolMaster: dict[str, Any] = Field(default_factory=dict)
+    nextSettlement: dict[str, Any] = Field(default_factory=dict)
+    history: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "趋势面（不参与裁决）：daysRecorded / degradedStreak / blockedStreak / "
+            "notOkStreak / streakSince / recent[] / path"
+        ),
+    )
+    disclaimer: str | None = None
+
+
 # ----- settings -----
 
 

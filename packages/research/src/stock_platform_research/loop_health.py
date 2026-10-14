@@ -28,11 +28,21 @@
 - **方法永不抛**：任何一段异常都被就地降级为 ``unavailable``，其余段照常产出；
   `collect_loop_health` 对调用方是 total function。
 
+历史台账（趋势面，T1 / v4.9.0）
+
+``collect_loop_health`` 额外读一段 **``history``**：来自 ``<dir>/history.jsonl``
+（``append_history`` 追加，CLI 落盘时写），给出 ``degradedStreak`` / ``blockedStreak`` /
+``notOkStreak``（**含本次**；同一天重跑只算一次，本次覆盖当天旧记录）与近 N 天裁决。
+**``history`` 不参与裁决** —— 裁决仍只看六路信号的当下快照，历史只回答「这次降级是持续还是偶发」。
+台账只写平台自有 ``data/``，绝不写 ``market.db`` 或任何库。
+
 SIMULATE only. Not investment advice.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -51,10 +61,27 @@ from .symbol_master import open_symbol_master
 # 默认输出目录（CLI 用）。相对 cwd，与 data/ 其它产物同级。
 DEFAULT_LOOP_HEALTH_OUT_DIR = "./data/health"
 
+# 历史台账（T1 / v4.9.0）—— 每次体检追加一行 ``{ts, asof, status, failed, warned}``。
+# 目录可用 ``STOCK_PLATFORM_LOOP_HEALTH_DIR`` 覆盖；台账**只写平台自有 data/**，
+# 绝不写 ``market.db`` 或任何库（承接 ADR 0058 只读）。
+LOOP_HEALTH_HISTORY_FILENAME = "history.jsonl"
+ENV_LOOP_HEALTH_DIR = "STOCK_PLATFORM_LOOP_HEALTH_DIR"
+DEFAULT_HISTORY_RECENT = 7
+HISTORY_MAX_RECORDS = 400
+
 # 各段 status 取值（fail-closed 的显式词表）。
 SECTION_OK = "ok"
 SECTION_EMPTY = "empty"
 SECTION_UNAVAILABLE = "unavailable"
+
+# 供数段「不可判」的硬失败档 —— 没有供数就是物理上选不出票，不许当「正常」。
+# 含 ``error``（库存在但不可读）与 ``unconfigured``（未配置路径）：
+# 这两档在 v4.7.0 的裁决里既非 fail 也非 warn，会被误判成 ok（T1 / v4.9.0 修正）。
+COVERAGE_HARD_FAIL = frozenset(
+    {SECTION_UNAVAILABLE, SECTION_EMPTY, "missing_table", "error", "unconfigured"}
+)
+# 供数段「可跑但要打折看」的档。
+COVERAGE_WARN = frozenset({"stale", "thin"})
 
 # 裁决档位。
 VERDICT_OK = "ok"
@@ -306,8 +333,9 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
 
     规则（写进契约 ``docs/contracts/loop-health.md``）：
 
-    - coverage：``unavailable`` / ``missing_table`` / ``empty`` → fail；
-      ``stale`` / ``thin`` → warn；``ok`` → ok
+    - coverage：``COVERAGE_HARD_FAIL``（``unavailable`` / ``empty`` / ``missing_table`` /
+      ``error`` / ``unconfigured``）→ fail；``COVERAGE_WARN``（``stale`` / ``thin``）→ warn；
+      其余 → ok
     - latestBrief：``unavailable`` / ``empty`` → fail；
       ``asof`` 落后 ``coverage.latestTradeDate``（按交易日）→ warn；否则 ok
     - hits：``unavailable`` → warn；``empty`` → warn；``ok`` → ok
@@ -322,9 +350,9 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
 
     cov = sections.get("coverage") or {}
     cov_status = str(cov.get("status") or SECTION_UNAVAILABLE)
-    if cov_status in {SECTION_UNAVAILABLE, "missing_table", SECTION_EMPTY}:
+    if cov_status in COVERAGE_HARD_FAIL:
         add("coverage", _LEVEL_FAIL, f"供数不可用（status={cov_status}）")
-    elif cov_status in {"stale", "thin"}:
+    elif cov_status in COVERAGE_WARN:
         add("coverage", _LEVEL_WARN, f"供数异常（status={cov_status}）")
     else:
         add("coverage", _LEVEL_OK, f"供数正常（status={cov_status}）")
@@ -397,6 +425,165 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# 7. 历史台账（趋势面）—— 只写平台自有 data/，不写库
+# --------------------------------------------------------------------------- #
+def default_loop_health_dir() -> Path:
+    """体检产物目录：``STOCK_PLATFORM_LOOP_HEALTH_DIR`` 优先，否则 ``./data/health``。"""
+    raw = os.environ.get(ENV_LOOP_HEALTH_DIR, "").strip()
+    return Path(raw) if raw else Path(DEFAULT_LOOP_HEALTH_OUT_DIR)
+
+
+def default_loop_health_history_path() -> Path:
+    """默认历史上台账路径（``<dir>/history.jsonl``）。"""
+    return default_loop_health_dir() / LOOP_HEALTH_HISTORY_FILENAME
+
+
+def read_history(path: str | Path | None = None) -> list[dict[str, Any]]:
+    """读历史台账（最旧在前）。文件不存在 → ``[]``；**读失败向上抛**（由调用方 fail-closed）。
+
+    坏行（非 JSON / 缺 ``asof``）**跳过而不抛** —— 单行损坏不该让整条趋势面消失。
+    """
+    p = Path(path) if path is not None else default_loop_health_history_path()
+    if not p.is_file():
+        return []
+    out: list[dict[str, Any]] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            rec = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(rec, dict) and str(rec.get("asof") or "").strip():
+            out.append(rec)
+    return out
+
+
+def append_history(
+    payload: Mapping[str, Any], path: str | Path | None = None
+) -> dict[str, Any]:
+    """把一次体检结果追加进历史台账（**fail-open，永不抛**）。
+
+    只落四个审计字段（``ts`` / ``asof`` / ``status`` / ``failed`` / ``warned``），
+    不落整份 payload（趋势面只需要裁决）。超过 ``HISTORY_MAX_RECORDS`` 行时裁掉最旧部分。
+    """
+    p = Path(path) if path is not None else default_loop_health_history_path()
+    verdict = payload.get("verdict") or {}
+    record = {
+        "ts": str(payload.get("generatedAt") or _utcnow_iso()),
+        "asof": str(payload.get("asof") or "")[:10],
+        "status": str(verdict.get("status") or ""),
+        "failed": list(verdict.get("failed") or []),
+        "warned": list(verdict.get("warned") or []),
+    }
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        trimmed = _trim_history(p, HISTORY_MAX_RECORDS)
+        return {"appended": True, "path": str(p), "record": record, "trimmed": trimmed}
+    except Exception as exc:  # noqa: BLE001 — 台账是锦上添花，绝不拖垮体检
+        return {"appended": False, "path": str(p), "reason": _error_text(exc)}
+
+
+def _trim_history(path: Path, keep: int) -> int:
+    """把台账裁到最近 ``keep`` 行；返回裁掉的行数（失败 → 0）。"""
+    try:
+        lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        if len(lines) <= keep:
+            return 0
+        dropped = len(lines) - keep
+        path.write_text("\n".join(lines[-keep:]) + "\n", encoding="utf-8")
+        return dropped
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _dedupe_by_asof(records: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """按 ``asof`` 去重（同一天多次体检只算一次，``ts`` 较晚者胜）。"""
+    by: dict[str, dict[str, Any]] = {}
+    for rec in records:
+        day = str(rec.get("asof") or "")[:10]
+        if not day:
+            continue
+        ts = str(rec.get("ts") or "")
+        prev = by.get(day)
+        if prev is not None and ts < str(prev.get("ts") or ""):
+            continue
+        by[day] = {
+            "asof": day,
+            "status": str(rec.get("status") or ""),
+            "ts": ts or None,
+            "failed": list(rec.get("failed") or []),
+            "warned": list(rec.get("warned") or []),
+        }
+    return by
+
+
+def summarize_history(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    asof: str | None,
+    status: str | None,
+    recent_limit: int = DEFAULT_HISTORY_RECENT,
+) -> dict[str, Any]:
+    """把历史行卷成趋势摘要（**纯函数**）。
+
+    ``asof`` / ``status`` 是**本次**体检的时点与裁决 —— 计入连续段（同一天重跑只算一次，
+    本次覆盖当天旧记录），因此 ``degradedStreak`` 含本次。
+    """
+    by = _dedupe_by_asof(records)
+    stored_days = len(by)
+    day = str(asof or "")[:10]
+    if day:
+        by[day] = {
+            "asof": day,
+            "status": str(status or ""),
+            "ts": None,
+            "failed": [],
+            "warned": [],
+        }
+    days = sorted(by)
+
+    def _trailing(pred: Callable[[str], bool]) -> int:
+        n = 0
+        for d in reversed(days):
+            if pred(by[d]["status"]):
+                n += 1
+            else:
+                break
+        return n
+
+    degraded = _trailing(lambda s: s == VERDICT_DEGRADED)
+    blocked = _trailing(lambda s: s == VERDICT_BLOCKED)
+    not_ok = _trailing(lambda s: s not in {"", VERDICT_OK})
+    limit = max(1, int(recent_limit))
+    return {
+        "status": SECTION_OK if stored_days else SECTION_EMPTY,
+        "daysRecorded": stored_days,
+        "degradedStreak": degraded,
+        "blockedStreak": blocked,
+        "notOkStreak": not_ok,
+        "streakSince": days[len(days) - not_ok] if not_ok else None,
+        "recent": [by[d] for d in reversed(days[-limit:])],
+        **({} if stored_days else {"reason": "历史台账为空：本次是第一条记录。"}),
+    }
+
+
+def _collect_history(
+    path: str | Path | None, *, asof: str, status: str
+) -> dict[str, Any]:
+    """读历史台账并给出趋势摘要（读失败向上抛 → 由 ``_safe`` 标 ``unavailable``）。"""
+    records = read_history(path)
+    summary = summarize_history(records, asof=asof, status=status)
+    summary["path"] = str(
+        Path(path) if path is not None else default_loop_health_history_path()
+    )
+    return summary
+
+
+# --------------------------------------------------------------------------- #
 # 总入口
 # --------------------------------------------------------------------------- #
 def collect_loop_health(
@@ -408,11 +595,17 @@ def collect_loop_health(
     holding_days: int = 5,
     coverage_lookback_days: int | None = None,
     coverage_min_rows: int | None = None,
+    history_path: str | Path | None = None,
+    history_recent: int = DEFAULT_HISTORY_RECENT,
 ) -> dict[str, Any]:
     """聚合一次日用循环健康度快照（**永不抛**）。
 
     每一段独立 try/except：失败段 → ``status="unavailable"`` + ``reason``，
     其余段照常产出，最终仍给出一份完整 payload。
+
+    额外给出一段 **``history``（趋势面，T1 / v4.9.0）**：读 ``history.jsonl`` 并算
+    ``degradedStreak`` / ``blockedStreak`` / ``notOkStreak``（**含本次**，同一天重跑只算一次）。
+    ``history`` **不参与裁决** —— 裁决仍只看六路信号的当下快照，历史只解释「是持续还是偶发」。
     """
     asof_day = str(asof or date.today().isoformat())[:10]
 
@@ -448,6 +641,13 @@ def collect_loop_health(
         ),
     }
     verdict = roll_up_verdict(sections)
+    history = _safe(
+        lambda: _collect_history(
+            history_path, asof=asof_day, status=str(verdict.get("status") or "")
+        )
+    )
+    if history.get("status") == SECTION_OK and "recent" in history:
+        history["recent"] = history["recent"][: max(1, int(history_recent))]
 
     return {
         "environment": "SIMULATE",
@@ -457,6 +657,7 @@ def collect_loop_health(
         "holdingDays": int(holding_days),
         "verdict": verdict,
         **sections,
+        "history": history,
         "disclaimer": (
             "只读体检：零网络、不写库；研究指标，非投资建议；"
             "各段口径见 docs/contracts/loop-health.md。"
@@ -593,12 +794,54 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             lines.append(f"- **{name}**：{reason}")
         lines.append("")
 
+    lines += _render_history_block(payload.get("history") or {})
+
     lines += [
         "> 说明：本报告只**汇总既有只读信号**，不抓数、不写库、不改口径；",
-        "> 供数覆盖与结算口径分别见 ADR 0058 / ADR 0068，供数守卫见 ADR 0070。",
+        "> 供数覆盖与结算口径分别见 ADR 0058 / ADR 0068，供数守卫见 ADR 0070；",
+        "> 趋势台账只写平台自有 `data/health/history.jsonl`，不写任何库（T1 / ADR 0075）。",
         "",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _render_history_block(hist: Mapping[str, Any]) -> list[str]:
+    """趋势块（历史台账）：连续段 + 近 N 天裁决。"""
+    if not hist:
+        return []
+    out = ["## 趋势（历史台账）", ""]
+    if str(hist.get("status") or "") == SECTION_UNAVAILABLE:
+        out += [f"- 历史台账不可用：{hist.get('reason')}", ""]
+        return out
+    since = str(hist.get("streakSince") or "")
+    out += [
+        "- 台账：`{p}`（{n} 天记录）".format(
+            p=_cell(hist.get("path")), n=_cell(hist.get("daysRecorded"))
+        ),
+        "- 连续：degraded **{d}** 天 · blocked **{b}** 天 · 非正常 **{k}** 天{g}".format(
+            d=_cell(hist.get("degradedStreak")),
+            b=_cell(hist.get("blockedStreak")),
+            k=_cell(hist.get("notOkStreak")),
+            g=f"（自 `{since}` 起）" if since else "",
+        ),
+        "",
+        "| 时点 | 裁决 | warn |",
+        "|---|---|---|",
+    ]
+    recent = list(hist.get("recent") or [])
+    if not recent:
+        out.append("| — | — | — |")
+    for rec in recent:
+        status_raw = str(rec.get("status") or "")
+        out.append(
+            "| {a} | {s} | {w} |".format(
+                a=_cell(rec.get("asof")),
+                s=_VERDICT_ZH.get(status_raw, _cell(status_raw)),
+                w=", ".join(str(x) for x in (rec.get("warned") or [])) or "—",
+            )
+        )
+    out.append("")
+    return out
 
 
 def default_loop_health_out_dir() -> Path:
@@ -607,15 +850,26 @@ def default_loop_health_out_dir() -> Path:
 
 
 __all__ = [
+    "COVERAGE_HARD_FAIL",
+    "COVERAGE_WARN",
+    "DEFAULT_HISTORY_RECENT",
     "DEFAULT_LOOP_HEALTH_OUT_DIR",
+    "ENV_LOOP_HEALTH_DIR",
+    "HISTORY_MAX_RECORDS",
+    "LOOP_HEALTH_HISTORY_FILENAME",
     "SECTION_EMPTY",
     "SECTION_OK",
     "SECTION_UNAVAILABLE",
     "VERDICT_BLOCKED",
     "VERDICT_DEGRADED",
     "VERDICT_OK",
+    "append_history",
     "collect_loop_health",
+    "default_loop_health_dir",
+    "default_loop_health_history_path",
     "default_loop_health_out_dir",
+    "read_history",
     "render_loop_health_markdown",
     "roll_up_verdict",
+    "summarize_history",
 ]
