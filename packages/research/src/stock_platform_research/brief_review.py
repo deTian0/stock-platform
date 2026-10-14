@@ -40,6 +40,26 @@ def _trading_closes_tplus(
     return closes[entry_idx][1], closes[exit_idx][1], closes[entry_idx][0], closes[exit_idx][0]
 
 
+def window_return(
+    bars: Sequence[Mapping[str, Any]],
+    *,
+    start: date,
+    holding_days: int,
+) -> float | None:
+    """``holding_days`` 个交易日窗口的收益（entry=start 当根收盘，exit=T+H 收盘）。
+
+    与 :func:`_trading_closes_tplus` / ``performance._holding_window`` 同一口径；
+    窗口数据不足返回 ``None``（绝不猜）。基准对比复用本函数。
+    """
+    pair = _trading_closes_tplus(bars, start=start, holding_days=holding_days)
+    if pair is None:
+        return None
+    entry_c, exit_c = pair[0], pair[1]
+    if not entry_c:
+        return None
+    return exit_c / entry_c - 1.0
+
+
 def review_stored_brief(
     record: Mapping[str, Any],
     *,

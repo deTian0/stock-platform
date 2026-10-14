@@ -13,7 +13,8 @@ from datetime import date, timedelta
 from typing import Any, Callable, Sequence
 
 from .brief import build_premarket_brief
-from .brief_review import review_stored_brief
+from .brief_review import review_stored_brief, window_return
+from .performance import parse_holding_days
 from .universe import (
     UNIVERSE_TIERS,
     UniverseEmptyError,
@@ -31,6 +32,16 @@ MAX_LAST_N = 20
 DEFAULT_TOP_N = 5
 MAX_SYMBOLS = 80
 CALENDAR_PROBE_SYMBOL = "600519"
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    """样本均值；空样本 → ``None``（不填 0，不假装有结论）。"""
+    return sum(values) / len(values) if values else None
+
+
+def _rate(values: Sequence[float]) -> float | None:
+    """为正的比例；空样本 → ``None``。"""
+    return (sum(1 for v in values if v > 0) / len(values)) if values else None
 
 
 def _unique_trade_dates(bars: Sequence[dict[str, Any]]) -> list[date]:
@@ -134,6 +145,8 @@ def run_rolling_recommend_review(
     top_n: int = DEFAULT_TOP_N,
     soft_gates: bool = True,
     daily_source: str | None = None,
+    benchmark_get_daily: GetDaily | None = None,
+    benchmark_symbol: str = "000905",
 ) -> dict[str, Any]:
     """Roll TopN briefs over asof dates and aggregate review_stored_brief metrics.
 
@@ -147,6 +160,9 @@ def run_rolling_recommend_review(
         "holding": holding,
         "topN": int(top_n),
         "universeTier": universe_tier,
+        "benchmarkSymbol": (
+            benchmark_symbol if benchmark_get_daily is not None else None
+        ),
         "disclaimer": (
             "滚动推荐复盘（研究指标）；口径对齐 direction_accuracy；"
             "非投资建议；默认 SIMULATE；不冒充 live。"
@@ -184,10 +200,27 @@ def run_rolling_recommend_review(
         base["failClosed"] = True
         return base
 
+    holding_days = parse_holding_days(holding) or 1
+    benchmark_bars: Sequence[dict[str, Any]] | None = None
+    if benchmark_get_daily is not None:
+        try:
+            benchmark_bars = list(
+                benchmark_get_daily(
+                    [benchmark_symbol],
+                    start=min(asofs),
+                    end=max(asofs) + timedelta(days=max(holding_days * 4, 20)),
+                )
+                or []
+            )
+        except Exception:  # noqa: BLE001 — 基准拿不到 → alpha 置空，不阻断主链
+            benchmark_bars = None
+
     day_rows: list[dict[str, Any]] = []
     settled_total = 0
     pending_total = 0
     direction_hits = 0
+    all_raws: list[float] = []
+    all_alphas: list[float] = []
 
     for asof_d in asofs:
         brief = build_premarket_brief(
@@ -206,11 +239,25 @@ def run_rolling_recommend_review(
         settled_total += settled
         pending_total += pending
         # Pool hits from settled Buy rows (same 口径 as review_stored_brief).
+        day_raws: list[float] = []
         for row in review.get("rows") or []:
             if row.get("pending"):
                 continue
+            raw = row.get("rawReturnFloat")
+            if isinstance(raw, (int, float)):
+                day_raws.append(float(raw))
             if row.get("directionOk") is True:
                 direction_hits += 1
+        bench_raw = (
+            window_return(benchmark_bars, start=asof_d, holding_days=holding_days)
+            if benchmark_bars
+            else None
+        )
+        day_alphas = (
+            [r - bench_raw for r in day_raws] if bench_raw is not None else []
+        )
+        all_raws.extend(day_raws)
+        all_alphas.extend(day_alphas)
         picks = brief.get("picks") or []
         day_rows.append(
             {
@@ -220,6 +267,13 @@ def run_rolling_recommend_review(
                 "settledCount": settled,
                 "pendingCount": pending,
                 "directionAccuracy": review.get("directionAccuracy"),
+                "avgRawReturn": _mean(day_raws),
+                "upRate": _rate(day_raws),
+                "best": max(day_raws) if day_raws else None,
+                "worst": min(day_raws) if day_raws else None,
+                "benchmarkRawReturn": bench_raw,
+                "avgAlpha": _mean(day_alphas),
+                "beatBenchmarkRate": _rate(day_alphas),
                 "gatesRelaxed": bool(brief.get("gatesRelaxed")),
                 # Light payload for Workbench: click asof → 推荐区回看 / 复盘
                 "pickSymbols": [
@@ -248,6 +302,13 @@ def run_rolling_recommend_review(
         "sampleCount": settled_total,
         "directionAccuracy": direction_accuracy,
         "direction_accuracy": direction_accuracy,
+        "avgRawReturn": _mean(all_raws),
+        "upRate": _rate(all_raws),
+        "best": max(all_raws) if all_raws else None,
+        "worst": min(all_raws) if all_raws else None,
+        "avgAlpha": _mean(all_alphas),
+        "beatBenchmarkRate": _rate(all_alphas),
+        "benchmarkSampleCount": len(all_alphas),
         "metricNote": (
             "direction_accuracy 与 performance / U3 复盘对齐：「看多 Buy」收益>0 算对；"
             "缺行情为 pending；不静默填 0。汇总为区间内已结算样本池化。"
