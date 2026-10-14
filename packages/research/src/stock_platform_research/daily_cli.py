@@ -182,6 +182,22 @@ def _resolve_tolerate_gaps(args: argparse.Namespace) -> bool:
     return True
 
 
+def _refresh_symbol_master(args: argparse.Namespace) -> None:
+    """随每日流水刷新本地「代码↔名称」主数据表（幂等、只读引擎库）。
+
+    名称是装饰性信息：任何失败都被吞掉，绝不影响选股 / 评分 / 结算。
+    成功时把引擎 ``fundamentals`` 的全量代码名称落进平台
+    ``symbol_master``，于是命中追踪 / 榜单 / digest 的名称不再依赖
+    「哪一次跑批带了 name_map」（2026-10-14 事故的根治）。
+    """
+    try:
+        from .symbol_master import refresh_from_engine
+
+        refresh_from_engine(args.market_db)
+    except Exception:  # noqa: BLE001 — 装饰性副作用，失败不阻断主链
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     # P0-2: load repo-root .env before argparse so env-derived defaults
     # (provider, token, market.db) behave the same as a .bat launch.
@@ -342,6 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     provider = _build_provider(args)
     market_source = _build_market_symbol_source(args)
     name_map = _build_name_map(args)
+    _refresh_symbol_master(args)
     asof = date.fromisoformat(args.asof)
     holdings: list[dict[str, Any]] | None = None
     if args.holdings:

@@ -43,6 +43,12 @@ from typing import Any, Mapping, Protocol, Sequence
 from urllib.parse import unquote, urlparse
 
 from .rankings import BOARD_SLUGS, QUALITY_KEY, code_key
+from .symbol_master import (
+    UNKNOWN_NAME,
+    clean_name,
+    display_name,
+    open_symbol_master,
+)
 
 PRE_MARKET = "pre_market"
 POST_MARKET = "post_market"
@@ -126,9 +132,22 @@ def norm_hit_code(value: Any) -> str:
 
 
 def _clean_name(name: Any, code: str) -> str:
-    if name is None or str(name).strip().lower() in {"", "nan", "none"}:
-        return code
-    return str(name).strip()
+    """名称归一化：空 / NaN / **等于代码** → ``""``（绝不拿代码顶替名称）。
+
+    2026-10-14 修复：这里过去在名称缺失时回退成 ``code``，于是「未知」在报告里
+    伪装成「看起来正确」的代码值（``000801 | 000801``）。占位符统一由
+    :data:`symbol_master.UNKNOWN_NAME` 在展示层负责 —— 存储层只存真实名称。
+    """
+    text = clean_name(name)
+    return "" if text == code else text
+
+
+def _master_name_map(db_url: str | Path | None = None) -> Mapping[str, str] | None:
+    """本地主数据表的只读快照；不可用 → ``None``（渲染/记录绝不触发刷新）。"""
+    try:
+        return open_symbol_master(db_url).load() or None
+    except Exception:  # noqa: BLE001 — 名称是装饰性的，绝不让主链失败
+        return None
 
 
 def apply_hit(
@@ -427,6 +446,8 @@ class SqliteHitTrackingRepository:
                 f"session_type must be one of {HIT_SESSION_TYPES}, got {session_type!r}"
             )
         day = _parse_date(pick_date).isoformat()
+        if not clean_name(name):
+            name = (_master_name_map(self.db_url) or {}).get(norm)
         conn = self._connect()
         try:
             detail = self._record_conn(
@@ -460,6 +481,7 @@ class SqliteHitTrackingRepository:
         day = _parse_date(pick_date or date.today().isoformat()).isoformat()
         details: list[dict[str, Any]] = []
         skipped = 0
+        fallback_names = _master_name_map(self.db_url) or {}
         conn = self._connect()
         try:
             for entry in entries:
@@ -468,12 +490,15 @@ class SqliteHitTrackingRepository:
                 if not norm:
                     skipped += 1
                     continue
+                entry_name = entry.get("name")
+                if not clean_name(entry_name):
+                    entry_name = fallback_names.get(norm)
                 detail = self._record_conn(
                     conn,
                     code=norm,
                     session_type=session_type,
                     pick_date=day,
-                    name=entry.get("name"),
+                    name=entry_name,
                     category=entry.get("category"),
                     config=config,
                 )
@@ -486,6 +511,42 @@ class SqliteHitTrackingRepository:
             if self._path != ":memory:":
                 conn.close()
         return {"recorded": len(details), "skipped": skipped, "details": details}
+
+    def backfill_names(
+        self, *, name_map: Mapping[str, str] | None = None
+    ) -> dict[str, int]:
+        """把历史行里「缺失 / 等于代码」的名称改写成真实名称（幂等）。
+
+        只碰这两类行；已有真实名称不动。名称来源：``name_map`` > 本地
+        ``symbol_master``（只读）。返回 ``{"hitSummary": n, "hitTracking": m}``。
+        """
+        names = name_map if name_map is not None else _master_name_map(self.db_url)
+        if not names:
+            return {"hitSummary": 0, "hitTracking": 0}
+        fixed = {"hitSummary": 0, "hitTracking": 0}
+        conn = self._connect()
+        try:
+            for table, key in (("hit_summary", "hitSummary"), ("hit_tracking", "hitTracking")):
+                rows = conn.execute(
+                    f"SELECT DISTINCT code FROM {table} "
+                    "WHERE name IS NULL OR TRIM(name)='' OR name=code"
+                ).fetchall()
+                for row in rows:
+                    code = str(row["code"])
+                    real = names.get(code) or names.get(norm_hit_code(code))
+                    if not real:
+                        continue
+                    cur = conn.execute(
+                        f"UPDATE {table} SET name=? "
+                        "WHERE code=? AND (name IS NULL OR TRIM(name)='' OR name=code)",
+                        (real, code),
+                    )
+                    fixed[key] += int(cur.rowcount or 0)
+            conn.commit()
+        finally:
+            if self._path != ":memory:":
+                conn.close()
+        return fixed
 
     # -- reads ------------------------------------------------------------
     def get_state(self, code: str, session_type: str) -> dict[str, Any] | None:
@@ -679,9 +740,11 @@ def hit_tracking_snapshot(
     *,
     asof: str | None = None,
     cycle_top_n: int = 10,
+    name_map: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """The three cumulative queries (``X3`` acceptance) in one payload."""
     day = _parse_date(asof or date.today().isoformat()).isoformat()
+    names = name_map if name_map is not None else _master_name_map()
     out: dict[str, Any] = {
         "asof": day,
         "environment": "SIMULATE",
@@ -709,7 +772,7 @@ def hit_tracking_snapshot(
         "items": [
             {
                 "code": r.get("code"),
-                "name": r.get("name"),
+                "name": display_name(r.get("code"), r.get("name"), name_map=names),
                 "cycleHits": int(r.get("active_cycle_hits") or 0),
                 "cumulativeHits": int(r.get("cumulative_hits") or 0),
                 "cycleStart": r.get("active_cycle_start"),
@@ -726,9 +789,16 @@ def format_hit_report(
     *,
     asof: str | None = None,
     top_n: int = 10,
+    name_map: Mapping[str, str] | None = None,
 ) -> str:
-    """Render the three cumulative views as markdown (never blank)."""
+    """Render the three cumulative views as markdown (never blank).
+
+    ``name_map`` 覆盖本地 ``symbol_master``；名称一律经
+    :func:`symbol_master.display_name` 解析 —— 未收录时给占位符，
+    **不会**再把代码当名称回显（2026-10-14 修复）。
+    """
     day = _parse_date(asof or date.today().isoformat()).isoformat()
+    names = name_map if name_map is not None else _master_name_map()
     lines = [f"# 命中追踪（{day} · SIMULATE · 非投资建议）", ""]
     for st, label in ((PRE_MARKET, "盘前"), (POST_MARKET, "盘后")):
         rows = [r for r in repo.summary(session_type=st) if int(r.get("cumulative_hits") or 0)]
@@ -744,7 +814,7 @@ def format_hit_report(
             lines.append(
                 "| {c} | {n} | {cum} | {cy} | {ch} | {ce} | {last} |".format(
                     c=r.get("code"),
-                    n=r.get("name") or r.get("code"),
+                    n=display_name(r.get("code"), r.get("name"), name_map=names),
                     cum=r.get("cumulative_hits"),
                     cy=r.get("total_cycles"),
                     ch=r.get("active_cycle_hits"),
@@ -765,7 +835,7 @@ def format_hit_report(
             lines.append(
                 "| {c} | {n} | {ch} | {cum} | {cs} | {ce} |".format(
                     c=r.get("code"),
-                    n=r.get("name") or r.get("code"),
+                    n=display_name(r.get("code"), r.get("name"), name_map=names),
                     ch=r.get("active_cycle_hits"),
                     cum=r.get("cumulative_hits"),
                     cs=r.get("active_cycle_start") or "-",
@@ -778,6 +848,7 @@ def format_hit_report(
 
 __all__ = [
     "CATEGORY_QUALITY",
+    "UNKNOWN_NAME",
     "DEFAULT_CYCLE_CALENDAR_DAYS",
     "DEFAULT_TRACK_BOARDS",
     "HIT_SESSION_TYPES",

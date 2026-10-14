@@ -9,6 +9,7 @@ import pytest
 from stock_platform_research.hit_tracking import (
     POST_MARKET,
     PRE_MARKET,
+    UNKNOWN_NAME,
     HitTrackingConfig,
     SqliteHitTrackingRepository,
     apply_hit,
@@ -269,3 +270,66 @@ def test_track_brief_hits_idempotent_same_day(repo: SqliteHitTrackingRepository)
     assert second["recorded"] == 0
     assert second["skipped"] == 1
     assert repo.get_state("600519", PRE_MARKET)["cumulative_hits"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 名称显示回归（2026-10-14 事故：命中追踪「名称 = 代码」）
+# ---------------------------------------------------------------------------
+
+
+def test_unknown_name_is_not_stored_as_code(repo: SqliteHitTrackingRepository) -> None:
+    """名称缺失时存空串，**绝不**拿代码顶替（存储层不再伪造名称）。"""
+    _rec(repo, "600519", "2026-09-01")
+    assert repo.get_state("600519", PRE_MARKET)["name"] in ("", None)
+
+
+def test_format_hit_report_shows_placeholder_not_code(repo: SqliteHitTrackingRepository) -> None:
+    """未收录名称 → 占位符；报告里不能出现「代码 == 名称」。"""
+    _rec(repo, "600519", "2026-09-01")
+    text = format_hit_report(repo, asof="2026-09-01", name_map={})
+    assert f"| 600519 | {UNKNOWN_NAME} |" in text
+    assert "| 600519 | 600519 |" not in text
+
+
+def test_format_hit_report_resolves_names_from_map(repo: SqliteHitTrackingRepository) -> None:
+    """给了权威映射 → 渲染中文名（历史行名称缺失也能补上，无需改库）。"""
+    _rec(repo, "601038", "2026-09-01")
+    text = format_hit_report(repo, asof="2026-09-01", name_map={"601038": "一拖股份"})
+    assert "| 601038 | 一拖股份 |" in text
+
+
+def test_backfill_names_fixes_code_as_name_rows(repo: SqliteHitTrackingRepository) -> None:
+    """回填：把「空 / 等于代码」的历史名称改写成真实名称，且幂等。"""
+    _rec(repo, "000801", "2026-09-01")
+    # 手工制造历史脏值（旧版本把代码写进了 name 列）
+    con = repo._connect()
+    con.execute("UPDATE hit_summary SET name='000801' WHERE code='000801'")
+    con.execute("UPDATE hit_tracking SET name='000801' WHERE code='000801'")
+    con.commit()
+    con.close()
+
+    fixed = repo.backfill_names(name_map={"000801": "四川九洲"})
+    assert fixed == {"hitSummary": 1, "hitTracking": 1}
+    assert repo.get_state("000801", PRE_MARKET)["name"] == "四川九洲"
+    # 幂等：再跑一次没有可改的行
+    assert repo.backfill_names(name_map={"000801": "四川九洲"}) == {
+        "hitSummary": 0,
+        "hitTracking": 0,
+    }
+
+
+def test_backfill_names_keeps_real_names(repo: SqliteHitTrackingRepository) -> None:
+    """已有真实名称的行不动。"""
+    _rec(repo, "600519", "2026-09-01", name="贵州茅台")
+    assert repo.backfill_names(name_map={"600519": "别的名字"}) == {
+        "hitSummary": 0,
+        "hitTracking": 0,
+    }
+    assert repo.get_state("600519", PRE_MARKET)["name"] == "贵州茅台"
+
+
+def test_snapshot_items_resolve_names(repo: SqliteHitTrackingRepository) -> None:
+    _rec(repo, "601318", "2026-09-01")
+    snap = hit_tracking_snapshot(repo, asof="2026-09-01", name_map={"601318": "中国平安"})
+    item = snap["pre_market_in_cycle"]["items"][0]
+    assert item["name"] == "中国平安"
