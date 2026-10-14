@@ -8,6 +8,58 @@
 
 - （无）
 
+## [4.7.0] - 2026-10-14
+
+### Added
+
+- **日用循环健康度单点（`R3`）—— `research.loop_health` + CLI `stock-platform-loop-health`**
+  —— 平台日用循环由**五段**串成（供数 → 选股 → 命中记账 → 绩效结算 → 名称展示），
+  每段各有守卫，却**没有任何单一入口**回答「今天的循环正不正常」。新增只读单点把
+  **六路信号**聚合成**一个裁决**：
+  - `coverage` —— **复用** `EngineSqliteProvider.coverage_snapshot()`（C2 单点，懒导入）；
+  - `latestBrief` —— `open_brief_repository().list_recent(limit=1)`；
+  - `hits` —— 两类 session 的 `summary()` 汇总（码数 / 累计次数 / 最近选日）；
+  - `performance` —— `performance_summary()` 的 settled / pending / 样本量；
+  - `symbolMaster` —— `open_symbol_master().stats()` 行数；
+  - `nextSettlement` —— 由 brief asof 按交易日历推第 `holding` 个交易日（**提示，非承诺**）。
+- **`roll_up_verdict()` 纯函数裁决**（`ok` / `degraded` / `blocked`）：coverage 的
+  `unavailable` / `missing_table` / `empty` → **blocked**（没有供数就物理上选不出票），
+  `stale` / `thin` → degraded；brief asof 落后供数（按交易日）→ degraded；
+  绩效 `settledCount < MIN_MEANINGFUL_SAMPLE(=20)` → degraded；命中/名称缺失 → degraded。
+- **人读报告** `render_loop_health_markdown()`：结论先行 + 「裁决明细」+「六路信号」+「缺失/异常说明」；
+  CLI 默认写 `./data/health/loop_health.{json,md,html}`。
+- **架构 / 契约**：ADR [`0073`](docs/architecture/0073-daily-loop-health-single-point.md)、
+  契约 [`loop-health`](docs/contracts/loop-health.md)（段定义 / payload 形状 / 裁决规则表 / 边界）。
+
+### Changed
+
+- **`research` 顶层零 `providers` 依赖得到显式锁死**：`loop_health` 对
+  `EngineSqliteProvider` / `get_trading_calendar` **只在函数内导入**；新增静态测试
+  `test_providers_imported_lazily_only` 断言「所有 `stock_platform_providers` 出现处均缩进
+  （即函数内）」。
+- 路线图：`R3` 行标 done（`v4.7.0`）+ 修订记录；`docs/plans/README.md` 与 `docs/README.md`
+  状态刷为「`C` 域全部收官 / `R` 域 `R1`–`R3` done / `P0` 线至 `v4.7.0`」。
+- `check_docs.ps1` 登记两份新文档（`$required` 162 → 164）。
+
+### Notes
+
+- **CLI 退出码恒为 0** —— 体检**不是门禁**，裁决在 payload `verdict.status`；需要门禁的运维
+  脚本读 JSON 判断。非 0 会与「循环可跑但需留意」的正常状态混淆。
+- **硬约束**：零网络 / 只读（`market.db` 仍 `mode=ro`）/ fail-closed（缺件标 `unavailable`+`reason`，
+  绝不用默认值冒充正常）/ **每段独立 try-except —— `collect_loop_health` 是 total function，永不抛**。
+- **不替代既有守卫**：ADR 0070 的 ops asof 回落守卫仍在写 brief **之前**防伤害，体检是**事后**认伤害。
+- **不抓数、不回补**：只如实报告供数滞后；成因治理仍归 `Invoke-MarketDbBackfill.ps1`。
+
+### Verified
+
+- 新增 `packages/research/tests/test_loop_health.py` **19 项**（fail-closed / 段隔离 /
+  coverage 复用 C2 / 裁决规则表驱动 / 渲染 / providers 懒导入 / CLI 写与不写产物）。
+- 真机一次运行（2026-10-14）：裁决 **`degraded`**，`warned=['coverage','performance']`
+  —— `latestTradeDate=2026-10-12`（滞后 2 个交易日）、绩效样本 `3 < 20`；
+  `hits=14 码 / 累计 20 次`、`symbolMaster=5237 行`、`nextSettlement=2026-10-19` 均正常。
+- `scripts/check_versions.ps1` OK（`VERSION=4.7.0, packages=5`）；`scripts/check_docs.ps1` OK。
+- 全量 `pytest packages apps`（`replay`）**1056 passed / 0 failed / 1 warning**（98.18s）。
+
 ## [4.6.2] - 2026-10-14
 
 ### Added
