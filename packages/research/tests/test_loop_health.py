@@ -198,6 +198,7 @@ def _sections(**over: object) -> dict[str, object]:
     base: dict[str, object] = {
         "coverage": {"status": "ok", "latestTradeDate": "2026-10-14"},
         "latestBrief": {"status": "ok", "asof": "2026-10-14"},
+        "briefContinuity": {"status": "ok", "windowDays": 5, "missingDays": []},
         "hits": {"status": "ok", "totalCodeCount": 5, "totalCumulativeHits": 9},
         "performance": {
             "status": "ok",
@@ -206,6 +207,7 @@ def _sections(**over: object) -> dict[str, object]:
             "sampleSufficient": True,
         },
         "symbolMaster": {"status": "ok", "total": 5200},
+        "opsLedger": {"status": "ok", "failingTasks": [], "taskCount": 3, "totalRuns": 9},
     }
     base.update(over)
     return base
@@ -287,7 +289,14 @@ def test_render_markdown_has_core_sections(tmp_path: Path) -> None:
         asof="2026-10-14",
     )
     md = render_loop_health_markdown(payload)
-    for needle in ("# 日用循环健康度", "## 裁决明细", "## 六路信号", "## 缺失/异常说明"):
+    for needle in (
+        "# 日用循环健康度",
+        "## 裁决明细",
+        "## 信号明细",
+        "## brief 连续性（近 N 个交易日）",
+        "## 调度执行台账",
+        "## 缺失/异常说明",
+    ):
         assert needle in md
     assert "阻断" in md  # 空库 → blocked
 
@@ -534,3 +543,175 @@ def test_cli_appends_history_unless_disabled(tmp_path: Path) -> None:
     assert len(read_history(hp)) == 2
     assert main(base + ["--no-write"]) == 0
     assert len(read_history(hp)) == 2
+
+
+# ---------------------------------------------------------------------------
+# 10. 调度执行台账 + brief 连续性（T2 / v4.9.1）
+# ---------------------------------------------------------------------------
+
+
+def _trading_days(asof: str, count: int) -> list[str]:
+    """``asof``（含）往前 ``count`` 个交易日，**升序**（与 ``_recent_trading_days`` 一致）。"""
+    from stock_platform_providers import get_trading_calendar
+
+    cal = get_trading_calendar("CN")
+    cursor = date.fromisoformat(asof)
+    days: list[str] = []
+    while len(days) < count:
+        if cal.is_trading_day(cursor):
+            days.append(cursor.isoformat())
+        cursor -= timedelta(days=1)
+    days.reverse()
+    return days
+
+
+def _save_briefs(path: Path, asofs: list[str]) -> None:
+    repo = SqliteBriefRepository(path)
+    for asof in asofs:
+        repo.save(
+            {
+                "asof": asof,
+                "provider": "replay",
+                "picks": [{"symbol": "600519"}],
+                "environment": "SIMULATE",
+            }
+        )
+
+
+def test_section_constants_align_with_ops_ledger() -> None:
+    """两个模块各自定义 ``SECTION_*`` 字面量 —— 钉住它们**不漂移**（无循环导入的代价）。"""
+    from stock_platform_research import ops_ledger as ol
+
+    assert ol.SECTION_OK == lh.SECTION_OK == "ok"
+    assert ol.SECTION_EMPTY == lh.SECTION_EMPTY == "empty"
+    assert ol.SECTION_UNAVAILABLE == lh.SECTION_UNAVAILABLE == "unavailable"
+
+
+def test_brief_continuity_flags_missing_days(tmp_path: Path) -> None:
+    """近 5 个交易日只写了 2 天 brief → 缺 3 日，**逐个列出**。"""
+    days = _trading_days("2026-10-14", 5)
+    db = tmp_path / "platform.db"
+    _save_briefs(db, days[-2:])
+    payload = collect_loop_health(
+        db_url=db,
+        market_db=tmp_path / "nope.db",  # 供数不可用 → 窗口锚在体检时点
+        perf_log=tmp_path / "missing.jsonl",
+        asof="2026-10-14",
+        brief_window_days=5,
+    )
+    bc = payload["briefContinuity"]
+    assert bc["status"] == "incomplete"
+    assert bc["windowDays"] == 5
+    assert bc["missingDays"] == days[:3]
+    assert bc["coveredDays"] == days[-2:]
+    assert bc["coverageRatio"] == pytest.approx(0.4)
+    assert "缺" in bc["reason"]
+
+
+def test_brief_continuity_all_covered_is_ok(tmp_path: Path) -> None:
+    days = _trading_days("2026-10-14", 5)
+    db = tmp_path / "platform.db"
+    _save_briefs(db, days)
+    payload = collect_loop_health(
+        db_url=db,
+        market_db=tmp_path / "nope.db",
+        perf_log=tmp_path / "missing.jsonl",
+        asof="2026-10-14",
+        brief_window_days=5,
+    )
+    bc = payload["briefContinuity"]
+    assert bc["status"] == "ok"
+    assert bc["missingDays"] == []
+    assert "reason" not in bc
+
+
+def test_brief_continuity_calendar_unavailable(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(lh, "_recent_trading_days", lambda *_a, **_k: None)
+    payload = lh._collect_brief_continuity(
+        tmp_path / "platform.db", end_day="2026-10-14", window_days=5
+    )
+    assert payload["status"] == SECTION_UNAVAILABLE
+    assert "日历" in payload["reason"]
+
+
+def test_verdict_brief_continuity_missing_warns_not_blocks() -> None:
+    verdict = roll_up_verdict(
+        _sections(
+            briefContinuity={
+                "status": "incomplete",
+                "windowDays": 5,
+                "missingDays": ["2026-10-13", "2026-10-14"],
+            }
+        )
+    )
+    assert verdict["status"] == VERDICT_DEGRADED
+    assert "briefContinuity" in verdict["warned"]
+    assert verdict["failed"] == []
+
+
+def test_verdict_ops_ledger_unavailable_warns_not_blocks() -> None:
+    """台账缺失是**观测面缺口**：fail-closed（不假装 ok）但**不阻断**日用循环。"""
+    verdict = roll_up_verdict(_sections(opsLedger={"status": SECTION_UNAVAILABLE}))
+    assert verdict["status"] == VERDICT_DEGRADED
+    assert verdict["warned"] == ["opsLedger"]
+    assert verdict["failed"] == []
+
+
+def test_verdict_ops_ledger_failing_tasks_warn() -> None:
+    verdict = roll_up_verdict(
+        _sections(
+            opsLedger={
+                "status": "ok",
+                "taskCount": 3,
+                "totalRuns": 9,
+                "failingTasks": ["marketdb-backfill"],
+            }
+        )
+    )
+    assert verdict["status"] == VERDICT_DEGRADED
+    assert verdict["warned"] == ["opsLedger"]
+    check = next(c for c in verdict["checks"] if c["id"] == "opsLedger")
+    assert "marketdb-backfill" in check["detail"]
+
+
+def test_ops_ledger_segment_reads_ledger(tmp_path: Path) -> None:
+    from stock_platform_research.ops_ledger import record_run
+
+    led = tmp_path / "logs" / "runs.jsonl"
+    record_run(task="daily", exit_code=0, path=led)
+    payload = collect_loop_health(
+        db_url=tmp_path / "platform.db",
+        market_db=tmp_path / "nope.db",
+        perf_log=tmp_path / "missing.jsonl",
+        asof="2026-10-14",
+        ops_ledger_path=led,
+    )
+    ops = payload["opsLedger"]
+    assert ops["status"] == "ok"
+    assert ops["totalRuns"] == 1
+    assert ops["failingTasks"] == []
+    assert ops["tasks"][0]["label"] == "盘前选股"
+
+
+def test_render_includes_continuity_and_ops_blocks(tmp_path: Path) -> None:
+    days = _trading_days("2026-10-14", 5)
+    db = tmp_path / "platform.db"
+    _save_briefs(db, days[-2:])
+    from stock_platform_research.ops_ledger import record_run
+
+    led = tmp_path / "logs" / "runs.jsonl"
+    record_run(task="marketdb-backfill", exit_code=1, path=led)
+    record_run(task="marketdb-backfill", exit_code=1, path=led)
+    payload = collect_loop_health(
+        db_url=db,
+        market_db=tmp_path / "nope.db",
+        perf_log=tmp_path / "missing.jsonl",
+        asof="2026-10-14",
+        ops_ledger_path=led,
+    )
+    md = render_loop_health_markdown(payload)
+    assert "## brief 连续性（近 N 个交易日）" in md
+    assert "## 调度执行台账" in md
+    for miss in days[:3]:
+        assert f"`{miss}`" in md  # 缺日逐个列出
+    assert "**2**" in md  # 连续失败 2 次加粗

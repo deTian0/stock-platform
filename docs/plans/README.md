@@ -11,7 +11,7 @@
 | [m-d1-capability-gap-matrix.md](m-d1-capability-gap-matrix.md) | M-D1：能力矩阵 × Skill 端点缺口对照 | done |
 | [m-r1-tsp-backtest-first-knife.md](m-r1-tsp-backtest-first-knife.md) | M-R1：TSP 回测首刀选型（walk-forward） | done |
 | [m-a1-tradingagents-portability.md](m-a1-tradingagents-portability.md) | M-A1：TradingAgents 可移植清单 | done |
-| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R/T 八域） | `G`/`B`/`X`/`S` 域全 done；**`C` 域（C1/C2/C3）全部收官**；`P0` 生产可用线 done 至 `v4.9.0`（调度 + 日报 + 绩效 PnL + 循环自足 + 报告 HTML + THS 导入 + 名称根治 + 日用循环健康度体检 + 绩效代理台账 + **体检出口与趋势台账**）；**`R` 域进行中**：`R1`/`R2`/`R3`/`R4` done（`v4.6.1`/`v4.6.2`/`v4.7.0`/`v4.7.1`），`R5` ETF 进宇宙 待做（**被生产侧 ETF 回补卡住**）；**`T` 域（循环可信度与运营）进行中**：`T1` 健康度出口与趋势台账 **done（`v4.9.0`）**，`T2` 执行台账 + brief 连续性 / `T3` 数据质量体检 待做；`L1` P0 纯模拟盘（`L2`/`L3` 门禁） |
+| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R/T 八域） | `G`/`B`/`X`/`S` 域全 done；**`C` 域（C1/C2/C3）全部收官**；`P0` 生产可用线 done 至 `v4.9.0`（调度 + 日报 + 绩效 PnL + 循环自足 + 报告 HTML + THS 导入 + 名称根治 + 日用循环健康度体检 + 绩效代理台账 + **体检出口与趋势台账**）；**`R` 域进行中**：`R1`/`R2`/`R3`/`R4` done（`v4.6.1`/`v4.6.2`/`v4.7.0`/`v4.7.1`），`R5` ETF 进宇宙 待做（**被生产侧 ETF 回补卡住**）；**`T` 域（循环可信度与运营）进行中**：`T1` 健康度出口与趋势台账 **done（`v4.9.0`）**、`T2` 调度执行台账 + brief 连续性 **done（`v4.9.1`）**，`T3` 数据质量体检 待做；`L1` P0 纯模拟盘（`L2`/`L3` 门禁） |
 | [dual-line-responsibility.md](dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） | done |
 | [duplicate-implementation-convergence.md](duplicate-implementation-convergence.md) | `C3` 双线重复实现收敛清单（18 项，只定边界不删代码） | done（`v4.6.2`，由 `R2` 收口） |
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |

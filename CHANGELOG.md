@@ -8,6 +8,52 @@
 
 - （无）
 
+## [4.9.1] - 2026-10-14
+
+### Added
+
+- **调度执行台账单点（`T2`）—— `research.ops_ledger` + CLI `stock-platform-ops-ledger`**
+  —— `R3`/`T1` 的裁决只回答「循环**现在**健不健康」，**回答不了「任务到底跑没跑」**。
+  真机事故（2026-10-13/14 `market.db` 连续两日无 bar、brief 停在 `10-12`）证明代价：
+  排查**必须离开平台**去翻 Windows 任务计划程序，才发现 18:30 回补任务**压根没注册**。
+  新增 append-only 台账 `data/logs/runs.jsonl`：
+  - `record_run()` —— **本模块唯一写**，向台账**追加**一行
+    `{ts,task,plannedAt,startedAt,endedAt,exitCode,durationSec,asof,note}`；
+    **fail-open**（写失败返回 `recorded=false` + `reason`，绝不拖垮被调度的任务）、
+    `task` 为空拒绝、超 `RUNS_MAX_RECORDS=400` 裁最旧；
+  - `read_runs()` / `summarize_runs()`（**纯函数**）/ `collect_ops_ledger()` —— 逐任务给
+    `lastRunAt` / `lastExitCode` / `lastDurationSec` / **`failureStreak`**（连续失败），
+    汇总 `failingTasks`（≥`OPERATIONAL_FAILURE_STREAK=2`）+ `recent`；台账缺失 →
+    `status="unavailable"`（fail-closed，**不假装有记录**）；
+  - `render_ops_ledger_markdown()` —— 人读版（结论先行 + 逐任务表 + 最近执行表）。
+- **调度包装器 `scripts/ops/Invoke-ScheduledRun.ps1`** —— 调度任务统一入口：从**任务预设**
+  （`daily` 08:30 / `postmarket` 15:30 / `marketdb-backfill` 18:30）解析目标脚本与规范参数 →
+  **子进程**运行目标（目标的 `exit` 无法绕过本层，**总能记到一行**）→ best-effort 追加台账
+  （记失败**只报告、绝不改退出码**）→ **原样透传**目标退出码。
+- **`loop_health` 新增两路信号**：`briefContinuity`（近 5 个**交易日**的 brief 覆盖，
+  **缺日逐个列出** + `coverageRatio`；`status ∈ {ok,incomplete,empty,unavailable}`）与
+  `opsLedger`（只读 `collect_ops_ledger` 的汇总）。
+- **新公开面**：`ops_ledger.record_run` / `read_runs` / `summarize_runs` / `collect_ops_ledger` /
+  `render_ops_ledger_markdown` / `default_ops_ledger_dir` / `default_ops_ledger_path` /
+  `task_label` / `task_planned_at` / `TASK_SCHEDULES`（CLI `stock-platform-ops-ledger`）。
+- **架构 / 契约**：ADR [`0076`](docs/architecture/0076-ops-run-ledger-and-brief-continuity.md)；
+  契约 [`ops-ledger`](docs/contracts/ops-ledger.md)（台账格式 / 写入语义 / 失败判定 / 跳号说明）。
+
+### Changed
+
+- **裁决口径扩展：`briefContinuity` 与 `opsLedger` 两路信号并入 `roll_up_verdict`**，
+  缺 brief 日 / 任务连续失败 → **`degraded`**。二者是**观测面**信号：说明流水线本身出问题，
+  但过去的日子已跑完、当日仍能选股，没有 `coverage` 那种「物理上选不出票」的硬前提，
+  故**只降级、永不 `blocked`**（与 hard-fail 不同档）。
+- **出口同步**：API `LoopHealthResponse` 增 `briefContinuity` / `opsLedger`；
+  Workbench `#health` 面板增两行 `kv`（brief 连续性 / 调度执行台账）；
+  CLI `stock-platform-loop-health` 增 `--ops-ledger` / `--ops-recent` / `--brief-window`。
+- **口径硬条款**：`ops_ledger` 的台账是**平台自有 `data/` 下的本地文件**，
+  **永不写 `market.db` / 平台库**（承接 ADR 0058）；本模块**不 import** `loop_health`
+  （保持单向依赖，`SECTION_*` 常量自持并有测试钉住与 `loop_health` 同字面量）。
+- **跳号说明**：本里程碑编 `v4.9.1`（patch，加固），承接 `v4.9.0`（T1）；
+  `v4.8.0`（`R5` ETF 进宇宙）因**生产侧 ETF 回补未完成**而顺延，按完成顺序直接编号。
+
 ## [4.9.0] - 2026-10-14
 
 ### Added

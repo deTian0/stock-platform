@@ -1,10 +1,12 @@
-"""T1: ``/api/ops/loop-health`` —— 只读转发 + fail-closed 503 + 趋势面。
+"""T1/T2: ``/api/ops/loop-health`` —— 只读转发 + fail-closed 503 + 趋势面 + 执行台账。
 
-把 R3 的裁决从 ``data/health/*`` 接到 Workbench 之后，必须钉住三件事：
+把 R3 的裁决从 ``data/health/*`` 接到 Workbench 之后，必须钉住四件事：
 
 1. **无供数 → 503**（供数段落在 ``COVERAGE_HARD_FAIL``），绝不用假数据兜底；
 2. **降级不掩盖** —— 供数偏薄/滞后仍然 200，裁决在 ``verdict.status`` 里；
-3. **零业务逻辑** —— 响应就是 ``collect_loop_health`` 的 payload（含 ``history``）。
+3. **零业务逻辑** —— 响应就是 ``collect_loop_health`` 的 payload（含 ``history``）；
+4. **T2 执行台账** —— ``opsLedger`` 缺台账 → ``unavailable``（warn，不阻断）；
+   任务连续失败 → warn，同样仍 200。
 """
 
 from __future__ import annotations
@@ -59,17 +61,35 @@ def _make_db(path: Path, rows_by_day: dict[str, int]) -> Path:
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    def _build(market_db: Path | None, *, with_history: bool = False) -> TestClient:
+    def _build(
+        market_db: Path | None, *, with_history: bool = False, with_ledger: bool = False
+    ) -> TestClient:
         monkeypatch.setenv("STOCK_PLATFORM_PROVIDER_PRESET", "replay")
         monkeypatch.setenv(
             "STOCK_PLATFORM_DB_URL", f"sqlite:///{(tmp_path / 'briefs.db').as_posix()}"
         )
         monkeypatch.setenv("STOCK_PLATFORM_PERFORMANCE_LOG", str(tmp_path / "perf.jsonl"))
         monkeypatch.setenv(ENV_HEALTH_DIR, str(tmp_path / "health"))
+        monkeypatch.setenv("STOCK_PLATFORM_OPS_LEDGER_DIR", str(tmp_path / "logs"))
         if market_db is None:
             monkeypatch.delenv(ENV_MARKET_DB, raising=False)
         else:
             monkeypatch.setenv(ENV_MARKET_DB, str(market_db))
+        if with_ledger:
+            logs = tmp_path / "logs"
+            logs.mkdir(parents=True, exist_ok=True)
+            (logs / "runs.jsonl").write_text(
+                "\n".join(
+                    [
+                        '{"ts":"2026-10-13T18:30:05+08:00","task":"marketdb-backfill",'
+                        '"exitCode":1,"durationSec":3.1}',
+                        '{"ts":"2026-10-14T18:30:06+08:00","task":"marketdb-backfill",'
+                        '"exitCode":1,"durationSec":3.2}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         if with_history:
             health = tmp_path / "health"
             health.mkdir(parents=True, exist_ok=True)
@@ -142,17 +162,23 @@ def test_full_window_returns_payload_and_history(client, tmp_path: Path) -> None
     assert body["coverage"]["status"] == "ok"
     assert body["coverage"]["lagTradingDays"] == 0
     assert body["verdict"]["status"] in {"ok", "degraded"}
-    # 六路信号 + 趋势面都在（零业务逻辑：响应即 collect 的 payload）
+    # 全部信号 + 趋势面都在（零业务逻辑：响应即 collect 的 payload）
     for key in (
         "coverage",
         "latestBrief",
+        "briefContinuity",
         "hits",
         "performance",
         "symbolMaster",
+        "opsLedger",
         "nextSettlement",
         "history",
     ):
         assert key in body
+    # T2：新信号参与裁决但**不阻断**（这里模板无执行台账 → unavailable → warn）
+    assert body["opsLedger"]["status"] == "unavailable"
+    assert "opsLedger" in body["verdict"]["warned"]
+    assert body["verdict"]["failed"] == []
     hist = body["history"]
     assert str(hist["path"]).endswith("history.jsonl")
     assert hist["daysRecorded"] == 2
@@ -170,3 +196,17 @@ def test_thin_day_degrades_but_stays_200(client, tmp_path: Path) -> None:
     assert body["coverage"]["status"] == "thin"
     assert body["verdict"]["status"] == "degraded"
     assert "coverage" in body["verdict"]["warned"]
+
+
+def test_consecutive_task_failure_degrades_but_stays_200(client, tmp_path: Path) -> None:
+    """T2：回补任务连续失败 → 裁决 degraded，仍 200（观测面缺口不阻断日用循环）。"""
+    db = _make_db(
+        tmp_path / "market.db", {d.isoformat(): 3000 for d in _expected_days()}
+    )
+    r = client(db, with_ledger=True).get("/api/ops/loop-health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["opsLedger"]["status"] == "ok"
+    assert body["opsLedger"]["failingTasks"] == ["marketdb-backfill"]
+    assert "opsLedger" in body["verdict"]["warned"]
+    assert body["verdict"]["failed"] == []
