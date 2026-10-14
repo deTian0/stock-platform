@@ -6,6 +6,12 @@
   Enforces VERSION file consistency, refuses to move existing tags,
   and maps -Kind to documentation expectations (patch=small, minor/major=big).
 
+  The tag message is always written to a UTF-8 (no BOM) temp file OUTSIDE the
+  repo and passed to `git tag -a -F`, never as a native `-m` argument. This keeps
+  Chinese annotations intact: PowerShell 5.1 encodes native command-line
+  arguments with the ANSI code page (GBK on this machine), which would otherwise
+  mangle any non-ASCII message.
+
 .PARAMETER Version
   SemVer without leading v, e.g. 0.0.1
 
@@ -13,13 +19,20 @@
   patch | minor | major | rc
 
 .PARAMETER Message
-  Annotated tag message body (short).
+  Annotated tag message body (short). Prefer -MessageFile for Chinese.
+
+.PARAMETER MessageFile
+  Path to a UTF-8 file whose contents become the tag message body.
+  Use this for Chinese annotations so no CLI encoding is involved.
 
 .PARAMETER DryRun
   Print actions only.
 
 .EXAMPLE
   .\scripts\release_tag.ps1 -Version 0.0.1 -Kind patch -Message "M0.1 scaffold"
+
+.EXAMPLE
+  .\scripts\release_tag.ps1 -Version 4.6.1 -Kind patch -MessageFile "$env:TEMP\tag.txt"
 #>
 [CmdletBinding()]
 param(
@@ -31,8 +44,11 @@ param(
   [ValidateSet('patch', 'minor', 'major', 'rc')]
   [string]$Kind,
 
-  [Parameter(Mandatory = $true)]
-  [string]$Message,
+  [Parameter(Mandatory = $false)]
+  [string]$Message = '',
+
+  [Parameter(Mandatory = $false)]
+  [string]$MessageFile = '',
 
   [switch]$DryRun
 )
@@ -51,10 +67,24 @@ if ($fileVersion -ne $Version) {
   throw "VERSION file is '$fileVersion' but -Version is '$Version'. Update VERSION first."
 }
 
+if ([string]::IsNullOrWhiteSpace($Message) -and [string]::IsNullOrWhiteSpace($MessageFile)) {
+  throw "Provide -Message (ASCII) or -MessageFile (UTF-8, for Chinese)."
+}
+
+if (-not [string]::IsNullOrWhiteSpace($MessageFile)) {
+  if (-not (Test-Path $MessageFile)) {
+    throw "MessageFile not found: $MessageFile"
+  }
+  $body = [System.IO.File]::ReadAllText($MessageFile, (New-Object System.Text.UTF8Encoding($false)))
+} else {
+  $body = $Message
+}
+$body = $body.TrimStart([char]0xFEFF).TrimEnd("`r", "`n")
+
 $fullMessage = @"
 $tag ($Kind milestone)
 
-$Message
+$body
 
 See docs/ROADMAP.md and docs/versioning.md.
 "@
@@ -73,7 +103,7 @@ if ($DryRun) {
   if ($status) {
     Write-Host "[DryRun] note: working tree not clean (would refuse without -DryRun)"
   }
-  Write-Host "[DryRun] git tag -a $tag -m <message>"
+  Write-Host "[DryRun] git tag -a $tag -F <utf8-tempfile>"
   Write-Host $fullMessage
   exit 0
 }
@@ -88,7 +118,10 @@ if ($status) {
   throw "Working tree not clean. Commit or stash before tagging.`n$status"
 }
 
-git tag -a $tag -m $fullMessage
-Write-Host "Created annotated tag $tag"
+$msgFile = Join-Path $env:TEMP ("sp_tagmsg_$Version.txt")
+[System.IO.File]::WriteAllText($msgFile, $fullMessage, (New-Object System.Text.UTF8Encoding($false)))
+
+git tag -a $tag -F $msgFile
+Write-Host "Created annotated tag $tag (UTF-8 message via $msgFile)"
 git show $tag --no-patch
 Write-Host "Done. Push when ready: git push origin main --follow-tags"

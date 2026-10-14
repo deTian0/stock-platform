@@ -11,7 +11,7 @@
 | [m-d1-capability-gap-matrix.md](m-d1-capability-gap-matrix.md) | M-D1：能力矩阵 × Skill 端点缺口对照 | done |
 | [m-r1-tsp-backtest-first-knife.md](m-r1-tsp-backtest-first-knife.md) | M-R1：TSP 回测首刀选型（walk-forward） | done |
 | [m-a1-tradingagents-portability.md](m-a1-tradingagents-portability.md) | M-A1：TradingAgents 可移植清单 | done |
-| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C 六域） | `G`/`B`/`X`/`S`/`C` 域全 done；`P0` 生产可用 + 调度 + 日报 + 绩效 PnL 闭环 done（`v4.3.0`）；测试数据隔离 + 日报修复 done（`v4.3.1`）；日常循环自足（供数守卫 + 中文名 + 持仓接线）done（`v4.4.0`）；`L1` P0 纯模拟盘 |
+| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R 七域） | `G`/`B`/`X`/`S` 域全 done；`C` 域仅剩 `C3`；`P0` 生产可用线 done 至 `v4.6.0`（调度 + 日报 + 绩效 PnL + 循环自足 + 报告 HTML + THS 导入 + 名称根治）；**`R` 域（收尾与加固）开局**：`R1` 名称权威文档债 / `R2` `C3` 收敛清单 / `R3` 循环健康度 / `R4` 绩效代理样本 / `R5` ETF 进宇宙；`L1` P0 纯模拟盘（`L2`/`L3` 门禁） |
 | [dual-line-responsibility.md](dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） | done |
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |
 | [handoff-v4.2.0.md](handoff-v4.2.0.md) | 交接：v4.2.0 → 下一块砖（绩效 PnL 闭环） | 历史交接 |

@@ -152,6 +152,26 @@
 
 ---
 
+### 3.7 R — 收尾与加固（Remediation，P0/P1）
+
+**背景**：`G/B/S/X` 四域收官、`C` 域仅剩 `C3` 后，`v4.6.0` 体检暴露四类「非功能性、但直接决定平台可信度」的收尾项：
+① `v4.6.0` 的名称根治只改了 `CHANGELOG`，**未落 ADR / 契约 / 路线图** —— 违反本仓「改行为必须同步文档」的硬规则；
+② `C3`（重复实现收敛清单）是唯一未闭合的正式里程碑；
+③ 绩效台账样本仅 **3** 条（`< MIN_MEANINGFUL_SAMPLE=20` = 噪音）⇒「这套推荐逻辑赚不赚钱」无法判断；
+④ 日用循环缺一个「**今天是否自足**」的单点裁决面（现散落于 coverage 守卫 / `E1_ops_health` / 日报之间）。
+
+| ID | 名称 | 量级 | 目标 tag | 验收标准 |
+|----|------|------|----------|----------|
+| **R1** | 名称权威与文档债收口 | S | `v4.6.1`（小） | **done（2026-10-14）** 新增 ADR `0072`（`symbol_master` 名称权威单点 + 回退语义）+ 契约 `docs/contracts/symbol-naming.md`（存储只存真名 / 展示走 `display_name` / 未知 `—`）；路线图补 `v4.6.0` 修订记录 + 本 R 域表；`check_docs` 登记两份新文档 |
+| **R2** | `C3` 重复实现收敛清单 | S | `v4.6.2`（小） | 新增 `docs/plans/duplicate-implementation-convergence.md`：逐项列 选股引擎 / 回测引擎 / 行情抓取 / 多 Agent 的重复实现，每条标「保留 / 降级为参考 / 废弃」+ 归属里程碑；**不删代码**（承接 C 域约束） |
+| **R3** | 日用循环健康度单点 | M | `v4.7.0`（大） | 新增 `research.loop_health` 单点 + CLI `stock-platform-loop-health`：聚合 供数覆盖率（复用 C2 `coverage_snapshot`）/ 最新 brief asof 与 picks / 命中记账 / 绩效 settled 与 pending / `symbol_master` 行数 → JSON + Markdown；零网络、fail-closed、方法永不抛 |
+| **R4** | 绩效代理样本增强 | M | `v4.7.1`（小） | 用 `stock-platform-picks-backtest` 长窗（≥1 年）产出「代理台账」，把 `settled` 从个位数抬到 ≥ `MIN_MEANINGFUL_SAMPLE=20`；代理与真实台账**分栏陈列、禁止混算**（口径差异写进契约） |
+| **R5** | ETF 进宇宙与 ③A | L | `v4.8.0`（大） | universe / ③A 持仓榜支持 ETF（复用 B4 `asset_class` 单点）；`market.db` ETF 日线缺口由生产侧回补（平台只读）；缺口未补时 fail-closed 且显式标注 |
+
+**约束（承接 C 域）**：R 域只做「补文档 + 补裁决面 + 补样本」，**不做大规模代码合并、不做 ETF 生产侧写库**；任何触库改动一律走既有只读路径。
+
+---
+
 ## 4. 依赖关系
 
 ```text
@@ -171,7 +191,8 @@ X2 ← X1；X3 ← X1；X4 ← B5 + X3
 L1（立项）← B5 + X4（回测与实盘口径已统一，才具备实盘前提）
 L2 ← L1 Accepted；L3 ← L2
 
-C2 ← B1；C3 ← S1
+C2 ← B1；C3 ← S1（C3 收口归 `R2`）
+R1 ← `v4.6.0`（文档债）；R2 ← R1；R3 ← C2；R4 ← B1；R5 ← B4
 ```
 
 **关键路径**：`G1 → B1 → B5 → X4 → L1`。这条链上的每一项都是后者不可绕过的前置。
@@ -187,6 +208,7 @@ C2 ← B1；C3 ← S1
 | S | S1–S5 | `v4.1.0` → `v4.1.5` | minor（目标 tag 顺延：X 域先于 S 域于 `v4.0.x` 收官；`v4.1.4` 由 `L1` 占用 → `S5` 顺延 `v4.1.5`）|
 | X | X1–X4 | `v4.0.0` → `v4.0.4` | **major**（能力边界从 watch 扩到全市场） |
 | C | C2（穿插） | `v4.0.3` | patch（数据治理：真相源统一 + 覆盖守卫） |
+| R | R1–R2 / R3 / R4 / R5 | `v4.6.1` → `v4.6.2` / `v4.7.0` / `v4.7.1` / `v4.8.0` | patch（收尾/条款）与 minor（R3/R5 新能力）混编 |
 | L | L1–L3 | `v5.0.0` → `v5.0.2` | **major**（解禁实盘红线）；`L1` 为「立项（不解除能力）」故实际发布 `v4.1.4`，`v5.0.0` 保留给真正解除红线的那次（P1/P2 立项复核）|
 
 每个里程碑收口时按既有流程：勾选本文件 → 更新 `CHANGELOG.md` → 更新 `VERSION` → `scripts/release_tag.ps1` → `git push --follow-tags`。
@@ -291,3 +313,6 @@ C2 ← B1；C3 ← S1
 | 2026-10-13 | **报告 HTML 化（v4.5.0）**：把「Markdown 报告 → 本仓报告模板样式」抽成**唯一单点**。**动机**：平台所有报告先写 Markdown（对 agent / diff 友好），但人要看的是有样式的一页；仓内已有观感基准 `static/report-templates/a-share-preopen.html`（深色面板 + 金色 accent + **A 股红涨绿跌**），而产出侧**没有出口**（digest / rankings / hits / performance 只写 `.md`），跑批器还自带一份**配色不一致的私有浅色渲染器**。**新增** 零依赖渲染器 `research/report_html.py`（`markdown_to_body` / `render_report_html` / `render_markdown_file`）：仅 stdlib（本机**无 markdown 库**、且不可为此加依赖），**先 `html.escape` 再套标签**，畸形输入 fail-open；`LOCAL_THEME` 的 `:root` token 与报告模板**逐 token 相同**（`--bg:#0b0e14` / `--accent:#4d8dff` / `--gold:#f5c451` / `--up:#ff4d4f` / `--down:#00b578`），并有测试**直接读模板比对**防漂移；行内带符号百分比按 A 股约定自动着色（`(?<![\w>])` 反向断言避免误吞 `2020-2026` 这类区间），`colorize=False` 可关；**未知主题名回落 `local`，永不抛**。**新 CLI** `stock-platform-report-html`（`--in` / `--dir` / `--title` / `--subtitle` / `--source` / `--badge` / `--theme`）可一键把任意历史 `.md` 重渲染成模板样式。**digest 默认双格式**：CLI 默认写 `{asof}.html` + `latest.html`（`--no-html` 退回只写 md），`build_digest(emit_html=…)` 库默认仍 `False`（纯增量、旧键全留）⇒ 两个计划任务与 `Invoke-DailyPipeline.ps1 -Digest` **零改动**即开始出 HTML。**跑批器改用单点**（删掉私有 `_CSS` / `md_to_html`，import 同一模块）。**实测**：`test_report_html.py` **8 项全过**；历史报告按新主题**重渲染**，每项 `.md` + `.html` 同目录、离线可开（无 CDN / 无外链）。ADR `0071`。发布 `v4.5.0` |
 | 2026-10-13 | **日报「同花顺导入」行（v4.5.1）**：盘前日报（digest）在「当日推荐」顶部新增可**整块复制**的 6 位代码块，直投同花顺手机版「自选 → 导入」。**约束**：同花顺手机版**一次仅支持导入 5 只** ⇒ 按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`），超出自动换行、逐行粘贴（10 只推荐 → 两行）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`，**仅保留合法 6 位码**，脏码不进城）、按推荐序去重、无有效代码则整块省略（fail-closed）。Markdown 与 HTML 双份同步生效（代码块 → `<pre><code>`）。`test_daily_digest.py` **+4 项**（导入行 / 12 只按 5 分 3 行 / 后缀剥离 / 无推荐省略）。发布 `v4.5.1` |
 | 2026-10-13 | **同花顺导入文件 txt（v4.5.2）**：用户实测同花顺「导入自选」支持**选择 txt 文件**（比手机端逐行粘贴省事），故把当日推荐再落成**文件**。新增单点 `daily_digest.write_ths_import(codes, *, asof, out_dir)` → `data/ths_import/{asof}.txt` + `latest.txt`（**每行 1 个 6 位码**、无表头无名称，纯 ASCII 数字）。代码归一化**复用 `_ths_codes`**（与日报导入行同源，同一去重/6 位裸码规则）；`build_digest` 新增 `emit_ths`（**库默认 `False`**）+ `ths_dir`，CLI 默认产出（`--no-ths` 退回、`--ths-dir` 覆盖）；目录默认取 digest 目录的**同级** `ths_import`（`data/digests` ↔ `data/ths_import`）。无推荐则不产出（fail-closed，不生成占位文件）；并清理目录内遗留 `*.sel`（项目统一只用 txt，此前试写的二进制 `.sel` 已废）。`Invoke-DailyPipeline.ps1 -Digest` 零改参即产出（语义只增），并设 `PYTHONIOENCODING=utf-8` 保日志编码。`test_daily_digest.py` **+7 项**。发布 `v4.5.2` |
+| 2026-10-14 | **名称映射根治 + 当日战绩（v4.6.0）**：① **本地 code↔name 主表 `symbol_master`**（源=引擎只读 `market.db.fundamentals`，实测 **5237/5237** 全覆盖；表存平台 SQLite、与 brief 归档同库；`display_name()` 为名称解析**唯一入口**，优先级 = 记录真实名 > 显式 `name_map` > 本地表 > 占位 `—`；`daily_cli` 每跑批顺带刷新（失败静默）；`stock-platform-hits --backfill-names` 修历史脏行，实测修 **14 条 `hit_summary` + 20 条 `hit_tracking`**、0 残留）。**根因**：`hit_tracking._clean_name()` 名称缺失时**回退成代码**，且 `UNIQUE(code,session_type,pick_date)` 去重使后续跑批的名称**永远写不回去** ⇒ 存储层只存真名（未知存空、绝不写代码）、展示层统一走 `display_name`（未知显示 `—`）。② **当日战绩报告（选股 → 次日收盘 · 1 日窗口）**：新增 `research.sameday` + CLI `stock-platform-sameday`（`summarize_sameday` / `render_sameday_markdown`），复用 `brief_review` 单点，报告位 `A5_sameday`；`rolling_review` 同步补齐 `avgRawReturn` / `upRate` / `best` / `worst` / `avgAlpha` / `beatBenchmarkRate`（纯新增键、旧调用不变）。③ panel CSV 前导零单点 `batch.load_panel_csv()`（`symbol`/`code`/`ts_code` 固定 `dtype=str`）。新增测试 **22** 项（`test_symbol_master.py` 12 / `test_sameday.py` 4 / `hit_tracking` 名称回归 6），全量 **1037 passed**。**遗留（由 `R1` 偿还）**：未落 ADR / 契约 / 路线图 —— 违反本仓「改行为必须同步文档」硬规则 |
+| 2026-10-14 | **R 域开局（收尾与加固）**：新增 **R — 收尾与加固** 域（`R1` 名称权威文档债 / `R2` `C3` 收敛清单 / `R3` 循环健康度单点 / `R4` 绩效代理样本 / `R5` ETF 进宇宙），把「v4.6.0 未落 ADR/契约」的文档债、唯一未闭合的 `C3`、绩效样本不足（3 条 < 20 = 噪音）与循环裁决面缺失四个收尾项显式立项；`release_tag.ps1` 增加 `-MessageFile`（UTF-8）以支持中文 tag 注释 |
+| 2026-10-14 | **`R1` 完成（名称权威文档债收口，`v4.6.1`）**：补 `v4.6.0` 名称根治遗留的文档债 —— 新增 ADR `0072`（代码↔名称主数据表 `symbol_master` 为名称解析**唯一权威** + 回退语义 + 「源 `fundamentals` 无英文字段、故不做中英双语」的诚实边界）与契约 `docs/contracts/symbol-naming.md`（存储只存真名 / 展示走 `display_name` / 未知 `—` / 解析优先级四档）；`check_docs.ps1` 登记两份新文档；`release_tag.ps1` 增加 `-MessageFile`（UTF-8 读入 + `git tag -F`）以支持**中文 tag 注释** |
