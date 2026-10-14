@@ -8,6 +8,68 @@
 
 - （无）
 
+## [4.10.0] - 2026-10-14
+
+### Added
+
+- **策略采纳闸门单点（`Y1`）—— `research.adoption_gate` + CLI `stock-platform-strategy-adoption`**
+  —— `G/B/S/X/C/R/T` 七域把**研究侧**做到了相当完整，但**研究结论与生产默认档之间没有桥**：
+  `S4` 行业中性化（单窗 `total_return` 0.3029 → 0.5257、`sharpe` 1.06 → 1.14）与
+  `S3` 闸门（出厂 `min_pick_score=0.80` 的 `sharpe` 1.060 是**全网格最差**）都**实测改善却只诊断不改档**，
+  `R4` 近一年 `avgReturn=−0.38%` 无出口 ⇒ **平台不改进 = 赚不到钱**。
+  - `evaluate_adoption()` —— 基线档（= 生产档，`neutralize=None`）与候选档**共用同一引擎**
+    （`run_neutralization_book` → `X4` 单点 `book_replay.replay_book`），在 `build_windows()`
+    （默认近 3 个**互不重叠**的 1 年窗口）各跑一遍；**特征在全跨度上只算一次**（含 `ma20`/`ma60` 预热）
+    再由 `slice_window()` 按日期切窗 ⇒ 边界**不损失**预热（`trade_date` 是 `datetime64`，
+    两侧强制转 `Timestamp` —— 裸字符串比较会静默丢掉边界日）；
+  - `AdoptionRule`（**事前登记**：`min_sharpe_margin=0.05` / `max_drawdown_tolerance=0.05` /
+    `max_winrate_drop=0.05` / `min_trades=8` / `require_all_windows=True`）+
+    `decide_adoption()`（**纯函数**，不碰引擎不碰 pandas）给 `adopt` / `reject` / `insufficient`；
+    窗口 `pass` 需「夏普边际 + 回撤容差 + 胜率容差」**三项全过**，任一指标缺失**判否**；
+    **样本不足不做结论**；
+  - `CandidateSpec` + `BASELINE_SPEC` + `DEFAULT_CANDIDATES`（`neutralized` / `neutralized_capped` /
+    `gate_070` / `neutralized_capped_gate_070`）+ `CANDIDATE_REGISTRY`；
+  - 报告 `data/strategy/adoption_gate.{json,md,html}` —— 逐窗 `blockingChecks` 让**落选原因可读**；
+  - **只出建议**：`adoptionNote` 显式声明**不改任何生产默认档、不写 brief / picks**
+    （采纳是独立的人工签核步骤，计划中的 `Y2`）。
+- **架构 / 契约**：ADR [`0077`](docs/architecture/0077-strategy-adoption-gate.md)（`Y` 域决定）+ 契约
+  [`adoption-gate`](docs/contracts/adoption-gate.md)（候选 / 窗口 / 规则 / 裁决 / 出口 / 边界）。
+- **新公开面**：`adoption_gate` 的 `AdoptionRule` / `BASELINE_SPEC` / `CANDIDATE_REGISTRY` /
+  `DEFAULT_CANDIDATES` / `DEFAULT_RULE` / `DEFAULT_ADOPTION_OUT_DIR` / `DEFAULT_WINDOW_COUNT` /
+  `DEFAULT_WINDOW_YEARS` / `CandidateSpec` / `build_windows` / `decide_adoption` /
+  `evaluate_adoption` / `render_adoption_markdown` / `run_candidate` / `slice_window` 进
+  `stock_platform_research` 顶层导出。
+
+### Changed
+
+- **路线图新增 `Y — 收益增强（Yield）` 域** —— `Y1` 策略采纳闸门（`v4.10.0`）/ `Y2` 采纳落地
+  （`v4.10.1`，**须人工签核**）/ `Y3` 近期负收益根因诊断（`v4.11.x`）；
+  `T3`（数据质量体检）目标 tag 因 `Y1` 先落地而**顺延至 `v4.11.0`**。
+
+### 真机实测（2026-10-14 · 3 个互不重叠的 1 年窗口 · 全市场 stock 宇宙）
+
+窗口：`2023-10-13~2024-10-12`（241 交易日 / 基线 106 笔）、`2024-10-13~2025-10-13`
+（243 / 86）、`2025-10-14~2026-10-14`（243 / 84）。
+
+| 候选 | 判定 | 通过窗 | Δ夏普(均) | Δ收益(均) | Δ回撤(均) | Δ胜率(均) |
+|------|------|--------|-----------|-----------|-----------|-----------|
+| 行业中性化 | **不采纳** | 0/3 | −0.241 | −2.61% | −0.090 | −9.23% |
+| 中性化 + 行业上限 3 | **不采纳** | 0/3 | −0.232 | −2.55% | −0.091 | −9.11% |
+| **闸门 0.70** | **不采纳** | **2/3** | **+0.274** | **+5.90%** | −0.025 | −1.66% |
+| 中性化 + 上限 3 + 闸门 0.70 | **不采纳** | 0/3 | −0.327 | −4.82% | −0.105 | −9.42% |
+
+**两条结论**：
+
+1. **`S4` 中性化在样本外全窗恶化** —— 与其单窗（2024-09-02→2026-09-08 连续 2 年）
+   「`total_return` 0.3029 → 0.5257」的结论**相反** ⇒ 单窗口的「大幅改善」**没有复现**。
+   差异待归因（窗口切分方式 / 连续 2 年 vs 两段 1 年复利 / 起止日期），记为 `Y3` 的输入。
+2. **`gate_070` 是唯一有正向证据的候选** —— w2（Δ夏普 **+0.846**、回撤 **−9.57% → −8.14%**）
+   与 w3（**+0.374**、回撤 **−14.54% → −13.77%**）通过，仅 w1 未达标（−0.398、回撤恶化）；
+   `require_all_windows=True` **如实拦下** —— 正是闸门的设计意图（单窗幸运不可挟持结论）。
+
+⇒ **建议：维持生产基线** —— 本次没有候选能带着**样本外证据**进生产。
+本次最大的价值不是「采纳了什么」，而是**拦住了一个在单窗看起来赢、样本外实际输的改动**。
+
 ## [4.9.1] - 2026-10-14
 
 ### Added
