@@ -162,19 +162,39 @@ def _ths_codes(picks: list[Mapping[str, Any]]) -> list[str]:
     return codes
 
 
+def _short_term_codes(record: "BriefRecord | None") -> list[str]:
+    """Bare 6-digit codes of the ②B 短线榜 board (payload ``rankings``).
+
+    短线与长线各有独立的可复制代码块；这里从 brief payload 的榜单取 ②B 榜，
+    再走同一套 :func:`_ths_code` 归一化（单点），保证两条线口径一致。
+    """
+    if record is None:
+        return []
+    from .rankings import BOARD_SLUGS, SHORT_TERM_KEY  # local: keep module import-light
+
+    boards = ((record.payload or {}).get("rankings") or {}).get("boards") or {}
+    items = (boards.get(BOARD_SLUGS[SHORT_TERM_KEY]) or {}).get("items") or []
+    return _ths_codes([dict(it) for it in items if isinstance(it, Mapping)])
+
+
 def _ths_import_section(
-    picks: list[Mapping[str, Any]], *, per_line: int = THS_IMPORT_PER_LINE
+    picks: list[Mapping[str, Any]],
+    *,
+    per_line: int = THS_IMPORT_PER_LINE,
+    label: str | None = None,
 ) -> list[str]:
     """Copy-paste block for 同花顺 (THS) self-select import.
 
     同花顺手机版**一次最多导入 5 只**，故按 ``per_line`` 分组：每行一组、逐行粘贴。
     代码按推荐序（rank 升序）保留，去重 + 归一化为 6 位。无有效代码则整块省略
-    （与全篇 fail-closed 一致，不生成占位行）。
+    （与全篇 fail-closed 一致，不生成占位行）。``label`` 标注线别（长线 / 短线），
+    两条线各出一块，互不混淆。
     """
     codes = _ths_codes(picks)
     if not codes:
         return []
-    out = [f"**同花顺导入（每行 {per_line} 只，逐行复制到「自选 → 导入」）：**", ""]
+    tag = f" · {label}" if label else ""
+    out = [f"**同花顺导入{tag}（每行 {per_line} 只，逐行复制到「自选 → 导入」）：**", ""]
     out.append("```text")
     for i in range(0, len(codes), per_line):
         out.append(" ".join(codes[i : i + per_line]))
@@ -184,13 +204,17 @@ def _ths_import_section(
 
 
 def write_ths_import(
-    codes: list[str], *, asof: str, out_dir: str | Path | None = None
+    codes: list[str],
+    *,
+    asof: str,
+    out_dir: str | Path | None = None,
+    kind: str = "",
 ) -> dict[str, Any] | None:
     """Emit the 同花顺 (THS) watchlist import txt for ``asof``.
 
-    Writes ``{out_dir}/{asof}.txt`` plus a ``latest.txt`` pointer copy -- one
-    bare 6-digit code per line, no header, no names (exactly what 同花顺's
-    「导入自选」 dialog wants; the user confirmed this import path works).
+    Writes ``{out_dir}/{asof}{kind}.txt`` plus a ``latest{kind}.txt`` pointer
+    copy -- one bare 6-digit code per line, no header, no names (exactly what
+    同花顺's 「导入自选」 dialog wants; the user confirmed this import path works).
     Returns ``{"thsPath", "latestThsPath", "thsCount"}``, or ``None`` when there
     are no codes (fail-closed: no placeholder file). Stale ``*.sel`` files in
     the same directory are removed -- the project standardised on txt only.
@@ -205,8 +229,8 @@ def write_ths_import(
         except OSError:  # pragma: no cover - best effort
             pass
     text = "\n".join(codes) + "\n"
-    dated = root / f"{asof}.txt"
-    latest = root / "latest.txt"
+    dated = root / f"{asof}{kind}.txt"
+    latest = root / f"latest{kind}.txt"
     dated.write_text(text, encoding="utf-8")
     shutil.copyfile(dated, latest)
     return {
@@ -238,6 +262,9 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
             lines.append("_空（fail-closed，不生成占位条目）_")
             lines.append("")
             continue
+        if slug == "short_term":
+            # 短线与长线一样给出可直接复制的 6 位码块（同花顺导入），不再只有表格。
+            lines.extend(_ths_import_section(items, label="短线"))
         lines.append("| # | 代码 | 名称 | 备注 |")
         lines.append("|---|---|---|---|")
         for i, it in enumerate(items[:10], start=1):
@@ -275,7 +302,7 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
     lines.append("")
 
     picks = record.picks or []
-    lines.append(f"## 当日推荐（{len(picks)} 条）")
+    lines.append(f"## 当日推荐 · 长线（{len(picks)} 条）")
     lines.append("")
     if not picks:
         msg = payload.get("emptyPicksMessage") or "当日无推荐"
@@ -286,7 +313,7 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
             lines.append(f"> {tip}")
         lines.append("")
     else:
-        lines.extend(_ths_import_section(picks))
+        lines.extend(_ths_import_section(picks, label="长线"))
         lines.extend(_picks_table(picks))
         lines.append("")
 
@@ -372,9 +399,10 @@ def build_digest(
     ``{asof}.md`` (and latest copy) when not. ``emit_html`` additionally renders
     the same text through :mod:`stock_platform_research.report_html` so the
     scheduled runs ship markdown **and** the local report-template HTML.
-    ``emit_ths`` additionally emits the 同花顺 import txt (``{asof}.txt`` +
-    ``latest.txt``); its directory defaults to a ``ths_import`` sibling of the
-    digest dir, or ``DEFAULT_THS_DIR`` when ``out_dir`` is not given.
+    ``emit_ths`` additionally emits the 同花顺 import txt for **both** lines
+    (``{asof}.txt`` / ``latest.txt`` for 长线, ``{asof}_short.txt`` /
+    ``latest_short.txt`` for 短线); its directory defaults to a ``ths_import``
+    sibling of the digest dir, or ``DEFAULT_THS_DIR`` when ``out_dir`` is not given.
     """
     repo = open_brief_repository(db_url)
     record = repo.get_by_asof(asof) if asof else None
@@ -420,6 +448,7 @@ def build_digest(
         result["latestHtmlPath"] = str(latest_html_path)
     if emit_ths:
         codes = _ths_codes(record.picks or []) if record is not None else []
+        short_codes = _short_term_codes(record)
         if ths_dir is not None:
             ths_root = Path(ths_dir)
         elif out_dir is not None:
@@ -429,6 +458,14 @@ def build_digest(
         ths = write_ths_import(codes, asof=target_asof, out_dir=ths_root)
         if ths:
             result.update(ths)
+        # 短线同样「可直接复制」：另存一份 *_short.txt，与长线池互不混淆。
+        short_ths = write_ths_import(
+            short_codes, asof=target_asof, out_dir=ths_root, kind="_short"
+        )
+        if short_ths:
+            result["thsShortPath"] = short_ths["thsPath"]
+            result["latestThsShortPath"] = short_ths["latestThsPath"]
+            result["thsShortCount"] = short_ths["thsCount"]
     return result
 
 

@@ -8,6 +8,27 @@
 
 - （无）
 
+## [4.11.1] - 2026-10-15
+
+### Added
+
+- **早晨简报短线榜可复制代码块** —— `daily_digest` 现在为短线榜（②B）也产出「可直接复制的 6 位代码」区块（与长线当日推荐同源），并一并落成 `data/ths_import/{asof}_short.txt` + `latest_short.txt`（与长线 `latest.txt` 对称，每行 1 个 6 位裸码，供同花顺「导入自选 → 选择文件」直接导入）。长线 / 短线现在都有可整块复制的代码，满足「长线短线都要可以直接复制的代码」诉求。
+- `daily_digest_cli` 增加 `--no-ths-short` 开关（与既有 `--no-ths` 对称），可关闭短线 txt 产出。
+
+### Changed
+
+- 短线榜区块渲染：在五榜概览的 ②B 短线榜后追加可复制代码块（fail-closed：无有效短线代码则整块省略）。
+
+### Verified
+
+- 单元测试 `packages/research/tests/test_daily_digest.py`：**25 passed**（新增 4 例，覆盖短线代码块与 `--no-ths-short`）。
+- 全量 `pytest packages apps`：**1230 passed / 0 failed**（v4.11.0 基线 1226，+4 新用例）。
+- 真实 2026-10-14 数据重渲简报：长线 `latest.txt` 与短线 `latest_short.txt` 均正确产出 6 位裸码。
+
+### Docs
+
+- `docs/ops/scheduler.md` / `docs/ops/daily-pipeline.md`：补充短线同花顺导入文件产出说明。
+
 ## [4.11.0] - 2026-10-15
 
 ### Added

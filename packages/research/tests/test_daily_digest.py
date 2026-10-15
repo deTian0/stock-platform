@@ -342,3 +342,119 @@ def test_digest_cli_no_ths_flag(env):
     rc = cli_main(["--out-dir", str(env / "digests"), "--no-html", "--no-ths"])
     assert rc == 0
     assert not (env / "ths_import").exists()
+
+
+# ---------------------------------------------------------------------------
+# 双线代码块：长线（当日推荐）+ 短线（②B 短线榜）都要「可直接复制」
+# ---------------------------------------------------------------------------
+
+RANKINGS = {
+    "asof": "2026-10-09",
+    "counts": {"quality": 1, "short_term": 2, "holdings": 0, "actions": 0, "watchlist": 0},
+    "boards": {
+        "quality": {
+            "key": "②A_质量榜",
+            "label": "②A_质量榜",
+            "slug": "quality",
+            "items": [
+                {
+                    "rank": 1,
+                    "symbol": "600519",
+                    "name": "贵州茅台",
+                    "composite_score": 0.9,
+                    "close": 1253.8,
+                    "reasons": [],
+                    "reasonSummary": "x",
+                }
+            ],
+        },
+        "short_term": {
+            "key": "②B_短线榜",
+            "label": "②B_短线榜",
+            "slug": "short_term",
+            "items": [
+                {
+                    "rank": 1,
+                    "symbol": "002392.SZ",
+                    "name": "北京利尔",
+                    "composite_score": 0.8,
+                    "close": 5.0,
+                    "reasons": [],
+                    "reasonSummary": "y",
+                },
+                {
+                    "rank": 2,
+                    "symbol": "002227",
+                    "name": "*ST特迅",
+                    "composite_score": 0.7,
+                    "close": 3.0,
+                    "reasons": [],
+                    "reasonSummary": "z",
+                },
+            ],
+        },
+        "holdings": {"key": "③A_持仓", "slug": "holdings", "items": []},
+        "actions": {"key": "③B_操作建议", "slug": "actions", "items": []},
+        "watchlist": {"key": "③C_观察名单", "slug": "watchlist", "items": []},
+    },
+}
+
+
+def _save_brief_with_rankings() -> None:
+    from stock_platform_research.persistence import open_brief_repository
+
+    brief = {**BRIEF, "rankings": RANKINGS}
+    open_brief_repository().save(brief, symbols=brief["symbols"])
+
+
+def test_digest_labels_both_lines_and_short_gets_a_copy_paste_block(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    brief = {**BRIEF, "rankings": RANKINGS}
+    record = open_brief_repository().save(brief, symbols=brief["symbols"])
+    text = build_digest_text(record, hits_repo=None)
+
+    assert "同花顺导入 · 长线" in text
+    assert "同花顺导入 · 短线" in text
+
+    # 短线块落在「②B 短线榜」段落里（不再只有一张表）
+    assert text.index("②B 短线榜") < text.index("同花顺导入 · 短线")
+    seg = (
+        text.split("同花顺导入 · 短线", 1)[1]
+        .split("```text", 1)[1]
+        .split("```", 1)[0]
+        .strip()
+    )
+    assert seg == "002392 002227"  # 去交易所后缀 + 6 位裸码，一行整块复制
+
+
+def test_digest_short_block_absent_when_short_board_empty(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    rankings = json.loads(json.dumps(RANKINGS))
+    rankings["boards"]["short_term"]["items"] = []
+    brief = {**BRIEF, "rankings": rankings}
+    record = open_brief_repository().save(brief, symbols=brief["symbols"])
+    text = build_digest_text(record, hits_repo=None)
+    assert "同花顺导入 · 长线" in text
+    assert "同花顺导入 · 短线" not in text
+
+
+def test_build_digest_emits_short_ths_txt(env):
+    _save_brief_with_rankings()
+    result = build_digest(out_dir=env / "digests", emit_ths=True)
+    ths = Path(result["thsShortPath"])
+    latest = Path(result["latestThsShortPath"])
+    assert ths == env / "ths_import" / "2026-10-09_short.txt"
+    assert ths.read_text(encoding="utf-8") == "002392\n002227\n"
+    assert latest.read_text(encoding="utf-8") == "002392\n002227\n"
+    assert result["thsShortCount"] == 2
+    # 长线 txt 仍只含长线代码，两池互不混淆
+    assert Path(result["thsPath"]).read_text(encoding="utf-8") == "600519\n000001\n"
+
+
+def test_build_digest_no_short_ths_when_no_short_board(env):
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests", emit_ths=True)
+    assert "thsShortPath" not in result
+    assert not (env / "ths_import" / "latest_short.txt").exists()
