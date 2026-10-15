@@ -8,6 +8,62 @@
 
 - （无）
 
+## [4.11.0] - 2026-10-15
+
+### Added
+
+- **收益归因 / 负收益根因诊断（`Y3`）—— `research.attribution` + CLI `stock-platform-attribution`**
+  —— `Y1` 采纳闸门把「改进能不能进生产」解决后，暴露出一个此前无出口的问题：**为什么现在是亏的**
+  （`R4` 近一年 `avgReturn=−0.38%`、`winRate=0.3735`；`Y1` 三窗基线**全部**跑输基准）。
+  本模块把一段窗口的亏损分解成**互不重叠、各自可处置**的少数几项原因。
+  - `build_signal_panel()` —— 逐日（当日截面）用 `score_lvrev` + `apply_entry_gates` 打分，
+    **与生产 `screener_entry_provider` 同源**；每行携带 `fwd_{k}`（绝对前瞻收益）与
+    `excess_{k}`（相对基准超额，基准缺日按日历 `ffill`）。
+  - **两个样本集**：`gated`（全部过闸，用于评分单调性）与 `picks`
+    （过闸且 `composite_score >= score_floor`，即候选池）。**曲线对两者各算一遍**——
+    差值即**评分闸门本身**的贡献（`S3` 说 0.80 是全网格最差却始终无法证实处）。
+  - **两口径硬分（真机教训）**：`horizon_curve()` 每行**同时**给出 `meanExcess`（相对）与
+    `meanReturn`（绝对）；**边缘类**结论读 `meanExcess`（有没有技能），**持有期类**结论读
+    `meanReturn`（拿在手里赚不赚钱）。近一年实测出现「绝对收益 10 日见顶后转负、而超额只在 40 日为正」
+    —— 那是**熊市相对防守**，混用口径会给出「延长持有」的**错处方**，故必须分开归属。
+  - `score_curve()`（Spearman = **秩的 Pearson 相关**，自实现，**不引 SciPy**：`research` 只依赖 numpy/pandas）、
+    `cost_drag()`、`payoff_profile()`、`concentration()`（`by ∈ month/reason/assetClass/industry`，
+    `reason` 按**规则名**分桶、行业按 `norm_code` 归一、`lossShare` 按亏损质量占比）。
+  - **收益单位归一**：`book_replay` 的 `gross_ret` / `net_ret` 是**百分数**，模块内 ×
+    `TRADE_RET_SCALE=0.01` 统一为小数（产物带 `"unit": "fraction"`）。
+  - `diagnose()` —— **纯函数**（不碰 pandas / 引擎），7 类原因码 + **事前登记**阈值
+    （`COST_SHARE_WARN=0.30` / `LOSS_CONCENTRATION_WARN=0.40` / `SPEARMAN_FLAT=0.05` /
+    `PAYOFF_RATIO_WARN=1.0` / `WINRATE_WARN=0.50` / `MIN_MEANINGFUL_SAMPLE=20`）；
+    排序键 = 严重度 → `_CAUSE_RANK`（事前登记；`impact` 跨量纲不可比，故**只作三级键**）→ |impact|；
+    **样本不足的 horizon 标 `adequate=False` 且不参与结论**；`picks` 太薄时退用 `gated` 并写 `notes`；
+    **单组分组永不构成「集中」**（`assetClass=stock` 恒 100% 的退化情形显式跳过）。
+  - 报告 `data/strategy/attribution.{json,md,html}`（六节：信号有效性曲线 / 评分单调性 / 成本拖累 /
+    赔率结构 / 亏损集中度 / 根因裁决）。
+  - **只出归因**：`attributionNote` 显式声明**不改任何生产默认档、不写 brief / picks**；
+    产出的「候选方向」仍须过 `Y1` 闸门 + 人工签核 ⇒ `Y3`（找方向）与 `Y1`（验方向）构成闭环。
+- **架构 / 契约**：ADR [`0078`](docs/architecture/0078-loss-attribution.md) + 契约
+  [`attribution`](docs/contracts/attribution.md)（输入 / 面板 / 各块 / 原因码与阈值 / 排序键 / 出口 / 边界）。
+- **新公开面**：`attribution` 的 `build_signal_panel` / `select_set` / `horizon_curve` / `score_curve` /
+  `cost_drag` / `payoff_profile` / `concentration` / `diagnose` / `render_attribution_markdown` /
+  `attach_forward_returns` / `prepare_benchmark` + 常量（`SET_*` / `CAUSE_*` / `SEVERITY_*` / `BASIS_*` /
+  `CONCENTRATION_KEYS` / `DEFAULT_*` / `TRADE_RET_SCALE` / `MIN_MEANINGFUL_SAMPLE`）进包公开面。
+- **CLI**：`stock-platform-attribution`（`--years/--start/--end/--universe/--benchmark/--no-benchmark/
+  --score-floor/--horizons/--buckets/--reference-horizon/--min-sample/--no-replay/--out-dir/--json/--no-write`）。
+
+### Notes
+
+- **真机实测（近一年 `2025-10-14`~`2026-10-14`，universe=stock，基准 `000905.SZ`）**：
+  `gated=33450` 行 / `picks=11663` 行 / 85 笔成交。
+  - 主因 **`hold_too_long`**：候选池**绝对**收益 3 日 +0.11%、5 日 +0.18%、**10 日见顶 +0.23%**、
+    20 日 −0.86%、40 日 −1.63%，而**实际平均持有 32.5 天**。
+  - 次因 `edge_only_long_horizon`（5 日超额 −0.89%，仅 40 日 +4.77% —— 基准同期跌更多，属**相对防守**）、
+    `score_weak`（Spearman=−0.015，接近无关联）、`concentrated_loss`（`stop_loss` 占亏损 94%）。
+  - **成本不是问题**（占毛收益 2.7%）、**赔率不差**（盈亏比 1.19、胜率 31.8%）⇒ 指向**持有期**。
+- **跳号说明**：承接 `v4.10.0`（`Y1`）；`v4.8.0`（`R5` ETF 进宇宙）仍被**生产侧 ETF 回补**卡住而顺延。
+  `T3` 数据质量体检两度顺延至 `v4.12.0`。
+- 本轮实测发现并修掉两处**首版缺陷**：收益单位（百分数 vs 小数，读数放大 100 倍）与退化单组分组
+  （`assetClass=stock` 恒 100% 被误判为「亏损集中」）。
+
 ## [4.10.0] - 2026-10-14
 
 ### Added
