@@ -47,3 +47,7 @@ htmlcov/
 
 # local scratch (not part of the product)
 userinput.py
+
+# root-level scratch written by automated/agent runs (console capture, report harness,
+# diagnostics). Convention: any repo-root name starting with "_" is transient.
+/_*
