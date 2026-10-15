@@ -69,7 +69,12 @@ def main(argv: list[str] | None = None) -> int:
     if result.get("htmlPath"):
         print(f"digest html: {result['htmlPath']} (latest: {result['latestHtmlPath']})")
     if result.get("thsPath"):
-        print(f"同花顺导入 ({result['thsCount']} 只): {result['thsPath']} (latest: {result['latestThsPath']})")
+        print(f"同花顺导入·长线 ({result['thsCount']} 只): {result['thsPath']} (latest: {result['latestThsPath']})")
+    if result.get("thsShortPath"):
+        print(
+            f"同花顺导入·短线 ({result['thsShortCount']} 只): "
+            f"{result['thsShortPath']} (latest: {result['latestThsShortPath']})"
+        )
     return 0
 
 
