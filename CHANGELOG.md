@@ -8,6 +8,32 @@
 
 - （无）
 
+## [4.11.3] - 2026-10-16
+
+### Fixed
+
+- **推荐样本入账单点：盘前任务也带 `-SettleAfter`**（ADR [`0079`](docs/architecture/0079-settle-after-on-premarket.md)）。
+  此前只有盘后任务（`15:30`）带 `-SettleAfter`，而 `-SettleAfter` 才是调 `_settle_after_pipeline` → `log_brief_decisions` + `settle_performance_log` 的开关。盘前与盘后**用的是同一个 T-1 `asof`**，所以盘前那次运行本已具备入账条件，只是没带开关 —— 结果是一个单点失效：**某天 15:30 盘后没跑成，该 `asof` 的推荐就永久丢失**（次日盘前的 `asof` 已前移，不会回头补）。
+  - 真机实证：`runs.jsonl` 无 `2026-10-15 15:30` 的 `postmarket` 行，`recommend_decisions.jsonl` 因此缺 `2026-10-14`（33 行，应有 43 行）；同日 `10-15 08:31` 的 `daily` 成功（`exit=0`）却因没带开关而放过。
+  - 修法：`daily` canonical 参数改为 `-MarketDb -PrevSession -SettleAfter -Digest`。两任务同 `asof`、写入幂等（`skip_existing=True`；结算只计 `settledNewly`）⇒ 是**冗余**而非重复：任一任务成功即入账，后跑的成为空操作。日线可见范围在 08:30 与 15:30 相同（都停在 T-1），结算结果不因提前而改变。
+  - 边界不变：选股/`asof`/持有期（`5d`）/基准（`000905`）口径全部不动，仍 SIMULATE、`liveTradingEnabled=false`、纸面记账，`market.db` 仍只读（ADR 0058）。
+
+### Added
+
+- `packages/research/tests/test_scheduler_args_contract.py`：把 canonical 调度参数钉进测试（只读文本，不执行 PowerShell）—— 断言 `daily`/`postmarket` 预设都含 `-MarketDb -PrevSession -SettleAfter -Digest`、Windows XML 的 `<Arguments>` 与包装器预设一致、`Register-ScheduledTasks.ps1` 头注同步，且**活跃制品里不得残留旧参数** `-MarketDb -PrevSession -Digest`（历史记录 CHANGELOG / handoff 文档不受限）。这一缺陷的根因是「同一份 canonical 参数散在三处、只改一处不会报错」，Python 层测试此前无法覆盖。
+
+### Changed
+
+- 参数同步三处 + 文档：`scripts/ops/stock-platform-daily.xml`（任务计划程序实际执行的 `Arguments`）、`scripts/ops/Invoke-ScheduledRun.ps1` 的 `TASK_PRESETS['daily']`、`scripts/ops/Register-ScheduledTasks.ps1` 头注；`docs/contracts/ops-ledger.md` 任务登记表、`docs/ops/scheduler.md` 同步更新。
+
+### Verified
+
+- 新增测试 `test_scheduler_args_contract.py`：**5 passed**。
+- 补录真机执行（`Invoke-ScheduledRun.ps1 -Task postmarket-catchup -Script .\scripts\ops\Invoke-DailyPipeline.ps1 -TargetArgs '-Asof 2026-10-14 -MarketDb -SettleAfter' -Asof 2026-10-14`，`exit=0`、14.8s、已入台账）：
+  - `settleAfter.logged = 10`（`2026-10-14` 的 10 条以 `pending: true` 入账，`recommend_decisions.jsonl` 33 → **43** 行）；
+  - 同一趟顺带结算了到期的 `2026-10-09` 批次（`settledNewly = 10`、`alphaSettledNewly = 10`、`settledCount 3 → 13`、`pendingCount = 30`）—— 该批次到期需 `2026-10-16` 截面，正是本次 18:30 回补补上的那天。
+- 全量 `pytest packages apps -q`：**1235 passed**（v4.11.2 基线 1230 + 5 新用例，无回归）。
+
 ## [4.11.2] - 2026-10-16
 
 ### Fixed
