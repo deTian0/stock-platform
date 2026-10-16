@@ -606,4 +606,4 @@ __all__ = [
     "select_set",
 ]
 
-__version__ = "4.11.1"
+__version__ = "4.11.2"
