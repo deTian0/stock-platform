@@ -7,6 +7,21 @@
   Measured end-to-end: ~15s for ~5.2k symbols (vs. hours when every symbol was an
   HTTP call). No secrets, no liveTrading.
 
+  Runs the same offline fast path as the post-market task, plus:
+
+    -SettleAfter  — log picks into the performance JSONL and settle pending
+                    samples against engine market.db (paper only).
+
+                    Redundancy, not duplication: the write is idempotent
+                    (``log_brief_decisions(..., skip_existing=True)`` and
+                    ``settle_performance_log`` only counts *newly* settled), and
+                    both tasks run with the **same** ``asof`` (T-1). Before this,
+                    only the 15:30 post-market task carried the switch, so a
+                    single missed post-market run lost that day's picks for good
+                    — the 2026-10-14 incident (see
+                    docs/architecture/0079-settle-after-on-premarket.md).
+                    With the switch on both, either task logs the day.
+
   The CLI auto-loads the repo-root .env (P0-2), so the task needs no wrapper .bat
   and no environment injection.
 
@@ -65,7 +80,7 @@
       <!-- Edit WorkingDirectory to your clone path before import.
            Prefer pwsh.exe when PowerShell 7+ is installed; else powershell.exe. -->
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -Digest</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest</Arguments>
       <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
     </Exec>
   </Actions>

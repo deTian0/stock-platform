@@ -71,7 +71,7 @@ param(
 # Canonical schedule: one place to change when a job's arguments move.
 $TASK_PRESETS = @{
   'daily'             = @{ Script = 'scripts\ops\Invoke-DailyPipeline.ps1'
-                           Args   = '-MarketDb -PrevSession -Digest'
+                           Args   = '-MarketDb -PrevSession -SettleAfter -Digest'
                            PlannedAt = '08:30' }
   'postmarket'        = @{ Script = 'scripts\ops\Invoke-DailyPipeline.ps1'
                            Args   = '-MarketDb -PrevSession -SettleAfter -Digest'

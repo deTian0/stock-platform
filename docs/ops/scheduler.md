@@ -72,7 +72,7 @@ cd D:\workspace\stock_trading\stock-platform
 
 ## Windows Task Scheduler
 
-1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -Digest` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。
+1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。
 2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest`，`ExecutionTimeLimit=PT30M`）。
 3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。
 4. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
@@ -135,7 +135,7 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 见 `scripts/ops/cron-daily.example`。推荐每日调用包装脚本，由日历决定 skip：
 
 ```text
-# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -Digest
+# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest
 
 # 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest
 ```

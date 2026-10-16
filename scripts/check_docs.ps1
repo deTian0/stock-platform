@@ -97,6 +97,7 @@ $required = @(
   'docs/architecture/0076-ops-run-ledger-and-brief-continuity.md',
   'docs/architecture/0077-strategy-adoption-gate.md',
   'docs/architecture/0078-loss-attribution.md',
+  'docs/architecture/0079-settle-after-on-premarket.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',
