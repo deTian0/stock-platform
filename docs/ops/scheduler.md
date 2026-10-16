@@ -112,6 +112,11 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 （实测 asof=2026-10-12 brief `panelSize=0` 的废档即此因）。`-PrevSession` 让包装脚本用
 `TradingCalendar` 把 asof 解析为**前一交易日**（T-1 收盘截面 = 正确的 PIT 选股时点）。
 
+> **「今天跑出来的日报还是昨天的日期」不是故障**（`v4.11.2`）。asof = **数据基准日**（该日收盘截面），
+> 不是运行日；10-16 08:30 跑出来的 `asof=2026-10-15` 正是当日选股要用的 T-1 截面。为免误读，digest
+> 现在会在标题下自证口径（数据基准日 + 生成时刻，本机时区），HTML 抬头同步显示 —— 见下「用户可读日报」。
+> 想要 **asof=当天** 的简报，需等 18:30 回补完成后另跑一次（不带 `-PrevSession`）。
+
 ## 用户可读日报（digest）
 
 每日流水线成功后自动渲染人读版日报（`-Digest`），**Markdown + 同主题 HTML 双份**（ADR [`0071`](../architecture/0071-report-html-theme.md)）：
@@ -119,6 +124,7 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 - CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...]`
 - 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针），**并默认同时输出** `{asof}.html` + `latest.html`（主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown）
 - 内容：环境/数据源/宇宙概览、**长线 + 短线双代码块**（见下）、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
+  - **口径自证行（`v4.11.2`）**：标题下固定输出一行 `> **口径**：数据基准日（asof）YYYY-MM-DD —— 取该交易日收盘截面；本简报生成于 YYYY-MM-DD HH:MM:SS +08:00 …`，把「数据日」与「运行日」并列写出，避免 asof 被误读成「报告过期」。`生成时间` 也改按**本机时区**渲染（UTC 存档值保留在括号内）
   - **同花顺导入行（`v4.5.1`；`v4.11.1` 起双线各一块）**：**长线**（当日推荐 / ②A 质量榜）与**短线**（②B 短线榜）**各给一块可整块复制**的 6 位代码行，直接粘进同花顺手机版「自选 → 导入」。**手机版一次仅支持导入 5 只**，故按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`）、按推荐序去重、仅保留合法 6 位码；某条线无有效代码则该块整块省略（fail-closed）
   - **同花顺导入文件（`v4.5.2`；`v4.11.1` 起双文件）**：两条线各落一份 —— 长线 `data/ths_import/{asof}.txt` + `latest.txt`，短线 `data/ths_import/{asof}_short.txt` + `latest_short.txt`（每行 1 个 6 位码、无表头无名称），供同花顺「导入自选 → 选择文件」直接导入（用户实测 txt 通道可用）。目录默认取 digest 目录的**同级** `ths_import`（`--ths-dir` 可覆盖）；某条线无代码则不产出该文件（fail-closed），并顺带清理目录内遗留的 `*.sel`（项目已统一只用 txt）
   - **名称（`v4.4.0`）**：读 `fundamentals.name`（`load_engine_names`，**fail-open**），key 归一到 6 位核；**装饰性、可缺省** —— 取不到名就不写 `name` 键（brief / ledger / 命中 / 绩效 JSONL 逐字节不变）

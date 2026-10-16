@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -279,6 +279,31 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def _human_ts(iso: Any) -> str:
+    """Render an ISO timestamp in the machine's local zone (best-effort).
+
+    ``BriefRecord.generated_at`` is stored as UTC (e.g. ``2026-10-16T00:30:37+00:00``),
+    which reads like "00:30" and made the digest look stale/odd to a CST reader.
+    Falls back to the raw string when it cannot be parsed.
+    """
+    if not iso:
+        return ""
+    raw = str(iso).strip()
+    if not raw:
+        return ""
+    try:
+        dt = datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return raw
+    if dt.tzinfo is None:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    local = dt.astimezone()
+    off = local.strftime("%z")
+    if len(off) == 5:  # +0800 -> +08:00
+        off = f"{off[:3]}:{off[3:]}"
+    return local.strftime("%Y-%m-%d %H:%M:%S") + f" {off}"
+
+
 def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> str:
     """Render one BriefRecord as the human-readable markdown digest."""
     payload = record.payload or {}
@@ -286,6 +311,18 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
     lines: list[str] = []
     lines.append(f"# 每日简报 · {asof}")
     lines.append("")
+    # 口径自证：定时任务（08:30 盘前 / 15:30 盘后）都带 -PrevSession，asof 恒为
+    # 「上一交易日收盘截面」—— 当日 K 线要等 18:30 回补后才进市场库。把「数据基准日」
+    # 与「本简报实际生成时刻」并列写出，避免 asof 被误读成「报告过期」。
+    generated_local = _human_ts(record.generated_at)
+    if generated_local:
+        lines.append(
+            f"> **口径**：数据基准日（asof）**{asof}** —— 取该交易日**收盘截面**；"
+            f"本简报生成于 **{generated_local}**。"
+            f"盘前/盘后任务取上一交易日收盘（当日 K 线尚未入库），这是设计约定，"
+            f"不是数据滞后。"
+        )
+        lines.append("")
     lines.append(f"- 环境：{record.environment}（{_DISCLAIMER}）")
     provider = record.provider or payload.get("provider") or "未记录"
     lines.append(f"- 数据源：`{provider}`")
@@ -298,7 +335,11 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
         lines.append(f"- 数据备注：{record.data_note}")
     if payload.get("softGates"):
         lines.append("- 闸门：softGates 开启" + ("（闸门放宽）" if payload.get("gatesRelaxed") else ""))
-    lines.append(f"- 生成时间：{record.generated_at or '-'}")
+    _gen_raw = record.generated_at or ""
+    if generated_local and _gen_raw and generated_local != _gen_raw:
+        lines.append(f"- 生成时间：{generated_local}（存档值 {_gen_raw}）")
+    else:
+        lines.append(f"- 生成时间：{generated_local or _gen_raw or '-'}")
     lines.append("")
 
     picks = record.picks or []
@@ -433,10 +474,15 @@ def build_digest(
     }
     if emit_html:
         env_note = f"环境 {record.environment}" if record is not None else "无该日 brief 存档（stub）"
+        gen_note = ""
+        if record is not None:
+            _g = _human_ts(record.generated_at)
+            if _g:
+                gen_note = f" · 生成 {_g}"
         doc = render_report_html(
             text,
             title=f"每日简报 · {target_asof}",
-            subtitle=f"asof {target_asof} · {env_note}",
+            subtitle=f"数据基准日（asof）{target_asof} · {env_note}{gen_note}",
             source="数据来源：SQLite brief 仓库（只读）+ 命中追踪 + 绩效 JSONL",
             badge="DAILY DIGEST",
         )
