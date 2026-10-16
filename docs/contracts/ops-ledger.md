@@ -60,9 +60,13 @@
 
 | `task` | `label` | `plannedAt` | 包装器预设参数 |
 |--------|---------|-------------|----------------|
-| `daily` | 盘前选股 | `08:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -Digest` |
+| `daily` | 盘前选股 | `08:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest` |
 | `postmarket` | 盘后台账 | `15:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest` |
 | `marketdb-backfill` | 行情回补 | `18:30` | `Invoke-MarketDbBackfill.ps1 -Mode apply` |
+
+> `daily` 与 `postmarket` 都带 `-SettleAfter`：两个任务用**同一个** T-1 `asof`，写入幂等
+> （`log_brief_decisions(..., skip_existing=True)`），所以是**冗余**而非重复——任一任务成功即入账，
+> 消除「盘后漏跑一次则该日推荐永久丢失」的单点（2026-10-14 事故，ADR 0079）。
 
 ## 5. 写入语义（`record_run`）
 

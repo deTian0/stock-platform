@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Wraps Register-ScheduledTask from the versioned XML files in scripts/ops:
-    stock-platform-daily.xml      -> task "stock-platform-daily"      (08:30, -MarketDb -PrevSession -Digest)
+    stock-platform-daily.xml      -> task "stock-platform-daily"      (08:30, -MarketDb -PrevSession -SettleAfter -Digest)
     stock-platform-postmarket.xml -> task "stock-platform-postmarket" (15:30, -MarketDb -PrevSession -SettleAfter -Digest)
     stock-platform-marketdb-backfill.xml -> task "stock-platform-marketdb-backfill" (18:30, engine backfill --apply)
 
