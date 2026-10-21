@@ -49,13 +49,25 @@ def load_holdings(path: str | Path) -> list[dict[str, Any]]:
 
     Decoded as ``utf-8-sig`` so a file saved by Windows PowerShell
     (``Set-Content -Encoding UTF8`` writes a BOM) loads without a manual strip.
+
+    The document-level ``asof`` is stamped onto every row as ``holdings_asof``.
+    Each row's ``price`` is a **hand-typed snapshot from that date**; once the
+    book is older than the pipeline's asof, that snapshot is stale and must not
+    shadow the current close (see ``rankings.enrich_holdings``). Dropping the
+    document date at load time is what made ③B report a false "no action".
     """
     data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    doc_asof = ""
     if isinstance(data, Mapping):
+        doc_asof = str(data.get("asof") or "").strip()
         data = data.get("holdings") or []
     if not isinstance(data, list):
         raise ValueError("holdings JSON must be a list or {'holdings': [...]}")
-    return [dict(r) for r in data if isinstance(r, Mapping)]
+    rows = [dict(r) for r in data if isinstance(r, Mapping)]
+    if doc_asof:
+        for row in rows:
+            row.setdefault("holdings_asof", doc_asof)
+    return rows
 
 
 def enrich_from_db(
