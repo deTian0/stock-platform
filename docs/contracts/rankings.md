@@ -15,11 +15,18 @@
 |---|---|---|
 | `②A_质量榜` | `quality` | 综合分最高的前 `quality_top_n` 只（默认 **10**） |
 | `②B_短线榜` | `short_term` | 在**排除 ②A 头部**后的池里取 `short_term_top_n` 只（默认 **5**）；若截面带 `entry_ok` 列则**优先取 `entry_ok=True`**，不足再按综合分补足 |
-| `③A_持仓` | `holdings` | 传入的持仓 ∩ 评分截面，按综合分降序；**未过今日入场闸门的持仓也会列示**（`composite_score=null`，说明「未过今日入场闸门」），持仓是既成事实，不因买点闸门而消失 |
+| `③A_持仓` | `holdings` | 传入的持仓 ∩ 评分截面，按综合分降序；**未过今日入场闸门的持仓也会列示**（`composite_score=null`，说明「未过今日入场闸门」），持仓是既成事实，不因买点闸门而消失。**不在股票截面内但持仓文件自带 `price` 的（典型是 ETF）同样列示**（`composite_score=null`）；无价则不列（fail-closed） |
 | `③B_操作建议` | `actions` | **只**收录 `review_positions()` 判为 `exit` / `trim` 的持仓（B5 规则单点）。行内含 `action` / `reason` / `ret_pct` / `deferred` |
 | `③C_观察名单` | `watchlist` | ②A 头部之后的 `watchlist_top_n` 只（默认 **23**） |
 
 `add` 属加仓偏差、`hold` / `pending` 属无指令，**都不进 ③B**。
+
+### 3B 为空 ≠ 数据故障
+
+③B 只列「需要动手」的持仓。持仓全为 `hold` 时它**必然**是空的，这是规则结论而不是缺数据。
+为此 payload 额外带一个 `holdingsReview`（= `review_positions()` 原始返回，含 `counts` 与逐只 `rows`），
+报表/前端据此渲染「当日无需减仓：N 只持仓全部继续持有」+ 逐只明细，而不是那句会被误读成失败的
+「无（fail-closed：不生成占位条目）」。`rows` 里 `pending` 占满时仍回到 fail-closed 文案。
 
 ---
 

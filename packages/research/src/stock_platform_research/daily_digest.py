@@ -240,12 +240,27 @@ def write_ths_import(
     }
 
 
+_ACTION_LABELS = {
+    "exit": "退出",
+    "trim": "减仓",
+    "add": "补仓",
+    "hold": "继续持有",
+    "pending": "待定（缺成本价/现价）",
+}
+
+
 def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
     rankings = payload.get("rankings") or {}
     boards = rankings.get("boards") or {}
     if not boards:
         return []
     lines = ["## 五榜概览", ""]
+    # ③B 明细行来自 holdingsReview（B5 复核结果），本身不带中文名 —— 用 ③A 补。
+    name_by_code = {
+        str(it.get("symbol") or "").strip(): it.get("name")
+        for it in ((boards.get("holdings") or {}).get("items") or [])
+        if it.get("name")
+    }
     order = [
         ("quality", "②A 质量榜"),
         ("short_term", "②B 短线榜"),
@@ -256,6 +271,43 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
     for slug, label in order:
         board = boards.get(slug) or {}
         items = board.get("items") or []
+        review = rankings.get("holdingsReview") or {}
+        review_rows = list(review.get("rows") or [])
+        rcounts = review.get("counts") or {}
+
+        if slug == "actions" and not items and review_rows:
+            # ③B only ever lists exit/trim (REDUCE_ACTIONS). When the whole book
+            # is "hold" the board is empty *by design* — but an empty board read
+            # like a data failure. Render the real verdict per holding instead.
+            pending = int(rcounts.get("pending") or 0)
+            held = int(rcounts.get("hold") or 0)
+            lines.append(f"### {label}（0 需操作 · {len(review_rows)} 只已复核）")
+            lines.append("")
+            if pending == len(review_rows):
+                lines.append("_空（fail-closed：持仓缺成本价/现价，不生成占位条目）_")
+                lines.append("")
+                continue
+            if held:
+                lines.append(
+                    f"**当日无需减仓：{held} 只持仓全部继续持有**"
+                    f"（B5 规则未触发 exit/trim）"
+                )
+                lines.append("")
+            lines.append("| # | 代码 | 名称 | 持有天数 | 收益% | 动作 |")
+            lines.append("|---|---|---|---|---|---|")
+            for i, r in enumerate(review_rows, start=1):
+                ret = r.get("ret_pct")
+                held_days = r.get("held_days")
+                code = str(r.get("code") or "").strip()
+                lines.append(
+                    f"| {i} | {code or '-'} | {name_by_code.get(code) or '-'} "
+                    f"| {'-' if held_days is None else held_days} "
+                    f"| {'' if ret is None else f'{ret:+.2f}'} "
+                    f"| {_ACTION_LABELS.get(r.get('action'), r.get('action') or '-')} |"
+                )
+            lines.append("")
+            continue
+
         lines.append(f"### {label}（{len(items)} 条）")
         lines.append("")
         if not items:

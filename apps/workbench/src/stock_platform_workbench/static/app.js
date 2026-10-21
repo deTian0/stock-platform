@@ -1334,6 +1334,13 @@
   }
 
   var BOARD_ORDER = ["quality", "short_term", "holdings", "actions", "watchlist"];
+  var ACTION_LABELS = {
+    exit: "退出",
+    trim: "减仓",
+    add: "补仓",
+    hold: "继续持有",
+    pending: "待定（缺成本价/现价）",
+  };
 
   function renderRankings(rankings) {
     var host = $("recommend-rankings");
@@ -1350,6 +1357,41 @@
       var board = rankings.boards[BOARD_ORDER[i]];
       if (!board) continue;
       var items = board.items || [];
+      var review = rankings.holdingsReview || {};
+      var reviewRows = review.rows || [];
+      if (board.slug === "actions" && !items.length && reviewRows.length) {
+        // ③B only lists exit/trim; an all-hold book is empty by design. Show the
+        // actual verdicts instead of an empty line that reads like a failure.
+        var rc = review.counts || {};
+        var pend = Number(rc.pending || 0);
+        html +=
+          "<h4>" + escapeHtml(board.key || "actions") +
+          "（0 需操作 · " + reviewRows.length + " 只已复核）</h4>";
+        if (pend === reviewRows.length) {
+          html += '<p class="empty-hint">无（fail-closed：持仓缺成本价/现价，不生成占位条目）</p>';
+          continue;
+        }
+        if (Number(rc.hold || 0)) {
+          html +=
+            '<p class="empty-hint">当日无需减仓：' + rc.hold +
+            " 只持仓全部继续持有（B5 规则未触发 exit/trim）</p>";
+        }
+        html += '<div class="table-wrap table-compact"><table><thead><tr>' +
+          '<th>#</th><th>代码</th><th>持有天数</th><th class="num">收益%</th><th>动作</th>' +
+          "</tr></thead><tbody>";
+        for (var q = 0; q < reviewRows.length; q++) {
+          var rr = reviewRows[q] || {};
+          html += "<tr>" +
+            td(q + 1) +
+            td(rr.code) +
+            tdNum(rr.held_days == null ? "—" : rr.held_days) +
+            tdNum(rr.ret_pct == null ? "—" : Number(rr.ret_pct).toFixed(2)) +
+            td(ACTION_LABELS[rr.action] || rr.action) +
+            "</tr>";
+        }
+        html += "</tbody></table></div>";
+        continue;
+      }
       html +=
         "<h4>" + escapeHtml(board.key || BOARD_ORDER[i]) + "（" + items.length + "）</h4>";
       if (!items.length) {
