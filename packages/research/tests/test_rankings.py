@@ -292,3 +292,60 @@ def test_holdings_review_carries_every_verdict_not_just_the_reducible_ones() -> 
     assert review["counts"]["hold"] == 1
     assert [r["action"] for r in review["rows"]] == ["hold"]
     assert review["rows"][0]["ret_pct"] == -5.0
+
+
+def test_stale_book_snapshot_yields_to_the_asof_close() -> None:
+    """A hand-typed price older than the run's asof must not shadow the close.
+
+    Real case (2026-10-21): ``data/holdings.json`` carried asof 2026-10-14 with
+    000533 priced 9.72, while the 10-20 close was 9.32 — the stale snapshot
+    turned a −10.80 % ``stop_loss`` into a fabricated "hold".
+    """
+    panel = pd.DataFrame(
+        [{"symbol": "000533", "close": 9.32, "ma20": 9.5, "ma60": 9.8, "pct_chg": 0.5}]
+    )
+    stale = enrich_holdings(
+        [{"code": "000533", "entry_price": 10.449, "price": 9.72, "holdings_asof": "2026-10-14"}],
+        panel,
+        asof="2026-10-20",
+    )
+    assert stale[0]["price"] == 9.32
+    assert stale[0]["priceStaleSnapshot"] == 9.72  # kept for audit
+
+    # A same-day book keeps its own price (it is not stale).
+    fresh = enrich_holdings(
+        [{"code": "000533", "entry_price": 10.449, "price": 9.72, "holdings_asof": "2026-10-20"}],
+        panel,
+        asof="2026-10-20",
+    )
+    assert fresh[0]["price"] == 9.72
+    assert "priceStaleSnapshot" not in fresh[0]
+
+    # No asof supplied ⇒ legacy behaviour (fill only when missing).
+    legacy = enrich_holdings([{"code": "000533", "entry_price": 10.449, "price": 9.72}], panel)
+    assert legacy[0]["price"] == 9.72
+
+
+def test_stale_book_produces_the_real_exit_instead_of_a_false_hold() -> None:
+    """End-to-end: the stale book must land a stop_loss on ③B, not an empty board."""
+    panel = pd.DataFrame(
+        [{"symbol": "000533", "close": 9.32, "ma20": 9.5, "ma60": 9.8, "pct_chg": 0.5}]
+    )
+    out = build_rankings(
+        _scored(20),
+        holdings=[
+            {
+                "code": "000533",
+                "entry_price": 10.449,
+                "price": 9.72,
+                "held_days": 10,
+                "holdings_asof": "2026-10-14",
+            }
+        ],
+        panel=panel,
+        asof="2026-10-20",
+    )
+    actions = out["boards"]["actions"]["items"]
+    assert len(actions) == 1
+    assert actions[0]["action"] == "exit"
+    assert "stop_loss" in (actions[0]["reason"] or "")

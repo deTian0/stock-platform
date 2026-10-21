@@ -174,12 +174,25 @@ def apply_score_floor(scored: pd.DataFrame, min_score: float) -> tuple[pd.DataFr
 def enrich_holdings(
     holdings: Sequence[Mapping[str, Any]],
     panel: pd.DataFrame | None = None,
+    *,
+    asof: str | None = None,
 ) -> list[dict[str, Any]]:
     """Fill ``price`` / ``ma20`` / ``ma60`` for holdings from the asof panel.
 
     Uses the panel the brief was scored on, so the book is reviewed on exactly
     the same prices the ranking saw. Missing ``entry_price`` stays missing →
     :func:`review_positions` flags it ``pending`` (fail-closed, never guessed).
+
+    **Stale-snapshot guard**: ``data/holdings.json`` carries a hand-typed
+    ``price`` from the moment the broker screenshot was taken (its document
+    ``asof``, stamped onto each row as ``holdings_asof`` by ``load_holdings``).
+    Once the book is older than the run's ``asof``, that snapshot is *older*
+    than the panel close and used to shadow it — which silently turned a real
+    ``stop_loss`` into a ``hold`` (2026-10-21: 000533 snapshot 9.72 ⇒ −6.98 %
+    "hold" vs. actual 10-20 close 9.32 ⇒ −10.80 % "stop_loss"). When the book is
+    stale the panel wins; the snapshot is kept under ``priceStaleSnapshot`` for
+    audit. A same-day (or newer) book keeps its own price, and a code absent
+    from the panel (e.g. an ETF) keeps it regardless — it is the only price.
     """
     rows = [dict(r) for r in (holdings or []) if isinstance(r, Mapping)]
     if not rows or panel is None or len(panel) == 0:
@@ -198,8 +211,15 @@ def enrich_holdings(
         src = by_key.get(code_key(row.get("code") or row.get("symbol") or row.get("ts_code")))
         if not src:
             continue
-        if row.get("price") is None:
-            row["price"] = src.get("close")
+        close = src.get("close")
+        book_asof = str(row.get("holdings_asof") or "").strip()
+        stale = bool(asof) and bool(book_asof) and book_asof < str(asof)
+        if stale and close is not None and pd.notna(close):
+            if row.get("price") is not None:
+                row["priceStaleSnapshot"] = row.get("price")
+            row["price"] = close
+        elif row.get("price") is None:
+            row["price"] = close
         for field in ("ma20", "ma60", "pct_chg"):
             if row.get(field) is None and src.get(field) is not None:
                 row[field] = src.get(field)
@@ -276,7 +296,7 @@ def build_rankings(
     watchlist = rec.iloc[int(cfg.quality_top_n) : int(cfg.quality_top_n) + int(cfg.watchlist_top_n)].copy()
 
     # ③A 持仓 + ③B 操作建议
-    book = enrich_holdings(holdings or [], panel)
+    book = enrich_holdings(holdings or [], panel, asof=asof)
     holding_items: list[dict[str, Any]] = []
     action_items: list[dict[str, Any]] = []
     holdings_review: dict[str, Any] | None = None
