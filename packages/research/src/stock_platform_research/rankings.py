@@ -237,6 +237,7 @@ def build_rankings(
                 for k in BOARD_KEYS
             },
             "notes": ["截面为空：无可排名标的（fail-closed，不生成占位榜单）"],
+            "holdingsReview": None,
             "environment": "SIMULATE",
             "disclaimer": "榜单为研究口径；③B 操作建议与回测共用同一规则实现；非投资建议。",
         }
@@ -278,6 +279,7 @@ def build_rankings(
     book = enrich_holdings(holdings or [], panel)
     holding_items: list[dict[str, Any]] = []
     action_items: list[dict[str, Any]] = []
+    holdings_review: dict[str, Any] | None = None
     median_score = (
         float(rec["composite_score"].median())
         if "composite_score" in rec.columns and len(rec)
@@ -335,8 +337,39 @@ def build_rankings(
                 holding_items.append(entry)
                 seen_keys.add(k)
 
+        # The cross-section only carries stocks scored today, so an ETF (or a
+        # suspended name) held in the book appears in neither ``rec`` nor
+        # ``panel`` and used to vanish from ③A silently. List it from the book
+        # itself — its price comes from the holdings file / enrich step.
+        if any(k not in seen_keys for k in book_keys):
+            for bow in book:
+                k = code_key(bow.get("code") or bow.get("symbol") or bow.get("ts_code"))
+                if not k or k in seen_keys or k not in book_keys:
+                    continue
+                px = bow.get("price")
+                if px is None or not pd.notna(px):
+                    # No price anywhere ⇒ nothing truthful to show (fail-closed).
+                    continue
+                entry = {
+                    "rank": len(holding_items) + 1,
+                    "symbol": bow.get("code") or bow.get("symbol") or "",
+                    "composite_score": None,
+                    "close": float(px),
+                    "reasons": [],
+                    "reasonSummary": "未在当前评分截面内（如 ETF / 停牌）：仅列示持仓，不参与推荐排名",
+                    "belowMedian": False,
+                    "crossSectionRank": None,
+                }
+                display = _display_name(bow, name_map)
+                if display:
+                    entry["name"] = display
+                holding_items.append(entry)
+                seen_keys.add(k)
+
         review = review_positions(book, asof=asof)
-        for row in review.get("rows") or []:
+        holdings_review = review
+        review_rows = review.get("rows") or []
+        for row in review_rows:
             if row.get("action") not in REDUCE_ACTIONS:
                 continue
             k = code_key(row.get("code"))
@@ -386,6 +419,10 @@ def build_rankings(
         "config": cfg.to_dict(),
         "counts": {slug: len(boards[slug]["items"]) for slug in boards},
         "boards": boards,
+        # Full B5 verdict per holding (exit / trim / add / hold / pending).
+        # ③B itself only lists the *reducible* ones (exit/trim); this carries the
+        # rest so a report can say "3 只全部继续持有" instead of showing nothing.
+        "holdingsReview": holdings_review,
         "notes": notes,
         "environment": "SIMULATE",
         "disclaimer": "榜单为研究口径；③B 操作建议与回测共用同一规则实现；非投资建议。",
@@ -409,6 +446,14 @@ def format_rankings_markdown(rankings: Mapping[str, Any]) -> str:
     asof = rankings.get("asof") or "-"
     lines = [f"# 榜单（{asof} · SIMULATE · 非投资建议）", ""]
     counts = rankings.get("counts") or {}
+    review = rankings.get("holdingsReview") or {}
+    review_rows = list(review.get("rows") or [])
+    review_counts = review.get("counts") or {}
+    name_by_code = {
+        str(it.get("symbol") or "").strip(): it.get("name")
+        for it in ((rankings.get("boards") or {}).get(BOARD_SLUGS[HOLDINGS_KEY]) or {}).get("items") or []
+        if it.get("name")
+    }
     lines.append("| 榜单 | 数量 |\n|---|---|")
     for key in BOARD_KEYS:
         lines.append(f"| {key} | {counts.get(BOARD_SLUGS[key], 0)} |")
@@ -416,8 +461,36 @@ def format_rankings_markdown(rankings: Mapping[str, Any]) -> str:
     for key in BOARD_KEYS:
         board = (rankings.get("boards") or {}).get(BOARD_SLUGS[key]) or {}
         items = board.get("items") or []
-        lines.append(f"## {key}（{len(items)}）")
+        show_review = key == ACTIONS_KEY and not items and bool(review_rows)
+        header_count = f"0 需操作 / {len(review_rows)} 已复核" if show_review else len(items)
+        lines.append(f"## {key}（{header_count}）")
         lines.append("")
+        if show_review:
+            pending = int(review_counts.get("pending") or 0)
+            held = int(review_counts.get("hold") or 0)
+            if pending == len(review_rows):
+                lines.append("_无（fail-closed：持仓缺成本价/现价，不生成占位条目）_")
+                lines.append("")
+                continue
+            if held:
+                lines.append(
+                    f"**当日无需减仓：{held} 只持仓全部继续持有**"
+                    f"（B5 规则未触发 exit/trim）"
+                )
+                lines.append("")
+            lines.append("| # | 代码 | 名称 | 持有天数 | 收益% | 动作 |")
+            lines.append("|---|---|---|---|---|---|")
+            for i, r in enumerate(review_rows, start=1):
+                ret = r.get("ret_pct")
+                held_days = r.get("held_days")
+                code = str(r.get("code") or "").strip()
+                lines.append(
+                    f"| {i} | {code or '-'} | {name_by_code.get(code) or '-'} "
+                    f"| {'-' if held_days is None else held_days} "
+                    f"| {'' if ret is None else f'{ret:+.2f}'} | {r.get('action') or '-'} |"
+                )
+            lines.append("")
+            continue
         if not items:
             lines.append("_无（fail-closed：不生成占位条目）_")
             lines.append("")

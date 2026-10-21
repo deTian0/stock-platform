@@ -440,6 +440,75 @@ def test_digest_short_block_absent_when_short_board_empty(env):
     assert "同花顺导入 · 短线" not in text
 
 
+def test_actions_board_shows_hold_verdicts_instead_of_an_empty_line() -> None:
+    """③B lists only exit/trim, so an all-hold book used to render as
+    "_空（fail-closed）_" — which reads like a data failure rather than the
+    actual answer ("3 只全部继续持有"). Render the verdicts instead.
+    """
+    from stock_platform_research.daily_digest import _rankings_section
+
+    payload = {
+        "rankings": {
+            "counts": {"quality": 0, "short_term": 0, "holdings": 2, "actions": 0, "watchlist": 0},
+            "boards": {
+                "quality": {"key": "②A_质量榜", "slug": "quality", "items": []},
+                "short_term": {"key": "②B_短线榜", "slug": "short_term", "items": []},
+                "holdings": {
+                    "key": "③A_持仓",
+                    "slug": "holdings",
+                    "items": [
+                        {"rank": 1, "symbol": "000533", "name": "顺钠股份"},
+                        {"rank": 2, "symbol": "588080", "name": "科创板50"},
+                    ],
+                },
+                "actions": {"key": "③B_操作建议", "slug": "actions", "items": []},
+                "watchlist": {"key": "③C_观察名单", "slug": "watchlist", "items": []},
+            },
+            "holdingsReview": {
+                "counts": {"exit": 0, "trim": 0, "add": 0, "hold": 2, "pending": 0},
+                "rows": [
+                    {"code": "000533", "held_days": 10, "ret_pct": -6.98, "action": "hold"},
+                    {"code": "588080", "held_days": 3, "ret_pct": -1.63, "action": "hold"},
+                ],
+            },
+        }
+    }
+    text = "\n".join(_rankings_section(payload))
+
+    assert "### ③B 操作建议（0 需操作 · 2 只已复核）" in text
+    assert "当日无需减仓：2 只持仓全部继续持有" in text
+    # 中文名从 ③A 补全，动作翻成中文
+    assert "| 1 | 000533 | 顺钠股份 | 10 | -6.98 | 继续持有 |" in text
+    assert "| 2 | 588080 | 科创板50 | 3 | -1.63 | 继续持有 |" in text
+    # ③B 段内不得再出现「空」的措辞
+    actions_block = text.split("### ③B 操作建议")[1].split("###")[0]
+    assert "fail-closed" not in actions_block
+
+
+def test_actions_board_stays_fail_closed_when_every_holding_is_pending() -> None:
+    """No price anywhere ⇒ still an explicit fail-closed line, never a fake verdict."""
+    from stock_platform_research.daily_digest import _rankings_section
+
+    payload = {
+        "rankings": {
+            "boards": {
+                "quality": {"key": "②A_质量榜", "slug": "quality", "items": []},
+                "short_term": {"key": "②B_短线榜", "slug": "short_term", "items": []},
+                "holdings": {"key": "③A_持仓", "slug": "holdings", "items": []},
+                "actions": {"key": "③B_操作建议", "slug": "actions", "items": []},
+                "watchlist": {"key": "③C_观察名单", "slug": "watchlist", "items": []},
+            },
+            "holdingsReview": {
+                "counts": {"exit": 0, "trim": 0, "add": 0, "hold": 0, "pending": 1},
+                "rows": [{"code": "000533", "held_days": None, "ret_pct": None, "action": "pending"}],
+            },
+        }
+    }
+    actions_block = "\n".join(_rankings_section(payload)).split("### ③B 操作建议")[1].split("###")[0]
+    assert "fail-closed" in actions_block
+    assert "当日无需减仓" not in actions_block
+
+
 def test_build_digest_emits_short_ths_txt(env):
     _save_brief_with_rankings()
     result = build_digest(out_dir=env / "digests", emit_ths=True)

@@ -255,3 +255,40 @@ def test_rows_and_markdown_cover_every_board() -> None:
     md = format_rankings_markdown(out)
     for key in BOARD_KEYS:
         assert key in md
+
+
+def test_priced_holding_outside_the_cross_section_is_listed_on_the_holdings_board() -> None:
+    """An ETF is never in the stock cross-section, but it is still a holding.
+
+    It used to vanish from ③A silently. A price from the book is enough to list
+    it (no score, no rank); a holding with *no* price anywhere stays out — the
+    same fail-closed rule as before.
+    """
+    out = build_rankings(
+        _scored(20),
+        holdings=[{"code": "588080", "name": "科创板50", "entry_price": 1.472, "price": 1.448}],
+        asof="2026-09-03",
+    )
+    items = out["boards"]["holdings"]["items"]
+    assert [i["symbol"] for i in items] == ["588080"]
+    assert items[0]["name"] == "科创板50"
+    assert items[0]["close"] == 1.448
+    assert items[0]["composite_score"] is None
+
+
+def test_holdings_review_carries_every_verdict_not_just_the_reducible_ones() -> None:
+    """③B only lists exit/trim, so the payload must also carry the hold rows."""
+    panel = pd.DataFrame(
+        [{"symbol": "600005", "close": 95.0, "ma20": 90.0, "ma60": 80.0, "pct_chg": -1.0}]
+    )
+    out = build_rankings(
+        _scored(20),
+        holdings=[{"code": "600005", "entry_price": 100.0}],
+        panel=panel,
+        asof="2026-09-03",
+    )
+    assert out["boards"]["actions"]["items"] == []  # -5 % < 8 % stop, held_days 0 < min_hold
+    review = out["holdingsReview"]
+    assert review["counts"]["hold"] == 1
+    assert [r["action"] for r in review["rows"]] == ["hold"]
+    assert review["rows"][0]["ret_pct"] == -5.0
