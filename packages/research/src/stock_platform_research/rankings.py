@@ -300,6 +300,7 @@ def build_rankings(
     holding_items: list[dict[str, Any]] = []
     action_items: list[dict[str, Any]] = []
     holdings_review: dict[str, Any] | None = None
+    position_sizing: dict[str, Any] | None = None
     median_score = (
         float(rec["composite_score"].median())
         if "composite_score" in rec.columns and len(rec)
@@ -389,6 +390,30 @@ def build_rankings(
         review = review_positions(book, asof=asof)
         holdings_review = review
         review_rows = review.get("rows") or []
+
+        # 呈现侧折算：把「该不该动」翻译成「动多少股」（ADR 0081）。规则层保持无仓位口径，
+        # 回测路径不受影响。
+        from .position_sizing import plan_orders  # local: keep module import-light
+
+        sizing = plan_orders(book, review)
+        position_sizing = sizing
+        size_by_key = {o["code"]: o for o in sizing.get("orders") or []}
+
+        def _attach_size(entry: dict[str, Any], k: str) -> None:
+            sized = size_by_key.get(k) or {}
+            for src, dst in (
+                ("qty", "suggestQty"),
+                ("amount", "suggestAmount"),
+                ("price", "price"),
+                ("heldQty", "heldQty"),
+                ("available", "availableQty"),
+                ("weightBefore", "weightPct"),
+                ("weightAfter", "weightAfterPct"),
+                ("remainingQty", "remainingQty"),
+            ):
+                if sized.get(src) is not None:
+                    entry[dst] = sized[src]
+
         for row in review_rows:
             if row.get("action") not in REDUCE_ACTIONS:
                 continue
@@ -404,10 +429,39 @@ def build_rankings(
                 "compositeScore": score_by_key.get(k),
                 "crossSectionRank": rank_by_key.get(k),
             }
+            _attach_size(entry, k)
             display = _display_name(row, name_map)
             if display:
                 entry["name"] = display
             action_items.append(entry)
+
+        # 复核说 hold、但仓位已超单票上限 ⇒ 仍是一条要执行的动作（减到上限）。
+        listed = {code_key(i.get("symbol")) for i in action_items}
+        for row in review_rows:
+            k = code_key(row.get("code"))
+            if k in listed:
+                continue
+            sized = size_by_key.get(k) or {}
+            if sized.get("action") != "trim" or not sized.get("qty"):
+                continue
+            entry = {
+                "rank": len(action_items) + 1,
+                "symbol": row.get("code") or "",
+                "action": "trim",
+                "reason": sized.get("reason") or "超过单票权重上限",
+                "ret_pct": row.get("ret_pct"),
+                "deferred": False,
+                "assetClass": row.get("asset_class"),
+                "compositeScore": score_by_key.get(k),
+                "crossSectionRank": rank_by_key.get(k),
+            }
+            _attach_size(entry, k)
+            display = _display_name(row, name_map)
+            if display:
+                entry["name"] = display
+            action_items.append(entry)
+            listed.add(k)
+
         if not action_items:
             notes.append(
                 "持仓无需减仓：B5 规则（退出/冷静期/偏差）未对当日持仓触发 exit/trim"
@@ -443,6 +497,8 @@ def build_rankings(
         # ③B itself only lists the *reducible* ones (exit/trim); this carries the
         # rest so a report can say "3 只全部继续持有" instead of showing nothing.
         "holdingsReview": holdings_review,
+        # ③B 的具体数量（股数 / 金额 / 权重前后）。规则层无仓位口径，这里是呈现侧折算。
+        "positionSizing": position_sizing,
         "notes": notes,
         "environment": "SIMULATE",
         "disclaimer": "榜单为研究口径；③B 操作建议与回测共用同一规则实现；非投资建议。",
