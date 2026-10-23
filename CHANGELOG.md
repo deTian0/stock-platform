@@ -8,6 +8,59 @@
 
 - （无）
 
+## [4.12.0] - 2026-10-23
+
+### Added
+
+- **盘后当日行情台账 `A6_day_quote`：开 / 高 / 低 / 收 + 涨跌 + 量化归因**（ADR [`0082`](docs/architecture/0082-day-quote-attribution.md)、契约 [`day-quote`](docs/contracts/day-quote.md)）。
+  盘后台账此前只有账户层结论（`A3` 命中、`A4` 绩效），逐只标的的**开盘价 / 最高 / 最低 / 收盘价 / 涨跌幅**没有任何出口，更谈不上「为什么涨跌」。
+  - 新单点 `stock_platform_research.day_quote`（纯函数：四价派生 / 四轴归因 / 汇总 / 渲染）+ CLI `stock-platform-day-quote`。
+  - 四价分工：`close`/`volume`/`ma20` 走引擎 `market.db`（与主链同一截面）；`open`/`high`/`low` 走东财日线（经 `em_get`），落缓存 `data/quotes/ohlc-<asof>.json` ⇒ **同日复跑零网络且结果一致**。外部源不可用 → 该列 `—`、归因降级并在报告顶部标注，**不补零、不猜**。
+  - **涨跌幅一律自算** `close / prev_close − 1`，不读 `daily_price.pct_chg`（该列在引擎库是混合尺度：股票多为小数、ETF 多为百分点，见 `pct_scale`）。
+  - 「涨跌原因」= **量化归因**，四轴机械组合：分时形态（高开低走/低开高走/冲高回落/探底回升/窄幅整理/单边走强弱）、量价（放量/缩量 × 涨跌）、相对基准、均线位置（`vs MA20`）。payload 固定带 `attributionKind="quantitative"`，报告固定声明「平台无新闻/公告源，故不含且不编造消息面原因」。
+  - 覆盖 = asof 归档 brief 的 picks + `data/holdings.json` 持仓；基准单独成行、**不参与**涨跌家数与平均涨跌统计。
+  - 报告项注册进 `data/_reports/harness.py`（`--only A6_day_quote` 可单独跑）。
+
+- **③B 操作建议给出可执行数量**（ADR [`0081`](docs/architecture/0081-concrete-order-sizing.md)）。
+  ③B 长期只输出 `stop_loss(-x%)` 一行，没有股数、没有金额，读者无法据此下单。新增
+  `position_sizing.plan_orders()`（**呈现侧**折算，`rules.py` / `backtest.py` **零改动**）：
+  `exit` ⇒ 卖出全部**可卖**股数（`available_qty` 是硬约束，T+1 冻结部分记 `unsellable`）、
+  单票上限 20% ⇒ 整手 `ceil` 减到上限内、`exit` 优先于 `trim`、**永不产生 `add`**
+  （没有组合目标权重，买入量无处推导）、无价格的行跳过不猜。`rankings` ③B 条目补
+  `suggestQty` / `suggestAmount` / `weightPct` / `weightAfterPct`，返回体增 `positionSizing`
+  汇总；`daily_digest` ③B 表改为「动作 / 卖出数量 / 参考价 / 金额 / 权重」。
+  真机（`2026-10-23` 盘前）：`000533` 退出 900 股 @8.670 = 7,803.00、`588080` 退出 400 股
+  @1.299 = 519.60，合计 **8,322.60 元**。
+
+### Fixed
+
+- **③B 全 `hold` 不再渲染成空榜**：③B 长期显示「（0 条）/ 空（fail-closed）」，被读成数据故障；
+  实际是**规则判定全部继续持有**（`held < min_hold=45` 时只有 −8% 硬止损能触发）。现 payload 增
+  `holdingsReview`（`counts` + 逐只 `rows`），③B board **仍只收 `exit`/`trim`**（交易口径不变），
+  但空榜时渲染「0 需操作 · N 只已复核」+ 逐只动作明细；`pending` 占满仍回落 fail-closed 文案。
+  顺带补漏：**不在股票截面内、但账本自带 `price` 的标的**（典型是 ETF `588080`）此前被静默丢弃，
+  现按 book 兜底列示；无价仍不列。
+- **持仓快照价过期不得遮蔽 `asof` 收盘（③B 假阴性根因）**：`data/holdings.json` 的 `price` 是
+  **券商截图快照价**，有效期只到文档顶层 `asof`。`enrich_holdings` 原先只在 `price is None` 时才用
+  截面收盘补价 ⇒ 过期快照**永久遮蔽**最新收盘，把 −10.80% 的 `stop_loss` 抹成 `hold`，③B 报 0 条、
+  看起来像「无需操作」。现 `load_holdings` 把顶层 `asof` 盖到每行（`holdings_asof`），
+  `enrich_holdings(..., asof=)` 在 `holdings_asof < asof` 时弃用快照价、改用截面收盘
+  （旧值留 `priceStaleSnapshot` 供审计）；同日/更新账本保留自己的价；截面无该代码（ETF）也保留 ——
+  那是唯一价格。**教训：③B 报 0 条要先查账本 `asof` vs pipeline `asof`，别当「无需操作」。**
+- **量能分母口径**：`volRatio` 用 `volume / mean(volume[t−20 .. t−1])`，**刻意排除当日**——否则当日爆量会把自己摊薄、比值被系统性压低。
+
+### Known issues（本期记录、不修）
+
+- **平台基准 `000905` 在引擎库里是「厦门港务」这只个股，不是中证500指数**。`A4.avgAlpha` 与 `A6.dayAlpha` 因此都是**相对该个股**的超额，**不能读作指数超额**。本版不改基准口径（改它会断掉历史台账可比性），改为在 `A6` 报告顶部**强制打印** `benchmarkWarning` 把缺陷显式化。
+- 附带实测：`astock_http.get_daily` 对 `000001.SH` / `000905.SH` 会按代码规则回落成深市个股（后缀被 `normalize_symbol` 剥掉），**当前拿不到可靠指数序列**；`399006.SZ` 正常。修复（provider 支持强制市场后缀 + 基准口径迁移）另立里程碑。
+
+### Verified
+
+- 新增 `packages/research/tests/test_day_quote.py`：**20 passed**（四价派生、量能分母排除当日、MA20 窗口门槛、stale 标记、六类形态、相对基准三档、汇总去重与基准不入统计、渲染小节与警示）。
+- 真机（`--asof 2026-10-22`，选股 10 + 持仓 4）：计涨跌 13 只，上涨 2 / 下跌 11 / 平盘 0，平均 −1.52%、中位 −1.75%；最强 `600963 岳阳林纸 +1.47%`、最弱 `000533 顺钠股份 −3.38%`；OHLC 命中 13/14（`588080` ETF 引擎库 0 行）。
+- 全量 `pytest packages apps -q`：**1269 passed** / 0 failed（③B 呈现 +2、过期价 +2、可执行数量 +8、A6 +20，其余为既有用例）。
+
+
 ## [4.11.3] - 2026-10-16
 
 ### Fixed
