@@ -317,6 +317,38 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
         if slug == "short_term":
             # 短线与长线一样给出可直接复制的 6 位码块（同花顺导入），不再只有表格。
             lines.extend(_ths_import_section(items, label="短线"))
+        if slug == "actions" and any(it.get("suggestQty") for it in items):
+            # ADR 0081：操作建议必须可执行 —— 给出股数 / 金额，而不只是一句 reason。
+            lines.append("| # | 代码 | 名称 | 动作 | 卖出数量 | 参考价 | 金额 | 权重 | 备注 |")
+            lines.append("|---|---|---|---|---|---|---|---|---|")
+            for i, it in enumerate(items[:10], start=1):
+                qty = it.get("suggestQty")
+                px = float(it.get("price") or it.get("close") or 0) or None
+                amt = it.get("suggestAmount")
+                w0, w1 = it.get("weightPct"), it.get("weightAfterPct")
+                weight = (
+                    f"{w0 * 100:.2f}% → {w1 * 100:.2f}%"
+                    if w0 is not None and w1 is not None
+                    else "-"
+                )
+                note = str(it.get("reason") or "").replace("|", "\\|")
+                code = str(it.get("symbol") or "-")
+                lines.append(
+                    f"| {i} | {code} | {it.get('name') or name_by_code.get(code) or '-'} "
+                    f"| {_ACTION_LABELS.get(it.get('action'), it.get('action') or '-')} "
+                    f"| **{qty} 股** | {'-' if px is None else f'{px:.3f}'} "
+                    f"| {'-' if amt is None else f'{amt:,.2f}'} | {weight} | {note[:40] or '-'} |"
+                )
+            lines.append("")
+            sizing = rankings.get("positionSizing") or {}
+            if sizing:
+                lines.append(
+                    f"> 单票上限 {float(sizing.get('capWeight') or 0) * 100:.0f}%；"
+                    f"整手 {sizing.get('lot') or 100} 股；本表合计卖出 "
+                    f"**{float(sizing.get('totalAmount') or 0):,.2f}** 元。不产生加仓建议。"
+                )
+                lines.append("")
+            continue
         lines.append("| # | 代码 | 名称 | 备注 |")
         lines.append("|---|---|---|---|")
         for i, it in enumerate(items[:10], start=1):
