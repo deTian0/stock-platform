@@ -41,6 +41,7 @@
 | `-Force` | 休市日仍跑（仅排障） |
 | `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
 | `-Digest` | 流水线成功后渲染人读日报（`data/digests/` **Markdown + HTML**），并产出同花顺导入 `data/ths_import/latest.txt` |
+| `-Session pre\|post` | 展示用会话。08:30 用 `pre`，15:30 用 `post`。不改变 asof（仍是 T-1）。digest 另收显式运行日，不猜今天 |
 | `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
 | `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
 
@@ -72,8 +73,8 @@ cd D:\workspace\stock_trading\stock-platform
 
 ## Windows Task Scheduler
 
-1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。
-2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest`，`ExecutionTimeLimit=PT30M`）。
+1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest -Session pre` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。`-Session` 只区分展示，不改 asof（ADR [`0083`](../architecture/0083-digest-pre-post-and-secondary-pick.md)）。
+2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest -Session post`，`ExecutionTimeLimit=PT30M`）。
 3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。
 4. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
 5. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
@@ -121,8 +122,8 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 每日流水线成功后自动渲染人读版日报（`-Digest`），**Markdown + 同主题 HTML 双份**（ADR [`0071`](../architecture/0071-report-html-theme.md)）：
 
-- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...]`
-- 产物：`data/digests/{asof}.md` + `data/digests/latest.md`（最新指针），**并默认同时输出** `{asof}.html` + `latest.html`（主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown）
+- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--session pre|post] [--run-date YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...] [--no-ohlc]`。`--run-date` 必须显式传入；不传则不猜今天，盘前/缺运行日时开盘、收盘、涨跌为 `—`。
+- 产物：`data/digests/{asof}-pre.md` 与 `{asof}-post.md` **都保留**（html 同理）。`{asof}.md` / `{asof}.html` 与 `latest.md` / `latest.html` 是**最后一次成功渲染的别名**（拷贝，不是第三套正文）。另有 `latest-pre.*` / `latest-post.*`。主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown。同花顺文件名仍是 `{asof}.txt`（生产榜，不是二次精选）。
 - 内容：环境/数据源/宇宙概览、**长线 + 短线双代码块**（见下）、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
   - **口径自证行（`v4.11.2`）**：标题下固定输出一行 `> **口径**：数据基准日（asof）YYYY-MM-DD —— 取该交易日收盘截面；本简报生成于 YYYY-MM-DD HH:MM:SS +08:00 …`，把「数据日」与「运行日」并列写出，避免 asof 被误读成「报告过期」。`生成时间` 也改按**本机时区**渲染（UTC 存档值保留在括号内）
   - **同花顺导入行（`v4.5.1`；`v4.11.1` 起双线各一块）**：**长线**（当日推荐 / ②A 质量榜）与**短线**（②B 短线榜）**各给一块可整块复制**的 6 位代码行，直接粘进同花顺手机版「自选 → 导入」。**手机版一次仅支持导入 5 只**，故按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`）、按推荐序去重、仅保留合法 6 位码；某条线无有效代码则该块整块省略（fail-closed）
@@ -135,9 +136,9 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 见 `scripts/ops/cron-daily.example`。推荐每日调用包装脚本，由日历决定 skip：
 
 ```text
-# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest
+# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -Session pre
 
-# 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest
+# 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -Session post
 ```
 
 （cron 行里的 `&&` 仅出现在 Linux crontab 示例中；Windows PowerShell 运维脚本本身不使用 `&&`。）

@@ -101,7 +101,7 @@ def test_build_digest_text_contains_picks_and_disclaimer(env):
 
     record = open_brief_repository().save(BRIEF, symbols=BRIEF["symbols"])
     text = build_digest_text(record, hits_repo=None)
-    assert "# 每日简报 · 2026-10-09" in text
+    assert "# 每日简报 · 盘前 · 2026-10-09" in text
     assert "600519" in text and "0.8929" in text
     assert "非投资建议" in text
     assert "SIMULATE" in text
@@ -335,6 +335,19 @@ def test_digest_cli_emits_ths_by_default(env):
     assert latest.read_text(encoding="utf-8") == "600519\n000001\n"
 
 
+def test_digest_cli_does_not_invent_today_as_run_date(env):
+    from datetime import date
+
+    from stock_platform_research.daily_digest_cli import main as cli_main
+
+    _save_brief(env)
+    rc = cli_main(["--out-dir", str(env / "digests"), "--no-html", "--no-ths"])
+    assert rc == 0
+    text = (env / "digests" / "2026-10-09-pre.md").read_text(encoding="utf-8")
+    assert "未提供运行日，未取行情" in text
+    assert f"运行日 {date.today().isoformat()}" not in text
+
+
 def test_digest_cli_no_ths_flag(env):
     _save_brief(env)
     from stock_platform_research.daily_digest_cli import main as cli_main
@@ -475,13 +488,13 @@ def test_actions_board_shows_hold_verdicts_instead_of_an_empty_line() -> None:
     }
     text = "\n".join(_rankings_section(payload))
 
-    assert "### ③B 操作建议（0 需操作 · 2 只已复核）" in text
+    assert "## 五、③B 操作建议（0 需操作 · 2 只已复核）" in text
     assert "当日无需减仓：2 只持仓全部继续持有" in text
     # 中文名从 ③A 补全，动作翻成中文
     assert "| 1 | 000533 | 顺钠股份 | 10 | -6.98 | 继续持有 |" in text
     assert "| 2 | 588080 | 科创板50 | 3 | -1.63 | 继续持有 |" in text
     # ③B 段内不得再出现「空」的措辞
-    actions_block = text.split("### ③B 操作建议")[1].split("###")[0]
+    actions_block = text.split("## 五、③B 操作建议")[1].split("\n## ")[0]
     assert "fail-closed" not in actions_block
 
 
@@ -504,7 +517,9 @@ def test_actions_board_stays_fail_closed_when_every_holding_is_pending() -> None
             },
         }
     }
-    actions_block = "\n".join(_rankings_section(payload)).split("### ③B 操作建议")[1].split("###")[0]
+    actions_block = (
+        "\n".join(_rankings_section(payload)).split("## 五、③B 操作建议")[1].split("\n## ")[0]
+    )
     assert "fail-closed" in actions_block
     assert "当日无需减仓" not in actions_block
 
@@ -520,6 +535,190 @@ def test_build_digest_emits_short_ths_txt(env):
     assert result["thsShortCount"] == 2
     # 长线 txt 仍只含长线代码，两池互不混淆
     assert Path(result["thsPath"]).read_text(encoding="utf-8") == "600519\n000001\n"
+
+
+def test_pre_and_post_files_both_remain(env):
+    _save_brief(env)
+    pre = build_digest(out_dir=env / "digests", session="pre", ohlc=False)
+    post = build_digest(out_dir=env / "digests", session="post", ohlc=False)
+    pre_path = env / "digests" / "2026-10-09-pre.md"
+    post_path = env / "digests" / "2026-10-09-post.md"
+    alias = env / "digests" / "2026-10-09.md"
+    latest = env / "digests" / "latest.md"
+    assert pre_path.is_file() and post_path.is_file()
+    assert "盘前" in pre_path.read_text(encoding="utf-8")
+    assert "盘后" in post_path.read_text(encoding="utf-8")
+    assert alias.read_text(encoding="utf-8") == post_path.read_text(encoding="utf-8")
+    assert latest.read_text(encoding="utf-8") == post_path.read_text(encoding="utf-8")
+    assert pre["digestPath"].endswith("2026-10-09-pre.md")
+    assert post["session"] == "post"
+
+
+def test_pre_quote_columns_are_blank_without_run_date(env):
+    _save_brief(env)
+    text = Path(build_digest(out_dir=env / "digests")["digestPath"]).read_text(encoding="utf-8")
+    assert "未提供运行日，未取行情" in text
+    assert "开盘(—)" in text
+    assert "盘后报告补齐" in text
+
+
+def test_long_reason_is_not_truncated(env):
+    from stock_platform_research.persistence import open_brief_repository
+
+    reason = "完整理由" + ("甲" * 80)
+    brief = {
+        **BRIEF,
+        "picks": [{**BRIEF["picks"][0], "reasonSummary": reason}],
+    }
+    record = open_brief_repository().save(brief, symbols=brief["symbols"])
+    text = build_digest_text(record, hits_repo=None)
+    assert reason in text
+    assert "..." not in text
+
+
+def test_post_return_uses_external_close_over_asof_close():
+    from stock_platform_research.persistence import BriefRecord
+
+    record = BriefRecord(
+        id=1,
+        asof="2026-10-09",
+        provider="market_db",
+        universe_tier="watch",
+        symbols=["600519"],
+        picks=[{"rank": 1, "symbol": "600519", "name": "贵州茅台", "composite_score": 0.9, "close": 100.0, "reasonSummary": "长"}],
+        soft_gates=False,
+        gates_relaxed=False,
+        data_note=None,
+        generated_at="2026-10-10T07:30:00+00:00",
+        environment="SIMULATE",
+        payload={"market": "CN", "universeSize": 1, "panelSize": 1, "topN": 1},
+        created_at="",
+        updated_at="",
+    )
+    text = build_digest_text(
+        record,
+        hits_repo=None,
+        session="post",
+        run_date="2026-10-10",
+        quote_date="2026-10-10",
+        show_quotes=True,
+        quotes={"600519": {"open": 101.0, "close": 110.0}, "000905": {"open": 10.0, "close": 11.0}},
+        benchmark_name="厦门港务",
+        benchmark_asof_close=10.0,
+    )
+    assert "110.00" in text
+    assert "+10.00%" in text
+    assert "厦门港务" in text
+    assert "不能读作指数超额" in text
+    assert "跑赢中证500" not in text
+
+
+def test_same_day_quote_does_not_use_asof_close_as_denominator():
+    from stock_platform_research.persistence import BriefRecord
+
+    record = BriefRecord(
+        id=1,
+        asof="2026-10-09",
+        provider="market_db",
+        universe_tier="watch",
+        symbols=["600519"],
+        picks=[{"rank": 1, "symbol": "600519", "name": "贵州茅台", "composite_score": 0.9, "close": 100.0, "reasonSummary": "长"}],
+        soft_gates=False,
+        gates_relaxed=False,
+        data_note=None,
+        generated_at=None,
+        environment="SIMULATE",
+        payload={"market": "CN"},
+        created_at="",
+        updated_at="",
+    )
+    text = build_digest_text(
+        record,
+        hits_repo=None,
+        session="post",
+        run_date="2026-10-11",
+        quote_date="2026-10-09",
+        show_quotes=True,
+        quotes={"600519": {"open": 90.0, "close": 90.0}},
+        prior_closes={"600519": 80.0},
+    )
+    assert "+12.50%" in text
+    assert "-10.00%" not in text
+
+
+def test_html_has_a_single_h1(env):
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests", emit_html=True, session="pre", ohlc=False)
+    html = Path(result["htmlPath"]).read_text(encoding="utf-8")
+    assert html.count("<h1>") == 1
+    assert html.count("</h1>") == 1
+
+
+def test_action_detail_uses_sellable_counts_and_skips_t1_for_etf():
+    from stock_platform_research.daily_digest import _rankings_section
+
+    payload = {
+        "market": "CN",
+        "rankings": {
+            "boards": {
+                "quality": {"items": []},
+                "short_term": {"items": []},
+                "holdings": {"items": []},
+                "actions": {
+                    "items": [
+                        {
+                            "symbol": "588080",
+                            "name": "科创50ETF",
+                            "action": "exit",
+                            "suggestQty": 100,
+                            "price": 1.2,
+                            "suggestAmount": 120,
+                            "weightPct": 0.5,
+                            "weightAfterPct": 0.0,
+                            "reason": "stop_loss(-12.3%)",
+                            "ret_pct": -12.3,
+                        }
+                    ]
+                },
+                "watchlist": {"items": []},
+            },
+            "holdingsReview": {
+                "exitPolicy": {"stop_loss": 8.0, "take_profit": 0, "min_hold": 45},
+                "rows": [
+                    {
+                        "code": "588080",
+                        "asset_class": "etf",
+                        "entry_price": 1.4,
+                        "price": 1.2,
+                        "ret_pct": -12.3,
+                        "held_days": 10,
+                        "reason": "stop_loss(-12.3%)",
+                        "action": "exit",
+                    }
+                ],
+            },
+            "positionSizing": {
+                "capWeight": 0.2,
+                "orders": [
+                    {
+                        "code": "588080",
+                        "available": 100,
+                        "unsellable": 50,
+                        "heldQty": 150,
+                        "weightBefore": 0.5,
+                        "weightAfter": 0.0,
+                    }
+                ],
+            },
+        },
+    }
+    text = "\n".join(_rankings_section(payload))
+    assert "触发规则" in text
+    assert "持有 10 个交易日" in text
+    assert "可卖 100 / 持仓 150，不可卖 50" in text
+    assert "集中度" in text
+    assert "无 T+1 冻结" not in text
+    assert "T+1" not in text
 
 
 def test_build_digest_no_short_ths_when_no_short_board(env):

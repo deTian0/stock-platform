@@ -72,6 +72,7 @@ class RankingConfig:
 
     quality_top_n: int = 10
     short_term_top_n: int = 5
+    short_term_pool_n: int = 10
     watchlist_top_n: int = 23
     min_composite_score: float = 0.0
 
@@ -138,6 +139,11 @@ def _item_from_row(
         "reasons": reasons,
         "reasonSummary": reason_summary(reasons),
     }
+    for key in ("vol20", "rev_chg", "ma20", "rs20", "amount"):
+        if key in row.index and pd.notna(row[key]):
+            item[key] = float(row[key])
+        else:
+            item[key] = None
     display = _display_name(row, name_map)
     if display:
         item["name"] = display
@@ -226,6 +232,32 @@ def enrich_holdings(
     return rows
 
 
+def _take_short(rec: pd.DataFrame, quality: pd.DataFrame, n: int) -> pd.DataFrame:
+    """②B slice outside the ②A head. ``n`` is items width or the display pool width."""
+    width = int(n)
+    short = pd.DataFrame()
+    if rec is None or len(rec) == 0 or width <= 0:
+        return short
+    keys = _series_of_keys(rec)
+    qa_keys = set(keys.loc[quality.index].tolist()) if quality is not None and len(quality) else set()
+    rest = rec.loc[~keys.isin(qa_keys)].copy()
+    rest_keys = _series_of_keys(rest)
+    if "entry_ok" in rest.columns and bool(rest["entry_ok"].any()):
+        passed = rest.loc[rest["entry_ok"]]
+        short = passed.head(width).copy()
+    if len(short) < width:
+        used = set(_series_of_keys(short).tolist())
+        remain = rest.loc[~rest_keys.isin(used)]
+        need = width - len(short)
+        if need > 0 and len(remain):
+            short = pd.concat([short, remain.head(need)], axis=0)
+    if len(short) == 0 and len(rest):
+        # Gates already removed non-passing rows: the pool *is* the
+        # entry-passing set, so fall back to score order (documented).
+        short = rest.head(width).copy()
+    return short
+
+
 def build_rankings(
     scored: pd.DataFrame,
     *,
@@ -273,24 +305,9 @@ def build_rankings(
 
     # ②B 短线榜 — same lvrev kernel as ②A (never "buy strength"):
     # drop the ②A head, prefer entry-passing rows, top up by score.
-    short = pd.DataFrame()
-    if len(rec) > 0:
-        qa_keys = set(keys.loc[quality.index].tolist())
-        rest = rec.loc[~keys.isin(qa_keys)].copy()
-        rest_keys = _series_of_keys(rest)
-        if "entry_ok" in rest.columns and bool(rest["entry_ok"].any()):
-            passed = rest.loc[rest["entry_ok"]]
-            short = passed.head(int(cfg.short_term_top_n)).copy()
-        if len(short) < int(cfg.short_term_top_n):
-            used = set(_series_of_keys(short).tolist())
-            remain = rest.loc[~rest_keys.isin(used)]
-            need = int(cfg.short_term_top_n) - len(short)
-            if need > 0 and len(remain):
-                short = pd.concat([short, remain.head(need)], axis=0)
-        if len(short) == 0 and len(rest):
-            # Gates already removed non-passing rows: the pool *is* the
-            # entry-passing set, so fall back to score order (documented).
-            short = rest.head(int(cfg.short_term_top_n)).copy()
+    # ``items`` stays ``short_term_top_n``; ``pool`` is the wider display set.
+    short = _take_short(rec, quality, int(cfg.short_term_top_n))
+    short_pool = _take_short(rec, quality, int(cfg.short_term_pool_n))
 
     # ③C 观察名单
     watchlist = rec.iloc[int(cfg.quality_top_n) : int(cfg.quality_top_n) + int(cfg.watchlist_top_n)].copy()
@@ -487,6 +504,8 @@ def build_rankings(
         else:
             items = action_items
         boards[slug] = {"key": key, "label": key, "slug": slug, "items": items}
+    if "short_term" in boards:
+        boards["short_term"]["pool"] = _items_from_frame(short_pool, gated=gated, name_map=name_map)
 
     return {
         "asof": asof,

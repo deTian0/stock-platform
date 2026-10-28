@@ -182,6 +182,8 @@ def run_daily_pipeline(
     debate_runner: Callable[..., dict[str, Any]] | None = None,
     debate_engine: str | None = None,
     debate_max_picks: int | None = None,
+    session: str = "pre",
+    run_date: str | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
 
@@ -311,6 +313,18 @@ def run_daily_pipeline(
             holdings=holdings,
             name_map=name_map,
         )
+        sess = str(session or "pre").strip().lower()
+        brief["session"] = sess if sess in {"pre", "post"} else "pre"
+        if run_date:
+            brief["runDate"] = str(run_date)[:10]
+            try:
+                from .quotes import resolve_quote_date
+
+                brief["quoteDate"] = resolve_quote_date(
+                    date.fromisoformat(brief["runDate"])
+                ).isoformat()
+            except Exception:  # noqa: BLE001 — quote date is display-only
+                brief["quoteDate"] = None
         # Label the data source on the brief itself: ``payload["provider"]`` is
         # what the digest falls back to when the archive row carries no provider.
         brief.setdefault("provider", getattr(provider, "name", type(provider).__name__))

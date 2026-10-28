@@ -350,6 +350,17 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="S5: 参与辩论的 picks 上限（默认全部 TopN）",
     )
+    p.add_argument(
+        "--session",
+        choices=("pre", "post"),
+        default="pre",
+        help="展示用会话（盘前 pre / 盘后 post）。不改变 asof，也不改变命中 session_type",
+    )
+    p.add_argument(
+        "--run-date",
+        default=None,
+        help="任务运行日 YYYY-MM-DD。不传则不猜测今天，quoteDate 留空",
+    )
     args = p.parse_args(argv)
 
     if args.provider == "replay" and not args.fixtures:
@@ -399,6 +410,8 @@ def main(argv: list[str] | None = None) -> int:
         debate_runner=debate_runner,
         debate_engine=debate_engine,
         debate_max_picks=args.debate_max_picks,
+        session=args.session,
+        run_date=args.run_date,
     )
     payload = report.to_dict()
     settle_meta: dict[str, Any] = {}

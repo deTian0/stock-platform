@@ -26,6 +26,31 @@ def main(argv: list[str] | None = None) -> int:
         description="Render a human-readable markdown digest from the brief archive.",
     )
     parser.add_argument("--asof", default=None, help="Trade date YYYY-MM-DD; default = latest brief")
+    parser.add_argument(
+        "--session",
+        choices=("pre", "post"),
+        default=None,
+        help="盘前 pre / 盘后 post。缺省读 brief payload，再缺省为 pre。不使用今天的日期",
+    )
+    parser.add_argument(
+        "--run-date",
+        default=None,
+        help="任务运行日 YYYY-MM-DD。不传且 payload 也没有时，不猜测今天，行情列留空",
+    )
+    parser.add_argument(
+        "--ohlc",
+        dest="ohlc",
+        action="store_true",
+        default=None,
+        help="取运行日外部日线。缺省：盘后开、盘前关",
+    )
+    parser.add_argument(
+        "--no-ohlc",
+        dest="ohlc",
+        action="store_false",
+        help="不取外部日线",
+    )
+    parser.set_defaults(ohlc=None)
     parser.add_argument("--out-dir", default=None, help=f"Output directory (default {DEFAULT_OUT_DIR})")
     parser.add_argument("--db-url", default=None, help="Brief SQLite URL (default STOCK_PLATFORM_DB_URL)")
     parser.add_argument("--hit-db-url", default=None, help="Hit-tracking SQLite URL (default same DB)")
@@ -59,6 +84,9 @@ def main(argv: list[str] | None = None) -> int:
             emit_html=args.html,
             emit_ths=args.ths,
             ths_dir=Path(args.ths_dir) if args.ths_dir else None,
+            session=args.session,
+            run_date=args.run_date,
+            ohlc=args.ohlc,
         )
     except Exception as exc:
         print(f"digest failed: {exc}", file=sys.stderr)

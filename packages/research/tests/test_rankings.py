@@ -63,6 +63,28 @@ def test_quality_short_and_watchlist_split() -> None:
     assert len(short) == 5
     # ③C is the slice right after the ②A head
     assert [i["symbol"] for i in watch] == [f"{600000 + i}" for i in range(10, 33)]
+    pool = out["boards"]["short_term"]["pool"]
+    assert len(pool) == 10
+    assert len(short) == 5
+    quality_codes = {i["symbol"] for i in quality}
+    assert not (quality_codes & {i["symbol"] for i in pool})
+    assert not (quality_codes & {i["symbol"] for i in short})
+
+
+def test_hit_tracking_reads_items_not_pool():
+    from stock_platform_research.hit_tracking import _board_items
+
+    brief = {
+        "rankings": {
+            "boards": {
+                "short_term": {
+                    "items": [{"symbol": "600001"}],
+                    "pool": [{"symbol": "600099"}],
+                }
+            }
+        }
+    }
+    assert [row["symbol"] for row in _board_items(brief, "short_term")] == ["600001"]
 
 
 def test_short_term_prefers_entry_passing_rows() -> None:

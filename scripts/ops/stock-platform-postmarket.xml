@@ -60,7 +60,7 @@
     <Exec>
       <!-- Edit WorkingDirectory to your clone path before import. -->
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest -Session post</Arguments>
       <WorkingDirectory>D:\workspace\stock_trading\stock-platform</WorkingDirectory>
     </Exec>
   </Actions>

@@ -86,6 +86,8 @@ param(
   [switch]$MarketDb,
   [switch]$PrevSession,
   [switch]$Digest,
+  [ValidateSet('pre', 'post')]
+  [string]$Session = 'pre',
   [switch]$NoHoldings,
   [switch]$StrictCoverage,
   [switch]$Force
@@ -135,6 +137,9 @@ if ($LiveDay) {
 if ([string]::IsNullOrWhiteSpace($Asof)) {
   $Asof = (Get-Date).ToString('yyyy-MM-dd')
 }
+# Run date is the task day before -PrevSession rewrites asof to T-1.
+# Digest must receive it explicitly; it does not call date.today().
+$RunDate = $Asof
 
 # -PrevSession: scheduled runs must review T-1, not today (see .PARAMETER notes).
 if ($PrevSession) {
@@ -279,7 +284,9 @@ if ($tradingFlag -ne '1') {
 $cliArgs = @(
   '--asof', $Asof,
   '--provider', $Provider,
-  '--out', $Out
+  '--out', $Out,
+  '--session', $Session,
+  '--run-date', $RunDate
 )
 
 if ($Provider -eq 'replay') {
@@ -344,7 +351,13 @@ if ($cliEc -ne 0) {
 
 if ($Digest) {
   Write-Host "DIGEST rendering markdown + html + THS import txt for asof=$Asof"
-  $digestArgs = @('-m', 'stock_platform_research.daily_digest_cli', '--asof', $Asof)
+  $digestArgs = @(
+    '-m', 'stock_platform_research.daily_digest_cli',
+    '--asof', $Asof,
+    '--session', $Session,
+    '--run-date', $RunDate
+  )
+  if ($Session -eq 'pre') { $digestArgs += '--no-ohlc' }
   & $python @digestArgs
   if ($LASTEXITCODE -ne 0) {
     # Digest is best-effort: a rendering failure must not flip the pipeline result.

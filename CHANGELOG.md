@@ -8,6 +8,42 @@
 
 - （无）
 
+## [4.13.0] - 2026-10-28
+
+### Added
+
+- **每日简报盘前 / 盘后分线 + ②A/②B 双 profile 二次精选 + ③B 操作详解**（ADR [`0083`](docs/architecture/0083-digest-pre-post-and-secondary-pick.md)、方案 [`digest-pre-post-redesign.md`](docs/plans/digest-pre-post-redesign.md)）。
+  08:30 与 15:30 此前跑的是**完全相同**的参数（同为 `-MarketDb -PrevSession -SettleAfter -Digest`），两份简报只有生成时间不同；「长线 10 只」与 ②A 质量榜**逐行相同**；理由被 80 / 60 / 40 字三处硬截断成 `...`；短线榜只有 `# / 代码 / 名称 / 备注`。
+  - **展示分线**：流水线参数与 asof（仍 T-1）都不动，新增 `-Session pre|post`，`Invoke-DailyPipeline.ps1` / `Invoke-ScheduledRun.ps1` 的 `TASK_PRESETS` / 两个任务 XML 四处同步。包装脚本在 `-PrevSession` 改写 asof **之前**记下运行日并显式传 `--run-date`；digest **不调 `date.today()`**，缺运行日则不猜、行情列恒 `—`。
+  - **产物**：`data/digests/{asof}-pre.*` 与 `{asof}-post.*` **双向保留**（此前只留最后一份）；`{asof}.*` / `latest.*` 降级为「最后一次成功渲染的别名」，另加 `latest-pre.*` / `latest-post.*`。brief 库仍是 `UNIQUE(asof)` 一行，不改主键、无需数据迁移。
+  - **当日行情列**：`# / 代码 / 名称 / 综合分 / 收盘(asof) / 开盘 / 收盘 / 涨跌 / 入选理由`。开 / 高 / 低走东财 `em_get` 并复用 A6 同形缓存 `data/quotes/ohlc-<quoteDate>.json`（`quotes.py` 懒导入 providers，research 顶层不新增依赖）；涨跌幅一律自算 `close / prev_close − 1`，不读混合尺度的 `pct_chg`；`quoteDate == asof` 时分母取 asof **之前**那个交易日，不得自除。取不到显示 `—`，不补零、不猜。
+  - **二次精选（纯展示层 `secondary_pick.py`）**：②A 10 进 N，②B 候选池扩到 10 后同样 10 进 N，各带**落选原因**与入选两只最强维度；**不足 N 只如实少给，绝不补齐**。生产侧零变动 —— `short_term.items` 仍宽 5、同花顺仍导生产榜、命中追踪与 picks 回测只读 `items`。
+  - **③B 逐条展开**：触发规则、跌破几个百分点、成本 → 现价、持有天数、可卖 / 持仓 / 不可卖（T+1 半句仅在 A 股股票且确有冻结时出现，ETF 不写）、集中度（如 `90.24% → 0`，超单票 20% 上限）。
+  - **理由全量展示**：三处截断全部移除；HTML 表格单元格允许换行（`white-space: normal`），长理由不再被压成一行。
+
+### Fixed
+
+- **②B 短线榜一度 10 进 0、整榜全灭**（设计硬伤，不是随机结果）：草案给短线设 `rs20 >= -3` 绝对门槛，而 `rs20` 实际是 `(close/ma20 − 1) * 100`（**不是相对强度 RS**），引擎 lvrev 内核按构造只选 MA20 **下方**的票 ⇒ 20 只候选的 `rs20` 全在 −3.4 ~ −6.5 百分点，门槛必然全杀；更矛盾的是表里写「_无入选_」却又给了 5 个导入码。修法：**删除 `rs20` 硬门槛**（它本是打分维度，再作门槛等于二次惩罚），成交额下限 3000 万 → **1000 万**只兜底极端地量。
+- **短线「位置」维度 50% 权重空转**：该维度用钟形中心 `rs20 = +4` 打分，而候选 `rs20` 恒为负 ⇒ 恒 0 分。改为真正的**动量 45%**（20 日收益组内分位）+ 量能 30% + 波动活跃 25%，与长线的「低波动 + 反转钟形 + 贴近 MA20」形成可见口径分野 —— 两榜共用一套权重等于没区分。
+- 同轮修复的展示层缺陷 11 处：空 `## 五榜概览` 标题、章节编号断档（③A/B/C 原是 H3 挂在 ②B 之下）、二次精选表序号乱序、②B 零入选却仍给导入码、`vol20=0.0119（小数）` 开发注记泄漏、「相对强弱 rs20」措辞错误、**③A / ③C 备注恒 `-`**（item 只有 `reasonSummary`，代码取了 `reason`）、命中追踪自带 H1 嵌套、③C 写「23 条」只列 10 条、止损线「8.0（百分点）」、表格单元格不换行。
+
+### Verified
+
+- 全量 `pytest packages apps -q`：**1293 passed**（基线 1269，+24 新用例：`test_secondary_pick.py` / `test_quotes.py` / `test_daily_digest.py` 与 `test_rankings.py` 扩充）。
+- 真机双线（`--asof 2026-10-27`）：盘前 / 盘后均 `exit=0`、`COVERAGE asof=2026-10-27 ok`；②A **10 进 5**（畅联股份 / 浙商中拓 / 华锡有色 / 华润材料 / 清源股份），②B **10 进 5**（中国人保 / 春兰股份 / 致欧科技 / 苏豪弘业 / 森林包装）。
+- OHLC 链路自算校验：`600301` 华锡有色 asof 收 44.78 → 运行日 `2026-10-28` 收 44.14 = **−1.43%**；Top10 当日平均 **−0.30%**，②B 池平均 **+0.87%**（基准 `000905` 仍不可用作指数，见下）。
+- HTML 单 H1 实测 `h1=1`；`-pre` / `-post` 磁盘并存，`latest.md` 为最后渲染那份的别名。
+
+### Known issues（本期记录、不修）
+
+- `pytest packages/research`（**单包**跑）时 `test_persistence` 必挂：brief 库按 cwd 落到仓库 `data/`，会话级隔离守卫在全量口径下才生效。既存问题、与本里程碑无关，但说明**单包跑有污染生产数据的风险**，另立项查 conftest 加载顺序。
+- PowerShell 工具内直接 `& .\scripts\ops\Invoke-DailyPipeline.ps1` 会 `exit=1` 且输出全空；须 `powershell -NoProfile -File` 子进程壳才拿得到输出。运维文档已按子进程写法给样例。
+
+### Docs
+
+- 新增 ADR `0083`，登记进 `scripts/check_docs.ps1` 的 `$required`；方案 `docs/plans/digest-pre-post-redesign.md` 与其索引状态同步为 `done`。
+- `docs/ops/scheduler.md`、`docs/ops/daily-pipeline.md` 补 `-Session` 开关、新文件名与「`{asof}.*` 是别名」的语义；cron 示例与任务 XML 参数一并更新。
+
 ## [4.12.0] - 2026-10-23
 
 ### Added

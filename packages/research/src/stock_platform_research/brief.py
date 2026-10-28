@@ -50,7 +50,7 @@ def build_reasons_for_row(row: pd.Series, *, gated: bool = True) -> list[dict[st
         items.append(
             {
                 "key": "low_vol",
-                "summary": f"低波动贡献（vol20={float(vol):.4f}）",
+                "summary": f"低波动（20 日波动 {float(vol) * 100:.2f}%）",
                 "value": float(vol),
             }
         )
@@ -60,7 +60,7 @@ def build_reasons_for_row(row: pd.Series, *, gated: bool = True) -> list[dict[st
         items.append(
             {
                 "key": "reversal",
-                "summary": f"反转贡献（rev_chg={float(rev):.4f}）",
+                "summary": f"反转（20 日收益 {float(rev) * 100:+.2f}%）",
                 "value": float(rev),
             }
         )
@@ -73,7 +73,7 @@ def build_reasons_for_row(row: pd.Series, *, gated: bool = True) -> list[dict[st
         items.append(
             {
                 "key": "rs20",
-                "summary": f"相对强弱 rs20={float(rs):.2f}%",
+                "summary": f"收盘较 MA20 {float(rs):+.2f}%",
                 "value": float(rs),
             }
         )
@@ -286,6 +286,8 @@ def build_premarket_brief(
             "rev_chg": float(row["rev_chg"]) if "rev_chg" in row and pd.notna(row["rev_chg"]) else None,
             "ma20": float(row["ma20"]) if "ma20" in row and pd.notna(row["ma20"]) else None,
             "ma60": float(row["ma60"]) if "ma60" in row and pd.notna(row["ma60"]) else None,
+            "rs20": float(row["rs20"]) if "rs20" in row and pd.notna(row["rs20"]) else None,
+            "amount": float(row["amount"]) if "amount" in row and pd.notna(row["amount"]) else None,
             "reasons": reasons,
             "reasonSummary": reason_summary(reasons),
             "reason": reasons_to_legacy_string(reasons),

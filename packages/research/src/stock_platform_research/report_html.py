@@ -100,7 +100,8 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;border:1p
   border-radius:10px;overflow:hidden}
 th{text-align:left;font-weight:500;color:var(--text-dim);font-size:12px;padding:8px 10px;
   border-bottom:1px solid var(--border);white-space:nowrap;background:var(--panel-2)}
-td{padding:8px 10px;border-bottom:1px solid rgba(35,44,61,.6);vertical-align:top}
+td{padding:8px 10px;border-bottom:1px solid rgba(35,44,61,.6);vertical-align:top;
+  white-space:normal;word-break:break-word}
 tr:last-child td{border-bottom:none}
 tbody tr:nth-child(even) td{background:rgba(255,255,255,.015)}
 footer{margin-top:18px;padding-top:14px;border-top:1px solid var(--border);text-align:center}
@@ -137,7 +138,8 @@ h2{font-size:19px;margin-top:26px;border-bottom:1px solid #f0f2f5;padding-bottom
 h3{font-size:16px;margin-top:20px}
 h4,h5,h6{font-size:14px;margin-top:16px}
 table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
-th,td{border:1px solid #e3e6ea;padding:6px 10px;text-align:left;vertical-align:top}
+th,td{border:1px solid #e3e6ea;padding:6px 10px;text-align:left;vertical-align:top;
+ white-space:normal;word-break:break-word}
 th{background:#f2f4f7;font-weight:600}
 tr:nth-child(even) td{background:#fafbfc}
 code{background:#f2f4f7;border-radius:4px;padding:1px 5px;font-size:12px}
@@ -291,6 +293,7 @@ def render_report_html(
     colorize: bool = True,
     note: str | None = None,
     disclaimer: str | None = None,
+    strip_leading_h1: bool = False,
 ) -> str:
     """Wrap a markdown document in the platform report shell (hero + block + footer).
 
@@ -305,7 +308,21 @@ def render_report_html(
     )
     note_html = f'<div class="hero-note">{_inline(note, colorize=colorize)}</div>' if note else ""
     foot = html.escape(disclaimer or DISCLAIMER)
-    body = markdown_to_body(md, colorize=colorize)
+    body_md = md
+    if strip_leading_h1:
+        # The hero already owns the page H1. Drop the digest title, and demote any
+        # later standalone `# ` (hit-tracking report, etc.) so the page has one H1.
+        lines = str(md or "").splitlines()
+        if lines and lines[0].startswith("# ") and not lines[0].startswith("# " * 2):
+            lines = lines[1:]
+        demoted: list[str] = []
+        for line in lines:
+            if line.startswith("# ") and not line.startswith("## "):
+                demoted.append("#" + line)
+            else:
+                demoted.append(line)
+        body_md = "\n".join(demoted)
+    body = markdown_to_body(body_md, colorize=colorize)
     return (
         "<!DOCTYPE html>\n"
         '<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n'

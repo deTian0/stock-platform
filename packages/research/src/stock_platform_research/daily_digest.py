@@ -10,8 +10,11 @@ Data sources, all read-only:
   - hit tracking: ``format_hit_report`` (X3 single point)
   - performance: pending/settled counts from the recommendations JSONL
 
-Outputs ``{out_dir}/{asof}.md`` plus a ``latest.md`` pointer copy. Fail-closed:
-no brief found → a stub digest that says so (never fabricated numbers).
+Outputs ``{out_dir}/{asof}-{session}.md`` (and ``.html``), copies that render to
+``{asof}.md`` / ``latest.md`` / ``latest-{session}.md``, and keeps the other
+session's file. Fail-closed: no brief found → a stub that says so (never
+fabricated numbers). The stub title stays ``# 每日简报 · {asof}`` when there
+is no session to name.
 """
 
 from __future__ import annotations
@@ -115,22 +118,263 @@ def _fmt_price(value: Any) -> str:
         return str(value)
 
 
-def _picks_table(picks: list[Mapping[str, Any]]) -> list[str]:
+_DASH = "—"
+_SESSION_LABEL = {"pre": "盘前", "post": "盘后"}
+_BENCHMARK = "000905"
+_SECONDARY_DISCLAIMER = (
+    "二次精选是呈现口径，不参与评分、不改 picks、不改变仓位建议；入选不是更强的推荐。"
+)
+
+
+def _sym6(symbol: Any) -> str:
+    raw = str(symbol or "").split(".")[0]
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    return digits.zfill(6)[-6:] if digits else ""
+
+
+def _quote_label(quote_date: str | None) -> str:
+    if not quote_date or len(str(quote_date)) < 10:
+        return _DASH
+    parts = str(quote_date)[:10].split("-")
+    if len(parts) != 3:
+        return str(quote_date)
+    return f"{parts[1]}-{parts[2]}"
+
+
+def _cell(value: Any, *, price: bool = False, pct: bool = False) -> str:
+    if value is None:
+        return _DASH
+    if pct:
+        try:
+            return f"{float(value) * 100:+.2f}%"
+        except (TypeError, ValueError):
+            return _DASH
+    if price:
+        return _fmt_price(value)
+    return str(value)
+
+
+def _quote_triplet(
+    symbol: Any,
+    *,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prev_close: float | None,
+) -> tuple[str, str, str]:
+    if not show_quotes:
+        return _DASH, _DASH, _DASH
+    bar = (quotes or {}).get(_sym6(symbol)) or {}
+    opened = bar.get("open")
+    closed = bar.get("close")
+    pct = None
+    if closed is not None and prev_close not in (None, 0):
+        try:
+            pct = float(closed) / float(prev_close) - 1.0
+        except (TypeError, ValueError, ZeroDivisionError):
+            pct = None
+    return (
+        _cell(opened, price=True) if opened is not None else _DASH,
+        _cell(closed, price=True) if closed is not None else _DASH,
+        _cell(pct, pct=True) if pct is not None else _DASH,
+    )
+
+
+def _prev_for(
+    symbol: Any,
+    asof_close: Any,
+    *,
+    asof: str,
+    quote_date: str | None,
+    prior_closes: Mapping[str, Any] | None,
+) -> float | None:
+    from .quotes import resolve_prev_close
+
+    key = _sym6(symbol)
+    prior = (prior_closes or {}).get(key)
+    if prior is None:
+        prior = (prior_closes or {}).get(str(symbol or ""))
+    try:
+        asof_num = float(asof_close) if asof_close is not None else None
+    except (TypeError, ValueError):
+        asof_num = None
+    return resolve_prev_close(
+        quote_date=str(quote_date or ""),
+        asof=str(asof or "")[:10],
+        asof_close=asof_num,
+        prior_close=None if prior is None else float(prior),
+    )
+
+
+def _full_reason(row: Mapping[str, Any]) -> str:
+    text = str(row.get("reasonSummary") or row.get("reason") or row.get("secondaryReason") or "")
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _quote_table(
+    rows: list[Mapping[str, Any]],
+    *,
+    asof: str,
+    quote_date: str | None,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prior_closes: Mapping[str, Any] | None,
+    reason_key: str = "reasonSummary",
+) -> list[str]:
+    label = _quote_label(quote_date)
     lines = [
-        "| # | 代码 | 名称 | 综合分 | 收盘 | 理由 |",
-        "|---|---|---|---|---|---|",
+        "| # | 代码 | 名称 | 综合分 | 收盘(asof) | "
+        f"开盘({label}) | 收盘({label}) | 涨跌({label}) | 入选理由 |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
-    for p in picks:
-        reason = str(p.get("reasonSummary") or p.get("reason") or "").replace("|", "\\|")
-        if len(reason) > 80:
-            reason = reason[:77] + "..."
-        name = str(p.get("name") or "-").replace("|", "\\|")
+    for i, row in enumerate(rows, start=1):
+        prev = _prev_for(
+            row.get("symbol"),
+            row.get("close"),
+            asof=asof,
+            quote_date=quote_date,
+            prior_closes=prior_closes,
+        )
+        opened, closed, pct = _quote_triplet(
+            row.get("symbol"),
+            show_quotes=show_quotes,
+            quotes=quotes,
+            prev_close=prev,
+        )
+        reason = str(row.get(reason_key) or row.get("reasonSummary") or row.get("reason") or "")
+        reason = reason.replace("|", "\\|").replace("\n", " ")
+        name = str(row.get("name") or "-").replace("|", "\\|")
         lines.append(
-            f"| {p.get('rank', '-')} | {p.get('symbol', '-')} | {name} "
-            f"| {_fmt_score(p.get('composite_score'))} "
-            f"| {_fmt_price(p.get('close'))} | {reason or '-'} |"
+            f"| {i} | {row.get('symbol', '-')} | {name} "
+            f"| {_fmt_score(row.get('composite_score'))} "
+            f"| {_fmt_price(row.get('close'))} | {opened} | {closed} | {pct} | {reason or '-'} |"
         )
     return lines
+
+
+def _benchmark_warning(name: str | None, symbol: str = _BENCHMARK) -> str | None:
+    if not name:
+        return None
+    return (
+        f"平台基准 `{symbol}` 在引擎库中解析为 **{name}**（个股），"
+        "并非中证500 指数点位；因此「相对基准」列是相对该**个股**的超额，"
+        "**不能读作指数超额**（A4 绩效台账的 avgAlpha 用的是同一口径）。"
+    )
+
+
+def _pct_value(
+    symbol: Any,
+    asof_close: Any,
+    *,
+    asof: str,
+    quote_date: str | None,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prior_closes: Mapping[str, Any] | None,
+) -> float | None:
+    if not show_quotes:
+        return None
+    bar = (quotes or {}).get(_sym6(symbol)) or {}
+    closed = bar.get("close")
+    prev = _prev_for(
+        symbol, asof_close, asof=asof, quote_date=quote_date, prior_closes=prior_closes
+    )
+    if closed is None or prev in (None, 0):
+        return None
+    try:
+        return float(closed) / float(prev) - 1.0
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def _summary_line(
+    rows: list[Mapping[str, Any]],
+    *,
+    asof: str,
+    quote_date: str | None,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prior_closes: Mapping[str, Any] | None,
+    benchmark_name: str | None,
+    benchmark_asof_close: float | None = None,
+) -> list[str]:
+    if not show_quotes:
+        return []
+    pcts = [
+        p
+        for p in (
+            _pct_value(
+                row.get("symbol"),
+                row.get("close"),
+                asof=asof,
+                quote_date=quote_date,
+                show_quotes=True,
+                quotes=quotes,
+                prior_closes=prior_closes,
+            )
+            for row in rows
+        )
+        if p is not None
+    ]
+    label = quote_date or _DASH
+    if not pcts:
+        return [f"> {label} 无可计算涨跌。基准不可用", ""]
+    avg = sum(pcts) / len(pcts)
+    bench_prev = _prev_for(
+        _BENCHMARK,
+        benchmark_asof_close,
+        asof=asof,
+        quote_date=quote_date,
+        prior_closes=prior_closes,
+    )
+    bench = _pct_value(
+        _BENCHMARK,
+        bench_prev if quote_date == asof else benchmark_asof_close,
+        asof=asof,
+        quote_date=quote_date,
+        show_quotes=True,
+        quotes=quotes,
+        prior_closes=prior_closes if quote_date == asof else None,
+    )
+    # When dates match, _pct_value's asof_close argument is ignored by
+    # resolve_prev_close in favour of prior_closes. Pass prior via that map.
+    if quote_date == asof:
+        bench = None
+        bar = (quotes or {}).get(_BENCHMARK) or {}
+        closed = bar.get("close")
+        if closed is not None and bench_prev not in (None, 0):
+            try:
+                bench = float(closed) / float(bench_prev) - 1.0
+            except (TypeError, ValueError, ZeroDivisionError):
+                bench = None
+    head = f"> {len(pcts)} 只 {label} 平均涨跌 {avg * 100:+.2f}%"
+    if bench is None:
+        lines = [head + "。基准不可用", ""]
+    else:
+        beat = sum(1 for p in pcts if p > bench)
+        lines = [head + f"，相对 {_BENCHMARK} 上涨家数 {beat}/{len(pcts)}", ""]
+    warning = _benchmark_warning(benchmark_name)
+    if warning:
+        lines.insert(0, f"> {warning}")
+    return lines
+
+
+def _picks_table(
+    picks: list[Mapping[str, Any]],
+    *,
+    asof: str,
+    quote_date: str | None,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prior_closes: Mapping[str, Any] | None,
+) -> list[str]:
+    return _quote_table(
+        picks,
+        asof=asof,
+        quote_date=quote_date,
+        show_quotes=show_quotes,
+        quotes=quotes,
+        prior_closes=prior_closes,
+    )
 
 
 def _ths_code(symbol: Any) -> str:
@@ -182,6 +426,7 @@ def _ths_import_section(
     *,
     per_line: int = THS_IMPORT_PER_LINE,
     label: str | None = None,
+    source_note: str | None = None,
 ) -> list[str]:
     """Copy-paste block for 同花顺 (THS) self-select import.
 
@@ -199,6 +444,8 @@ def _ths_import_section(
     for i in range(0, len(codes), per_line):
         out.append(" ".join(codes[i : i + per_line]))
     out.append("```")
+    out.append("")
+    out.append(source_note or "导入码来自生产榜，不是二次精选结果。")
     out.append("")
     return out
 
@@ -249,12 +496,187 @@ _ACTION_LABELS = {
 }
 
 
-def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
+def _profile_compare() -> list[str]:
+    from .secondary_pick import PROFILE_TREND, QUALITY_WEIGHTS, SHORT_WEIGHTS
+
+    def _w(weights: Mapping[str, float]) -> str:
+        return " · ".join(f"{k} {v * 100:.0f}%" for k, v in weights.items())
+
+    return [
+        "**两条榜用不同的取舍口径**（同一截面，取向相反）：",
+        "",
+        "| 榜 | 维度权重 | 取向 |",
+        "|---|---|---|",
+        f"| ②A 长线 | {_w(QUALITY_WEIGHTS)} | {PROFILE_TREND['quality']} |",
+        f"| ②B 短线 | {_w(SHORT_WEIGHTS)} | {PROFILE_TREND['short']} |",
+        "",
+        _SECONDARY_DISCLAIMER,
+        "",
+    ]
+
+
+def _secondary_lines(
+    title: str,
+    result: Mapping[str, Any],
+    *,
+    asof: str,
+    quote_date: str | None,
+    show_quotes: bool,
+    quotes: Mapping[str, Mapping[str, Any]] | None,
+    prior_closes: Mapping[str, Any] | None,
+) -> list[str]:
+    selected = list(result.get("selected") or [])
+    rejected = list(result.get("rejected") or [])
+    n_in = int((result.get("stats") or {}).get("input") or 0)
+    lines = [f"### {title}（{n_in} 进 {len(selected)}）", ""]
+    note = (result.get("stats") or {}).get("note")
+    if note:
+        lines.append(str(note))
+        lines.append("")
+    if selected:
+        lines.extend(
+            _quote_table(
+                selected,
+                asof=asof,
+                quote_date=quote_date,
+                show_quotes=show_quotes,
+                quotes=quotes,
+                prior_closes=prior_closes,
+                reason_key="secondaryReason",
+            )
+        )
+        lines.append("")
+    else:
+        lines.append("_无入选_")
+        lines.append("")
+    lines.append(f"#### {title}未入选")
+    lines.append("")
+    if not rejected:
+        lines.append("_无_")
+        lines.append("")
+        return lines
+    lines.append("| 代码 | 名称 | 落选原因 |")
+    lines.append("|---|---|---|")
+    for row in rejected:
+        reason = str(row.get("rejectReason") or "-").replace("|", "\\|")
+        name = str(row.get("name") or "-").replace("|", "\\|")
+        lines.append(f"| {row.get('symbol', '-')} | {name} | {reason} |")
+    lines.append("")
+    return lines
+
+
+def _action_details(payload: Mapping[str, Any], items: list[Mapping[str, Any]]) -> list[str]:
+    from .rankings import code_key
+
+    rankings = payload.get("rankings") or {}
+    review = rankings.get("holdingsReview") or {}
+    policy = review.get("exitPolicy") or {}
+    rows = {
+        code_key(r.get("code")): r
+        for r in (review.get("rows") or [])
+        if isinstance(r, Mapping)
+    }
+    sizing = rankings.get("positionSizing") or {}
+    orders = {
+        code_key(o.get("code")): o
+        for o in (sizing.get("orders") or [])
+        if isinstance(o, Mapping)
+    }
+    market = str(payload.get("market") or "")
+    cap = sizing.get("capWeight")
+    lines: list[str] = []
+    for it in items:
+        key = code_key(it.get("symbol"))
+        row = rows.get(key) or {}
+        order = orders.get(key) or {}
+        name = it.get("name") or row.get("name") or ""
+        action = it.get("action") or row.get("action") or "-"
+        qty = it.get("suggestQty")
+        if qty is None:
+            qty = order.get("qty")
+        reason = it.get("reason") or row.get("reason") or "-"
+        ret = row.get("ret_pct")
+        if ret is None:
+            ret = it.get("ret_pct")
+        entry = row.get("entry_price")
+        price = row.get("price")
+        if price is None:
+            price = it.get("price")
+        held = row.get("held_days")
+        asset = row.get("asset_class") or order.get("assetClass") or it.get("assetClass")
+        available = order.get("available")
+        if available is None:
+            available = it.get("availableQty")
+        unsellable = order.get("unsellable")
+        held_qty = order.get("heldQty")
+        if held_qty is None:
+            held_qty = it.get("heldQty")
+        w0 = order.get("weightBefore")
+        if w0 is None:
+            w0 = it.get("weightPct")
+        w1 = order.get("weightAfter")
+        if w1 is None:
+            w1 = it.get("weightAfterPct")
+        lines.append(f"**{it.get('symbol') or '-'} {name} · {action} {qty if qty is not None else '-'} 股**")
+        stop = policy.get("stop_loss")
+        ret_txt = "-" if ret is None else f"{float(ret):+.2f}%"
+        stop_txt = "-" if stop is None else f"−{abs(float(stop)):.0f}%"
+        lines.append(f"- 触发规则：{reason}；止损线 {stop_txt}，实际收益 {ret_txt}")
+        if policy.get("take_profit") in (0, 0.0):
+            lines.append("- 未触发：take_profit 已关闭")
+        entry_txt = _fmt_price(entry) if entry is not None else "-"
+        price_txt = _fmt_price(price) if price is not None else "-"
+        held_txt = "-" if held is None else str(held)
+        lines.append(f"- 成本 {entry_txt} → 参考价 {price_txt} · 持有 {held_txt} 个交易日")
+        min_hold = policy.get("min_hold")
+        reason_s = str(reason or "")
+        if (
+            held is not None
+            and min_hold is not None
+            and int(held) < int(min_hold)
+            and not reason_s.startswith("stop_loss")
+            and not reason_s.startswith("take_profit")
+        ):
+            lines.append(f"- 未到最短持有 {int(min_hold)} 个交易日，故非到期退出")
+        av = "-" if available is None else str(int(available))
+        hq = "-" if held_qty is None else str(int(held_qty))
+        un = "-" if unsellable is None else str(int(unsellable))
+        lines.append(f"- 可卖 {av} / 持仓 {hq}，不可卖 {un}")
+        try:
+            unsellable_n = float(unsellable) if unsellable is not None else 0
+        except (TypeError, ValueError):
+            unsellable_n = 0
+        if asset == "stock" and market == "CN" and unsellable_n > 0:
+            lines.append("- 不可卖数量按 A 股 T+1 理解")
+        def _w(value: Any) -> str:
+            if value is None:
+                return "-"
+            try:
+                return f"{float(value) * 100:.2f}%"
+            except (TypeError, ValueError):
+                return str(value)
+        cap_txt = "-" if cap is None else f"{float(cap) * 100:.0f}%"
+        lines.append(f"- 集中度：{_w(w0)} → {_w(w1)}，单票上限 {cap_txt}")
+        lines.append("")
+    return lines
+
+
+def _rankings_section(
+    payload: Mapping[str, Any],
+    *,
+    asof: str = "",
+    quote_date: str | None = None,
+    show_quotes: bool = False,
+    quotes: Mapping[str, Mapping[str, Any]] | None = None,
+    prior_closes: Mapping[str, Any] | None = None,
+    benchmark_name: str | None = None,
+    benchmark_asof_close: float | None = None,
+) -> list[str]:
     rankings = payload.get("rankings") or {}
     boards = rankings.get("boards") or {}
     if not boards:
         return []
-    lines = ["## 五榜概览", ""]
+    lines: list[str] = []
     # ③B 明细行来自 holdingsReview（B5 复核结果），本身不带中文名 —— 用 ③A 补。
     name_by_code = {
         str(it.get("symbol") or "").strip(): it.get("name")
@@ -262,13 +684,13 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
         if it.get("name")
     }
     order = [
-        ("quality", "②A 质量榜"),
-        ("short_term", "②B 短线榜"),
-        ("holdings", "③A 持仓"),
-        ("actions", "③B 操作建议"),
-        ("watchlist", "③C 观察名单"),
+        ("quality", "②A 质量榜", "二"),
+        ("short_term", "②B 短线榜", "三"),
+        ("holdings", "③A 持仓", "四"),
+        ("actions", "③B 操作建议", "五"),
+        ("watchlist", "③C 观察名单", "六"),
     ]
-    for slug, label in order:
+    for slug, label, num in order:
         board = boards.get(slug) or {}
         items = board.get("items") or []
         review = rankings.get("holdingsReview") or {}
@@ -281,7 +703,7 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
             # like a data failure. Render the real verdict per holding instead.
             pending = int(rcounts.get("pending") or 0)
             held = int(rcounts.get("hold") or 0)
-            lines.append(f"### {label}（0 需操作 · {len(review_rows)} 只已复核）")
+            lines.append(f"## {num}、{label}（0 需操作 · {len(review_rows)} 只已复核）")
             lines.append("")
             if pending == len(review_rows):
                 lines.append("_空（fail-closed：持仓缺成本价/现价，不生成占位条目）_")
@@ -308,15 +730,84 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
             lines.append("")
             continue
 
-        lines.append(f"### {label}（{len(items)} 条）")
+        if slug == "quality" and items:
+            from .secondary_pick import select_secondary
+
+            picked = select_secondary(items, profile="quality", top_k=5)
+            lines.append(f"## {num}、{label}")
+            lines.append("")
+            lines.extend(_profile_compare())
+            lines.extend(
+                _secondary_lines(
+                    "②A 二次精选",
+                    picked,
+                    asof=asof,
+                    quote_date=quote_date,
+                    show_quotes=show_quotes,
+                    quotes=quotes,
+                    prior_closes=prior_closes,
+                )
+            )
+            continue
+
+        if slug == "short_term":
+            from .secondary_pick import select_secondary
+
+            lines.append(f"## {num}、{label}")
+            lines.append("")
+            pool = board.get("pool")
+            chosen = list(items)
+            if pool is None:
+                lines.append("无候选池，未做二次精选")
+                lines.append("")
+            else:
+                picked = select_secondary(list(pool), profile="short", top_k=5)
+                chosen = list(picked.get("selected") or [])
+                lines.extend(
+                    _secondary_lines(
+                        "②B 短线榜 · 二次精选",
+                        picked,
+                        asof=asof,
+                        quote_date=quote_date,
+                        show_quotes=show_quotes,
+                        quotes=quotes,
+                        prior_closes=prior_closes,
+                    )
+                )
+                lines.extend(
+                    _summary_line(
+                        list(pool),
+                        asof=asof,
+                        quote_date=quote_date,
+                        show_quotes=show_quotes,
+                        quotes=quotes,
+                        prior_closes=prior_closes,
+                        benchmark_name=benchmark_name,
+                        benchmark_asof_close=benchmark_asof_close,
+                    )
+                )
+            if chosen:
+                lines.extend(
+                    _ths_import_section(
+                        chosen,
+                        label="短线",
+                        source_note="导入码 = 上方二次精选入选（与生产榜条目不同）。",
+                    )
+                )
+            elif pool is None:
+                lines.append("_空（fail-closed，不生成占位条目）_")
+                lines.append("")
+            continue
+
+        shown = min(len(items), 10)
+        total = len(items)
+        suffix = f"{total} 条" if shown == total else f"{total} 条，列前 {shown}"
+        lines.append(f"## {num}、{label}（{suffix}）")
         lines.append("")
         if not items:
             lines.append("_空（fail-closed，不生成占位条目）_")
             lines.append("")
             continue
-        if slug == "short_term":
-            # 短线与长线一样给出可直接复制的 6 位码块（同花顺导入），不再只有表格。
-            lines.extend(_ths_import_section(items, label="短线"))
         if slug == "actions" and any(it.get("suggestQty") for it in items):
             # ADR 0081：操作建议必须可执行 —— 给出股数 / 金额，而不只是一句 reason。
             lines.append("| # | 代码 | 名称 | 动作 | 卖出数量 | 参考价 | 金额 | 权重 | 备注 |")
@@ -337,9 +828,10 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
                     f"| {i} | {code} | {it.get('name') or name_by_code.get(code) or '-'} "
                     f"| {_ACTION_LABELS.get(it.get('action'), it.get('action') or '-')} "
                     f"| **{qty} 股** | {'-' if px is None else f'{px:.3f}'} "
-                    f"| {'-' if amt is None else f'{amt:,.2f}'} | {weight} | {note[:40] or '-'} |"
+                    f"| {'-' if amt is None else f'{amt:,.2f}'} | {weight} | {note or '-'} |"
                 )
             lines.append("")
+            lines.extend(_action_details(payload, list(items[:10])))
             sizing = rankings.get("positionSizing") or {}
             if sizing:
                 lines.append(
@@ -349,16 +841,32 @@ def _rankings_section(payload: Mapping[str, Any]) -> list[str]:
                 )
                 lines.append("")
             continue
-        lines.append("| # | 代码 | 名称 | 备注 |")
-        lines.append("|---|---|---|---|")
+        if slug == "holdings":
+            lines.append("| # | 代码 | 名称 | 综合分 | 截面排名 | 备注 |")
+            lines.append("|---|---|---|---|---|---|")
+        else:
+            lines.append("| # | 代码 | 名称 | 综合分 | 备注 |")
+            lines.append("|---|---|---|---|---|")
         for i, it in enumerate(items[:10], start=1):
+            # ③A/③C 的 item 只有 reasonSummary（没有 reason）；漏取会让备注列恒为 "-"
             note = str(
-                it.get("reason") or it.get("belowMedian") and "低于中位（只读提示）" or ""
+                it.get("reason")
+                or it.get("reasonSummary")
+                or (it.get("belowMedian") and "低于中位（只读提示）")
+                or ""
             ).replace("|", "\\|")
-            lines.append(
-                f"| {i} | {it.get('symbol', '-')} | {it.get('name') or '-'} "
-                f"| {note[:60] or '-'} |"
-            )
+            score = _fmt_score(it.get("composite_score"))
+            if slug == "holdings":
+                rank = it.get("crossSectionRank")
+                lines.append(
+                    f"| {i} | {it.get('symbol', '-')} | {it.get('name') or '-'} "
+                    f"| {score} | {'-' if rank is None else rank} | {note or '-'} |"
+                )
+            else:
+                lines.append(
+                    f"| {i} | {it.get('symbol', '-')} | {it.get('name') or '-'} "
+                    f"| {score} | {note or '-'} |"
+                )
         lines.append("")
     return lines
 
@@ -388,25 +896,56 @@ def _human_ts(iso: Any) -> str:
     return local.strftime("%Y-%m-%d %H:%M:%S") + f" {off}"
 
 
-def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> str:
+def _coerce_session(session: str | None, payload: Mapping[str, Any]) -> str:
+    raw = session if session is not None else payload.get("session")
+    text = str(raw or "pre").strip().lower()
+    return text if text in {"pre", "post"} else "pre"
+
+
+def _coerce_run_date(run_date: str | None, payload: Mapping[str, Any]) -> str | None:
+    raw = run_date if run_date is not None else payload.get("runDate")
+    if not raw:
+        return None
+    return str(raw)[:10]
+
+
+def build_digest_text(
+    record: BriefRecord,
+    *,
+    hits_repo: Any | None = None,
+    session: str | None = None,
+    run_date: str | None = None,
+    quote_date: str | None = None,
+    show_quotes: bool = False,
+    quotes: Mapping[str, Mapping[str, Any]] | None = None,
+    prior_closes: Mapping[str, Any] | None = None,
+    extra_notes: list[str] | None = None,
+    benchmark_name: str | None = None,
+    benchmark_asof_close: float | None = None,
+) -> str:
     """Render one BriefRecord as the human-readable markdown digest."""
     payload = record.payload or {}
     asof = record.asof
+    sess = _coerce_session(session, payload)
+    label = _SESSION_LABEL[sess]
+    rd = _coerce_run_date(run_date, payload)
+    qd = str(quote_date)[:10] if quote_date else (str(payload.get("quoteDate"))[:10] if payload.get("quoteDate") else None)
     lines: list[str] = []
-    lines.append(f"# 每日简报 · {asof}")
+    lines.append(f"# 每日简报 · {label} · {asof}")
     lines.append("")
     # 口径自证：定时任务（08:30 盘前 / 15:30 盘后）都带 -PrevSession，asof 恒为
     # 「上一交易日收盘截面」—— 当日 K 线要等 18:30 回补后才进市场库。把「数据基准日」
     # 与「本简报实际生成时刻」并列写出，避免 asof 被误读成「报告过期」。
     generated_local = _human_ts(record.generated_at)
-    if generated_local:
-        lines.append(
-            f"> **口径**：数据基准日（asof）**{asof}** —— 取该交易日**收盘截面**；"
-            f"本简报生成于 **{generated_local}**。"
-            f"盘前/盘后任务取上一交易日收盘（当日 K 线尚未入库），这是设计约定，"
-            f"不是数据滞后。"
-        )
-        lines.append("")
+    lines.append(
+        f"> **口径**：数据基准日 asof={asof}（T-1 收盘截面）；"
+        f"报告类型：{label}；运行日 {rd or '未提供'}；报价日 quoteDate={qd or '未提供'}；"
+        f"生成于 {generated_local or '-'}。"
+        f"盘前/盘后任务取上一交易日收盘（当日 K 线尚未入库），这是设计约定，不是数据滞后。"
+    )
+    if sess == "pre":
+        lines.append("> 盘前：运行日行情尚未作为本报告的报价使用，开盘/收盘/涨跌留空（—）。盘后报告补齐。")
+    lines.append("")
     lines.append(f"- 环境：{record.environment}（{_DISCLAIMER}）")
     provider = record.provider or payload.get("provider") or "未记录"
     lines.append(f"- 数据源：`{provider}`")
@@ -417,6 +956,9 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
     )
     if record.data_note:
         lines.append(f"- 数据备注：{record.data_note}")
+    for note in extra_notes or []:
+        if note:
+            lines.append(f"- 数据备注：{note}")
     if payload.get("softGates"):
         lines.append("- 闸门：softGates 开启" + ("（闸门放宽）" if payload.get("gatesRelaxed") else ""))
     _gen_raw = record.generated_at or ""
@@ -427,7 +969,7 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
     lines.append("")
 
     picks = record.picks or []
-    lines.append(f"## 当日推荐 · 长线（{len(picks)} 条）")
+    lines.append(f"## 一、今日 Top10 · 长线（{len(picks)} 条）")
     lines.append("")
     if not picks:
         msg = payload.get("emptyPicksMessage") or "当日无推荐"
@@ -439,23 +981,71 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
         lines.append("")
     else:
         lines.extend(_ths_import_section(picks, label="长线"))
-        lines.extend(_picks_table(picks))
+        lines.extend(
+            _picks_table(
+                picks,
+                asof=asof,
+                quote_date=qd,
+                show_quotes=show_quotes,
+                quotes=quotes,
+                prior_closes=prior_closes,
+            )
+        )
         lines.append("")
+        if not show_quotes:
+            lines.append(f"盘后报告补齐 {qd or 'quoteDate'} 行情。")
+            lines.append("")
+        else:
+            lines.extend(
+                _summary_line(
+                    picks,
+                    asof=asof,
+                    quote_date=qd,
+                    show_quotes=True,
+                    quotes=quotes,
+                    prior_closes=prior_closes,
+                    benchmark_name=benchmark_name,
+                    benchmark_asof_close=benchmark_asof_close,
+                )
+            )
 
-    lines.extend(_rankings_section(payload))
+    lines.extend(
+        _rankings_section(
+            payload,
+            asof=asof,
+            quote_date=qd,
+            show_quotes=show_quotes,
+            quotes=quotes,
+            prior_closes=prior_closes,
+            benchmark_name=benchmark_name,
+            benchmark_asof_close=benchmark_asof_close,
+        )
+    )
 
     # ---- hit tracking (X3 single point rendering) ----
     if hits_repo is not None:
-        lines.append("## 命中追踪")
+        lines.append("## 七、命中追踪")
         lines.append("")
         try:
-            lines.append(format_hit_report(hits_repo, asof=asof))
+            hits_text = format_hit_report(hits_repo, asof=asof).strip()
+            hits_lines = hits_text.splitlines()
+            # The report renders its own H1/H2; demote so the digest keeps one H1
+            # per file and 命中追踪 stays a subsection of 七.
+            demoted = []
+            for line in hits_lines:
+                if line.startswith("## "):
+                    demoted.append("#### " + line[3:])
+                elif line.startswith("# "):
+                    demoted.append("### " + line[2:])
+                else:
+                    demoted.append(line)
+            lines.append("\n".join(demoted))
         except Exception as exc:  # pragma: no cover - defensive, digest never crashes
             lines.append(f"_命中追踪暂不可用：{exc}_")
             lines.append("")
 
     perf = performance_summary(asof)
-    lines.append("## 绩效台账")
+    lines.append("## 八、绩效台账")
     lines.append("")
     if not perf.get("available"):
         lines.append("_绩效 JSONL 未配置或不存在（best-effort，不阻断简报）_")
@@ -492,8 +1082,7 @@ def build_digest_text(record: BriefRecord, *, hits_repo: Any | None = None) -> s
     lines.append("")
 
     lines.append("---")
-    lines.append(f"*digest 由 `stock-platform-digest` 于 {date.today().isoformat()} 渲染；"
-                 "权威数据以 SQLite brief 仓库为准。*")
+    lines.append("*digest 由 `stock-platform-digest` 渲染；权威数据以 SQLite brief 仓库为准。*")
     lines.append("")
     return "\n".join(lines)
 
@@ -515,6 +1104,15 @@ def build_digest(
     emit_html: bool = False,
     emit_ths: bool = False,
     ths_dir: str | Path | None = None,
+    session: str | None = None,
+    run_date: str | None = None,
+    ohlc: bool | None = None,
+    cache_dir: str | Path | None = None,
+    quotes: Mapping[str, Mapping[str, Any]] | None = None,
+    prior_closes: Mapping[str, Any] | None = None,
+    benchmark_name: str | None = None,
+    benchmark_asof_close: float | None = None,
+    fetch_ohlc: Any | None = None,
 ) -> dict[str, Any]:
     """Render the digest for ``asof`` (or the latest brief) and write files.
 
@@ -534,27 +1132,93 @@ def build_digest(
     if record is None and not asof:
         recent = repo.list_recent(limit=1)
         record = recent[0] if recent else None
+    render_kw: dict[str, Any] = {}
+    sess = "pre"
     if record is None and asof:
         text = _stub_text(asof)
     elif record is None:
-        text = _stub_text(date.today().isoformat())
+        text = _stub_text(asof or "undated")
     else:
         hits_repo = open_hit_repository(hit_db_url) if hit_db_url is not None else open_hit_repository()
-        text = build_digest_text(record, hits_repo=hits_repo)
+        payload = record.payload or {}
+        sess = _coerce_session(session, payload)
+        rd = _coerce_run_date(run_date, payload)
+        notes: list[str] = []
+        qd = None
+        show = False
+        loaded = quotes
+        prior = dict(prior_closes or {})
+        if not rd:
+            notes.append("未提供运行日，未取行情")
+        else:
+            from .quotes import resolve_quote_date
+
+            qd = resolve_quote_date(date.fromisoformat(rd)).isoformat()
+        want_ohlc = ohlc if ohlc is not None else (sess == "post")
+        show = bool(want_ohlc and sess == "post" and rd and qd)
+        if show and loaded is None:
+            symbols = [_sym6(p.get("symbol")) for p in (record.picks or [])]
+            pool = (
+                ((payload.get("rankings") or {}).get("boards") or {})
+                .get("short_term", {})
+                .get("pool")
+                or []
+            )
+            symbols.extend(_sym6(it.get("symbol")) for it in pool if isinstance(it, Mapping))
+            symbols.append(_BENCHMARK)
+            from .quotes import load_ohlc
+
+            cache = Path(cache_dir) if cache_dir is not None else Path("./data/quotes")
+            loaded, err = load_ohlc(
+                [s for s in symbols if s],
+                qd or rd,
+                cache_dir=cache,
+                allow_network=True,
+                fetch=fetch_ohlc,
+            )
+            if err:
+                notes.append(err)
+            if qd == record.asof and not prior:
+                from .quotes import load_prior_closes
+
+                prior = load_prior_closes(symbols, record.asof)
+        if sess == "pre":
+            show = False
+        render_kw = {
+            "session": sess,
+            "run_date": rd,
+            "quote_date": qd,
+            "show_quotes": show,
+            "quotes": loaded,
+            "prior_closes": prior,
+            "extra_notes": notes,
+            "benchmark_name": benchmark_name,
+            "benchmark_asof_close": benchmark_asof_close,
+        }
+        text = build_digest_text(record, hits_repo=hits_repo, **render_kw)
 
     root = Path(out_dir) if out_dir is not None else Path(DEFAULT_OUT_DIR)
     root.mkdir(parents=True, exist_ok=True)
-    target_asof = (record.asof if record is not None else (asof or date.today().isoformat()))
-    digest_path = root / f"{target_asof}.md"
+    target_asof = record.asof if record is not None else (asof or "undated")
+    if record is None:
+        sess = _coerce_session(session, {})
+    session_path = root / f"{target_asof}-{sess}.md"
+    alias_path = root / f"{target_asof}.md"
     latest_path = root / "latest.md"
-    digest_path.write_text(text, encoding="utf-8")
-    shutil.copyfile(digest_path, latest_path)
+    latest_session_path = root / f"latest-{sess}.md"
+    session_path.write_text(text, encoding="utf-8")
+    shutil.copyfile(session_path, alias_path)
+    shutil.copyfile(session_path, latest_path)
+    shutil.copyfile(session_path, latest_session_path)
+    digest_path = session_path
 
     result: dict[str, Any] = {
         "asof": target_asof,
         "found": record is not None,
         "digestPath": str(digest_path),
+        "aliasPath": str(alias_path),
         "latestPath": str(latest_path),
+        "session": sess,
     }
     if emit_html:
         env_note = f"环境 {record.environment}" if record is not None else "无该日 brief 存档（stub）"
@@ -563,17 +1227,27 @@ def build_digest(
             _g = _human_ts(record.generated_at)
             if _g:
                 gen_note = f" · 生成 {_g}"
+        html_title = (
+            f"每日简报 · {_SESSION_LABEL.get(sess, sess)} · {target_asof}"
+            if record is not None
+            else f"每日简报 · {target_asof}"
+        )
         doc = render_report_html(
             text,
-            title=f"每日简报 · {target_asof}",
+            title=html_title,
             subtitle=f"数据基准日（asof）{target_asof} · {env_note}{gen_note}",
             source="数据来源：SQLite brief 仓库（只读）+ 命中追踪 + 绩效 JSONL",
             badge="DAILY DIGEST",
+            strip_leading_h1=True,
         )
-        html_path = root / f"{target_asof}.html"
+        html_path = root / f"{target_asof}-{sess}.html"
+        alias_html = root / f"{target_asof}.html"
         latest_html_path = root / "latest.html"
+        latest_session_html = root / f"latest-{sess}.html"
         html_path.write_text(doc, encoding="utf-8")
+        shutil.copyfile(html_path, alias_html)
         shutil.copyfile(html_path, latest_html_path)
+        shutil.copyfile(html_path, latest_session_html)
         result["htmlPath"] = str(html_path)
         result["latestHtmlPath"] = str(latest_html_path)
     if emit_ths:
