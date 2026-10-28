@@ -27,7 +27,9 @@
 
 `daily_briefs.asof` 保持 `UNIQUE(asof)`。工作台、A6、同日对照和 digest 都按「一个 asof 一行」读取。盘前与盘后各留磁盘文件，不改主键。
 
-后一次写入覆盖库里的 `payload`（含 `session` / `runDate` / `quoteDate`）。盘前原文在 `data/digests/{asof}-pre.md`。`{asof}.md` 与 `latest.md` 是最后一次成功渲染的拷贝，不是第三套正文。另有 `latest-pre.*` / `latest-post.*`。
+后一次写入覆盖库里的 `payload`（含 `session` / `runDate` / `quoteDate`）。盘前原文在 `data/digests/{reportDay}-pre.md`。`{reportDay}.md` 与 `latest.md` 是最后一次成功渲染的拷贝，不是第三套正文。另有 `latest-pre.*` / `latest-post.*`。
+
+**标题与文件名的日期 = 运行日（报告日），不是 `asof`**（`v4.13.1` 修正）。`asof` 是选股基准日（T-1 收盘截面），盘前与盘后共用同一天，若标题只写 `asof`，就与正文的 `开盘(T) / 收盘(T) / 涨跌(T)` 三列直接冲突。故标题为 `# 每日简报 · 盘前|盘后 · {reportDay}（选股基准 {asof}）`，`reportDay == asof`（回补场景）时省略括注；文件名同用 `reportDay`。`asof` 只保留在三处：正文口径行、brief 库主键、同花顺导入文件名（选股批次的键）。
 
 ### 3. 盘后收盘来自外部日线，前收分两种
 
@@ -70,7 +72,7 @@ HTML：英雄区一个 `<h1>`。digest 渲染时去掉正文开头的 `# `，并
 
 ## 后果
 
-- 盘前后各有一份文件；库里仍是一行。早上的 ③B 若被盘后覆盖，以 `{asof}-pre.md` 为准。
+- 盘前后各有一份文件；库里仍是一行。早上的 ③B 若被盘后覆盖，以 `{reportDay}-pre.md` 为准。
 - 盘后涨跌在外部源失败时整列是 `—`，不回退到引擎最后一根。
 - 二次精选可能入选很少甚至为空。这是展示结果，不补齐到 5，也不改生产榜。
 - 阈值已按 `2026-10-27` 截面校准；后续再校准须同时改 `secondary_pick.py`、计划 §3.2 与本 ADR 的表，三处不一致视为缺陷。

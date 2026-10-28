@@ -108,6 +108,29 @@ def test_build_digest_text_contains_picks_and_disclaimer(env):
     assert "绩效台账" in text
 
 
+def test_build_digest_text_title_uses_run_date_with_basis_note(env):
+    """标题的日期是运行日（报告服务的那一天），asof 只作选股基准括注。"""
+    from stock_platform_research.persistence import open_brief_repository
+
+    record = open_brief_repository().save(BRIEF, symbols=BRIEF["symbols"])
+    text = build_digest_text(record, hits_repo=None, session="post", run_date="2026-10-12")
+    first = text.splitlines()[0]
+    assert first == "# 每日简报 · 盘后 · 2026-10-12（选股基准 2026-10-09）"
+    # 同日运行不应出现多余括注
+    same = build_digest_text(record, hits_repo=None, session="pre", run_date="2026-10-09")
+    assert same.splitlines()[0] == "# 每日简报 · 盘前 · 2026-10-09"
+
+
+def test_build_digest_names_files_by_run_date(env):
+    """文件名跟标题同一天，不再用 asof 命名。"""
+    _save_brief(env)
+    result = build_digest(out_dir=env / "digests", session="pre", run_date="2026-10-12")
+    assert result["asof"] == "2026-10-09"
+    assert result["reportDate"] == "2026-10-12"
+    assert Path(result["digestPath"]).name == "2026-10-12-pre.md"
+    assert Path(result["aliasPath"]).name == "2026-10-12.md"
+
+
 def test_build_digest_writes_files_and_latest_pointer(env):
     _save_brief(env)
     result = build_digest(out_dir=env / "digests")

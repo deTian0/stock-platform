@@ -931,7 +931,12 @@ def build_digest_text(
     rd = _coerce_run_date(run_date, payload)
     qd = str(quote_date)[:10] if quote_date else (str(payload.get("quoteDate"))[:10] if payload.get("quoteDate") else None)
     lines: list[str] = []
-    lines.append(f"# 每日简报 · {label} · {asof}")
+    # 标题的日期 = 运行日（这份简报服务的那一天）；asof 只是选股用的截面基准日。
+    # 定时任务都带 -PrevSession，asof 恒为 T-1，若标题只写 asof，盘后正文里
+    # 「开盘(T)/收盘(T)/涨跌(T)」那几列会和标题日期直接冲突。
+    report_day = rd or asof
+    basis_note = f"（选股基准 {asof}）" if rd and rd != asof else ""
+    lines.append(f"# 每日简报 · {label} · {report_day}{basis_note}")
     lines.append("")
     # 口径自证：定时任务（08:30 盘前 / 15:30 盘后）都带 -PrevSession，asof 恒为
     # 「上一交易日收盘截面」—— 当日 K 线要等 18:30 回补后才进市场库。把「数据基准日」
@@ -1202,8 +1207,13 @@ def build_digest(
     target_asof = record.asof if record is not None else (asof or "undated")
     if record is None:
         sess = _coerce_session(session, {})
-    session_path = root / f"{target_asof}-{sess}.md"
-    alias_path = root / f"{target_asof}.md"
+    # 文件名与标题同一天（报告日期）；asof 只留在正文口径行与 brief 库主键里。
+    target_run = _coerce_run_date(
+        run_date, (record.payload if record is not None else {}) or {}
+    )
+    report_day = target_run or target_asof
+    session_path = root / f"{report_day}-{sess}.md"
+    alias_path = root / f"{report_day}.md"
     latest_path = root / "latest.md"
     latest_session_path = root / f"latest-{sess}.md"
     session_path.write_text(text, encoding="utf-8")
@@ -1214,6 +1224,7 @@ def build_digest(
 
     result: dict[str, Any] = {
         "asof": target_asof,
+        "reportDate": report_day,
         "found": record is not None,
         "digestPath": str(digest_path),
         "aliasPath": str(alias_path),
@@ -1227,21 +1238,22 @@ def build_digest(
             _g = _human_ts(record.generated_at)
             if _g:
                 gen_note = f" · 生成 {_g}"
+        _basis = f"（选股基准 {target_asof}）" if report_day != target_asof else ""
         html_title = (
-            f"每日简报 · {_SESSION_LABEL.get(sess, sess)} · {target_asof}"
+            f"每日简报 · {_SESSION_LABEL.get(sess, sess)} · {report_day}{_basis}"
             if record is not None
             else f"每日简报 · {target_asof}"
         )
         doc = render_report_html(
             text,
             title=html_title,
-            subtitle=f"数据基准日（asof）{target_asof} · {env_note}{gen_note}",
+            subtitle=f"报告日 {report_day} · 选股基准 asof {target_asof} · {env_note}{gen_note}",
             source="数据来源：SQLite brief 仓库（只读）+ 命中追踪 + 绩效 JSONL",
             badge="DAILY DIGEST",
             strip_leading_h1=True,
         )
-        html_path = root / f"{target_asof}-{sess}.html"
-        alias_html = root / f"{target_asof}.html"
+        html_path = root / f"{report_day}-{sess}.html"
+        alias_html = root / f"{report_day}.html"
         latest_html_path = root / "latest.html"
         latest_session_html = root / f"latest-{sess}.html"
         html_path.write_text(doc, encoding="utf-8")
