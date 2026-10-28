@@ -453,13 +453,13 @@ def _ths_import_section(
 def write_ths_import(
     codes: list[str],
     *,
-    asof: str,
+    day: str,
     out_dir: str | Path | None = None,
     kind: str = "",
 ) -> dict[str, Any] | None:
-    """Emit the 同花顺 (THS) watchlist import txt for ``asof``.
+    """Emit the 同花顺 (THS) watchlist import txt for report ``day``.
 
-    Writes ``{out_dir}/{asof}{kind}.txt`` plus a ``latest{kind}.txt`` pointer
+    Writes ``{out_dir}/{day}{kind}.txt`` plus a ``latest{kind}.txt`` pointer
     copy -- one bare 6-digit code per line, no header, no names (exactly what
     同花顺's 「导入自选」 dialog wants; the user confirmed this import path works).
     Returns ``{"thsPath", "latestThsPath", "thsCount"}``, or ``None`` when there
@@ -476,7 +476,7 @@ def write_ths_import(
         except OSError:  # pragma: no cover - best effort
             pass
     text = "\n".join(codes) + "\n"
-    dated = root / f"{asof}{kind}.txt"
+    dated = root / f"{day}{kind}.txt"
     latest = root / f"latest{kind}.txt"
     dated.write_text(text, encoding="utf-8")
     shutil.copyfile(dated, latest)
@@ -1271,12 +1271,12 @@ def build_digest(
             ths_root = root.parent / "ths_import"
         else:
             ths_root = Path(DEFAULT_THS_DIR)
-        ths = write_ths_import(codes, asof=target_asof, out_dir=ths_root)
+        ths = write_ths_import(codes, day=report_day, out_dir=ths_root)
         if ths:
             result.update(ths)
         # 短线同样「可直接复制」：另存一份 *_short.txt，与长线池互不混淆。
         short_ths = write_ths_import(
-            short_codes, asof=target_asof, out_dir=ths_root, kind="_short"
+            short_codes, day=report_day, out_dir=ths_root, kind="_short"
         )
         if short_ths:
             result["thsShortPath"] = short_ths["thsPath"]

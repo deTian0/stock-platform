@@ -59,7 +59,7 @@ stock-platform-daily --asof 2026-09-12 --provider tushare --skip-refresh --settl
 | `-LiveDay` | 一键：`Provider=tushare`（若未指定）+ `SkipRefresh` + `SettleAfter`；**不**改变无参时的 replay 默认 |
 | `-PrevSession` | asof 解析为**前一交易日**（调度必用：早/午后时点 market.db 无当日 bar，见 [scheduler.md](scheduler.md)） |
 | `-Session pre\|post` | 展示用会话，默认 `pre`。08:30 传 `pre`，15:30 传 `post`。asof 仍由 `-PrevSession` 定为 T-1。包装脚本在改写 asof 之前把运行日传给 `--run-date`（ADR [0083](../architecture/0083-digest-pre-post-and-secondary-pick.md)） |
-| `-Digest` | 成功后渲染人读版日报（`stock-platform-digest` → `data/digests/{asof}-pre.md` 与 `{asof}-post.md` 都保留；`{asof}.md` 与 `latest.md` 是最后一次成功渲染的别名，并有 `latest-pre` / `latest-post`。**默认同主题 HTML**，见 [ADR 0071](../architecture/0071-report-html-theme.md)；`--no-html` 可只留 Markdown）。**另产出同花顺导入（生产榜，长线 + 短线各一份）**：`data/ths_import/{asof}.txt` + `latest.txt`（长线）与 `{asof}_short.txt` + `latest_short.txt`（短线），每行 1 个 6 位码（`--no-ths` 关闭） |
+| `-Digest` | 成功后渲染人读版日报（`stock-platform-digest` → `data/digests/{reportDay}-pre.md` 与 `{reportDay}-post.md` 都保留；`{reportDay}.md` 与 `latest.md` 是最后一次成功渲染的别名，并有 `latest-pre` / `latest-post`。**默认同主题 HTML**，见 [ADR 0071](../architecture/0071-report-html-theme.md)；`--no-html` 可只留 Markdown）。**另产出同花顺导入（生产榜，长线 + 短线各一份）**：`data/ths_import/{reportDay}.txt` + `latest.txt`（长线）与 `{reportDay}_short.txt` + `latest_short.txt`（短线），每行 1 个 6 位码（`--no-ths` 关闭） |
 | `-SettleAfter` / `--settle-after` | brief 成功后记入绩效 JSONL，并用日线结算可结算样本（优先 engine market.db） |
 | 别名 | `tushare` / `tushare_http` / `cn_tushare_http` |
 | 缺 token | **非 0 退出**，可读错误；**不**自动降级 fixtures |
