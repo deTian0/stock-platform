@@ -96,7 +96,7 @@ def test_digest_picks_table_renders_the_name(tmp_path: Path, monkeypatch) -> Non
         )
         record = open_brief_repository().save(brief, symbols=list(_NAMES))
         text = build_digest_text(record, hits_repo=None)
-        assert "| # | 代码 | 名称 | 综合分 | 收盘 | 理由 |" in text
+        assert "| # | 代码 | 名称 | 综合分 | 收盘(asof) |" in text
         assert "贵州茅台" in text
     finally:
         reset_brief_repository_cache()
