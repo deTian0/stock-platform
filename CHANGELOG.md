@@ -8,6 +8,17 @@
 
 - （无）
 
+## [4.13.1] - 2026-10-28
+
+### Fixed
+
+- **简报标题的日期与正文日期冲突**（`v4.13.0` 遗留）。标题原为 `# 每日简报 · 盘后 · {asof}`，而 `asof` 是**选股基准日**（T-1 收盘截面），正文第一列却是 `开盘(T) / 收盘(T) / 涨跌(T)` —— 10-28 跑出来的报告标题写着 10-27。三个定时任务都带 `-PrevSession`，`asof` 恒为 T-1，且 **10-28 的盘前与盘后共用同一个 `asof=10-27`**，两份产物因此都叫 `2026-10-27-pre/post`，读者无法从标题判断这份简报服务的是哪一天。
+  - 标题改为「**报告日 = 运行日**」：`# 每日简报 · 盘后 · 2026-10-28（选股基准 2026-10-27）`；`run_date == asof`（回补场景）时不出现括注。
+  - 产物文件名同步改为 `data/digests/{reportDay}-pre|post.md|html`，`{reportDay}.*` / `latest*.md` 别名不变；`build_digest` 返回值新增 `reportDate`，**`asof` 语义不变**（仍是选股基准日，brief 库主键不动）。
+  - HTML `<title>` / `<h1>` / 副标题同步（副标题改为「报告日 … · 选股基准 asof …」）。
+  - **口径不动**：选股截面仍是 T-1 收盘、`quoteDate` 仍按运行日解析。盘后若改用当日收盘选股，涨跌恒为 0，报告失去复盘意义 —— 这正是该设计保留 `-PrevSession` 的原因。同花顺导入 txt 仍按 `asof` 命名（那是选股批次的键）。
+  - 新增 2 个测试锁死口径：`test_build_digest_text_title_uses_run_date_with_basis_note` / `test_build_digest_names_files_by_run_date`。
+
 ## [4.13.0] - 2026-10-28
 
 ### Added
