@@ -8,6 +8,17 @@
 
 - （无）
 
+## [4.13.2] - 2026-10-28
+
+### Changed
+
+- **同花顺导入 txt 的文件名改用报告日**（`v4.13.1` 遗留的表达错位）。`v4.13.1` 把 digest 本体改成 `{reportDay}-pre|post` 之后，`data/ths_import/{asof}.txt` / `{asof}_short.txt` 仍停在**选股基准日** ⇒ 报告标题写 10-28、导入文件却叫 10-27，同一种「标题与文件日期不一致」换了个位置复发。
+  - `write_ths_import(..., day=...)`（原关键字 `asof`）改为接收**文件名日期**；`build_digest` 两个调用点统一传 `report_day`。
+  - 产物：`data/ths_import/{reportDay}.txt` + `latest.txt`、`{reportDay}_short.txt` + `latest_short.txt`；**`latest*` 指针语义不变**。
+  - **口径不变**：导入码仍取生产榜（长线 `picks` 10 只 / 短线 `short_term.items` 5 只），不是二次精选结果；文件内容与该文件叫什么都无关。
+  - 历史文件不重命名 —— 文件名只承担「这是哪一天的报告」这一个用途，按新规则向前生效，不回改归档。
+  - 测试：`test_build_digest_names_files_by_run_date` 增加 `thsPath` / `thsShortPath` 文件名断言；两处 `write_ths_import(...)` 调用同步改关键字。
+
 ## [4.13.1] - 2026-10-28
 
 ### Fixed

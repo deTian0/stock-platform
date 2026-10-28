@@ -123,12 +123,17 @@ def test_build_digest_text_title_uses_run_date_with_basis_note(env):
 
 def test_build_digest_names_files_by_run_date(env):
     """文件名跟标题同一天，不再用 asof 命名。"""
-    _save_brief(env)
-    result = build_digest(out_dir=env / "digests", session="pre", run_date="2026-10-12")
+    _save_brief_with_rankings()  # 带短线池，才能同时校验 *_short.txt 的命名
+    result = build_digest(
+        out_dir=env / "digests", session="pre", run_date="2026-10-12", emit_ths=True
+    )
     assert result["asof"] == "2026-10-09"
     assert result["reportDate"] == "2026-10-12"
     assert Path(result["digestPath"]).name == "2026-10-12-pre.md"
     assert Path(result["aliasPath"]).name == "2026-10-12.md"
+    # 同花顺导入 txt 也按报告日命名，不跟 asof
+    assert Path(result["thsPath"]).name == "2026-10-12.txt"
+    assert Path(result["thsShortPath"]).name == "2026-10-12_short.txt"
 
 
 def test_build_digest_writes_files_and_latest_pointer(env):
@@ -336,14 +341,14 @@ def test_write_ths_import_removes_stale_sel(tmp_path):
     out = tmp_path / "ths_import"
     out.mkdir()
     (out / "old.sel").write_bytes(b"\x00\x00")
-    res = write_ths_import(["600519"], asof="2026-10-09", out_dir=out)
+    res = write_ths_import(["600519"], day="2026-10-09", out_dir=out)
     assert res is not None
     assert not list(out.glob("*.sel"))
     assert (out / "latest.txt").read_text(encoding="utf-8") == "600519\n"
 
 
 def test_write_ths_import_none_when_no_codes(tmp_path):
-    assert write_ths_import([], asof="2026-10-09", out_dir=tmp_path) is None
+    assert write_ths_import([], day="2026-10-09", out_dir=tmp_path) is None
     assert not (tmp_path / "latest.txt").exists()
 
 
