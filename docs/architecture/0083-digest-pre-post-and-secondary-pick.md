@@ -44,7 +44,7 @@
 
 ### 4. 二次精选是展示口径
 
-输入必须带齐 `rev_chg`、`vol20`、`rs20`、`amount`。缺字段落选，不把剩余权重重新归一。单位：`rev_chg` / `vol20` 是小数，`rs20` 是百分点 `(close/ma20-1)*100`，`amount` 是元。长线趋势位置取 `|rs20|` 的组内分位（越贴近 MA20 越好）。短线**不设 `rs20` 门槛、也不用位置钟形**，改用 20 日动量分位：引擎 lvrev 内核按构造只选 MA20 下方的票，任何 `rs20` 绝对下限都会把整板剔除（2026-10-27 实测 10 只全在 −3.4 ~ −6.5 百分点）。`short_term.items` 仍是生产榜 5 只；`short_term.pool` 默认 10，且排除 ②A 头部。同花顺文件为 `{reportDay}.txt` / `{reportDay}_short.txt`，导出生产榜。命中追踪只读 `items`。
+输入必须带齐 `rev_chg`、`vol20`、`rs20`、`amount`。缺字段落选，不把剩余权重重新归一。单位：`rev_chg` / `vol20` 是小数，`rs20` 是百分点 `(close/ma20-1)*100`，`amount` 是元。长线趋势位置取 `|rs20|` 的组内分位（越贴近 MA20 越好）。短线**不设 `rs20` 门槛、也不用位置钟形**，改用 20 日动量分位：引擎 lvrev 内核按构造只选 MA20 下方的票，任何 `rs20` 绝对下限都会把整板剔除（2026-10-27 实测 10 只全在 −3.4 ~ −6.5 百分点）。`short_term.items` 仍是生产榜 5 只；`short_term.pool` 默认 10，且排除 ②A 头部。同花顺文件为 `{reportDay}.txt` / `{reportDay}_short.txt`，导出生产榜；**自 `v4.13.3` 起二次精选另有 `{reportDay}_quality_sec.txt` / `{reportDay}_short_sec.txt` 与对应代码块**（ADR [0084](0084-secondary-pick-import-blocks.md)，本节的生产榜结论不变）。命中追踪只读 `items`。
 
 000905 的汇总警告复用 A6：引擎里它解析为个股（厦门港务），「相对基准」不能读作指数超额。
 

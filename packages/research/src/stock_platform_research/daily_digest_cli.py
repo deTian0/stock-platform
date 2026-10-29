@@ -103,6 +103,15 @@ def main(argv: list[str] | None = None) -> int:
             f"同花顺导入·短线 ({result['thsShortCount']} 只): "
             f"{result['thsShortPath']} (latest: {result['latestThsShortPath']})"
         )
+    for key, note in (
+        ("QualitySec", "同花顺导入·二次精选（长线）"),
+        ("ShortSec", "同花顺导入·二次精选（短线）"),
+    ):
+        if result.get(f"ths{key}Path"):
+            print(
+                f"{note} ({result[f'ths{key}Count']} 只): "
+                f"{result[f'ths{key}Path']} (latest: {result[f'latestThs{key}Path']})"
+            )
     return 0
 
 

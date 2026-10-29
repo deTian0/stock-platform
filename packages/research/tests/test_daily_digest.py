@@ -754,3 +754,179 @@ def test_build_digest_no_short_ths_when_no_short_board(env):
     result = build_digest(out_dir=env / "digests", emit_ths=True)
     assert "thsShortPath" not in result
     assert not (env / "ths_import" / "latest_short.txt").exists()
+
+
+# ---------------------------------------------------------------------------
+# 二次精选自己也要「一键导入」：生产榜的代码块与二次精选取舍口径不同
+# （②B 尤其如此），只给生产榜的块会逼人手动删改。
+# ---------------------------------------------------------------------------
+
+_QUALITY_ROWS = [
+    {
+        "rank": 1,
+        "symbol": "600036.SH",
+        "name": "招商银行",
+        "composite_score": 0.90,
+        "close": 40.0,
+        "amount": 8.0e8,
+        "rev_chg": -0.101,
+        "rs20": -4.1,
+        "vol20": 0.0125,
+        "reasonSummary": "x",
+    },
+    {
+        "rank": 2,
+        "symbol": "601398.SH",
+        "name": "工商银行",
+        "composite_score": 0.88,
+        "close": 6.5,
+        "amount": 6.0e8,
+        "rev_chg": -0.095,
+        "rs20": -3.2,
+        "vol20": 0.0118,
+        "reasonSummary": "x",
+    },
+    {
+        "rank": 3,
+        "symbol": "000488.SZ",
+        "name": "ST晨鸣",
+        "composite_score": 0.86,
+        "close": 1.91,
+        "amount": 5.0e8,
+        "rev_chg": -0.098,
+        "rs20": -5.0,
+        "vol20": 0.0124,
+        "reasonSummary": "x",
+    },
+]
+
+_SHORT_POOL = [
+    {
+        "rank": 1,
+        "symbol": "002392.SZ",
+        "name": "北京利尔",
+        "composite_score": 0.80,
+        "close": 5.0,
+        "amount": 3.0e7,
+        "rev_chg": -0.070,
+        "rs20": -4.0,
+        "vol20": 0.0168,
+        "reasonSummary": "y",
+    },
+    {
+        "rank": 2,
+        "symbol": "002227",
+        "name": "*ST特迅",
+        "composite_score": 0.78,
+        "close": 3.0,
+        "amount": 2.0e7,
+        "rev_chg": -0.060,
+        "rs20": -3.0,
+        "vol20": 0.0175,
+        "reasonSummary": "z",
+    },
+    {
+        "rank": 3,
+        "symbol": "600000.SH",
+        "name": "浦发银行",
+        "composite_score": 0.76,
+        "close": 9.0,
+        "amount": 4.0e7,
+        "rev_chg": -0.083,
+        "rs20": -5.2,
+        "vol20": 0.0147,
+        "reasonSummary": "w",
+    },
+    {
+        "rank": 4,
+        "symbol": "601988.SH",
+        "name": "中国银行",
+        "composite_score": 0.74,
+        "close": 4.4,
+        "amount": 2.5e7,
+        "rev_chg": -0.110,
+        "rs20": -6.1,
+        "vol20": 0.0131,
+        "reasonSummary": "v",
+    },
+]
+
+
+def _secondary_block(text: str, label: str) -> list[str]:
+    """代码块里的裸码（排序后比较：块内顺序由二次精选得分决定，不是断言点）。"""
+    seg = text.split(f"同花顺导入 · {label}", 1)[1].split("```text", 1)[1]
+    return sorted(seg.split("```", 1)[0].split())
+
+
+def _save_brief_with_secondary(env: Path, *, with_pool: bool = True) -> None:
+    from stock_platform_research.persistence import open_brief_repository
+
+    rankings = json.loads(json.dumps(RANKINGS))
+    rankings["boards"]["quality"]["items"] = _QUALITY_ROWS
+    rankings["boards"]["short_term"]["items"] = _SHORT_POOL[:2]
+    if with_pool:
+        rankings["boards"]["short_term"]["pool"] = _SHORT_POOL
+    brief = {**BRIEF, "asof": "2026-10-09", "rankings": rankings}
+    open_brief_repository().save(brief, symbols=BRIEF["symbols"])
+
+
+def test_digest_secondary_lines_get_their_own_copy_paste_blocks(env):
+    _save_brief_with_secondary(env)
+    from stock_platform_research.persistence import open_brief_repository
+
+    record = open_brief_repository().get_by_asof("2026-10-09")
+    text = build_digest_text(record, hits_repo=None)
+
+    # 长线的生产榜 = 「一、今日 Top10」的 picks；②A 二次精选剔 ST 后少一只
+    assert _secondary_block(text, "长线") == ["000001", "600519"]
+    assert _secondary_block(text, "二次精选（长线）") == ["600036", "601398"]
+    # 短线：生产榜 2 只，二次精选从 pool(4) 里剔 ST 后取 3 只
+    assert _secondary_block(text, "短线") == ["002227", "002392"]
+    assert _secondary_block(text, "二次精选（短线）") == ["002392", "600000", "601988"]
+    # 两块都要落在各自榜单段落里，不能串到别的章
+    assert text.index("②A 二次精选") < text.index("同花顺导入 · 二次精选（长线）")
+    assert text.index("同花顺导入 · 二次精选（长线）") < text.index("②B 短线榜")
+
+
+def test_digest_secondary_block_absent_when_pool_missing(env):
+    """无 pool ⇒ 未做二次精选 ⇒ 不生成短线二次精选块（fail-closed，无占位行）。"""
+    _save_brief_with_secondary(env, with_pool=False)
+    from stock_platform_research.persistence import open_brief_repository
+
+    record = open_brief_repository().get_by_asof("2026-10-09")
+    text = build_digest_text(record, hits_repo=None)
+    assert "无候选池，未做二次精选" in text
+    assert "同花顺导入 · 二次精选（短线）" not in text
+    # 长线二次精选仍出块（quality 榜自带 items，不需要 pool）
+    assert "同花顺导入 · 二次精选（长线）" in text
+
+
+def test_build_digest_emits_secondary_ths_txt(env):
+    _save_brief_with_secondary(env)
+    result = build_digest(out_dir=env / "digests", emit_ths=True)
+
+    assert Path(result["thsQualitySecPath"]) == env / "ths_import" / "2026-10-09_quality_sec.txt"
+    assert sorted(
+        Path(result["thsQualitySecPath"]).read_text(encoding="utf-8").split()
+    ) == ["600036", "601398"]
+    assert result["thsQualitySecCount"] == 2
+    assert sorted(
+        Path(result["latestThsQualitySecPath"]).read_text(encoding="utf-8").split()
+    ) == ["600036", "601398"]
+
+    assert Path(result["thsShortSecPath"]) == env / "ths_import" / "2026-10-09_short_sec.txt"
+    assert sorted(
+        Path(result["thsShortSecPath"]).read_text(encoding="utf-8").split()
+    ) == ["002392", "600000", "601988"]
+    # 生产榜的 txt 不受影响，三份文件互不覆盖
+    assert (
+        env / "ths_import" / "2026-10-09_short.txt"
+    ).read_text(encoding="utf-8") == "002392\n002227\n"
+
+
+def test_secondary_ths_txt_absent_when_nothing_selected(env):
+    _save_brief(env)  # 无 rankings
+    result = build_digest(out_dir=env / "digests", emit_ths=True)
+    assert "thsQualitySecPath" not in result
+    assert "thsShortSecPath" not in result
+

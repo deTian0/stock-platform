@@ -135,7 +135,9 @@
 
 ### 2.5 同花顺
 
-导入码仍用**生产榜**：长线 = `picks`（10），短线 = `boards.short_term.items`（5）。不用二次精选的 5 只。文件名改用**报告日** `data/ths_import/{reportDay}.txt`、`{reportDay}_short.txt` 以及 `latest.txt` / `latest_short.txt`，不按 session 分线。报告里代码块旁边加一句：「导入码来自生产榜，不是二次精选结果。」手机一次只能导入 5 只，长线块继续按现有每行 5 只折行；本计划不改这个上限。
+导入码仍用**生产榜**：长线 = `picks`（10），短线 = `boards.short_term.items`（5）。文件名改用**报告日** `data/ths_import/{reportDay}.txt`、`{reportDay}_short.txt` 以及 `latest.txt` / `latest_short.txt`，不按 session 分线。报告里代码块旁边加一句：「导入码来自生产榜，不是二次精选结果。」手机一次只能导入 5 只，长线块继续按现有每行 5 只折行；本计划不改这个上限。
+
+> **2026-10-29 增补（ADR [0084](../architecture/0084-secondary-pick-import-blocks.md)）**：二次精选也要能一键导入，故在生产榜两块之外再加 `同花顺导入 · 二次精选（长线|短线）`，对应 `{reportDay}_quality_sec.txt` / `{reportDay}_short_sec.txt`。生产榜的块与 txt 命名不变（ADR 0083 结论保留），②B 段会同时出现两块，按标签区分口径。
 
 ### 2.6 ③B 说明块
 

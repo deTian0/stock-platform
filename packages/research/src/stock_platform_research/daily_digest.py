@@ -421,6 +421,34 @@ def _short_term_codes(record: "BriefRecord | None") -> list[str]:
     return _ths_codes([dict(it) for it in items if isinstance(it, Mapping)])
 
 
+def _secondary_codes(record: "BriefRecord | None", profile: str) -> list[str]:
+    """Bare 6-digit codes of the 二次精选 selection for ``profile``.
+
+    二次精选在 :func:`build_digest_text` 里是**现场重算**的（不入 brief 存档），
+    所以 txt 侧必须用同一个函数、同一份入参再算一次，才能和报告里的代码块逐字一致。
+    ②A 取 quality 榜 ``items``；②B 取 short_term 榜 ``pool``（无 pool 即无二次精选）。
+    """
+    if record is None:
+        return []
+    from .rankings import BOARD_SLUGS, QUALITY_KEY, SHORT_TERM_KEY
+    from .secondary_pick import select_secondary
+
+    boards = ((record.payload or {}).get("rankings") or {}).get("boards") or {}
+    if profile == "quality":
+        board = boards.get(BOARD_SLUGS[QUALITY_KEY]) or {}
+        source = board.get("items") or []
+    else:
+        board = boards.get(BOARD_SLUGS[SHORT_TERM_KEY]) or {}
+        source = board.get("pool")
+        if source is None:
+            return []
+    rows = [dict(it) for it in source if isinstance(it, Mapping)]
+    if not rows:
+        return []
+    picked = select_secondary(rows, profile=profile, top_k=THS_IMPORT_PER_LINE)
+    return _ths_codes(list(picked.get("selected") or []))
+
+
 def _ths_import_section(
     picks: list[Mapping[str, Any]],
     *,
@@ -524,6 +552,8 @@ def _secondary_lines(
     show_quotes: bool,
     quotes: Mapping[str, Mapping[str, Any]] | None,
     prior_closes: Mapping[str, Any] | None,
+    import_label: str | None = None,
+    import_note: str | None = None,
 ) -> list[str]:
     selected = list(result.get("selected") or [])
     rejected = list(result.get("rejected") or [])
@@ -546,6 +576,14 @@ def _secondary_lines(
             )
         )
         lines.append("")
+        # 二次精选自己也要「一键导入」：生产榜的代码块与二次精选取舍口径不同
+        # （②B 尤其如此），只给生产榜的块会让人手动删改。紧贴入选表出一块。
+        if import_label:
+            lines.extend(
+                _ths_import_section(
+                    selected, label=import_label, source_note=import_note
+                )
+            )
     else:
         lines.append("_无入选_")
         lines.append("")
@@ -746,6 +784,11 @@ def _rankings_section(
                     show_quotes=show_quotes,
                     quotes=quotes,
                     prior_closes=prior_closes,
+                    import_label="二次精选（长线）",
+                    import_note=(
+                        "导入码 = 上方②A 二次精选入选（已剔除 ST/地量，"
+                        "与「一、今日 Top10」的生产榜不同）。"
+                    ),
                 )
             )
             continue
@@ -756,13 +799,11 @@ def _rankings_section(
             lines.append(f"## {num}、{label}")
             lines.append("")
             pool = board.get("pool")
-            chosen = list(items)
             if pool is None:
                 lines.append("无候选池，未做二次精选")
                 lines.append("")
             else:
                 picked = select_secondary(list(pool), profile="short", top_k=5)
-                chosen = list(picked.get("selected") or [])
                 lines.extend(
                     _secondary_lines(
                         "②B 短线榜 · 二次精选",
@@ -772,6 +813,10 @@ def _rankings_section(
                         show_quotes=show_quotes,
                         quotes=quotes,
                         prior_closes=prior_closes,
+                        import_label="二次精选（短线）",
+                        import_note=(
+                            "导入码 = 上方②B 二次精选入选（与下方生产榜的短线块不同）。"
+                        ),
                     )
                 )
                 lines.extend(
@@ -786,14 +831,9 @@ def _rankings_section(
                         benchmark_asof_close=benchmark_asof_close,
                     )
                 )
-            if chosen:
-                lines.extend(
-                    _ths_import_section(
-                        chosen,
-                        label="短线",
-                        source_note="导入码 = 上方二次精选入选（与生产榜条目不同）。",
-                    )
-                )
+            # 生产榜的块照 ADR 0083 保留：其内容 = data/ths_import/{reportDay}_short.txt。
+            if items:
+                lines.extend(_ths_import_section(items, label="短线"))
             elif pool is None:
                 lines.append("_空（fail-closed，不生成占位条目）_")
                 lines.append("")
@@ -1282,6 +1322,21 @@ def build_digest(
             result["thsShortPath"] = short_ths["thsPath"]
             result["latestThsShortPath"] = short_ths["latestThsPath"]
             result["thsShortCount"] = short_ths["thsCount"]
+        # 二次精选同样落盘：生产榜与二次精选是两套取舍口径，各存一份才不互相覆盖。
+        for kind, profile, key in (
+            ("_quality_sec", "quality", "QualitySec"),
+            ("_short_sec", "short", "ShortSec"),
+        ):
+            sec = write_ths_import(
+                _secondary_codes(record, profile),
+                day=report_day,
+                out_dir=ths_root,
+                kind=kind,
+            )
+            if sec:
+                result[f"ths{key}Path"] = sec["thsPath"]
+                result[f"latestThs{key}Path"] = sec["latestThsPath"]
+                result[f"ths{key}Count"] = sec["thsCount"]
     return result
 
 
