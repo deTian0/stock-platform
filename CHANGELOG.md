@@ -8,6 +8,23 @@
 
 - （无）
 
+## [4.13.3] - 2026-10-29
+
+### Added
+
+- **二次精选逐榜给出可复制的同花顺导入块**（ADR [0084](docs/architecture/0084-secondary-pick-import-blocks.md)）。此前二次精选只有表格没有代码块：②A 二次精选要人工从表里抄 5 个代码建自选，「一键导入」恰恰漏在取舍得最狠的那一榜上。
+  - 新增块：`同花顺导入 · 二次精选（长线）`（②A 二次精选入选）、`同花顺导入 · 二次精选（短线）`（②B `pool` 二次精选入选）。标签刻意不写成「长线二次精选」—— 否则 `同花顺导入 · 短线` 会成为它的前缀，任何按标签切分的读取方都会撞车。
+  - 新增文件：`data/ths_import/{reportDay}_quality_sec.txt` / `{reportDay}_short_sec.txt` + 对应 `latest_*` 指针；文件名后缀 `_quality_sec` / `_short_sec`，不与既有 `{reportDay}.txt` / `{reportDay}_short.txt` 冲突。
+  - 生成逻辑收敛到 `_secondary_codes(record, profile)`：md 的块与 txt 都走同一个 `select_secondary`、同一份入参（二次精选结果不入 brief 存档，故必须共用函数，否则「块与 txt 一致」只是巧合）。
+  - fail-closed：选不出标的不出块、不落盘；`short_term.pool` 缺失时正文写「无候选池，未做二次精选」。
+
+### Fixed
+
+- **②B 段 md 代码块与 `_short.txt` 内容不一致**（`v4.13.0` 遗留）。`v4.13.0` 起 md 里的「同花顺导入 · 短线」渲染的是**二次精选入选**，而 `data/ths_import/{reportDay}_short.txt` 按 ADR 0083 导出的是 **`short_term.items` 生产榜** —— 同一份报告里，复制一行和打开 txt 拿到两组不同代码，且生产榜那 5 只含 ST / 地量（二次精选才剔）。
+  - 现在「短线」块回到生产榜（= `_short.txt` 内容），二次精选单列一块（= `_short_sec.txt` 内容），四个块与四份 txt 一一对应。
+  - 生产榜与二次精选本就是两套取舍口径，代码可以不同 —— 这是设计，不是 bug。
+- 测试：新增 4 个用例锁死「块与 txt 一一对应」「无 pool 不出块」「两块标签互不为前缀」；`test_digest_labels_both_lines_and_short_gets_a_copy_paste_block` 等原用例全部照旧通过。
+
 ## [4.13.2] - 2026-10-28
 
 ### Changed
