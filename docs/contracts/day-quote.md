@@ -62,16 +62,22 @@
 | 日线（close/volume 序列） | 引擎 `market.db`（只读） | `STOCK_PLATFORM_ENGINE_MARKET_DB` 或 `--market-db` |
 | 开/高/低（主源） | 东财 `kline/get`（经 `em_get`） | `--no-ohlc` 可完全禁用 |
 | 开/高/低（兜底） | 腾讯 `qt.gtimg.cn` → 新浪 `hq.sinajs.cn` | ADR [0085](../architecture/0085-ohlc-multi-source-fallback.md)；东财整体不可达时接管，**只取当日这一根** |
+| 开/高/低（第四源） | westock CLI（WorkBuddy 侧本地二进制） | ADR [0086](../architecture/0086-westock-fourth-source-and-provider.md)；**仅前三源对该批标的全灭时**触发，不补零星缺口 |
 | 开/高/低缓存 | `data/quotes/ohlc-<asof>.json` | 同日复跑零网络；坏缓存视作无缓存 |
 
-兜底源的两条硬约束：
+兜底链的四条硬约束：
 
 1. **只接受 `trade_date == 报价日` 的行**。厂商收盘后仍会返回上一交易日的完整
    K 线，日期不符一律丢弃 —— 拿旧收盘冒充当日收盘会让「涨跌」恒等于 0。
 2. **`open <= 0` 或 `close <= 0` 整行丢弃**（停牌），绝不补零。
+3. **第四源按「颗粒无收」触发**，不是按「有缺口」触发：它能救「四源里只剩它」，
+   但不负责补腾讯/新浪的零星缺失。
+4. westock 的表格按**列名**寻址，绝不按位置 —— `quote` 的列顺序在不同调用之间
+   并不稳定。
 
 换源会在 `ohlc.degraded` 留痕；只有东财**整体不可达**时才写
 `东财不可达（…），N/M 只改用腾讯/新浪当日快照`，部分缺口则由东财填的部分静默。
+第四源补位时追加 `N/M 只改用 westock CLI 当日快照`。
 
 `ohlc` 段：`requested` / `filled` / `source`（`none|cache|provider|cache+provider`）/
 `missing[]` / `degraded`（降级原因，非空即在报告顶部提示）。快照补齐的行同样写入

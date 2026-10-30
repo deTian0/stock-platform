@@ -8,6 +8,24 @@
 
 - （无）
 
+## [4.13.6] - 2026-10-30
+
+### Added
+
+- **第四源 westock CLI + 可选 provider（WorkBuddy 侧数据源正式接入）**。`v4.13.5` 的多源链假设「东财 / 腾讯 / 新浪互相独立」，2026-10-30 盘后这个假设被打破：东财 `CircuitOpenError` 的同时腾讯、新浪也返回空 —— 故障在本机出口层，再加源是空转。WorkBuddy 侧有一条完全不同的链路：`westock` CLI（Go 二进制，`stockbuddy.qq.com` 分发 + SHA256 清单校验，装到 `~/.local/bin`）是**本地进程**，云侧后端独立。
+  - **新增 `stock_platform_providers.westock`**：`fetch_day_snapshot(symbols, day)` 与 `snapshot.fetch_day_snapshot` 同签名可互换（`(rows, note)`，永不抛出）；`WestockProvider.get_daily / get_realtime` 供能力矩阵路由；自带 `parse_md_table` / `parse_quote_rows` / `parse_kline_rows` 纯函数解析器。二进制解析顺序 `STOCK_PLATFORM_WESTOCK_BIN` → `~/.local/bin/westock[.exe]` → `which`。
+  - **P0 接线**：`day_quote_cli._fetch_ohlc` 在快照之后加第四源 `_westock_fill`，**仅当东财/腾讯/新浪对该批标的颗粒无收时**触发（按约定不补零星缺口）。`quotes.load_ohlc`、`A6` 行情台账、盘后简报自动获得兜底。
+  - **P1 矩阵**：`capabilities` 增加 `westock` 声明（`daily` + `realtime`）；`presets` 增加 `cn_westock` 预设。**生产默认仍是 `cn_astock_http`**，`liveTradingEnabled` 恒 false。
+  - **复权口径锁死 qfq**：实测 `--fq bfq` **服务端直接报错**（`code=1620053001`，帮助文本写错）；省略 `--fq` 等价于 `qfq`；与引擎库 `close` 比对 **qfq 0/120 不一致、hfq 120/120 不一致** ⇒ 引擎库是前复权序列，`get_daily` 显式传 `--fq qfq`。
+  - **两条硬约束**：按**列名**寻址（`quote` 列顺序在不同调用间不稳定，按位置必错位）；只接受 `time == 报价日`、`open/close <= 0` 整行丢弃。
+  - **文档**：新增 ADR [`0086`](docs/architecture/0086-westock-fourth-source-and-provider.md)；契约 [`day-quote`](docs/contracts/day-quote.md) §5 改四源链并补两条约束；`scripts/check_docs.ps1` 补登记 `0086`。
+  - **测试**：`packages/providers/tests/test_westock.py` 24 例（表格解析、列序打乱、跨日拒收、停牌丢弃、单/多代码 kline 身份回退、批量分片、provider 映射、`asof_ts` 北京时间定点、`pre_close` 回填、二进制缺失 fail-closed、CLI 错误外露）；`test_quotes.py` 新增 4 例并给 autouse fixture 加桩 `_westock_fill`（单测绝不 shell 出去）。全量 **1351 passed**。
+  - **真机验证**：`quote` 60 只/次、**300/300 覆盖**、1.9–4.8 s/批、15:30 即取到当日完整 OHLC；四源降级演练（强制前三源全失败）6/6 补齐并留痕 `…；6/6 只改用 westock CLI 当日快照`；provider 真实路径 5 只 × 8 日 = 40 行与引擎库 `close` **0 不一致**。收口前实跑 `day_quote --asof 2026-10-29`（当时东财断路器**正处于打开状态**、腾讯/新浪亦全失败）：**12/13 只由 westock 补齐**，`degraded` 完整留痕。
+  - **顺带修掉一处留痕被吞**：`部分缺失` 那段原先用**未截断的原始错误**，把 300 字预算吃光、正好把换源留痕截掉；改为 `_brief_err(last_err)`，并补 1 例锁死「长错误不得挤掉『谁救的』」。
+  - **新发现（既有缺陷，本次未修）**：`exchange_prefix("588080")` 返回 `sz`（规则漏了 `5` 开头的沪市基金），`em_secid` 得 `0.588080` —— 沪市 ETF 在东财/腾讯/新浪/westock **四源一律取不到**（实测 `westock quote sh588080` 有数据、`sz588080` 报「未找到行情数据」）。上条冒烟的唯一缺口 588080 就是这个原因。修它需动共享权威并补前缀测试，另立版本。
+  - **遗留**：Markdown 表格是脆弱契约（无 `--json`）；全市场 `get_daily` 需 261 次调用，定位是小批量补当日/校验，不替代 `engine_sqlite` 历史回补；`000905` 基准口径缺陷**未动**（`sh000905` 才是中证500，`exchange_prefix` 推出 `sz000905` 即厦门港务，与既有行为一致，另立里程碑）。
+  - **与既有 `workbuddy_bridge` 的分工**：后者（`v4.1.8`）是**缓存写入器**（批量刷新 → `daily_{code}.json`，供 `WorkbuddyProvider` 只读消费），本次新增的是**运行时适配器**（内存行、零落盘）。`providers` 不能 import `research`，故 provider 侧必须自带最小适配器；两者的边界与代价已写入 ADR §7，未做合并（属独立重构）。
+
 ## [4.13.5] - 2026-10-30
 
 ### Fixed

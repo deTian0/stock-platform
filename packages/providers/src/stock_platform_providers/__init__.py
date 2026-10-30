@@ -77,6 +77,13 @@ from .workbuddy import (
     write_realtime_cache,
 )
 from .tdx import ENV_TDX_ROOT, TdxProvider, parse_day_file, resolve_tdx_root
+from .westock import (
+    ENV_WESTOCK_BIN,
+    ENV_WESTOCK_TIMEOUT,
+    WestockProvider,
+    fetch_day_snapshot as fetch_westock_snapshot,
+    resolve_westock_bin,
+)
 from .futu import (
     DEFAULT_FUTU_HOST,
     DEFAULT_FUTU_PORT,
@@ -101,6 +108,8 @@ __all__ = [
     "ENV_FUTU_PORT",
     "ENV_TDX_ROOT",
     "ENV_WORKBUDDY_CACHE_DIR",
+    "ENV_WESTOCK_BIN",
+    "ENV_WESTOCK_TIMEOUT",
     "EastmoneyClient",
     "EngineSqliteProvider",
     "MarketDbBulkProvider",
@@ -124,11 +133,13 @@ __all__ = [
     "TushareHttpError",
     "TushareHttpProvider",
     "WorkbuddyProvider",
+    "WestockProvider",
     "build_capability_matrix",
     "em_board_secid",
     "em_get",
     "em_secid",
     "from_ts_code",
+    "fetch_westock_snapshot",
     "http_trust_env",
     "is_transient_http_error",
     "DEFAULT_STARTUP_PRESET",
@@ -155,6 +166,7 @@ __all__ = [
     "resolve_engine_market_db",
     "resolve_tdx_root",
     "resolve_tushare_token",
+    "resolve_westock_bin",
     "resolve_workbuddy_cache_dir",
     "to_ts_code",
     "parse_day_file",
@@ -162,4 +174,4 @@ __all__ = [
     "write_realtime_cache",
 ]
 
-__version__ = "4.13.5"
+__version__ = "4.13.6"

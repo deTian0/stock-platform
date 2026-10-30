@@ -12,10 +12,11 @@ Examples::
 * **开盘/最高/最低** ← 外部日线（引擎 ``daily_price`` 无这三列），落缓存
   ``data/quotes/ohlc-<asof>.json`` 保证**同日复跑零网络且结果一致**；
   取不到就降级为 ``—``，绝不补零。
-* **外部日线的三源链** ← 东财 ``kline/get``（主源，含完整历史）→ 腾讯
-  ``qt.gtimg.cn`` → 新浪 ``hq.sinajs.cn``（后两者是批量快照，只取**当日**这一根）。
-  单源时代东财一挂整列全空（2026-10-29、2026-10-30 连发两次），故多留一条命；
-  快照同样只认 ``trade_date == 当日``，绝不拿旧数据冒充。
+* **外部日线的四源链** ← 东财 ``kline/get``（主源，含完整历史）→ 腾讯
+  ``qt.gtimg.cn`` → 新浪 ``hq.sinajs.cn``（这两个是批量快照，只取**当日**这一根）
+  → westock CLI（WorkBuddy 侧本地二进制，前三源颗粒无收时兜底）。
+  单源时代东财一挂整列全空（2026-10-29、2026-10-30 连发两次），故多留命；
+  快照与 westock 同样只认 ``trade_date == 当日``，绝不拿旧数据冒充。
 """
 
 from __future__ import annotations
@@ -112,6 +113,20 @@ def _snapshot_fill(
     return fetch_day_snapshot(list(symbols), asof)
 
 
+def _westock_fill(
+    symbols: list[str], asof: str
+) -> tuple[dict[str, dict[str, Any]], str | None]:
+    """第四源兜底：WorkBuddy 侧 ``westock`` 本地 CLI（前三源全灭时才走到这里）。
+
+    懒导入同上。CLI 是**本地可执行文件**（不是 HTTP 端点），因此能被定时流水线
+    的 python 子进程直接调用 —— 这是它与 ``neodata``（必须 Agent 在线换 token）
+    的根本差别。契约与 ``fetch_day_snapshot`` 一致：``(rows, note)``，绝不抛。
+    """
+    from stock_platform_providers.westock import fetch_day_snapshot
+
+    return fetch_day_snapshot(list(symbols), asof)
+
+
 def _brief_err(err: str | None, limit: int = 60) -> str:
     """错误摘要：只留首行并截断 —— CircuitOpenError 的原话能写满一整屏。"""
     text = str(err or "无数据").strip().splitlines()[0]
@@ -134,6 +149,10 @@ def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]
        不可达**时（2026-10-30 实测：``CircuitOpenError``，三次重试全灭）必须换源 ——
        腾讯 ``qt.gtimg.cn`` / 新浪 ``hq.sinajs.cn`` 的批量快照带当日开/高/低/收，
        且与东财互相独立。快照只接受 ``trade_date == 当日`` 的行。
+    4. **第四源 westock CLI**（``_westock_fill``）：2026-10-30 再次实测，东财整批
+       不可达时腾讯/新浪也同时不可用（同机网络出口问题），前三源全灭。WorkBuddy 侧
+       的 ``westock`` 是**本地 Go 二进制**，走另一条链路，故留作最后一命；仅在前三源
+       **颗粒无收**时触发，不负责补零星缺口。
     """
     day = date.fromisoformat(str(asof)[:10])
     start = day - timedelta(days=10)
@@ -180,6 +199,7 @@ def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]
 
     # 第二源：东财不可达 / 仍有缺口时改走腾讯 → 新浪当日快照。
     snap_note: str | None = None
+    snapped: dict[str, dict[str, Any]] = {}
     if pending:
         before = len(pending)
         try:
@@ -202,14 +222,34 @@ def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]
                 f"腾讯/新浪快照亦不可用（{_brief_err(_snap_err)}）"
             )
 
+    # 第四源：东财 / 腾讯 / 新浪三家对这批标的全军覆没时，最后走 westock CLI。
+    # 只在「快照颗粒无收」时触发 —— 按约定它不负责补前三源的零星缺口。
+    ws_note: str | None = None
+    if pending and not snapped:
+        ws_before = len(pending)
+        try:
+            ws_rows, _ws_err = _westock_fill(pending, asof)
+        except Exception as exc:  # noqa: BLE001 — 兜底源同样只降级
+            ws_rows, _ws_err = {}, f"{type(exc).__name__}: {exc}"
+        for sym, bar in (ws_rows or {}).items():
+            by_symbol.setdefault(str(sym).split(".")[0].zfill(6), bar)
+        pending = [s for s in pending if s.split(".")[0].zfill(6) not in by_symbol]
+        ws_note = (
+            f"{ws_before - len(pending)}/{ws_before} 只改用 westock CLI 当日快照"
+            if ws_rows
+            else f"westock 快照亦不可用（{_brief_err(_ws_err)}）"
+        )
+
+    note_all = "；".join(n for n in (snap_note, ws_note) if n) or None
+
     if not by_symbol:
-        return {}, (snap_note or f"全部失败（{last_err or '无数据返回'}）")[:300]
+        return {}, (note_all or f"全部失败（{last_err or '无数据返回'}）")[:300]
     if pending:
-        parts = [f"部分缺失（缺 {len(pending)}/{total} 只；最后错误 {last_err}）"]
-        if snap_note:
-            parts.append(snap_note)
+        parts = [f"部分缺失（缺 {len(pending)}/{total} 只；最后错误 {_brief_err(last_err)}）"]
+        if note_all:
+            parts.append(note_all)
         return by_symbol, "；".join(parts)[:300]
-    return by_symbol, (snap_note[:300] if snap_note else None)
+    return by_symbol, (note_all[:300] if note_all else None)
 
 
 def main(argv: list[str] | None = None) -> int:

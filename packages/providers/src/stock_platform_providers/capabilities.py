@@ -235,6 +235,24 @@ def register_builtin_providers(registry: ProviderRegistry | None = None) -> None
             ),
         )
     )
+    reg.register(
+        ProviderDeclaration(
+            name="westock",
+            display="WeStock CLI (WorkBuddy 侧本地二进制)",
+            kind="builtin",
+            datasets=frozenset({"daily", "realtime"}),
+            available=True,
+            status="ok",
+            note=(
+                "CN daily/realtime via the local `westock` CLI (Markdown tables, no "
+                "--json); binary from STOCK_PLATFORM_WESTOCK_BIN or ~/.local/bin. "
+                "daily uses `kline --fq qfq` — the only adjustment that matches the "
+                "engine market.db (verified 0/120 mismatch; hfq 120/120). "
+                "Not the production default; apply cn_westock. "
+                "neodata is NOT available here: it needs an agent-side cloud token."
+            ),
+        )
+    )
 
 
 def build_capability_matrix(

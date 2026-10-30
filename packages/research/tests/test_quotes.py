@@ -14,10 +14,11 @@ from stock_platform_research.quotes import load_ohlc, resolve_prev_close, resolv
 
 @pytest.fixture(autouse=True)
 def _no_network_snapshot(monkeypatch):
-    """`_fetch_ohlc` 的第二源兜底默认打桩：单测绝不联网。"""
+    """`_fetch_ohlc` 的兜底源默认打桩：单测绝不联网、也绝不 shell 出去。"""
     from stock_platform_research import day_quote_cli as dq
 
     monkeypatch.setattr(dq, "_snapshot_fill", lambda symbols, asof: ({}, "stub 快照不可用"))
+    monkeypatch.setattr(dq, "_westock_fill", lambda symbols, asof: ({}, "stub westock 不可用"))
 
 
 def test_cache_hit_does_not_fetch(tmp_path: Path):
@@ -199,6 +200,102 @@ def test_fetch_ohlc_snapshot_exception_does_not_escape(monkeypatch):
     rows, err = dq._fetch_ohlc(["600000"], "2026-10-30")
     assert rows == {}
     assert err and "snap boom" in err
+
+
+def test_fetch_ohlc_falls_back_to_westock_when_all_three_sources_fail(monkeypatch):
+    """东财 + 腾讯 + 新浪全灭时，第四源 westock CLI 必须接手，三列不能全空。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    monkeypatch.setattr(
+        dq, "_fetch_ohlc_chunk", lambda s, a, b: (_ for _ in ()).throw(ConnectionError("em dead"))
+    )
+    monkeypatch.setattr(dq, "_snapshot_fill", lambda symbols, asof: ({}, "腾讯/新浪全灭"))
+    monkeypatch.setattr(
+        dq,
+        "_westock_fill",
+        lambda symbols, asof: (
+            {s: {"open": 3.0, "high": 4.0, "low": 2.5, "close": 3.5} for s in symbols},
+            None,
+        ),
+    )
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, err = dq._fetch_ohlc(["600000", "600001"], "2026-10-30")
+    assert set(rows) == {"600000", "600001"}
+    assert rows["600000"]["close"] == 3.5
+    assert err and "westock" in err  # 换源必须留痕
+
+
+def test_fetch_ohlc_skips_westock_when_snapshot_already_filled(monkeypatch):
+    """westock 只在「前三源颗粒无收」时触发，不负责补零星缺口。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    called: list[list[str]] = []
+    monkeypatch.setattr(
+        dq, "_fetch_ohlc_chunk", lambda s, a, b: (_ for _ in ()).throw(ConnectionError("em dead"))
+    )
+    monkeypatch.setattr(
+        dq,
+        "_snapshot_fill",
+        lambda symbols, asof: (
+            {s: {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5} for s in symbols},
+            None,
+        ),
+    )
+
+    def _ws(symbols, asof):
+        called.append(list(symbols))
+        return {}, "should not be used"
+
+    monkeypatch.setattr(dq, "_westock_fill", _ws)
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, _ = dq._fetch_ohlc(["600000"], "2026-10-30")
+    assert rows["600000"]["close"] == 1.5
+    assert called == []
+
+
+def test_fetch_ohlc_westock_exception_does_not_escape(monkeypatch):
+    from stock_platform_research import day_quote_cli as dq
+
+    monkeypatch.setattr(
+        dq, "_fetch_ohlc_chunk", lambda s, a, b: (_ for _ in ()).throw(ConnectionError("x"))
+    )
+    monkeypatch.setattr(dq, "_snapshot_fill", lambda symbols, asof: ({}, "down"))
+    monkeypatch.setattr(
+        dq, "_westock_fill", lambda symbols, asof: (_ for _ in ()).throw(RuntimeError("ws boom"))
+    )
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, err = dq._fetch_ohlc(["600000"], "2026-10-30")
+    assert rows == {}
+    assert err and "ws boom" in err
+
+
+def test_fetch_ohlc_error_note_survives_truncation(monkeypatch):
+    """300 字预算内必须保住「谁救的」；东财长错误不能把它挤掉。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    long_err = "CircuitOpenError: eastmoney circuit open until 1793350578.575 " + "x" * 400
+
+    def _dead(symbols, start, end):
+        raise ConnectionError(long_err)
+
+    monkeypatch.setattr(dq, "_fetch_ohlc_chunk", _dead)
+    monkeypatch.setattr(dq, "_snapshot_fill", lambda s, a: ({}, "腾讯/新浪快照全部失败"))
+    monkeypatch.setattr(
+        dq,
+        "_westock_fill",
+        lambda s, a: (
+            {x: {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5} for x in s},
+            None,
+        ),
+    )
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, err = dq._fetch_ohlc(["600000", "600001"], "2026-10-30")
+    assert set(rows) == {"600000", "600001"}
+    assert err and "westock" in err, f"换源留痕被截断掉了：{err!r}"
 
 
 def test_snapshot_rows_land_in_cache_so_rerun_is_zero_network(tmp_path: Path, monkeypatch):

@@ -131,6 +131,21 @@ PREFERENCE_PRESETS: dict[str, dict[str, Any]] = {
             "requires futu-api + running OpenD. Other caps stay replay."
         ),
     },
+    "cn_westock": {
+        "id": "cn_westock",
+        "label": "CN daily/realtime via WeStock CLI (WorkBuddy 侧)",
+        "is_default": False,
+        "preferences": {
+            **_REPLAY_PREFS,
+            "daily": "westock",
+            "realtime": "westock",
+        },
+        "note": (
+            "daily/realtime → westock (local CLI; STOCK_PLATFORM_WESTOCK_BIN or "
+            "~/.local/bin). daily = kline --fq qfq, the only mode matching the "
+            "engine market.db. Other caps stay replay. Not the production default."
+        ),
+    },
 }
 
 
@@ -146,6 +161,7 @@ def list_preference_presets() -> list[dict[str, Any]]:
             "workbuddy",
             "cn_tdx",
             "cn_futu",
+            "cn_westock",
         )
     ]
 
