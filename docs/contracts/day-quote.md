@@ -60,11 +60,22 @@
 | 数据 | 来源 | 备注 |
 |---|---|---|
 | 日线（close/volume 序列） | 引擎 `market.db`（只读） | `STOCK_PLATFORM_ENGINE_MARKET_DB` 或 `--market-db` |
-| 开/高/低 | 东财 `kline/get`（经 `em_get`） | `--no-ohlc` 可完全禁用 |
+| 开/高/低（主源） | 东财 `kline/get`（经 `em_get`） | `--no-ohlc` 可完全禁用 |
+| 开/高/低（兜底） | 腾讯 `qt.gtimg.cn` → 新浪 `hq.sinajs.cn` | ADR [0085](../architecture/0085-ohlc-multi-source-fallback.md)；东财整体不可达时接管，**只取当日这一根** |
 | 开/高/低缓存 | `data/quotes/ohlc-<asof>.json` | 同日复跑零网络；坏缓存视作无缓存 |
 
+兜底源的两条硬约束：
+
+1. **只接受 `trade_date == 报价日` 的行**。厂商收盘后仍会返回上一交易日的完整
+   K 线，日期不符一律丢弃 —— 拿旧收盘冒充当日收盘会让「涨跌」恒等于 0。
+2. **`open <= 0` 或 `close <= 0` 整行丢弃**（停牌），绝不补零。
+
+换源会在 `ohlc.degraded` 留痕；只有东财**整体不可达**时才写
+`东财不可达（…），N/M 只改用腾讯/新浪当日快照`，部分缺口则由东财填的部分静默。
+
 `ohlc` 段：`requested` / `filled` / `source`（`none|cache|provider|cache+provider`）/
-`missing[]` / `degraded`（降级原因，非空即在报告顶部提示）。
+`missing[]` / `degraded`（降级原因，非空即在报告顶部提示）。快照补齐的行同样写入
+缓存，`source` 仍记 `provider`。
 
 ## 6. 已知缺陷（硬约定）
 
