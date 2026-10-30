@@ -317,7 +317,11 @@ def _summary_line(
     ]
     label = quote_date or _DASH
     if not pcts:
-        return [f"> {label} 无可计算涨跌。基准不可用", ""]
+        return [
+            f"> {label} 行情缺失，无可计算涨跌"
+            "（外部日线源不可用且引擎库无该日 K 线；见顶部「数据备注」）",
+            "",
+        ]
     avg = sum(pcts) / len(pcts)
     bench_prev = _prev_for(
         _BENCHMARK,
@@ -1220,6 +1224,7 @@ def build_digest(
                 cache_dir=cache,
                 allow_network=True,
                 fetch=fetch_ohlc,
+                selection_asof=record.asof,
             )
             if err:
                 notes.append(err)

@@ -1,8 +1,14 @@
 """Run-date quotes for the digest. Network stays inside functions.
 
-Close on the quote date comes only from the external daily bar
+Close on the quote date comes from the external daily bar
 (``day_quote_cli._fetch_ohlc`` → ``AStockHttpProvider`` / ``em_get``).
-This module does not treat the engine's last bar as today's close.
+
+One guarded exception: when the external source is down **and** the quote date
+is strictly later than the brief's ``asof`` (i.e. a session that has already
+settled and been backfilled into ``market.db``), the engine close is used as a
+degraded fallback so 收盘/涨跌 stay computable and 开盘 is simply absent. The
+engine bar is never substituted for a same-day quote (``quote_date == asof``),
+and it is never written into the external OHLC cache.
 """
 
 from __future__ import annotations
@@ -84,11 +90,18 @@ def load_ohlc(
     cache_dir: str | Path,
     allow_network: bool = True,
     fetch: Callable[[list[str], str], tuple[dict[str, Any], str | None]] | None = None,
+    selection_asof: str | None = None,
 ) -> tuple[dict[str, dict[str, Any]], str | None]:
     """Read ``ohlc-<quote_date>.json``, fill gaps, write the same three-key shape.
 
     ``_fetch_ohlc`` does not touch the cache; this function does.
     A source failure with an empty cache returns ``{}`` and does not raise.
+
+    When ``selection_asof`` is given and ``quote_date`` is **later** than it,
+    symbols still missing after the external attempt get an engine-close
+    fallback (:func:`load_engine_closes`) so the return/涨跌 column is never
+    blank just because the HTTP source blinked. Those rows are not cached:
+    the cache keeps the external (open-bearing) truth only.
     """
     from .day_quote_cli import _cache_path, _fetch_ohlc, _read_cache
 
@@ -123,6 +136,23 @@ def load_ohlc(
             root.mkdir(parents=True, exist_ok=True)
             payload = {"asof": day, "rows": merged, "count": len(merged)}
             path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if selection_asof:
+        gap = [key for key in wanted if key not in merged]
+        try:
+            later = date.fromisoformat(day) > date.fromisoformat(str(selection_asof)[:10])
+        except ValueError:
+            later = False
+        if gap and later:
+            falls_back = load_engine_closes(gap, day)
+            for key, close in falls_back.items():
+                merged[key] = {"close": close}
+                have[key] = merged[key]
+            if falls_back:
+                extra = (
+                    f"开盘/最高/最低不可得（外部源缺失）；"
+                    f"{len(falls_back)}/{len(gap)} 只用引擎库收盘兜底，涨跌按该收盘自算"
+                )
+                note = f"{note}；{extra}" if note else extra
     if not have and note:
         return {}, note
     if not have and missing and allow_network and note is None:
@@ -137,6 +167,12 @@ def load_prior_closes(
     market_db: str | None = None,
 ) -> dict[str, float]:
     """Engine close on the trading day before ``asof``. Empty on any failure."""
+    try:
+        from .dotenv import load_dotenv
+
+        load_dotenv()  # 进程未加载 .env 时 resolve_engine_market_db() 返回 None
+    except Exception:  # noqa: BLE001
+        pass
     try:
         from datetime import timedelta
 
@@ -172,7 +208,47 @@ def load_prior_closes(
     return out
 
 
+def load_engine_closes(
+    symbols: list[str],
+    day: str,
+    *,
+    market_db: str | None = None,
+) -> dict[str, float]:
+    """Engine ``market.db`` close for the single session ``day``.
+
+    Only meaningful for a session that has already been backfilled; callers must
+    gate on ``quote_date > asof`` before trusting it. Empty on any failure.
+    """
+    try:
+        from stock_platform_providers import EngineSqliteProvider, resolve_engine_market_db
+    except Exception:  # noqa: BLE001 — optional dependency surface
+        return {}
+    try:
+        path = market_db or resolve_engine_market_db()
+        if path is None or not Path(path).is_file():
+            return {}
+        target = date.fromisoformat(str(day)[:10])
+        provider = EngineSqliteProvider(path)
+        bars = list(provider.get_daily(list(symbols), start=target, end=target) or [])
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict[str, float] = {}
+    for bar in bars:
+        if str(bar.get("date") or "")[:10] != target.isoformat():
+            continue
+        key = _sym6(bar.get("symbol"))
+        close = bar.get("close")
+        if not key or close is None:
+            continue
+        try:
+            out[key] = float(close)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 __all__ = [
+    "load_engine_closes",
     "load_ohlc",
     "load_prior_closes",
     "resolve_prev_close",

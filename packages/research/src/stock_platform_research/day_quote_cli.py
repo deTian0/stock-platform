@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -82,29 +83,77 @@ def _read_cache(path: Path) -> dict[str, dict[str, Any]]:
     return {str(k): dict(v) for k, v in rows.items() if isinstance(v, dict)}
 
 
+CHUNK_SIZE = 30
+CHUNK_ATTEMPTS = 2
+CHUNK_PAUSE_SEC = 0.8
+FETCH_PASSES = 3  # get_daily 对单只瞬时错误是静默跳过，需逐轮补齐
+FETCH_PASSES = 3  # get_daily 对单只瞬时错误是静默跳过，需逐轮补齐
+
+
+def _fetch_ohlc_chunk(symbols: list[str], start: date, end: date) -> list[dict[str, Any]]:
+    """One chunk through a **fresh** provider (fresh circuit breaker)."""
+    from stock_platform_providers.astock_http import AStockHttpProvider
+
+    return list(AStockHttpProvider().get_daily(symbols, start=start, end=end) or [])
+
+
 def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]], str | None]:
-    """外部日线补开/高/低。返回 ``(rows, error)``；任何异常都只降级、不抛出。"""
-    try:
-        from stock_platform_providers.astock_http import AStockHttpProvider
+    """外部日线补开/高/低。返回 ``(rows, error)``；任何异常都只降级、不抛出。
 
-        provider = AStockHttpProvider()
-        start = date.fromisoformat(asof) - timedelta(days=10)
-        end = date.fromisoformat(asof)
-        bars = provider.get_daily(symbols, start=start, end=end) or []
-    except Exception as exc:  # noqa: BLE001 — 外部源不可用不应拖垮台账
-        return {}, f"{type(exc).__name__}: {exc}"[:300]
+    两层韧性 —— 2026-10-29 盘后实测：东财 ``RemoteDisconnected`` → 断路器打开 →
+    70+ 只**整批全灭** → 简报「开盘/收盘/涨跌」三列全空。
 
+    1. **分批**（``CHUNK_SIZE``）：``AStockHttpProvider.get_daily`` 碰上断路器是整体
+       抛出，一次调用全部符号会把已拿到的数据一起丢掉。分批后单批失败只损失该批，
+       并换一个新建 provider（断路器是实例级的）重试一次。
+    2. **逐轮补齐**（``FETCH_PASSES``）：``get_daily`` 对**单只**的瞬时错误是
+       **静默跳过**（只塞进 ``symbol_errors``，不抛异常），所以一次调用常常「调用成功
+       但少回几只」。对仍然缺的代码再跑下一轮，直到补齐或轮次用尽。
+    """
+    day = date.fromisoformat(str(asof)[:10])
+    start = day - timedelta(days=10)
     by_symbol: dict[str, dict[str, Any]] = {}
-    for bar in bars:
-        sym = str(bar.get("symbol") or "").split(".")[0].zfill(6)
-        if str(bar.get("date") or "")[:10] != asof:
-            continue
-        by_symbol[sym] = {
-            "open": bar.get("open"),
-            "high": bar.get("high"),
-            "low": bar.get("low"),
-            "close": bar.get("close"),
-        }
+    pending = [s for s in dict.fromkeys(str(s) for s in symbols) if s]
+    total = len(pending)
+    last_err: str | None = None
+    for pass_no in range(1, FETCH_PASSES + 1):
+        if not pending:
+            break
+        for offset in range(0, len(pending), CHUNK_SIZE):
+            chunk = pending[offset : offset + CHUNK_SIZE]
+            bars: list[dict[str, Any]] | None = None
+            for attempt in range(1, CHUNK_ATTEMPTS + 1):
+                try:
+                    bars = _fetch_ohlc_chunk(chunk, start, day)
+                    break
+                except Exception as exc:  # noqa: BLE001 — 单批失败只降级
+                    last_err = f"{type(exc).__name__}: {exc}"[:200]
+                    bars = None
+                    if attempt < CHUNK_ATTEMPTS:
+                        time.sleep(CHUNK_PAUSE_SEC * attempt)
+            if bars is None:
+                continue
+            for bar in bars:
+                sym = str(bar.get("symbol") or "").split(".")[0].zfill(6)
+                if str(bar.get("date") or "")[:10] != day.isoformat():
+                    continue
+                by_symbol[sym] = {
+                    "open": bar.get("open"),
+                    "high": bar.get("high"),
+                    "low": bar.get("low"),
+                    "close": bar.get("close"),
+                }
+        pending = [
+            s for s in pending if s.split(".")[0].zfill(6) not in by_symbol
+        ]
+        if pending and pass_no < FETCH_PASSES:
+            time.sleep(CHUNK_PAUSE_SEC * pass_no)
+    if not by_symbol:
+        return {}, f"全部失败（{last_err or '无数据返回'}）"[:300]
+    if pending:
+        return by_symbol, (
+            f"部分缺失（缺 {len(pending)}/{total} 只；最后错误 {last_err}）"[:300]
+        )
     return by_symbol, None
 
 
