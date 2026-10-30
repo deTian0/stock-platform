@@ -8,6 +8,19 @@
 
 - （无）
 
+## [4.13.5] - 2026-10-30
+
+### Fixed
+
+- **盘后「开盘(T) / 收盘(T) / 涨跌(T)」三列再次整列为空**（`2026-10-30` 盘后实测，`v4.13.4` 修复后次日复发）。`v4.13.4` 加固的是「东财偶尔少回几只」，而这次是东财**整体不可达**：`CircuitOpenError: eastmoney circuit open`，分批 + 换断路器实例重试 + `FETCH_PASSES=3` 全部落空；`market.db` 当日 K 线要等 18:30 回补、且 `daily_price` 本身没有 open/high/low —— 三条路同时失效，三列又全变 `—`。
+  - **新增第二、第三数据源**：`stock_platform_providers.snapshot` 提供 `fetch_day_snapshot` + `parse_tencent_snapshot` / `parse_sina_snapshot`，走腾讯 `qt.gtimg.cn` → 新浪 `hq.sinajs.cn` 的批量快照（50 只/请求，GBK 文本，纯函数解析可单测）。两源与东财互相独立，任一生效即可补齐当日开/高/低/收。
+  - **接线点只有一处**：`day_quote_cli._fetch_ohlc` 在东财轮次结束后把缺口交给快照（`setdefault` 语义，东财已有的行绝不覆盖）。`quotes.load_ohlc`、`A6` 行情台账、盘后简报因此自动获得兜底。
+  - **两条硬约束**：快照只接受 `trade_date == 报价日` 的行（厂商收盘后仍会返回上一交易日完整 K 线，否则「涨跌」恒为 0）；`open/close <= 0`（停牌）整行丢弃，绝不补零。
+  - **换源留痕**：东财整体不可达时「数据备注」写明 `东财不可达（…），N/M 只改用腾讯/新浪当日快照`；错误摘要只取首行截断 60 字（`CircuitOpenError` 原话能写满一屏）。快照行照旧入 `data/quotes/ohlc-<date>.json`，同日复跑零网络。
+  - **文档**：新增 ADR [`0085`](docs/architecture/0085-ohlc-multi-source-fallback.md)；契约 [`day-quote`](docs/contracts/day-quote.md) §5 补三源链与两条硬约束；`scripts/check_docs.ps1` 的 `$required` 补登记 ADR `0084`（`v4.13.3` 遗漏）与 `0085`。
+  - **测试**：`packages/providers/tests/test_snapshot.py` 新增 16 例（真实 payload 解析、跨日拒收、停牌丢弃、北交所前缀、源降级顺序、部分合并、全失败不抛、四板前缀参数化）；`test_quotes.py` 新增 4 例并改写 1 例，另加 autouse fixture 打桩 `_snapshot_fill`（单测绝不联网）。全量 **1322 passed**。
+  - **真机验证**：15:38 东财仍 `all daily fetches failed`、腾讯/新浪均返回 `600854 open 4.21 / high 4.33 / low 4.15 / close 4.18` 且两源一致；重渲染 `data/digests/2026-10-30-post.md`，Top10 / ②A / ②B 三张表 **21/21 全部有值**。
+
 ## [4.13.4] - 2026-10-30
 
 ### Fixed

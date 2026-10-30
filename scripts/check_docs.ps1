@@ -100,6 +100,8 @@ $required = @(
   'docs/architecture/0079-settle-after-on-premarket.md',
   'docs/architecture/0082-day-quote-attribution.md',
   'docs/architecture/0083-digest-pre-post-and-secondary-pick.md',
+  'docs/architecture/0084-secondary-pick-import-blocks.md',
+  'docs/architecture/0085-ohlc-multi-source-fallback.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

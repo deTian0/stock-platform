@@ -6,8 +6,18 @@ import json
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 import stock_platform_research.quotes as quotes
 from stock_platform_research.quotes import load_ohlc, resolve_prev_close, resolve_quote_date
+
+
+@pytest.fixture(autouse=True)
+def _no_network_snapshot(monkeypatch):
+    """`_fetch_ohlc` 的第二源兜底默认打桩：单测绝不联网。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    monkeypatch.setattr(dq, "_snapshot_fill", lambda symbols, asof: ({}, "stub 快照不可用"))
 
 
 def test_cache_hit_does_not_fetch(tmp_path: Path):
@@ -123,7 +133,97 @@ def test_fetch_ohlc_reports_total_failure(monkeypatch):
 
     rows, err = dq._fetch_ohlc(["600000"], "2026-10-29")
     assert rows == {}
-    assert err and "全部失败" in err
+    assert err and "东财不可达" in err and "快照亦不可用" in err
+
+
+def test_fetch_ohlc_falls_back_to_snapshot_when_eastmoney_is_dead(monkeypatch):
+    """东财整体不可达（CircuitOpenError）时，必须换腾讯/新浪快照，三列不能全空。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    def _dead(symbols, start, end):
+        raise ConnectionError("eastmoney circuit open")
+
+    monkeypatch.setattr(dq, "_fetch_ohlc_chunk", _dead)
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+    monkeypatch.setattr(
+        dq,
+        "_snapshot_fill",
+        lambda symbols, asof: (
+            {s: {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5} for s in symbols},
+            None,
+        ),
+    )
+
+    rows, err = dq._fetch_ohlc(["600000", "600001"], "2026-10-30")
+    assert set(rows) == {"600000", "600001"}
+    assert rows["600000"]["open"] == 1.0
+    assert err and "快照" in err  # 换源要留痕，不能静默
+
+
+def test_fetch_ohlc_only_asks_snapshot_for_the_gap(monkeypatch):
+    from stock_platform_research import day_quote_cli as dq
+
+    def _partial(symbols, start, end):
+        return [
+            {"symbol": s, "date": "2026-10-30", "open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5}
+            for s in symbols
+            if s == "600000"
+        ]
+
+    asked: list[list[str]] = []
+
+    def _snap(symbols, asof):
+        asked.append(list(symbols))
+        return {s: {"open": 9.0, "high": 9.5, "low": 8.5, "close": 9.2} for s in symbols}, None
+
+    monkeypatch.setattr(dq, "_fetch_ohlc_chunk", _partial)
+    monkeypatch.setattr(dq, "_snapshot_fill", _snap)
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, err = dq._fetch_ohlc(["600000", "600001"], "2026-10-30")
+    assert rows["600000"]["close"] == 1.5  # 东财优先，不被快照覆盖
+    assert rows["600001"]["close"] == 9.2  # 缺口由快照补
+    assert asked == [["600001"]]
+    assert err is None
+
+
+def test_fetch_ohlc_snapshot_exception_does_not_escape(monkeypatch):
+    from stock_platform_research import day_quote_cli as dq
+
+    monkeypatch.setattr(dq, "_fetch_ohlc_chunk", lambda s, a, b: (_ for _ in ()).throw(ConnectionError("x")))
+    monkeypatch.setattr(
+        dq, "_snapshot_fill", lambda symbols, asof: (_ for _ in ()).throw(RuntimeError("snap boom"))
+    )
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, err = dq._fetch_ohlc(["600000"], "2026-10-30")
+    assert rows == {}
+    assert err and "snap boom" in err
+
+
+def test_snapshot_rows_land_in_cache_so_rerun_is_zero_network(tmp_path: Path, monkeypatch):
+    """快照补齐的当日行同样入缓存：盘中复跑不再打网络。"""
+    from stock_platform_research import day_quote_cli as dq
+
+    monkeypatch.setattr(
+        dq,
+        "_fetch_ohlc_chunk",
+        lambda s, a, b: (_ for _ in ()).throw(ConnectionError("dead")),
+    )
+    monkeypatch.setattr(
+        dq,
+        "_snapshot_fill",
+        lambda symbols, asof: (
+            {s: {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5} for s in symbols},
+            None,
+        ),
+    )
+    monkeypatch.setattr("time.sleep", lambda *_: None)
+
+    rows, _ = load_ohlc(["600000"], "2026-10-30", cache_dir=tmp_path, allow_network=True)
+    assert rows["600000"]["open"] == 1.0
+    blob = json.loads((tmp_path / "ohlc-2026-10-30.json").read_text(encoding="utf-8"))
+    assert blob["rows"]["600000"] == {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5}
 
 
 def test_engine_fallback_only_when_quote_date_is_later_than_asof(tmp_path: Path, monkeypatch):

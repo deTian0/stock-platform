@@ -12,6 +12,10 @@ Examples::
 * **开盘/最高/最低** ← 外部日线（引擎 ``daily_price`` 无这三列），落缓存
   ``data/quotes/ohlc-<asof>.json`` 保证**同日复跑零网络且结果一致**；
   取不到就降级为 ``—``，绝不补零。
+* **外部日线的三源链** ← 东财 ``kline/get``（主源，含完整历史）→ 腾讯
+  ``qt.gtimg.cn`` → 新浪 ``hq.sinajs.cn``（后两者是批量快照，只取**当日**这一根）。
+  单源时代东财一挂整列全空（2026-10-29、2026-10-30 连发两次），故多留一条命；
+  快照同样只认 ``trade_date == 当日``，绝不拿旧数据冒充。
 """
 
 from __future__ import annotations
@@ -87,7 +91,6 @@ CHUNK_SIZE = 30
 CHUNK_ATTEMPTS = 2
 CHUNK_PAUSE_SEC = 0.8
 FETCH_PASSES = 3  # get_daily 对单只瞬时错误是静默跳过，需逐轮补齐
-FETCH_PASSES = 3  # get_daily 对单只瞬时错误是静默跳过，需逐轮补齐
 
 
 def _fetch_ohlc_chunk(symbols: list[str], start: date, end: date) -> list[dict[str, Any]]:
@@ -95,6 +98,24 @@ def _fetch_ohlc_chunk(symbols: list[str], start: date, end: date) -> list[dict[s
     from stock_platform_providers.astock_http import AStockHttpProvider
 
     return list(AStockHttpProvider().get_daily(symbols, start=start, end=end) or [])
+
+
+def _snapshot_fill(
+    symbols: list[str], asof: str
+) -> tuple[dict[str, dict[str, Any]], str | None]:
+    """第二源兜底：腾讯 → 新浪当日快照（东财挂掉时唯一能救开盘价的路子）。
+
+    懒导入 ``stock_platform_providers``（本包顶层禁止 import providers）。
+    """
+    from stock_platform_providers.snapshot import fetch_day_snapshot
+
+    return fetch_day_snapshot(list(symbols), asof)
+
+
+def _brief_err(err: str | None, limit: int = 60) -> str:
+    """错误摘要：只留首行并截断 —— CircuitOpenError 的原话能写满一整屏。"""
+    text = str(err or "无数据").strip().splitlines()[0]
+    return text if len(text) <= limit else text[:limit] + "…"
 
 
 def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]], str | None]:
@@ -109,6 +130,10 @@ def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]
     2. **逐轮补齐**（``FETCH_PASSES``）：``get_daily`` 对**单只**的瞬时错误是
        **静默跳过**（只塞进 ``symbol_errors``，不抛异常），所以一次调用常常「调用成功
        但少回几只」。对仍然缺的代码再跑下一轮，直到补齐或轮次用尽。
+    3. **第二源快照**（``_snapshot_fill``）：上面两层都只能扛「部分失败」。东财**整体
+       不可达**时（2026-10-30 实测：``CircuitOpenError``，三次重试全灭）必须换源 ——
+       腾讯 ``qt.gtimg.cn`` / 新浪 ``hq.sinajs.cn`` 的批量快照带当日开/高/低/收，
+       且与东财互相独立。快照只接受 ``trade_date == 当日`` 的行。
     """
     day = date.fromisoformat(str(asof)[:10])
     start = day - timedelta(days=10)
@@ -147,14 +172,44 @@ def _fetch_ohlc(symbols: list[str], asof: str) -> tuple[dict[str, dict[str, Any]
             s for s in pending if s.split(".")[0].zfill(6) not in by_symbol
         ]
         if pending and pass_no < FETCH_PASSES:
+            if not by_symbol and pass_no == 1:
+                break  # 首轮颗粒无收 = 源整体不可达，别再耗三轮，直接走快照兜底
             time.sleep(CHUNK_PAUSE_SEC * pass_no)
-    if not by_symbol:
-        return {}, f"全部失败（{last_err or '无数据返回'}）"[:300]
+    em_error = last_err
+    em_filled = len(by_symbol)
+
+    # 第二源：东财不可达 / 仍有缺口时改走腾讯 → 新浪当日快照。
+    snap_note: str | None = None
     if pending:
-        return by_symbol, (
-            f"部分缺失（缺 {len(pending)}/{total} 只；最后错误 {last_err}）"[:300]
-        )
-    return by_symbol, None
+        before = len(pending)
+        try:
+            snapped, _snap_err = _snapshot_fill(pending, asof)
+        except Exception as exc:  # noqa: BLE001 — 兜底源同样只降级
+            snapped, _snap_err = {}, f"{type(exc).__name__}: {exc}"
+        for sym, bar in (snapped or {}).items():
+            by_symbol.setdefault(str(sym).split(".")[0].zfill(6), bar)
+        pending = [s for s in pending if s.split(".")[0].zfill(6) not in by_symbol]
+        if snapped and em_filled == 0:
+            # 整列都靠快照救回来：这是「换源」而非「降级」，但必须留痕。
+            snap_note = (
+                f"东财不可达（{_brief_err(em_error)}），"
+                f"{before - len(pending)}/{before} 只改用腾讯/新浪当日快照"
+            )
+        elif not snapped:
+            head = "东财不可达" if em_filled == 0 else "东财部分缺失"
+            snap_note = (
+                f"{head}（{_brief_err(em_error)}）；"
+                f"腾讯/新浪快照亦不可用（{_brief_err(_snap_err)}）"
+            )
+
+    if not by_symbol:
+        return {}, (snap_note or f"全部失败（{last_err or '无数据返回'}）")[:300]
+    if pending:
+        parts = [f"部分缺失（缺 {len(pending)}/{total} 只；最后错误 {last_err}）"]
+        if snap_note:
+            parts.append(snap_note)
+        return by_symbol, "；".join(parts)[:300]
+    return by_symbol, (snap_note[:300] if snap_note else None)
 
 
 def main(argv: list[str] | None = None) -> int:
