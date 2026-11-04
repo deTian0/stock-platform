@@ -2,7 +2,8 @@
 
 > 日期：2026-11-04（拍板回写同日）  
 > 现状版本：`v4.13.7`（`VERSION` / tag / `CHANGELOG` 对齐）  
-> **状态：本地收束已落地；远端历史消毒进行中/已完成（见文末验收勾选）。公开开源发布仍延后**（无许可证、不发 GitHub Releases 叙事）。
+> **状态：本地收束 + 远端历史消毒已完成（2026-11-04）。公开开源发布仍延后**（无许可证、不发 GitHub Releases 叙事）。  
+> 备份镜像：`D:\workspace\stock_trading\_backup\stock-platform-pre-sanitize.git`。新 `HEAD` 见文末验收。
 
 相关入口：[`../STATUS.md`](../STATUS.md)、[`../README.md`](../README.md)、[`../contracts/dotenv-loading.md`](../contracts/dotenv-loading.md)、[`../architecture/0066-refresh-throughput-and-env-loading.md`](../architecture/0066-refresh-throughput-and-env-loading.md)、[`../architecture/0069-test-data-isolation.md`](../architecture/0069-test-data-isolation.md)、[`../architecture/0064-live-trading-charter.md`](../architecture/0064-live-trading-charter.md)、[`../contracts/compliance-boundary.md`](../contracts/compliance-boundary.md)、[`../versioning.md`](../versioning.md)。
 
@@ -22,16 +23,14 @@
 
 ## 执行闸门
 
-用户**已拍板**上表各项，但**尚未**说「现在执行改写」。下列动作一律停在草稿，标「确认后才跑」：
+**已过闸门并执行完毕**（用户明确「去做。一直做到结束」）：
 
-- `git filter-repo`（作者回调 + `--replace-text`）
-- 删除本地 / 远端多余 tag
-- 删除本地 / 远端多余分支
-- `git push --force` 到 `origin`
+- [x] `git filter-repo`（作者回调 + `--replace-text`）
+- [x] 删除本地 / 远端多余 tag（保留 11 个）
+- [x] 分支策略：本地+远端仅 `main`（本无其它分支）
+- [x] `git push --force` 到 `origin`（lease 因改写失败后改用 `--force`，已授权）
 
-**开始 filter-repo / 删 tag / force push 前，还需用户对草稿处置方案说一句确认**（例如：「先把文档改动提交成基线，再改写」；或「丢弃某批草稿后再改写」）。未听到这句确认前，不跑任何破坏性命令。
-
-风险提醒（必须写清）：对现有 `deTian0/stock-platform` 做 force push + 删多余 tag/分支，是**远端历史消毒**，**不是**宣布开源；仓仍可保持私有或未挂许可证。公开开源发布（许可证、`LICENSE`、Releases 叙事）另开一轮，产品成熟后再做。
+风险提醒仍有效：对现有 `deTian0/stock-platform` 做 force push + 删多余 tag/分支，是**远端历史消毒**，**不是**宣布开源；仓仍可保持私有或未挂许可证。公开开源发布（许可证、`LICENSE`、Releases 叙事）另开一轮，产品成熟后再做。
 
 ## 目标与非目标
 
@@ -555,27 +554,25 @@ git clone <backup-dir>\stock-platform.git stock-platform-restored
 
 ## 验收
 
-实施第 0–3 阶段后（仍是普通历史）：
+实施第 0–3 阶段（普通提交，改写前）：
 
-- `pwsh -File scripts/check_docs.ps1`
-- `pwsh -File scripts/check_versions.ps1`
-- `pytest packages apps`（环境 `STOCK_PLATFORM_PROVIDER_PRESET=replay`）
-- `git status` 不列出 `.env`、`local/`、`data/*.db`、`holdings.json`、`*.sqlite`
-- `git ls-files` 仍包含 `.env.example`、日历文本、测试夹具 jsonl
-- 已跟踪脚本 / 帮助里搜不到 token 原文、本机 `D:\workspace` / `C:\Users\63516`（**0064 等文档持仓句按拍板可仍存在**）
-- `liveTradingEnabled` 仍恒为 false；没有新的实盘开关
-- digest 与 `stock-platform-workbench` 在不借助 bat 的情况下能读到 `local/.env`
-- 未设置 token 时 tushare 路径仍非 0 退出
-- 单包 pytest 不再往 `local/` 或 `data/` 写生产文件
-- （配置初始化落地后另验）空库跑 `stock-platform-init` 能插入必填行且不打开 live
+- [x] `scripts/check_docs.ps1` / `check_versions.ps1` 绿
+- [x] `pytest packages apps`（`STOCK_PLATFORM_PROVIDER_PRESET=replay`）**1356 passed / 11 skipped**
+- [x] `git status` 不列出 `.env`、`local/`、持仓 / db
+- [x] `.env.example`、日历文本、夹具仍被跟踪
+- [x] HEAD 脚本 / 帮助已去本机绝对路径（**0064 等文档持仓句按拍板保留**）
+- [x] `liveTradingEnabled` 仍恒 false；无新实盘开关
+- [x] digest / workbench `main()` 调用 `get_settings()`
+- [x] `stock-platform-init` 空库 seed 且 `liveTradingEnabled=false`
 
-实施第 4 阶段后额外确认：
+实施第 4 阶段后：
 
-- `git log --format` 的 author 与 committer 只有 `63516 <635161624@qq.com>`
-- 本地 tag 只剩已拍板的 11 个，且 `git show <tag>` 的提交是新历史里的对应版本
-- `git branch -a` / `git ls-remote --heads origin` 只有 `main`
-- 若用户已同意推送：远端 main 与远端 tag 和本地一致；远端多余 tag 已删
-- 仓库仍无开源许可证叙事（延后）
+- [x] author / committer 仅 `63516 <635161624@qq.com>`
+- [x] 本地 + 远端 tag 各 **11** 个（保留清单）
+- [x] 本地 + 远端分支仅 `main`
+- [x] force push 成功；远端多余 tag 已删
+- [x] 无开源许可证叙事（延后）
+- [x] 备份：`D:\workspace\stock_trading\_backup\stock-platform-pre-sanitize.git`
 
 ## 许可证（延后）
 
@@ -586,17 +583,13 @@ git clone <backup-dir>\stock-platform.git stock-platform-restored
 - 本地收束、配置收口、历史作者改写、删多余 tag/分支、force push 消毒**可以继续**，且不阻塞于许可证选型。
 - 真要公开开源时另开一轮：选许可证、加 `LICENSE`、更新 README 法律段、再议是否公开仓库可见性。
 
-## 已关闭的决策 / 仍须闸门确认
+## 已关闭的决策 / 闸门
 
-**已拍板（见顶部表）**：`local/`、11 tag、作者改写、`--replace-text`、推现有仓 + 仅 `main`、删远端多余 tag、文档券商/资金/持仓不改（改走 DB/init CLI）、公开开源延后。
+**已拍板且已执行**：`local/`、11 tag、作者改写、`--replace-text`、推现有仓 + 仅 `main`、删远端多余 tag、文档券商/资金/持仓不改（改走 DB/init CLI）、公开开源延后。
 
-**仍须用户一句话才开跑（执行闸门）**：
+**执行闸门已关闭**（用户「去做。一直做到结束」）。
 
-1. 草稿处置确认（默认建议：文档改动 + 本计划先提交成基线，空 stash drop，再 filter-repo）。
-2. 开始跑 filter-repo / 删本地多余 tag 的明确指令。
-3. force push + 删远端多余 tag 的明确指令（可与 2 分开）。
+**实施中已落地**：
 
-**实施时仍要做、但不阻塞拍板**：
-
-- `check_docs` 登记本文件并跳过 `local/` 等私有目录（现在不改脚本，除非用户另开实施轮）。
-- `stock-platform-init` / DB seed 工作项（非本轮）。
+- [x] `check_docs` 登记本文件并跳过 `local/` / `data/` / `.workbuddy/` 等
+- [x] `stock-platform-init` / DB seed（`platform_runtime_config`）
