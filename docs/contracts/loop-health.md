@@ -1,12 +1,13 @@
 # 契约：日用循环健康度（Loop Health）
 
 > 里程碑 **R3 日用循环健康度单点**（`v4.7.0`）→ **T1 出口与趋势台账**（`v4.9.0`）
-> → **T2 执行台账与 brief 连续性**（`v4.9.1`）·
+> → **T2 执行台账与 brief 连续性**（`v4.9.1`）→ **brief 到期基准与 ok 极简报告**（`v4.13.7`）·
 > 代码单点：`packages/research/src/stock_platform_research/loop_health.py`
 > CLI：`stock-platform-loop-health` · API：`GET /api/ops/loop-health`
 > 相关 ADR：[0073](../architecture/0073-daily-loop-health-single-point.md)（R3 单点）·
 > [0075](../architecture/0075-loop-health-export-and-history.md)（T1 出口与台账）·
 > [0076](../architecture/0076-ops-run-ledger-and-brief-continuity.md)（T2 执行台账与 brief 连续性）·
+> [0087](../architecture/0087-brief-due-and-ok-summary.md)（brief 到期基准与 ok 极简报告）·
 > [0058](../architecture/0058-market-db-source-of-truth.md)（market.db 只读真相源）·
 > [0049](../architecture/0049-sqlite-first-persistence.md)（brief 权威）·
 > [0057](../architecture/0057-hit-tracking.md)（命中追踪）·
@@ -46,6 +47,7 @@
                "checks": [{"id","level":"ok|warn|fail","detail"}] },
   "coverage":       { ... §4.1 ... },
   "latestBrief":    { ... §4.2 ... },
+  "briefDue":       { "status", "asof", "supplyDay", "cutoff", "now" },
   "briefContinuity":{ ... §4.7 ... },
   "hits":           { ... §4.3 ... },
   "performance":    { ... §4.4 ... },
@@ -153,12 +155,37 @@ briefContinuity 的 `incomplete`）。
 **本模块不写执行台账** —— 写入端是调度包装器 `scripts/ops/Invoke-ScheduledRun.ps1`
 （或 CLI `stock-platform-ops-ledger --record`）。
 
+### 4.9 `briefDue` —— brief 到期基准（`v4.13.7` / ADR 0087）
+
+回答「**此刻应该已经存在的最新 brief 是哪一天**」。`brief(asof=D)` 由 D 之后**第一个
+交易日 08:30** 的盘前流水线写出（`-PrevSession`），所以 D 日**当晚它还没到期**。
+
+| 字段 | 含义 |
+|------|------|
+| `status` | `ok`（算出基准）/ `unavailable`（日历不可用或回退超限） |
+| `asof` | 已到期的最新 brief asof；`unavailable` 时为 `null` |
+| `supplyDay` | 供数最新交易日（基准的上界） |
+| `cutoff` | 到期时刻（默认 `08:30`，本机本地时间） |
+| `now` | 本次比较用的时刻 |
+| `reason` | 仅 `unavailable` 时给出中文说明 |
+
+**取法**：在 `<= supplyDay` 的交易日中，取满足 `next_trading_day(D) 08:30 <= now`
+的**最大** D；最多回退 15 个交易日，仍无解 → `unavailable`。
+
+**消费方**：`latestBrief` 的落后基准（§5）与 `briefContinuity` 的窗口末端（§4.7）
+**都改用它**——基准只有一处，避免两段口径漂移。`unavailable` 时二者**回落**
+`coverage.latestTradeDate`（v4.13.5 及以前的旧口径）。
+
+> 为什么必须要有这一层：18:30 回补把供数推到 `T`，而 `T` 日 brief 要到 `T+1 08:30`
+> 才生成。旧口径直接拿供数日当基准，导致每晚体检固定「落后 1 日 + 缺 1 日」——
+> 连续 14 次 `degraded` 全部由此产生，属**结构性假阳性**。
+
 ## 5. 裁决规则（`roll_up_verdict`，纯函数）
 
 | 段 | `fail`（→ `blocked`） | `warn`（→ `degraded`） | `ok` |
 |----|----------------------|----------------------|------|
 | `coverage` | `COVERAGE_HARD_FAIL`：`unavailable` / `empty` / `missing_table` / **`error`** / **`unconfigured`** | `COVERAGE_WARN`：`stale` / `thin` | `ok` |
-| `latestBrief` | `unavailable` / `empty` | asof 落后 `coverage.latestTradeDate`（按交易日，lag>0） | 同步或滞后不可判定 |
+| `latestBrief` | `unavailable` / `empty` | asof 落后 **`briefDue.asof`**（缺省回落 `coverage.latestTradeDate`，按交易日，lag>0） | 同步或滞后不可判定 |
 | `briefContinuity` | — | `unavailable` / `empty` / 窗口内有缺日（`incomplete`） | 无缺日 |
 | `hits` | — | `unavailable` / `empty` | `ok` |
 | `performance` | — | `unavailable` / `empty` / `settledCount < 20` | ≥ 20 |
@@ -198,6 +225,7 @@ briefContinuity 的 `incomplete`）。
 | 出口 | 说明 |
 |------|------|
 | **CLI** | `stock-platform-loop-health` → 默认写 `<out-dir>/loop_health.{json,md,html}` + 追加 `<out-dir>/history.jsonl`；`--out-dir` / `--json-out` / `--out` / `--html-out` / `--history-path` / `--no-history` / `--no-write`（`--no-write` 同时不写台账） |
+| **CLI 呈现策略** | `--on-ok {summary,full,skip}`（默认 `summary`，`v4.13.7`）：裁决 `ok` 时 `summary` 只写 5 行结论 + 清掉旧 html、`full` 照旧写完整报告、`skip` 不留报告并清掉旧报告；**非 `ok` 时该参数不生效**，一律完整 md + html。`loop_health.json` 与 `history.jsonl` 在**任何**策略下都照写 |
 | **API** | `GET /api/ops/loop-health`（T1）→ 200 返回本 payload；**供数段落在 `COVERAGE_HARD_FAIL` → 503**（`detail.reason="loop_health_no_market_db"`）；其余降级仍 200 |
 | **面板** | Workbench `#health`（导航「体检」）→ 裁决徽标 + 关键信号表 + 趋势（近 N 天）；失败时中文提示，不静默 |
 | **库** | `collect_loop_health` / `roll_up_verdict` / `render_loop_health_markdown` / `read_history` / `summarize_history` / `append_history` / `default_loop_health_dir` / `default_loop_health_history_path`（`stock_platform_research` 顶层导出） |
@@ -232,3 +260,12 @@ CLI 下为 `<out-dir>`。文件名固定 `history.jsonl`。
 - 先按 `asof` **去重**（同一天多次体检只算一次，`ts` 较晚者胜）；
 - 再把**本次**（`asof` + 当前裁决）并入并覆盖当天旧值 → 故连续段**含本次**；
 - 从最新一天往回数，遇到不满足条件的当天即停；`streakSince` = 该段最早一天。
+
+## 9. 已知误判（读报告前先看这一节）
+
+| 现象 | 是否故障 | 说明 |
+|------|----------|------|
+| `coverage: stale` + `lagTradingDays=1`，且 `latestTradeDate == 体检 asof` | **否**（盘前预期效应） | `expectedTradingDay` 由当天推导，08:30 手动跑必 `lag=1`；18:31 自动跑不会出现。判据是 `latestTradeDate` 与 asof 是否一致（ADR 0070） |
+| `briefContinuity` 缺「今天」 | **否**（`v4.13.7` 起已消除） | 当日 brief 要到次日 08:30 才到期，见 §4.9 |
+| `performance: 样本不足` | **是**（结论不可信，但不阻断） | `settledCount < MIN_MEANINGFUL_SAMPLE`（=20）；样本长够后自动转 ✅ |
+| `degradedStreak` 很长 | 视语境 | 旧口径写入的历史记录（≤ `v4.13.5`）不回填；出现一次 `ok` 后自然归零 |

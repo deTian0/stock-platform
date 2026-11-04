@@ -147,6 +147,7 @@ from .loop_health import (
     default_loop_health_out_dir,
     read_history,
     render_loop_health_markdown,
+    render_loop_health_summary,
     roll_up_verdict,
     summarize_history,
 )
@@ -378,6 +379,7 @@ __all__ = [
     "default_loop_health_out_dir",
     "read_history",
     "render_loop_health_markdown",
+    "render_loop_health_summary",
     "roll_up_verdict",
     "summarize_history",
     "DEFAULT_OPS_LEDGER_OUT_DIR",
@@ -606,4 +608,4 @@ __all__ = [
     "select_set",
 ]
 
-__version__ = "4.13.6"
+__version__ = "4.13.7"

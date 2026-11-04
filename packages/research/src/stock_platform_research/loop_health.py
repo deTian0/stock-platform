@@ -53,7 +53,7 @@ from __future__ import annotations
 import json
 import os
 import traceback
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -81,6 +81,11 @@ HISTORY_MAX_RECORDS = 400
 
 # brief 连续性（T2 / v4.9.1）—— 近 N 个交易日里 brief 的覆盖情况，缺日逐个列出。
 DEFAULT_BRIEF_WINDOW_DAYS = 5
+
+# brief **到期**口径（v4.13.7 / ADR 0087）—— brief(asof=D) 由「D 之后第一个交易日的
+# 08:30 盘前流水线」写出（``-PrevSession``），所以 D 日当晚它**还没到期**：既不算
+# 「缺日」，也不算「落后」。缺了这条口径，18:30 回补后的体检每晚固定假阳性。
+BRIEF_DUE_CUTOFF_HHMM = "08:30"
 
 # 各段 status 取值（fail-closed 的显式词表）。
 SECTION_OK = "ok"
@@ -206,6 +211,53 @@ def _recent_trading_days(end: str, count: int) -> list[str] | None:
         days.reverse()
         return days
     except Exception:  # noqa: BLE001 — 日历不可用 → 无法判定，不猜
+        return None
+
+
+def _brief_due_asof(
+    supply_day: str | None,
+    *,
+    now: datetime | None = None,
+    cutoff: str = BRIEF_DUE_CUTOFF_HHMM,
+) -> str | None:
+    """截止 ``now`` **已到期**的最新 brief asof（兼作窗口末端与落后基准）。
+
+    brief(asof=D) 由「D 之后**第一个交易日**的 08:30 盘前流水线」写出（``-PrevSession``），
+    因此：
+
+    - ``T 日 18:30`` 回补后供数已到 ``T``，但 ``T`` 日 brief 要到 ``T+1 08:30`` 才到期
+      → 基准回落到 ``T-1``。v4.13.5 及以前**直接拿供数日当基准**，于是每晚固定报
+      「落后 1 个交易日」+「缺 1 日」，属结构性假阳性（ADR 0087）；
+    - 若盘前任务没跑（``T+1 08:30`` 之后 brief 仍停在 ``T-1``）→ 基准 = ``T`` → 真 warn。
+
+    日历不可用 / 日期无法解析 / 回退超限 → ``None``，调用方回落旧口径
+    （基准 = 供数最新交易日）。
+    """
+    day = str(supply_day or "").strip()[:10]
+    if not day:
+        return None
+    try:
+        parts = str(cutoff or "").split(":")
+        hh, mm = int(parts[0]), int(parts[1])
+    except Exception:  # noqa: BLE001 — 脏配置不该让体检失败
+        hh, mm = 8, 30
+    moment = now or datetime.now()
+    if moment.tzinfo is not None:  # 统一成「本机本地时间」，与 08:30 口径对齐
+        moment = moment.astimezone().replace(tzinfo=None)
+    try:
+        from stock_platform_providers import get_trading_calendar  # type: ignore
+
+        cal = get_trading_calendar("CN")
+        cursor = date.fromisoformat(day)
+        for _ in range(15):  # 防御：最多回退 15 个交易日
+            if not cal.is_trading_day(cursor):
+                cursor = cal.prev_trading_day(cursor)
+                continue
+            if datetime.combine(cal.next_trading_day(cursor), time(hh, mm)) <= moment:
+                return cursor.isoformat()
+            cursor = cal.prev_trading_day(cursor)
+        return None
+    except Exception:  # noqa: BLE001 — 日历不可用 → 不猜
         return None
 
 
@@ -425,7 +477,8 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
       ``error`` / ``unconfigured``）→ fail；``COVERAGE_WARN``（``stale`` / ``thin``）→ warn；
       其余 → ok
     - latestBrief：``unavailable`` / ``empty`` → fail；
-      ``asof`` 落后 ``coverage.latestTradeDate``（按交易日）→ warn；否则 ok
+      ``asof`` 落后**已到期基准**（``briefDue.asof``，缺省回落 ``coverage.latestTradeDate``，
+      按交易日）→ warn；否则 ok
     - hits：``unavailable`` → warn；``empty`` → warn；``ok`` → ok
     - performance：``unavailable`` → warn；``empty`` → warn；
       样本 < ``MIN_MEANINGFUL_SAMPLE`` → warn；否则 ok
@@ -454,13 +507,17 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
     if brief_status in {SECTION_UNAVAILABLE, SECTION_EMPTY}:
         add("latestBrief", _LEVEL_FAIL, f"最新 brief 不可用（status={brief_status}）")
     else:
-        lag = _trading_day_lag(brief.get("asof"), cov.get("latestTradeDate"))
+        due = sections.get("briefDue") or {}
+        lag_base = str(due.get("asof") or "").strip()[:10] or str(
+            cov.get("latestTradeDate") or ""
+        ).strip()[:10]
+        lag = _trading_day_lag(brief.get("asof"), lag_base or None)
         if lag and lag > 0:
             add(
                 "latestBrief",
                 _LEVEL_WARN,
-                f"brief asof={brief.get('asof')} 落后供数 "
-                f"{cov.get('latestTradeDate')} 共 {lag} 个交易日",
+                f"brief asof={brief.get('asof')} 落后已到期基准 "
+                f"{lag_base} 共 {lag} 个交易日",
             )
         elif lag is None:
             add("latestBrief", _LEVEL_OK, f"brief asof={brief.get('asof')}（滞后未判定）")
@@ -734,6 +791,8 @@ def collect_loop_health(
     ops_ledger_path: str | Path | None = None,
     ops_recent: int = DEFAULT_RUNS_RECENT,
     brief_window_days: int = DEFAULT_BRIEF_WINDOW_DAYS,
+    brief_due_cutoff: str = BRIEF_DUE_CUTOFF_HHMM,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """聚合一次日用循环健康度快照（**永不抛**）。
 
@@ -747,6 +806,10 @@ def collect_loop_health(
     ``briefContinuity``（T2 / v4.9.1）：近 ``brief_window_days`` 个交易日的 brief 覆盖，缺日逐个列出；
     ``opsLedger``（T2）：调度执行台账汇总（任务 / 退出码 / 连续失败）。两者都**参与裁决**
     （缺日或任务连续失败 → ``degraded``，但**不阻断**）。
+
+    ``briefDue``（v4.13.7 / ADR 0087）：按「brief(asof=D) 到 ``D+1 08:30`` 才到期」的口径
+    算出**已到期的最新 asof**，同时作为 ``latestBrief`` 的落后基准与 ``briefContinuity``
+    的窗口末端。``now`` / ``brief_due_cutoff`` 仅供测试与回放注入。
     """
     asof_day = str(asof or date.today().isoformat())[:10]
 
@@ -766,9 +829,19 @@ def collect_loop_health(
     )
     latest_brief = _safe(lambda: _collect_latest_brief(db_url))
     supply_day = str(coverage.get("latestTradeDate") or "").strip()[:10] or asof_day
+    due_asof = _brief_due_asof(supply_day, now=now, cutoff=brief_due_cutoff)
+    brief_due: dict[str, Any] = {
+        "status": SECTION_OK if due_asof else SECTION_UNAVAILABLE,
+        "asof": due_asof,
+        "supplyDay": supply_day,
+        "cutoff": str(brief_due_cutoff),
+        "now": (now or datetime.now()).isoformat(timespec="seconds"),
+    }
+    if not due_asof:
+        brief_due["reason"] = "交易日历不可用：brief 到期基准回落供数最新交易日。"
     brief_continuity = _safe(
         lambda: _collect_brief_continuity(
-            db_url, end_day=supply_day, window_days=int(brief_window_days)
+            db_url, end_day=due_asof or supply_day, window_days=int(brief_window_days)
         )
     )
     hits = _safe(lambda: _collect_hits(db_url))
@@ -783,6 +856,7 @@ def collect_loop_health(
     sections = {
         "coverage": coverage,
         "latestBrief": latest_brief,
+        "briefDue": brief_due,
         "briefContinuity": brief_continuity,
         "hits": hits,
         "performance": performance,
@@ -865,6 +939,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
     nxt = payload.get("nextSettlement") or {}
     bc = payload.get("briefContinuity") or {}
     ops = payload.get("opsLedger") or {}
+    due = payload.get("briefDue") or {}
 
     lines = [
         "# 日用循环健康度（loop health）",
@@ -904,6 +979,12 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             a=_cell(brief.get("asof")),
             p=_cell(brief.get("pickCount")),
             pv=_cell(brief.get("provider")),
+        ),
+        "| brief 到期基准 | {s} | 已到期最新 asof `{a}` · 供数最新 `{sp}` · {c} 盘前到期 |".format(
+            s=_status_zh(due.get("status")),
+            a=_cell(due.get("asof")),
+            sp=_cell(due.get("supplyDay")),
+            c=_cell(due.get("cutoff")),
         ),
         "| brief 连续性 | {s} | 近 {w} 个交易日缺 {m} 日{gaps} |".format(
             s=_status_zh(bc.get("status")),
@@ -957,6 +1038,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
         for name, sec in (
             ("供数覆盖率", cov),
             ("最新 brief", brief),
+            ("brief 到期基准", due),
             ("brief 连续性", bc),
             ("命中记账", hits),
             ("绩效闭环", perf),
@@ -983,6 +1065,30 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
         "",
     ]
     return "\n".join(lines) + "\n"
+
+
+def render_loop_health_summary(payload: Mapping[str, Any]) -> str:
+    """``ok`` 时的**极简**报告（v4.13.7 / ADR 0087）。
+
+    全部检查通过时不展开明细 —— 完整 payload 在同目录 ``loop_health.json`` 与
+    Workbench「体检」面板；本文件只在**非 ok** 时由 CLI 改写成完整版。
+    """
+    verdict = payload.get("verdict") or {}
+    status = str(verdict.get("status") or "unknown")
+    checks = len(verdict.get("checks") or [])
+    return "\n".join(
+        [
+            "# 日用循环健康度（loop health）",
+            "",
+            f"- 裁决：**{_VERDICT_ZH.get(status, status)}**（{checks} 项检查全部通过）",
+            f"- 时点：`{payload.get('asof')}`（生成于 `{payload.get('generatedAt')}`）",
+            "- 环境：SIMULATE（`liveTradingEnabled=false`）· 只读 · 零网络",
+            "",
+            "> 本次无异常，故不展开明细；完整 payload 见同目录 `loop_health.json`，",
+            "> 或用 Workbench「体检」面板查看。裁决非 ok 时本文件会自动改为完整报告。",
+            "",
+        ]
+    )
 
 
 def _render_continuity_block(bc: Mapping[str, Any]) -> list[str]:

@@ -20,6 +20,7 @@ import pytest
 from stock_platform_research import loop_health as lh
 from stock_platform_research.loop_health import (
     SECTION_EMPTY,
+    SECTION_OK,
     SECTION_UNAVAILABLE,
     VERDICT_BLOCKED,
     VERDICT_DEGRADED,
@@ -715,3 +716,177 @@ def test_render_includes_continuity_and_ops_blocks(tmp_path: Path) -> None:
     for miss in days[:3]:
         assert f"`{miss}`" in md  # 缺日逐个列出
     assert "**2**" in md  # 连续失败 2 次加粗
+
+
+# ---------------------------------------------------------------------------
+# 10. brief 到期口径（v4.13.7 / ADR 0087）
+# ---------------------------------------------------------------------------
+
+
+def _dt(text: str) -> "datetime":
+    from datetime import datetime as _d
+
+    return _d.fromisoformat(text)
+
+
+def test_brief_due_asof_falls_back_on_night_run() -> None:
+    """T 日 18:31：T 日 brief 要到 T+1 08:30 才到期 → 基准回落 T-1。"""
+    assert lh._brief_due_asof("2026-11-03", now=_dt("2026-11-03T18:31:00")) == "2026-11-02"
+
+
+def test_brief_due_asof_advances_after_premarket() -> None:
+    """T+1 09:00：T 日 brief 已到期 → 基准就是 T。"""
+    assert lh._brief_due_asof("2026-11-03", now=_dt("2026-11-04T09:00:00")) == "2026-11-03"
+
+
+def test_brief_due_asof_before_premarket_goes_back_one_more() -> None:
+    """T 日 07:00（盘前尚未跑）：连 T-1 的 brief 都没到期 → 基准退到 T-2。"""
+    assert lh._brief_due_asof("2026-11-03", now=_dt("2026-11-03T07:00:00")) == "2026-10-30"
+
+
+def test_brief_due_asof_bad_input_is_none() -> None:
+    assert lh._brief_due_asof("") is None
+    assert lh._brief_due_asof("not-a-date") is None
+
+
+def test_roll_up_no_lag_when_brief_matches_due_base() -> None:
+    """供数已到 T、brief 停在 T-1，但 T 未到期 → **不得**判 warn。"""
+    verdict = roll_up_verdict(
+        _sections(
+            coverage={"status": "ok", "latestTradeDate": "2026-11-03"},
+            latestBrief={"status": "ok", "asof": "2026-11-02"},
+            briefDue={"status": "ok", "asof": "2026-11-02"},
+        )
+    )
+    assert verdict["status"] == VERDICT_OK
+    assert verdict["warned"] == []
+
+
+def test_roll_up_lag_when_brief_behind_due_base() -> None:
+    """盘前任务没跑（T 已到期但 brief 仍停 T-1）→ 真 warn。"""
+    verdict = roll_up_verdict(
+        _sections(
+            coverage={"status": "ok", "latestTradeDate": "2026-11-03"},
+            latestBrief={"status": "ok", "asof": "2026-11-02"},
+            briefDue={"status": "ok", "asof": "2026-11-03"},
+        )
+    )
+    assert verdict["status"] == VERDICT_DEGRADED
+    assert "latestBrief" in verdict["warned"]
+
+
+def test_night_run_does_not_flag_brief_as_missing(tmp_path: Path) -> None:
+    """回归（v4.13.5 及以前每晚恒 degraded）：18:30 回补后体检，两路假阳性应消失。"""
+    asof = "2026-11-03"
+    engine = _engine_db_with_coverage(tmp_path / "market.db", asof, min_rows=1)
+    yesterday = _trading_days(asof, 2)[0]
+    db = tmp_path / "platform.db"
+    _save_briefs(db, _trading_days(yesterday, 5))
+    payload = collect_loop_health(
+        db_url=db,
+        market_db=engine,
+        perf_log=tmp_path / "missing.jsonl",
+        asof=asof,
+        brief_window_days=5,
+        now=_dt("2026-11-03T18:31:00"),
+    )
+    assert payload["briefDue"]["asof"] == yesterday
+    assert payload["briefContinuity"]["endDay"] == yesterday
+    assert payload["briefContinuity"]["missingDays"] == []
+    assert "latestBrief" not in (payload["verdict"]["warned"] or [])
+    assert "briefContinuity" not in (payload["verdict"]["warned"] or [])
+    assert payload["verdict"]["status"] != VERDICT_BLOCKED
+
+
+def test_brief_due_falls_back_when_calendar_gone(monkeypatch, tmp_path: Path) -> None:
+    """到期基准算不出 → 回落旧口径（基准 = 供数最新交易日），并如实标 unavailable。"""
+    monkeypatch.setattr(lh, "_brief_due_asof", lambda *_a, **_k: None)
+    payload = collect_loop_health(
+        db_url=tmp_path / "platform.db",
+        market_db=tmp_path / "nope.db",
+        perf_log=tmp_path / "missing.jsonl",
+        asof="2026-10-14",
+    )
+    due = payload["briefDue"]
+    assert due["status"] == SECTION_UNAVAILABLE
+    assert due["asof"] is None
+    assert due["supplyDay"] == "2026-10-14"
+    assert "reason" in due
+    assert payload["briefContinuity"]["endDay"] == "2026-10-14"
+
+
+def test_render_shows_brief_due_row() -> None:
+    md = render_loop_health_markdown(
+        {
+            "verdict": {"status": VERDICT_OK, "failed": [], "warned": [], "checks": []},
+            "briefDue": {
+                "status": SECTION_OK,
+                "asof": "2026-11-02",
+                "supplyDay": "2026-11-03",
+                "cutoff": "08:30",
+            },
+        }
+    )
+    assert "brief 到期基准" in md
+    assert "2026-11-02" in md
+
+
+def test_summary_report_is_short() -> None:
+    md = lh.render_loop_health_summary(
+        {
+            "verdict": {"status": VERDICT_OK, "checks": [{"id": "coverage", "level": "ok"}]},
+            "asof": "2026-11-03",
+            "generatedAt": "2026-11-03T10:31:00+00:00",
+        }
+    )
+    assert "不展开明细" in md
+    assert "裁决明细" not in md
+    assert len(md.splitlines()) <= 12
+
+
+def test_cli_ok_writes_summary_not_detail(tmp_path: Path, monkeypatch) -> None:
+    from stock_platform_research import loop_health_cli as cli
+
+    ok_payload = {
+        "verdict": {"status": VERDICT_OK, "failed": [], "warned": [], "checks": []},
+        "asof": "2026-11-03",
+        "generatedAt": "2026-11-03T10:31:00+00:00",
+        "history": {"status": SECTION_EMPTY},
+    }
+    monkeypatch.setattr(cli, "collect_loop_health", lambda **_k: dict(ok_payload))
+    out = tmp_path / "health"
+
+    assert cli.main(["--out-dir", str(out), "--no-history"]) == 0
+    md = (out / "loop_health.md").read_text(encoding="utf-8")
+    assert "不展开明细" in md and "裁决明细" not in md
+    assert not (out / "loop_health.html").exists()
+    assert (out / "loop_health.json").is_file()
+
+    assert cli.main(["--out-dir", str(out), "--no-history", "--on-ok", "full"]) == 0
+    assert "裁决明细" in (out / "loop_health.md").read_text(encoding="utf-8")
+
+    assert cli.main(["--out-dir", str(out), "--no-history", "--on-ok", "skip"]) == 0
+    assert not (out / "loop_health.md").exists()
+    assert not (out / "loop_health.html").exists()
+
+
+def test_cli_non_ok_ignores_on_ok_summary(tmp_path: Path) -> None:
+    """非 ok 时 ``--on-ok summary`` 不生效：完整报告照写（异常必须展开）。"""
+    from stock_platform_research.loop_health_cli import main
+
+    out = tmp_path / "health"
+    assert main(
+        [
+            "--db", str(tmp_path / "platform.db"),
+            "--market-db", str(tmp_path / "nope.db"),
+            "--perf-log", str(tmp_path / "missing.jsonl"),
+            "--asof", "2026-10-14",
+            "--out-dir", str(out),
+            "--no-history",
+            "--on-ok", "summary",
+        ]
+    ) == 0
+    md = (out / "loop_health.md").read_text(encoding="utf-8")
+    assert "裁决明细" in md
+
+

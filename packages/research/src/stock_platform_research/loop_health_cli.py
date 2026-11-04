@@ -6,6 +6,8 @@ Examples::
     stock-platform-loop-health --no-write            # 只打印（也不写台账）
     stock-platform-loop-health --out-dir D:/tmp/h    # 指定输出目录（台账随之）
     stock-platform-loop-health --no-history          # 写报告但不追加趋势台账
+    stock-platform-loop-health --on-ok full          # ok 时也写完整报告（旧行为）
+    stock-platform-loop-health --on-ok skip          # ok 时不留报告并清掉旧报告
     stock-platform-loop-health --market-db D:/.../market.db --asof 2026-10-14
 
 退出码：**0 恒成立**——体检本身不是门禁；裁决在 payload ``verdict.status`` 里
@@ -27,9 +29,11 @@ from .loop_health import (
     DEFAULT_BRIEF_WINDOW_DAYS,
     DEFAULT_LOOP_HEALTH_OUT_DIR,
     LOOP_HEALTH_HISTORY_FILENAME,
+    VERDICT_OK,
     append_history,
     collect_loop_health,
     render_loop_health_markdown,
+    render_loop_health_summary,
 )
 from .ops_ledger import DEFAULT_RUNS_RECENT
 
@@ -64,6 +68,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--brief-window", type=int, default=DEFAULT_BRIEF_WINDOW_DAYS,
                    help=f"brief 连续性窗口（交易日，默认 {DEFAULT_BRIEF_WINDOW_DAYS}）")
     p.add_argument("--no-write", action="store_true", help="只打印，不写文件（含台账）")
+    p.add_argument(
+        "--on-ok",
+        choices=("summary", "full", "skip"),
+        default="summary",
+        help=(
+            "裁决为 ok 时的呈现策略（默认 summary）：summary=只写一行结论，"
+            "full=照旧写完整报告，skip=不写报告并清掉旧报告"
+        ),
+    )
     args = p.parse_args(argv)
 
     out_dir = args.out_dir or Path(DEFAULT_LOOP_HEALTH_OUT_DIR)
@@ -87,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
         brief_window_days=int(args.brief_window),
     )
     md = render_loop_health_markdown(payload)
+    verdict = payload.get("verdict") or {}
+    status = str(verdict.get("status") or "")
+    # ok 时的呈现策略（v4.13.7 / ADR 0087）：默认只落一行结论，完整报告留给非 ok。
+    ok_mode = str(args.on_ok) if status == VERDICT_OK else "full"
+    report = render_loop_health_summary(payload) if ok_mode == "summary" else md
 
     history_note: dict[str, object] = {"appended": False, "reason": "disabled"}
     if not args.no_write:
@@ -97,28 +115,42 @@ def main(argv: list[str] | None = None) -> int:
         json_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        md_path.parent.mkdir(parents=True, exist_ok=True)
-        md_path.write_text(md, encoding="utf-8")
-        try:
-            from .report_html import render_report_html
+        if ok_mode == "full":
+            md_path.parent.mkdir(parents=True, exist_ok=True)
+            md_path.write_text(md, encoding="utf-8")
+            try:
+                from .report_html import render_report_html
 
-            html_path.parent.mkdir(parents=True, exist_ok=True)
-            html_path.write_text(
-                render_report_html(
-                    md,
-                    title="日用循环健康度（loop health）",
-                    badge="HEALTH",
-                    generated_at=str(payload.get("generatedAt") or ""),
-                ),
-                encoding="utf-8",
-            )
-        except Exception:  # noqa: BLE001 — HTML 只是可选锦上添花，绝不拖垮体检
-            pass
+                html_path.parent.mkdir(parents=True, exist_ok=True)
+                html_path.write_text(
+                    render_report_html(
+                        md,
+                        title="日用循环健康度（loop health）",
+                        badge="HEALTH",
+                        generated_at=str(payload.get("generatedAt") or ""),
+                    ),
+                    encoding="utf-8",
+                )
+            except Exception:  # noqa: BLE001 — HTML 只是可选锦上添花，绝不拖垮体检
+                pass
+        elif ok_mode == "summary":
+            md_path.parent.mkdir(parents=True, exist_ok=True)
+            md_path.write_text(report, encoding="utf-8")
+            # 上一次「非 ok」留下的 HTML 会与本次结论矛盾 → 清掉（随时可重生成）
+            try:
+                html_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        else:  # skip —— 不留报告，且清掉旧报告，避免把上一次的结论当成本次
+            for stale in (md_path, html_path):
+                try:
+                    stale.unlink(missing_ok=True)
+                except OSError:
+                    pass
         if history_path is not None:
             history_note = append_history(payload, history_path)
 
-    print(md)
-    verdict = payload.get("verdict") or {}
+    print(report)
     history = payload.get("history") or {}
     print(
         "loop-health verdict={v} failed={f} warned={w} degradedStreak={d} historyWritten={hw}".format(

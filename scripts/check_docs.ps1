@@ -103,6 +103,7 @@ $required = @(
   'docs/architecture/0084-secondary-pick-import-blocks.md',
   'docs/architecture/0085-ohlc-multi-source-fallback.md',
   'docs/architecture/0086-westock-fourth-source-and-provider.md',
+  'docs/architecture/0087-brief-due-and-ok-summary.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',

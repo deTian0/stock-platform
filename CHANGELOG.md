@@ -8,6 +8,44 @@
 
 - （无）
 
+## [4.13.7] - 2026-11-04
+
+### Fixed
+
+- **体检报告每晚恒 `degraded` 的结构性假阳性**。`loop_health` 从 2026-10-14 起 14 次体检
+  **0 次 `ok`、0 次 `blocked`**，`warn` 长期只剩 `latestBrief` + `briefContinuity`，而其余六段
+  全是 ✅ —— 报告结论与真实状态矛盾，告警疲劳。
+  - **根因是时点错位**：`brief(asof=D)` 由 D 之后第一个交易日 `08:30` 的盘前流水线写出
+    （`-PrevSession`），而体检排在 `18:30` 回补之后 —— 此时供数已被推到 `T`，`T` 日 brief
+    却要到 `T+1 08:30` 才到期。旧口径直接拿供数日当基准，于是每晚固定「落后 1 个交易日」
+    +「缺 1 日」。
+  - **新增 `briefDue` 段**（ADR [`0087`](docs/architecture/0087-brief-due-and-ok-summary.md)）：
+    `_brief_due_asof(supply_day, now, cutoff="08:30")` 算出**已到期的最新 asof**
+    （`due(D) = next_trading_day(D) 08:30`，最多回退 15 个交易日，算不出则如实
+    `unavailable`）。该基准**同时**替代 `latestBrief` 的落后基准与 `briefContinuity` 的
+    窗口末端 —— 口径只有一处，不会两段漂移；缺该段时**回落**旧口径，外部 payload 兼容。
+  - **真信号不受影响**：盘前任务没跑（`T+1 08:30` 后 brief 仍停 `T-1`）→ 基准 = `T`
+    → 仍然 `warn`；中间缺日照旧逐个列出（`test_roll_up_lag_when_brief_behind_due_base`
+    与 `test_night_run_does_not_flag_brief_as_missing` 双向锁死）。
+
+### Changed
+
+- **体检报告改为「只在异常时展开」**。CLI 新增 `--on-ok {summary,full,skip}`，默认
+  `summary`：裁决 `ok` 时 `loop_health.md` 只写 5 行结论并清掉上一次的 `loop_health.html`，
+  非 `ok` 时该参数**不生效**、一律写完整 md + html。`loop_health.json` 与
+  `history.jsonl` 在任何策略下都照写（接口 / 面板 / 趋势需要连续性）。
+- 契约 [`loop-health`](docs/contracts/loop-health.md)：新增 §4.9 `briefDue`、§9「已知误判」
+  （盘前 `coverage: stale` + `lag=1` 属预期效应，判据是 `latestTradeDate == asof`）；
+  §5 裁决表的 `latestBrief` 基线与 §7 出口补 `--on-ok`。
+
+### Tests
+
+- `packages/research/tests/test_loop_health.py` **58 passed**（新增 12 例：到期基准三档时点、
+  坏输入、双向裁决、真机口径回归、日历缺失回落、渲染行、极简报告长度、CLI 三种
+  `--on-ok` 行为、非 `ok` 不受 `--on-ok` 影响）。
+- 真机 2026-11-04 09:06（`--no-write`）：`warn` 从 `['latestBrief', 'briefContinuity']`
+  降为 `['coverage']`，两路假阳性转 ✅。
+
 ## [4.13.6] - 2026-10-30
 
 ### Added
