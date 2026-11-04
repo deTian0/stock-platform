@@ -48,7 +48,7 @@ PROXY_SOURCE = "backtest_proxy"
 
 PROXY_LEDGER_FILENAME = "performance_proxy.jsonl"
 ENV_PROXY_LOG = "STOCK_PLATFORM_PERFORMANCE_PROXY_LOG"
-DEFAULT_PROXY_OUT_DIR = "data/performance"
+DEFAULT_PROXY_OUT_DIR = "local/performance"
 
 # ``build_proxy_view`` 的固定不可比说明（也写进契约 docs/contracts/performance-proxy.md）。
 COMPARABILITY_NOTE = (
@@ -85,13 +85,13 @@ def _as_float(value: Any) -> float | None:
 
 
 def default_proxy_log_path() -> Path:
-    """代理台账默认路径：环境变量覆盖，否则 ``./data/performance_proxy.jsonl``。"""
+    """代理台账默认路径：环境变量覆盖，否则 ``./local/performance_proxy.jsonl``。"""
     import os
 
     env = str(os.environ.get(ENV_PROXY_LOG) or "").strip()
     if env:
         return Path(env)
-    return Path.cwd() / "data" / PROXY_LEDGER_FILENAME
+    return Path.cwd() / "local" / PROXY_LEDGER_FILENAME
 
 
 def trades_to_decision_rows(

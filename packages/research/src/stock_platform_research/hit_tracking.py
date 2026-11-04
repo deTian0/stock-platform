@@ -58,7 +58,7 @@ HIT_SESSION_TYPES: tuple[str, ...] = (PRE_MARKET, POST_MARKET)
 DEFAULT_CYCLE_CALENDAR_DAYS = 14
 
 ENV_DB_URL = "STOCK_PLATFORM_DB_URL"
-DEFAULT_DB_URL = "sqlite:///./data/stock_platform.db"
+DEFAULT_DB_URL = "sqlite:///./local/stock_platform.db"
 
 # engine category labels (②A 质量榜 / ②B 短线榜 / ③C 观察名单 …)
 CATEGORY_QUALITY = QUALITY_KEY

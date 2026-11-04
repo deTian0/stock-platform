@@ -1,8 +1,8 @@
 # 现行快照
 
 > 日期：2026-11-04  
-> 版本：`v4.13.7`（`main` = `origin/main`，tag `v4.13.7`）  
-> 工作区：干净。`CHANGELOG` 的 `[Unreleased]` 只记录本次文档整理，没有半截功能。  
+> 版本：`v4.13.7`（tag `v4.13.7`；历史消毒后 SHA 会变）  
+> 工作区：本轮完成 `local/` 运行时收口、`stock-platform-init`、历史作者/路径消毒与 force push（公开开源仍延后）。详见 [`plans/opensource-sanitization.md`](plans/opensource-sanitization.md)、[`ops/local-runtime.md`](ops/local-runtime.md)。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 文档放哪
@@ -41,6 +41,6 @@
 
 - `exchange_prefix("588080")` 把 `5` 开头的沪市基金判成 `sz`，四源都取不到
 - 基准码 `000905` 被前缀规则推成 `sz000905`（厦门港务），不是中证 500 `sh000905`
-- 单包跑 `pytest packages/research` 时，个别用例可能写到仓库 `data/`；全量 `pytest packages apps` 才有会话隔离
+- （已收口）默认运行时目录改为 `local/`；根 `conftest.py` 扩大守卫，单包 pytest 也不应再写生产 `local/` / `data/`
 
-执行层仍是 SIMULATE，`liveTradingEnabled=false`。
+执行层仍是 SIMULATE，`liveTradingEnabled=false`。空库可跑 `stock-platform-init` 写入可改配置行（不打开实盘）。

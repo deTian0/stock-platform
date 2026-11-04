@@ -82,8 +82,9 @@ def _repo_root_candidates() -> list[Path]:
 def find_dotenv_path(explicit: str | Path | None = None) -> Path | None:
     """Locate the ``.env`` this process should load (``None`` if none exists).
 
-    Precedence: explicit arg > ``STOCK_PLATFORM_DOTENV`` > nearest ``.env``
-    found walking up from this module > ``.env`` in the current directory.
+    Precedence: explicit arg > ``STOCK_PLATFORM_DOTENV`` >
+    nearest ``local/.env`` walking up from this module >
+    transitional repo-root / cwd ``.env``.
     """
     if explicit is not None:
         candidate = Path(explicit).expanduser()
@@ -94,10 +95,12 @@ def find_dotenv_path(explicit: str | Path | None = None) -> Path | None:
         candidate = Path(from_env).expanduser()
         return candidate if candidate.is_file() else None
 
+    # Prefer machine-local runtime dir, then transitional repo-root .env.
     for directory in _repo_root_candidates():
-        candidate = directory / ".env"
-        if candidate.is_file():
-            return candidate
+        for rel in ("local/.env", ".env"):
+            candidate = directory / rel
+            if candidate.is_file():
+                return candidate
     return None
 
 

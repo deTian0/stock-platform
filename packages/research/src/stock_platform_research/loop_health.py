@@ -69,7 +69,7 @@ from .persistence import open_brief_repository
 from .symbol_master import open_symbol_master
 
 # 默认输出目录（CLI 用）。相对 cwd，与 data/ 其它产物同级。
-DEFAULT_LOOP_HEALTH_OUT_DIR = "./data/health"
+DEFAULT_LOOP_HEALTH_OUT_DIR = "./local/health"
 
 # 历史台账（T1 / v4.9.0）—— 每次体检追加一行 ``{ts, asof, status, failed, warned}``。
 # 目录可用 ``STOCK_PLATFORM_LOOP_HEALTH_DIR`` 覆盖；台账**只写平台自有 data/**，
@@ -619,7 +619,7 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
 # 7. 历史台账（趋势面）—— 只写平台自有 data/，不写库
 # --------------------------------------------------------------------------- #
 def default_loop_health_dir() -> Path:
-    """体检产物目录：``STOCK_PLATFORM_LOOP_HEALTH_DIR`` 优先，否则 ``./data/health``。"""
+    """体检产物目录：``STOCK_PLATFORM_LOOP_HEALTH_DIR`` 优先，否则 ``./local/health``。"""
     raw = os.environ.get(ENV_LOOP_HEALTH_DIR, "").strip()
     return Path(raw) if raw else Path(DEFAULT_LOOP_HEALTH_OUT_DIR)
 

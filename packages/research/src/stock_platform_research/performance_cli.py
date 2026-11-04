@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         "--log",
         type=Path,
         default=None,
-        help="JSONL path (default STOCK_PLATFORM_PERFORMANCE_LOG or ./data/recommend_decisions.jsonl)",
+        help="JSONL path (default STOCK_PLATFORM_PERFORMANCE_LOG or ./local/recommend_decisions.jsonl)",
     )
     p.add_argument(
         "--settle-fixture",

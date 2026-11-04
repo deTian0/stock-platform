@@ -27,12 +27,17 @@ Thumbs.db
 # Runtime data & caches (never commit market data)
 # Only repo-root /data — package calendars live under packages/*/src/*/data/
 /data/
+# Machine-local runtime (env, SQLite, holdings, digests, logs, caches)
+/local/
 data_cache/
 *.db
 *.sqlite
 *.parquet
 briefs/
 history/
+
+# Agent / IDE scratch that must never be committed
+.workbuddy/
 
 # Test / coverage
 .pytest_cache/

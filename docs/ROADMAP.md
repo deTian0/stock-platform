@@ -951,7 +951,7 @@
 
 **状态**：done（`v2.6.0`）
 
-计划见：`<local-cursor-plans>/phase_c_research_stable_20260914.plan.md`
+计划见：`本地 Cursor 计划（已迁到 docs/plans/）`
 
 ---
 
@@ -995,7 +995,7 @@
 
 **状态**：done（`v3.0.0`）
 
-计划见：`<local-cursor-plans>/phase_d_ths_sim_20260914.plan.md`
+计划见：`本地 Cursor 计划（已迁到 docs/plans/）`
 
 ---
 
@@ -1048,7 +1048,7 @@
 
 **状态**：done（Phase E 收口 `v3.8.0`；基线曾为 `v3.0.0`）
 
-**详细设计**：`<local-cursor-plans>/phase_e_daily_use_roadmap_20260914.plan.md`
+**详细设计**：`本地 Cursor 计划（已迁到 docs/plans/）`
 
 **非目标**：同花顺真实 HTTP transport；SPA；默认 live / 默认 `ths_sim`；真实券商 / `liveTradingEnabled=true`。
 

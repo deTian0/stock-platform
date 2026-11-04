@@ -42,7 +42,7 @@ from .neutralization_ab import run_neutralization_book
 from .strategy_ab import AB_METRIC_KEYS, _delta_metrics
 
 #: Default output directory (platform-owned ``data/``; never the engine DB).
-DEFAULT_ADOPTION_OUT_DIR = "data/strategy"
+DEFAULT_ADOPTION_OUT_DIR = "local/strategy"
 
 #: Rolling out-of-sample window defaults: last ``DEFAULT_WINDOW_COUNT`` years.
 DEFAULT_WINDOW_COUNT = 3

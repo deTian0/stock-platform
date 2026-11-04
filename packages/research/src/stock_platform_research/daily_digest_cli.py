@@ -2,13 +2,13 @@
 
 Examples::
 
-    stock-platform-digest                    # latest brief -> data/digests/latest.md
+    stock-platform-digest                    # latest brief -> local/digests/latest.md
     stock-platform-digest --asof 2026-10-09  # specific day
     stock-platform-digest --out-dir D:/tmp/digests
     stock-platform-digest --no-html --no-ths # markdown only
 
 By default this also emits the styled ``.html`` (ADR 0071) and the 同花顺
-import txt (``data/ths_import/latest.txt``); ``--no-html`` / ``--no-ths`` opt out.
+import txt (``local/ths_import/latest.txt``); ``--no-html`` / ``--no-ths`` opt out.
 """
 
 from __future__ import annotations
@@ -18,9 +18,11 @@ import sys
 from pathlib import Path
 
 from .daily_digest import DEFAULT_OUT_DIR, DEFAULT_THS_DIR, build_digest
+from .settings import get_settings
 
 
 def main(argv: list[str] | None = None) -> int:
+    get_settings()
     parser = argparse.ArgumentParser(
         prog="stock-platform-digest",
         description="Render a human-readable markdown digest from the brief archive.",

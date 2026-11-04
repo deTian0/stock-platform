@@ -22,7 +22,7 @@
 ## 安装
 
 ```powershell
-cd <repo-root>\packages\research
+cd packages/research
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```

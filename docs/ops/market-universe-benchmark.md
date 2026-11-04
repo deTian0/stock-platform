@@ -65,7 +65,7 @@
 ## 4. 复现
 
 ```powershell
-$py = '<repo-root>\.venv\Scripts\python.exe'
+$py = '<repo-root>/.venv/Scripts/python.exe'
 $env:STOCK_PLATFORM_ENGINE_MARKET_DB = '<engine>/data_cache/market.db'
 Set-Location <repo-root>
 

@@ -95,9 +95,11 @@ Set-Location $repoRoot
 $venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPy) { $venvPy } else { 'python' }
 
-# ---- Load repo-root .env so manual runs match scheduled runs ----------------
-$dotenv = Join-Path $repoRoot '.env'
-if (Test-Path $dotenv) {
+# ---- Load local/.env (fallback: repo-root .env) so manual runs match schedulers ----
+$localEnv = Join-Path $repoRoot 'local\.env'
+$rootEnv = Join-Path $repoRoot '.env'
+$dotenv = if (Test-Path $localEnv) { $localEnv } elseif (Test-Path $rootEnv) { $rootEnv } else { '' }
+if ($dotenv -ne '') {
   Get-Content $dotenv | ForEach-Object {
     $line = $_.Trim()
     if ($line -eq '' -or $line.StartsWith('#')) { return }
@@ -116,13 +118,13 @@ if (Test-Path $dotenv) {
   }
 }
 
-# ---- Resolve cache dir (default under data/ so it survives reboots) ---------
+# ---- Resolve cache dir (default under local/ so it survives reboots) ---------
 if ([string]::IsNullOrWhiteSpace($CacheDir)) {
   if (-not [string]::IsNullOrWhiteSpace($env:STOCK_PLATFORM_WORKBUDDY_CACHE_DIR)) {
     $CacheDir = $env:STOCK_PLATFORM_WORKBUDDY_CACHE_DIR
   }
   else {
-    $CacheDir = Join-Path $repoRoot 'data\workbuddy_cache'
+    $CacheDir = Join-Path $repoRoot 'local\workbuddy_cache'
   }
 }
 $env:STOCK_PLATFORM_WORKBUDDY_CACHE_DIR = $CacheDir

@@ -9,10 +9,14 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-rem Load repo-root .env (workbench does not read dotenv). Skip blanks and # comments.
-if exist ".env" (
-  echo [INFO] Loading .env
-  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+rem Prefer local/.env; fall back to transitional repo-root .env.
+rem Workbench also loads via get_settings(); bat injection keeps older habits working.
+set "DOTENV="
+if exist "local\.env" set "DOTENV=local\.env"
+if not defined DOTENV if exist ".env" set "DOTENV=.env"
+if defined DOTENV (
+  echo [INFO] Loading %DOTENV%
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%DOTENV%") do (
     if not "%%A"=="" set "%%A=%%B"
   )
 )

@@ -12,7 +12,7 @@
   between calls): a no-op evening costs a single trade_cal call. 18:30 gives the
   upstream daily bars time to settle after the 15:00 close.
 
-  This task needs the engine checkout at <engine-root>
+  This task needs the engine checkout at CHANGE_ME_TO_ENGINE_ROOT
   (see -EngineRoot on scripts\ops\Invoke-MarketDbBackfill.ps1 to relocate).
 
   Import (elevated PowerShell), after editing WorkingDirectory / paths:
@@ -70,7 +70,7 @@
       <!-- Edit WorkingDirectory to your clone path before import. -->
       <Command>powershell.exe</Command>
       <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-MarketDbBackfill.ps1" -Mode apply</Arguments>
-      <WorkingDirectory><repo-root></WorkingDirectory>
+      <WorkingDirectory>CHANGE_ME_TO_REPO_ROOT</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

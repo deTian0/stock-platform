@@ -4,6 +4,11 @@ from __future__ import annotations
 
 
 def main() -> None:
+    # Load local/.env before the app reads os.environ (bat is optional).
+    from stock_platform_research.settings import get_settings
+
+    get_settings()
+
     import uvicorn
 
     uvicorn.run(

@@ -64,7 +64,7 @@ from .lvrev import score_lvrev
 from .portfolio import norm_code
 
 #: Default output directory (platform-owned ``data/``; never the engine DB).
-DEFAULT_ATTRIBUTION_OUT_DIR = "data/strategy"
+DEFAULT_ATTRIBUTION_OUT_DIR = "local/strategy"
 
 #: Forward-return horizons, in **trading days**, roughly spanning the platform's
 #: decision windows (``A5`` 1 日 / ``A4`` 5 日 / 引擎最长持有 ~20–40 日）。

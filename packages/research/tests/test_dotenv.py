@@ -179,7 +179,28 @@ def test_find_dotenv_uses_env_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_find_dotenv_walks_up_from_module() -> None:
-    """In a source checkout the repo-root .env is discoverable (if it exists)."""
+    """In a source checkout local/.env (or transitional root .env) is discoverable."""
     found = find_dotenv_path()
     if found is not None:
         assert found.name == ".env"
+        # Prefer local/.env when both exist under the same ancestor.
+        assert found.parent.name in {".", "local"} or found.parent.exists()
+
+
+def test_find_dotenv_prefers_local_over_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_dir = tmp_path / "local"
+    local_dir.mkdir()
+    local_env = local_dir / ".env"
+    root_env = tmp_path / ".env"
+    local_env.write_text("A=local\n", encoding="utf-8")
+    root_env.write_text("A=root\n", encoding="utf-8")
+    monkeypatch.delenv("STOCK_PLATFORM_DOTENV", raising=False)
+    # Isolate discovery from the real checkout's local/.env.
+    monkeypatch.setattr(
+        "stock_platform_research.dotenv._repo_root_candidates",
+        lambda: [tmp_path],
+    )
+    found = find_dotenv_path()
+    assert found == local_env

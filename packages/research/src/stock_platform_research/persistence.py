@@ -16,7 +16,7 @@ from typing import Any, Mapping, Protocol, Sequence
 from urllib.parse import unquote, urlparse
 
 ENV_DB_URL = "STOCK_PLATFORM_DB_URL"
-DEFAULT_DB_URL = "sqlite:///./data/stock_platform.db"
+DEFAULT_DB_URL = "sqlite:///./local/stock_platform.db"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS daily_briefs (
@@ -46,7 +46,7 @@ def default_db_url() -> str:
 def resolve_sqlite_path(db_url: str | None = None) -> str | Path:
     """Parse ``STOCK_PLATFORM_DB_URL`` into a sqlite path or ``:memory:``.
 
-    Accepts ``sqlite:///./data/x.db``, ``sqlite:///:memory:``, or a bare path.
+    Accepts ``sqlite:///./local/x.db``, ``sqlite:///:memory:``, or a bare path.
     """
     raw = (db_url if db_url is not None else default_db_url()).strip()
     if not raw:
@@ -67,7 +67,7 @@ def resolve_sqlite_path(db_url: str | None = None) -> str | Path:
         path = f"{parsed.netloc}{path}"
     if path in {"", "/", "/:memory:"}:
         return ":memory:"
-    # sqlite:///./data/x.db → path="/./data/x.db"
+    # sqlite:///./local/x.db → path="/./local/x.db"
     if path.startswith("/") and len(path) > 1 and path[2:3] == ":":
         # Windows absolute: /C:/Users/...
         return Path(path[1:])
@@ -78,7 +78,7 @@ def resolve_sqlite_path(db_url: str | None = None) -> str | Path:
         # Prefer treating sqlite:///./data as relative; sqlite:////abs as absolute.
         if raw.startswith("sqlite:////"):
             return Path(path)
-        # sqlite:///data/x.db → /data/x.db on Unix absolute; on Windows treat as relative.
+        # sqlite:///local/x.db → /local/x.db on Unix absolute; on Windows treat as relative.
         if os.name == "nt":
             return Path(path.lstrip("/"))
         return Path(path)

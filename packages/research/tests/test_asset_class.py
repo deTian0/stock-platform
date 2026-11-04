@@ -27,12 +27,11 @@ from stock_platform_research import backtest, portfolio
 from stock_platform_research.portfolio import asset_class, compute_metrics, is_etf, is_fund
 
 ENGINE_PATH_ENV = "STOCK_PLATFORM_ENGINE_REPO"
-DEFAULT_ENGINE_PATH = Path(r"<engine-root>\local_backtest.py")
-
-
 def _engine_source() -> str:
     raw = os.environ.get(ENGINE_PATH_ENV)
-    path = Path(raw) if raw else DEFAULT_ENGINE_PATH
+    if not raw:
+        pytest.skip(f"set {ENGINE_PATH_ENV} to the a-stock-engine checkout for this check")
+    path = Path(raw)
     if path.is_dir():
         path = path / "local_backtest.py"
     if not path.is_file():

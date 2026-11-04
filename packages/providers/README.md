@@ -31,7 +31,7 @@
 ## 安装
 
 ```powershell
-cd <repo-root>\packages\providers
+cd packages/providers
 python -m pip install -e ".[dev]"
 python -m pytest -q
 ```

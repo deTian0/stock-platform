@@ -1,10 +1,10 @@
 # `.env` 自动加载契约
 
-> 状态：Accepted｜目标 tag：`v4.1.6`（2026-10-10）
-> 关联：`docs/architecture/0066-refresh-throughput-and-env-loading.md`
-> 实现：`packages/research/src/stock_platform_research/dotenv.py`
+> 状态：Accepted｜目标 tag：`v4.1.6`（2026-10-10）；`local/` 默认路径与 Settings 收口见开源消毒计划实施轮  
+> 关联：`docs/architecture/0066-refresh-throughput-and-env-loading.md` · [`docs/ops/local-runtime.md`](../ops/local-runtime.md)  
+> 实现：`packages/research/src/stock_platform_research/dotenv.py` · `settings.py`
 
-本契约锁定「CLI 如何读取仓库根 `.env`」。解决的真机问题是：`schtasks` 调度的进程**不会**替你 `export` 环境变量，而 `daily_cli._build_provider` 直接读 `os.environ["STOCK_PLATFORM_TUSHARE_TOKEN"]` → 每日自动化**必然**以 `requires STOCK_PLATFORM_TUSHARE_TOKEN` 退出 1。
+本契约锁定「CLI / Workbench 如何读取本机 `.env`」。解决的真机问题是：`schtasks` 调度的进程**不会**替你 `export` 环境变量，而 `daily_cli._build_provider` 直接读 `os.environ["STOCK_PLATFORM_TUSHARE_TOKEN"]` → 每日自动化**必然**以 `requires STOCK_PLATFORM_TUSHARE_TOKEN` 退出 1。
 
 ---
 
@@ -21,10 +21,10 @@
 
 1. `explicit` 实参
 2. `STOCK_PLATFORM_DOTENV`
-3. 从 `Path(__file__).resolve().parents` 逐级向上查找 `.env`
-4. 当前工作目录
+3. 从 `Path(__file__).resolve().parents` 与 cwd 逐级向上查找 **`local/.env`**
+4. 同批向上查找过渡期仓库根 / cwd **`.env`**
 
-**文件不存在不报错**（`load_dotenv` 返回 `{}`）。
+**文件不存在不报错**（`load_dotenv` 返回 `{}`）。复制模板：`.env.example` → `local/.env`。
 
 ## 3. 语义
 
@@ -37,6 +37,9 @@ load_dotenv(path=None, *, override=False, env=None, required=None, force=False) 
 - `env=` 可注入目标映射（默认 `os.environ`），便于测试。
 - `required=[...]`：缺失的键 → 抛 `DotenvMissingError`；否则静默。
 - 返回值 = **实际应用**的键值映射（未覆盖的不计入）。
+
+进程入口应先调用 `get_settings()`（会触发 `load_dotenv()`），再读 `os.environ`。  
+`liveTradingEnabled` **不进** Settings。
 
 ## 4. 解析规则（`parse_dotenv_text`）
 
@@ -60,13 +63,19 @@ load_dotenv(path=None, *, override=False, env=None, required=None, force=False) 
 
 加载器**自身的测试**用 `force=True` 绕过守卫。
 
+根 `conftest.py` 还会把 DB / 绩效 / health / logs / holdings / proxy 等默认路径重定向到会话临时目录（ADR 0069 / 0070），避免单包或全量 pytest 写入 `local/`。
+
 ## 6. 接入点
 
-`load_dotenv()` 是以下 **14 个 CLI** 的 `main()` 首行（`__init__.py` 导出 `find_dotenv_path` / `load_dotenv` / `parse_dotenv_text`）：
+`load_dotenv()` / `get_settings()` 是 research 各 console script 与 `stock-platform-workbench` 的入口约定。契约初版写「14 个 CLI」是 `v4.1.6` 数字；其后又增加 symbol-master、adoption、attribution、workbuddy-bridge、sameday、day-quote、loop-health、ops-ledger、performance-proxy、digest、init 等。**以 `packages/research/pyproject.toml` 的 `[project.scripts]` 为准。**
 
-`daily_cli` · `refresh_cli` · `backtest_cli` · `brief_cli` · `factors_cli` · `hit_tracking_cli` · `market_universe_cli` · `neutralization_cli` · `performance_cli` · `picks_backtest_cli` · `position_review_cli` · `rankings_cli` · `sensitivity_cli` · `strategy_ab_cli`
+特别约定：
+
+- `stock-platform-digest` 与 `stock-platform-workbench` 的 `main()` **必须**调用 `get_settings()`，不依赖 bat 注入。
+- `stock-platform-score` / `stock-platform-report-html` 只吃文件参数，可不加载。
 
 ## 7. 明确不做
 
 - **不下沉到 `providers` 包**：providers 只做 I/O，不碰开发环境约定。
 - **不覆盖已存在的进程变量**：保证 `STOCK_PLATFORM_*` 由调度器显式注入时不被文件改写。
+- **不**把 `liveTradingEnabled` 做成 `.env` 开关。

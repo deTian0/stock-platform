@@ -20,20 +20,29 @@
   validate calibrate the unit conversion against an existing full-coverage day
 
 .PARAMETER EngineRoot
-  Path to the archived a-stock-engine clone. Defaults to the sibling checkout.
+  Path to the archived a-stock-engine clone. Required unless STOCK_PLATFORM_ENGINE_REPO is set.
+  No hardcoded sibling default — fail-closed when unset.
 
 .EXAMPLE
-  .\scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode dry-run
+  .\scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode dry-run -EngineRoot <engine-root>
   .\scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode apply
 #>
 [CmdletBinding()]
 param(
   [ValidateSet('apply', 'dry-run', 'validate')]
   [string]$Mode = 'apply',
-  [string]$EngineRoot = '<engine-root>'
+  [string]$EngineRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($EngineRoot)) {
+  $EngineRoot = [string]$env:STOCK_PLATFORM_ENGINE_REPO
+}
+if ([string]::IsNullOrWhiteSpace($EngineRoot)) {
+  Write-Error "EngineRoot is required (pass -EngineRoot or set STOCK_PLATFORM_ENGINE_REPO). No default sibling path."
+  exit 1
+}
 
 if (-not (Test-Path $EngineRoot)) {
   Write-Error "Engine root not found: $EngineRoot (pass -EngineRoot <path>)"

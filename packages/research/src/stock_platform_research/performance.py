@@ -587,7 +587,7 @@ def default_performance_log_path() -> Path:
     env = os.environ.get("STOCK_PLATFORM_PERFORMANCE_LOG")
     if env:
         return Path(env)
-    return Path.cwd() / "data" / "recommend_decisions.jsonl"
+    return Path.cwd() / "local" / "recommend_decisions.jsonl"
 
 
 def _fill_as_mapping(fill: Any) -> dict[str, Any]:

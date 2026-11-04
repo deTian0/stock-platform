@@ -2,7 +2,7 @@
 
 两种用法：:
 
-    # ① 读取 + 汇总（默认）：写 ./data/health/ops_ledger.{json,md,html}
+    # ① 读取 + 汇总（默认）：写 ./local/health/ops_ledger.{json,md,html}
     stock-platform-ops-ledger
     stock-platform-ops-ledger --no-write          # 只打印
     stock-platform-ops-ledger --ledger D:/tmp/runs.jsonl --recent 20

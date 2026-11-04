@@ -18,7 +18,7 @@
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |
 | [../archive/README.md](../archive/README.md) | v4.2.0–v4.4.0 交接（下一块砖均已落地） | 归档 |
 | [digest-pre-post-redesign.md](digest-pre-post-redesign.md) | 每日简报「盘前 / 盘后」重构（展示分线 + 运行日 OHLC + ②A/②B 双 profile 二次精选 + ③B 详解） | **done（`v4.13.0`）**；`T3` 顺延 `v4.14.0` |
-| [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **已拍板（未执行；开源发布延后）** |
+| [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **本地收束 + 远端历史消毒已执行；公开开源发布仍延后** |
 
 ## 与其它文档的关系
 

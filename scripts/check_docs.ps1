@@ -131,6 +131,8 @@ $required = @(
   'docs/plans/b3-cost-model-milestone.md',
   'docs/plans/dual-line-responsibility.md',
   'docs/plans/duplicate-implementation-convergence.md',
+  'docs/plans/opensource-sanitization.md',
+  'docs/ops/local-runtime.md',
   'docs/archive/README.md',
   'docs/archive/handoffs/handoff-v4.2.0.md',
   'docs/archive/handoffs/handoff-v4.3.0.md',
@@ -219,8 +221,16 @@ if ($changelog -notmatch [regex]::Escape("[$ver]")) {
 }
 
 # Relative markdown links: ](path) or ](path#anchor) — skip http(s), mailto, anchors-only
+# Skip machine-local / IDE scratch so private md cannot fail public CI.
 $mdFiles = Get-ChildItem -Path $root -Recurse -Filter *.md |
-  Where-Object { $_.FullName -notmatch '\\\.git\\' }
+  Where-Object {
+    $_.FullName -notmatch '\\\.git\\' -and
+    $_.FullName -notmatch '\\local\\' -and
+    $_.FullName -notmatch '\\data\\' -and
+    $_.FullName -notmatch '\\\.cursor\\' -and
+    $_.FullName -notmatch '\\\.workbuddy\\' -and
+    $_.FullName -notmatch '\\_[^\\]*\\'
+  }
 
 $linkPattern = '\[([^\]]+)\]\(([^)]+)\)'
 foreach ($file in $mdFiles) {

@@ -550,7 +550,7 @@ def default_picks_ledger_path() -> Path:
     env = os.environ.get(ENV_PICKS_LEDGER)
     if env:
         return Path(env)
-    return Path.cwd() / "data" / PICK_LEDGER_FILENAME
+    return Path.cwd() / "local" / PICK_LEDGER_FILENAME
 
 
 def load_picks_ledger(path: str | Path) -> list[dict[str, Any]]:

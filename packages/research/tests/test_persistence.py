@@ -43,7 +43,7 @@ def _sample_brief(**overrides):
 
 def test_resolve_sqlite_path_relative_and_memory() -> None:
     assert resolve_sqlite_path("sqlite:///:memory:") == ":memory:"
-    p = resolve_sqlite_path("sqlite:///./data/stock_platform.db")
+    p = resolve_sqlite_path("sqlite:///./local/stock_platform.db")
     assert isinstance(p, Path)
     assert "stock_platform.db" in str(p).replace("\\", "/")
 

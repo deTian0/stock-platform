@@ -48,6 +48,8 @@ python -m pip install -e ".\packages\research[dev]"
 python -m pip install -e ".\packages\agents[dev]"
 python -m pip install -e ".\packages\execution[dev]"
 python -m pip install -e ".\apps\workbench[dev]"
+Copy-Item .env.example local\.env   # 填写 token / market.db 路径；勿提交
+stock-platform-init                 # 空库 seed 可改配置行（不打开实盘）
 $env:STOCK_PLATFORM_PROVIDER_PRESET = "replay"   # 全量 pytest 零公网
 python -m pytest packages apps -q
 Remove-Item Env:STOCK_PLATFORM_PROVIDER_PRESET   # 生产启动用 live 默认
@@ -57,11 +59,12 @@ python -m stock_platform_workbench
 # → http://127.0.0.1:3018/api/ops/health
 ```
 
+本机运行时目录：[`docs/ops/local-runtime.md`](docs/ops/local-runtime.md)。  
 Live 运维说明：[`docs/ops/live-startup.md`](docs/ops/live-startup.md)。
 日数据刷新（离线 replay fixtures）：
 
 ```powershell
-stock-platform-refresh --asof 2026-09-02 --universe path\to\universe.json --out D:\data\refresh --provider replay --fixtures path\to\fixtures
+stock-platform-refresh --asof 2026-09-02 --universe path\to\universe.json --out $env:TEMP\refresh --provider replay --fixtures path\to\fixtures
 ```
 
 盘前简报 CLI：

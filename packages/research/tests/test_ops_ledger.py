@@ -272,7 +272,7 @@ def test_default_dir_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 def test_default_dir_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("STOCK_PLATFORM_OPS_LEDGER_DIR", raising=False)
-    assert default_ops_ledger_dir() == Path("./data/logs")
+    assert default_ops_ledger_dir() == Path("./local/logs")
 
 
 def test_task_label_unknown_passes_through() -> None:

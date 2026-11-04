@@ -47,7 +47,7 @@ from typing import Any, Mapping, Sequence
 # 台账文件与目录。目录可用 ``STOCK_PLATFORM_OPS_LEDGER_DIR`` 覆盖。
 OPS_LEDGER_FILENAME = "runs.jsonl"
 ENV_OPS_LEDGER_DIR = "STOCK_PLATFORM_OPS_LEDGER_DIR"
-DEFAULT_OPS_LEDGER_OUT_DIR = "./data/logs"
+DEFAULT_OPS_LEDGER_OUT_DIR = "./local/logs"
 DEFAULT_RUNS_RECENT = 12
 RUNS_MAX_RECORDS = 400
 
@@ -80,7 +80,7 @@ def _error_text(exc: BaseException) -> str:
 
 
 def default_ops_ledger_dir() -> Path:
-    """台账目录：``STOCK_PLATFORM_OPS_LEDGER_DIR`` 优先，否则 ``./data/logs``。"""
+    """台账目录：``STOCK_PLATFORM_OPS_LEDGER_DIR`` 优先，否则 ``./local/logs``。"""
     raw = os.environ.get(ENV_OPS_LEDGER_DIR, "").strip()
     return Path(raw) if raw else Path(DEFAULT_OPS_LEDGER_OUT_DIR)
 

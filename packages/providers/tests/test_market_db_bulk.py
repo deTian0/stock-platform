@@ -24,12 +24,13 @@ from stock_platform_providers.market_db_bulk import (
 )
 
 ENGINE_ENV = "STOCK_PLATFORM_ENGINE_MARKET_DB"
-DEFAULT_DB = Path("<engine>/data_cache/market.db")
 
 
 def _resolve_db() -> Path | None:
     raw = (os.environ.get(ENGINE_ENV) or "").strip()
-    candidate = Path(raw) if raw else DEFAULT_DB
+    if not raw:
+        return None
+    candidate = Path(raw)
     return candidate if candidate.is_file() else None
 
 

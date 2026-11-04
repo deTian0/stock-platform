@@ -2,7 +2,7 @@
 
 Examples::
 
-    stock-platform-loop-health                       # 写 ./data/health/{json,md,html} + 追加 history.jsonl
+    stock-platform-loop-health                       # 写 ./local/health/{json,md,html} + 追加 history.jsonl
     stock-platform-loop-health --no-write            # 只打印（也不写台账）
     stock-platform-loop-health --out-dir D:/tmp/h    # 指定输出目录（台账随之）
     stock-platform-loop-health --no-history          # 写报告但不追加趋势台账
@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--db", default=None, help="平台 SQLite（默认 STOCK_PLATFORM_DB_URL）")
     p.add_argument("--market-db", default=None, help="引擎 market.db（默认环境变量）")
     p.add_argument("--perf-log", default=None,
-                   help="绩效 JSONL（默认 STOCK_PLATFORM_PERFORMANCE_LOG 或 ./data/recommend_decisions.jsonl）")
+                   help="绩效 JSONL（默认 STOCK_PLATFORM_PERFORMANCE_LOG 或 ./local/recommend_decisions.jsonl）")
     p.add_argument("--asof", default=None, help="体检时点（默认今天）")
     p.add_argument("--holding", type=int, default=5, help="持有窗口（默认 5 个交易日）")
     p.add_argument("--coverage-lookback-days", type=int, default=None,
@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
                    help=f"趋势台账路径（默认 <out-dir>/{LOOP_HEALTH_HISTORY_FILENAME}）")
     p.add_argument("--no-history", action="store_true", help="不追加趋势台账")
     p.add_argument("--ops-ledger", type=Path, default=None,
-                   help="调度执行台账路径（默认 STOCK_PLATFORM_OPS_LEDGER_DIR 或 ./data/logs/runs.jsonl）")
+                   help="调度执行台账路径（默认 STOCK_PLATFORM_OPS_LEDGER_DIR 或 ./local/logs/runs.jsonl）")
     p.add_argument("--ops-recent", type=int, default=DEFAULT_RUNS_RECENT,
                    help=f"执行台账保留最近多少次（默认 {DEFAULT_RUNS_RECENT}）")
     p.add_argument("--brief-window", type=int, default=DEFAULT_BRIEF_WINDOW_DAYS,

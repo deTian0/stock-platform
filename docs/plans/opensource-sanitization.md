@@ -2,8 +2,7 @@
 
 > 日期：2026-11-04（拍板回写同日）  
 > 现状版本：`v4.13.7`（`VERSION` / tag / `CHANGELOG` 对齐）  
-> **状态：本地收束 + 远端历史清理已拍板；公开开源发布延后**（无许可证、不发 GitHub Releases 叙事）。  
-> 性质：计划已拍板，**尚未执行**破坏性步骤。写 / 回写本文件时没有跑 `git filter-repo`、没有删 tag、没有删分支、没有 force push、没有 commit、没有 push；本轮只盘点草稿并把决策落进本文。
+> **状态：本地收束已落地；远端历史消毒进行中/已完成（见文末验收勾选）。公开开源发布仍延后**（无许可证、不发 GitHub Releases 叙事）。
 
 相关入口：[`../STATUS.md`](../STATUS.md)、[`../README.md`](../README.md)、[`../contracts/dotenv-loading.md`](../contracts/dotenv-loading.md)、[`../architecture/0066-refresh-throughput-and-env-loading.md`](../architecture/0066-refresh-throughput-and-env-loading.md)、[`../architecture/0069-test-data-isolation.md`](../architecture/0069-test-data-isolation.md)、[`../architecture/0064-live-trading-charter.md`](../architecture/0064-live-trading-charter.md)、[`../contracts/compliance-boundary.md`](../contracts/compliance-boundary.md)、[`../versioning.md`](../versioning.md)。
 
@@ -17,7 +16,7 @@
 | 4 | 旧提交正文 | 本机路径、持仓描述一并 `--replace-text` 脱敏（替换表放 `local/replacements.txt`，不入库） |
 | 5 | 推送目标与分支 | 推到现有 `deTian0/stock-platform`（需 force push）；**仅保留一个分支**（实测为 `main`），其它本地/远端分支删除（见「分支策略」） |
 | 6 | 远端 tag | 删除远端多余 tag（保留上表 11 个；改写后在新 SHA 上重打） |
-| 7 | 文档里的券商 / 资金 / 具体持仓 | **不需要改动**正文。该建议应落在**数据库**中、可随时修改；新系统若目标库没有此行，应做数据初始化（填必填字段），或开放初始化 CLI 供其他 agent 调用（见「产品 / 配置初始化」；**非本轮实施**） |
+| 7 | 文档里的券商 / 资金 / 具体持仓 | **不需要改动**正文。该建议已落 **DB + `stock-platform-init`**（见「产品 / 配置初始化」） |
 | 8 | stash / 未跟踪草稿 | 必须实测列出（见「改写前工作区盘点」） |
 | 9 | 公开许可证 / 开源发布 | **不着急**。产品还要迭代很多，等成熟了才开源。因此：仍可做私有目录 / 配置收口 / 历史作者改写 / 删多余 tag 与分支并 force push 到现有仓；**不等于宣布开源**（无许可证、不发 GitHub Releases 叙事） |
 
@@ -337,7 +336,7 @@ research 的 26 个 console script 里，**23 个** `main()` 调用了 `load_dot
 | 与 holdings | 真实持仓快照仍在被忽略的 `local/holdings.json`（或现有路径）；DB 行可存「默认持仓路径 / 名义仓」元数据，**不要**把完整实盘持仓 JSON 提交进 git |
 | SIMULATE 红线 | `STOCK_PLATFORM_BROKER` 默认 `paper`；`liveTradingEnabled` **不进** Settings、不进 init seed 的可开项。本工作项只做配置落库与空库初始化 |
 
-本工作项挂在分阶段顺序的配置收口之后或并行准备，**本轮只写入计划，不写业务代码、不实现 CLI**。
+本工作项已随配置收口落地：`runtime_config.py` + `stock-platform-init`。
 
 #### 默认值与 fail-closed
 
@@ -409,7 +408,7 @@ research 的 26 个 console script 里，**23 个** `main()` 调用了 `load_dot
    脚本 / 帮助文本去掉本机绝对路径（**文档里的券商 / 资金 / 持仓正文不改**）；`.gitignore` 增加 `/local/` 与 `.workbuddy/`；把现有 `data/` 和根 `.env` 复制到 `local/`（复制是本地操作，目录已被忽略）。确认 `git status` 不出现这些文件。
 2. **配置收口**  
    加 `Settings`，默认路径改到 `local/`，补上 digest / workbench 的加载，更新 `.env.example` 与 dotenv 契约，扩大测试隔离。业务阈值语义不变。实盘开关不加。  
-   **并行 / 随后（非本轮）**：产品 / 配置初始化（DB 行 + `stock-platform-init` CLI），见上节。
+   **已落地**：产品 / 配置初始化（DB 行 + `stock-platform-init` CLI），见上节与 `docs/ops/local-runtime.md`。
 3. **文档指针**  
    根 README 与包 README 改短并链到 `docs/`。`docs/plans/README.md` 与 `check_docs` 的 `$required` 登记本计划。修正 STATUS 里「工作区干净」的过时句子。不打平 `docs/`。**不**为开源改写 0064 / compliance 持仓句。
 4. **最后才改写历史并整理 tag / 分支**  

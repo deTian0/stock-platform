@@ -32,8 +32,8 @@ from .persistence import BriefRecord, open_brief_repository
 from .report_html import render_report_html
 
 ENV_PERF_LOG = "STOCK_PLATFORM_PERFORMANCE_LOG"
-DEFAULT_PERF_LOG = "./data/recommend_decisions.jsonl"
-DEFAULT_OUT_DIR = "./data/digests"
+DEFAULT_PERF_LOG = "./local/recommend_decisions.jsonl"
+DEFAULT_OUT_DIR = "./local/digests"
 
 _DISCLAIMER = "研究简报，非投资建议；环境 SIMULATE，liveTradingEnabled 恒为 false。"
 
@@ -41,7 +41,7 @@ _DISCLAIMER = "研究简报，非投资建议；环境 SIMULATE，liveTradingEna
 THS_IMPORT_PER_LINE = 5
 
 # 同花顺「导入自选」txt 落盘目录（每行 1 个 6 位码）。默认与 data/digests 同级。
-DEFAULT_THS_DIR = "./data/ths_import"
+DEFAULT_THS_DIR = "./local/ths_import"
 
 
 def _perf_log_path() -> Path:
@@ -1217,7 +1217,7 @@ def build_digest(
             symbols.append(_BENCHMARK)
             from .quotes import load_ohlc
 
-            cache = Path(cache_dir) if cache_dir is not None else Path("./data/quotes")
+            cache = Path(cache_dir) if cache_dir is not None else Path("./local/quotes")
             loaded, err = load_ohlc(
                 [s for s in symbols if s],
                 qd or rd,

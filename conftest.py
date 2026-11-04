@@ -1,27 +1,28 @@
 """Repo-root pytest guard — the test suite must never write the production data dir.
 
 ``stock-platform`` resolves its authoritative *runtime* stores from cwd-relative
-defaults (``ADR 0049`` / ``ADR 0057``):
+defaults (``ADR 0049`` / ``ADR 0057`` / local-runtime layout):
 
-    brief archive + hit cycles : ``STOCK_PLATFORM_DB_URL``            -> ``./data/stock_platform.db``
-    performance decision log   : ``STOCK_PLATFORM_PERFORMANCE_LOG``    -> ``./data/recommend_decisions.jsonl``
+    brief archive + hit cycles : ``STOCK_PLATFORM_DB_URL``            -> ``./local/stock_platform.db``
+    performance decision log   : ``STOCK_PLATFORM_PERFORMANCE_LOG``    -> ``./local/recommend_decisions.jsonl``
+    plus digest / health / logs / holdings / proxy / quotes defaults under ``./local/``
 
 A test that drives the daily CLI / pipeline (or the workbench routes) without
-overriding those two writes straight into the repo's real ``data/``. That is not
-a theoretical risk: ``test_daily_cli_settle_after_logs_performance`` did exactly
-this, upserting a fixture brief for ``2026-09-02`` into the production archive on
-*every* full-suite run. Because the digest renders the latest ``asof``, the
-polluted row shadowed the genuine brief and the user-visible daily report went
+overriding those writes straight into the repo's real ``local/`` (or legacy
+``data/``). That is not a theoretical risk: ``test_daily_cli_settle_after_logs_performance``
+did exactly this, upserting a fixture brief for ``2026-09-02`` into the production
+archive on *every* full-suite run. Because the digest renders the latest ``asof``,
+the polluted row shadowed the genuine brief and the user-visible daily report went
 blank (``ADR 0069``).
 
-Redirect both stores for the whole session **at import time** — before any test
+Redirect guarded stores for the whole session **at import time** — before any test
 module body (or ``.env`` load) can capture the production defaults — and hand
 the scratch dir back at exit. Set ``STOCK_PLATFORM_TEST_DATA_DIR`` to keep a copy
 of the scratch files for debugging instead of discarding them.
 
 Import-time setup alone proved insufficient: a test that assigns or deletes these
 variables directly (instead of using ``monkeypatch``) re-points *every later test*
-at the repo ``data/`` — one new test did exactly that and re-introduced the very
+at the repo runtime dir — one new test did exactly that and re-introduced the very
 pollution this file exists to prevent. So the redirect is also **re-asserted
 before every test** by an autouse fixture, which makes the guard idempotent and
 self-healing (``ADR 0070``).
@@ -38,7 +39,16 @@ from pathlib import Path
 import pytest
 
 #: Env vars that decide where the *runtime* stores live.
-GUARDED_ENV = ("STOCK_PLATFORM_DB_URL", "STOCK_PLATFORM_PERFORMANCE_LOG")
+GUARDED_ENV = (
+    "STOCK_PLATFORM_DB_URL",
+    "STOCK_PLATFORM_PERFORMANCE_LOG",
+    "STOCK_PLATFORM_PERFORMANCE_PROXY_LOG",
+    "STOCK_PLATFORM_LOOP_HEALTH_DIR",
+    "STOCK_PLATFORM_OPS_LEDGER_DIR",
+    "STOCK_PLATFORM_HOLDINGS_PATH",
+    "STOCK_PLATFORM_PICKS_LEDGER",
+    "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR",
+)
 
 _scratch = Path(tempfile.mkdtemp(prefix="stock-platform-tests-"))
 _saved: dict[str, str | None] = {key: os.environ.get(key) for key in GUARDED_ENV}
@@ -46,6 +56,12 @@ _saved: dict[str, str | None] = {key: os.environ.get(key) for key in GUARDED_ENV
 _REDIRECT: dict[str, str] = {
     "STOCK_PLATFORM_DB_URL": f"sqlite:///{(_scratch / 'briefs.db').as_posix()}",
     "STOCK_PLATFORM_PERFORMANCE_LOG": str(_scratch / "recommend_decisions.jsonl"),
+    "STOCK_PLATFORM_PERFORMANCE_PROXY_LOG": str(_scratch / "performance_proxy.jsonl"),
+    "STOCK_PLATFORM_LOOP_HEALTH_DIR": str(_scratch / "health"),
+    "STOCK_PLATFORM_OPS_LEDGER_DIR": str(_scratch / "logs"),
+    "STOCK_PLATFORM_HOLDINGS_PATH": str(_scratch / "holdings.json"),
+    "STOCK_PLATFORM_PICKS_LEDGER": str(_scratch / "picks_ledger.jsonl"),
+    "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR": str(_scratch / "workbuddy_cache"),
 }
 os.environ.update(_REDIRECT)
 

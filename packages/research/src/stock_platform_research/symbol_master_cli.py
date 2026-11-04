@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--db",
         default=None,
-        help="SQLite path/URL (default STOCK_PLATFORM_DB_URL or ./data/stock_platform.db)",
+        help="SQLite path/URL (default STOCK_PLATFORM_DB_URL or ./local/stock_platform.db)",
     )
     p.add_argument(
         "--market-db",

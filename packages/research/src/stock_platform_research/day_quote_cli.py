@@ -41,8 +41,8 @@ from .persistence import open_brief_repository
 from .symbol_master import name_map_from_master
 
 _REPO = Path(__file__).resolve().parents[4]
-DEFAULT_HOLDINGS = _REPO / "data" / "holdings.json"
-DEFAULT_CACHE_DIR = _REPO / "data" / "quotes"
+DEFAULT_HOLDINGS = _REPO / "local" / "holdings.json"
+DEFAULT_CACHE_DIR = _REPO / "local" / "quotes"
 LOOKBACK_DAYS = 120  # 覆盖 MA20 + 20 日均量 + 停牌缓冲
 
 
