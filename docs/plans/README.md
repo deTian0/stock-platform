@@ -1,28 +1,29 @@
 # 计划与路线图文档
 
-> **SSOT**：本目录。原 `.cursor/plans/*.md` 仅保留指向此处的短链索引。
+> **现行快照**：[`../STATUS.md`](../STATUS.md)（`v4.13.7`）。本目录只放**仍有效**的计划。已落地的 v4.2–v4.4 交接在 [`../archive/`](../archive/README.md)。  
+> **SSOT**：`docs/`。原 `.cursor/plans/*.md` 仅保留指向此处的短链索引。
 
 | 文档 | 说明 | 状态（摘要） |
 |------|------|----------------|
 | [workspace-projects-capability-inventory.md](workspace-projects-capability-inventory.md) | 工作区八仓能力盘点（合并输入，不实施） | 盘点日 2026-09-15 |
 | [capability-domain-merge-roadmap.md](capability-domain-merge-roadmap.md) | 按能力域合并路线图（非整仓） | Now/Next/Later 余量已 done；M-E4 实盘仍门禁 |
-| [usable-recommend-review-milestones.md](usable-recommend-review-milestones.md) | 真实可用「选股推荐 + 复盘」U1–U8 | 日用可用轨道 |
+| [usable-recommend-review-milestones.md](usable-recommend-review-milestones.md) | 真实可用「选股推荐 + 复盘」U1–U8 | done |
 | [market-report-dashboard-merge-milestones.md](market-report-dashboard-merge-milestones.md) | 情报看板 Skill 配方吸收（MR-1…） | **v3.12.5：MR-1…MR-5 done**；M-E4 仍门禁 |
 | [m-d1-capability-gap-matrix.md](m-d1-capability-gap-matrix.md) | M-D1：能力矩阵 × Skill 端点缺口对照 | done |
 | [m-r1-tsp-backtest-first-knife.md](m-r1-tsp-backtest-first-knife.md) | M-R1：TSP 回测首刀选型（walk-forward） | done |
 | [m-a1-tradingagents-portability.md](m-a1-tradingagents-portability.md) | M-A1：TradingAgents 可移植清单 | done |
-| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R/T/Y 九域） | `G`/`B`/`X`/`S` 域全 done；**`C` 域（C1/C2/C3）全部收官**；`P0` 生产可用线 done 至 `v4.9.0`（调度 + 日报 + 绩效 PnL + 循环自足 + 报告 HTML + THS 导入 + 名称根治 + 日用循环健康度体检 + 绩效代理台账 + **体检出口与趋势台账**）；**`R` 域进行中**：`R1`/`R2`/`R3`/`R4` done（`v4.6.1`/`v4.6.2`/`v4.7.0`/`v4.7.1`），`R5` ETF 进宇宙 待做（**被生产侧 ETF 回补卡住**）；**`T` 域（循环可信度与运营）进行中**：`T1` 健康度出口与趋势台账 **done（`v4.9.0`）**、`T2` 调度执行台账 + brief 连续性 **done（`v4.9.1`）**，`T3` 数据质量体检 **顺延 `v4.14.0`**（先让 `Y1`、再让 `Y3`、后让 A6、再让简报盘前/盘后重构；`v4.12.0` 由 A6 占用、`v4.13.0` 由简报重构占用）；**`Y` 域（收益增强）进行中**：`Y1` 策略采纳闸门 **done（`v4.10.0`）**、`Y3` 收益归因 / 负收益根因诊断 **done（`v4.11.0`）**、`Y2` 采纳落地 待人工签核；`L1` P0 纯模拟盘（`L2`/`L3` 门禁） |
+| [trading-system-roadmap.md](trading-system-roadmap.md) | 自有线路线图（G/B/S/X/L/C/R/T/Y 九域） | 现行开放项见 [`../STATUS.md`](../STATUS.md)：`T3` → `v4.14.0`；`R5` 等生产侧 ETF 回补；`Y2` 等人工签核。G/B/S/X/C 与 R1–R4、T1–T2、Y1、Y3、L1 已 done |
 | [dual-line-responsibility.md](dual-line-responsibility.md) | 双线职责边界（引擎线 ↔ 平台线，`C1`） | done |
 | [duplicate-implementation-convergence.md](duplicate-implementation-convergence.md) | `C3` 双线重复实现收敛清单（18 项，只定边界不删代码） | done（`v4.6.2`，由 `R2` 收口） |
 | [b3-cost-model-milestone.md](b3-cost-model-milestone.md) | B3：费用与摩擦模型对齐（里程碑方案） | done（`v3.13.3`） |
-| [handoff-v4.2.0.md](handoff-v4.2.0.md) | 交接：v4.2.0 → 下一块砖（绩效 PnL 闭环） | 历史交接 |
-| [handoff-v4.3.0.md](handoff-v4.3.0.md) | 交接：v4.3.0 → 下一块砖（闭环每日自然累积） | 历史交接 |
-| [handoff-v4.3.1.md](handoff-v4.3.1.md) | 交接：v4.3.1 → 下一块砖（首个无人值守结算） | 历史交接 |
-| [handoff-v4.4.0.md](handoff-v4.4.0.md) | 交接：v4.4.0 → 下一块砖（循环自足，等首个自然结算） | 当前交接 |
+| [../archive/README.md](../archive/README.md) | v4.2.0–v4.4.0 交接（下一块砖均已落地） | 归档 |
 | [digest-pre-post-redesign.md](digest-pre-post-redesign.md) | 每日简报「盘前 / 盘后」重构（展示分线 + 运行日 OHLC + ②A/②B 双 profile 二次精选 + ③B 详解） | **done（`v4.13.0`）**；`T3` 顺延 `v4.14.0` |
+| [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **已拍板（未执行；开源发布延后）** |
 
 ## 与其它文档的关系
 
+- 现行快照：[`../STATUS.md`](../STATUS.md)  
 - 历史里程碑叙事：[`../ROADMAP.md`](../ROADMAP.md)  
+- 已落地交接：[`../archive/README.md`](../archive/README.md)  
 - 上游红线：[`../upstream-archive.md`](../upstream-archive.md)  
 - 上游配方摘要：[`../upstream/`](../upstream/)  

@@ -30,10 +30,12 @@ CI 对齐：`.github/workflows/ci.yml` 的 `monorepo` job 跑同一条 pytest；
 
 | 路径 | 用途 |
 |------|------|
+| `docs/STATUS.md` | 现行快照（版本、未完成项、下一刀） |
 | `docs/README.md` | 文档分类索引（SSOT 入口） |
 | `docs/contracts/` | 对外契约；破坏性变更必须记 ADR |
 | `docs/architecture/` | ADR，编号递增 |
-| `docs/plans/` | 能力盘点、合并路线图、U 线与选型清单 |
+| `docs/plans/` | 仍有效的计划：九域路线图、U 线、MR 线、选型清单 |
+| `docs/archive/` | 已落地的历史交接 |
 | `docs/ops/` | 运维与诚实性说明 |
 | `docs/engineering/` | OpenAPI / 测试分层 / CI |
 | `docs/upstream/` | 上游配方只读摘要 |

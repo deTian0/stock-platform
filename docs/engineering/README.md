@@ -1,6 +1,6 @@
 # 工程说明
 
-本目录放 OpenAPI、测试分层与 CI 等**工程向**短文；产品契约仍在 [`../contracts/`](../contracts/)，运维在 [`../ops/`](../ops/)。
+本目录放 OpenAPI、测试分层与 CI 等**工程向**短文。现行产品状态在 [`../STATUS.md`](../STATUS.md)；契约在 [`../contracts/`](../contracts/)，运维在 [`../ops/`](../ops/)。
 
 | 文档 | 说明 |
 |------|------|

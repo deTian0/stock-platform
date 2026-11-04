@@ -1,10 +1,10 @@
 # 交易系统推进路线图（自有线）
 
-> **状态**：planned（初版 2026-10-09）
-> **版本基线**：`v3.12.5`
-> **职责**：定义 `stock-platform` 在既有路线图见底之后的**新推进主线**；覆盖 回测 / 策略 / 选股 / 实盘 / 双线收口 五个方向。
+> **状态**：进行中。现行开放项以 [`../STATUS.md`](../STATUS.md) 为准（2026-11-04，`v4.13.7`）。
+> **版本基线**：现行 `v4.13.7`。下文 §0 的 `v3.12.5` 是本文件初版时的对照点。
+> **职责**：定义 `stock-platform` 在既有路线图见底之后的**新推进主线**；覆盖 回测 / 策略 / 选股 / 实盘 / 双线收口，以及后来补上的 R / T / Y。
 > **不改写**：`docs/ROADMAP.md`（M0–M47 / Phase A–E）与 `docs/plans/` 既有 U1–U8、M-D/R/A/U/E/S、MR-1–MR-5 的 done 叙事。
-> **上游依据**：本次体检结论见 §7。
+> **上游依据**：初版体检结论见 §7。
 
 ---
 
@@ -20,6 +20,8 @@
 | `market-report-dashboard-merge-milestones.md` | MR-1–MR-5 | 全 done |
 
 **结论**：既有规划体系已执行到尽头，唯一的未开工项是 `M-E4`（实盘），且其原文标注「未立项前禁止开工」。因此「继续完善」不能靠接续旧计划，**必须重开产品目标**——本文件即该目标的可执行展开。
+
+**现行余量（2026-11-04，`v4.13.7`）**不在上表，见 [`../STATUS.md`](../STATUS.md)：下一刀是 `T3`（目标 `v4.14.0`）；`R5` 仍等生产侧 ETF 回补；`Y2` 仍等人工签核。
 
 同时存在两个未绑定的工程事实（详见 §7）：
 
@@ -187,7 +189,7 @@
 |----|------|------|----------|----------|
 | **T1** | 循环健康度出口与趋势台账 | M | `v4.9.0`（大） | **done（2026-10-14）** Workbench 新增 `GET /api/ops/loop-health`（只读转发 `collect_loop_health`，**零业务逻辑**；供数段落在 `COVERAGE_HARD_FAIL` → 503 fail-closed，其余降级仍 200）+ `#health` 面板（导航「体检」：裁决徽标 + 六段表 + 近 N 天趋势 + 原始 JSON）；`loop_health` 增**趋势面** `history` —— `history.jsonl` 追加台账（`append_history`，fail-open、超 400 行裁剪）+ `read_history` / `summarize_history`（按 `asof` 去重、**含本次**）给出 `degradedStreak` / `blockedStreak` / `notOkStreak` / `streakSince` / `recent`；**`history` 不参与裁决**（裁决仍只看六路信号当下快照）；同轮修正 `coverage` 硬失败档 —— `error`（库不可读）/ `unconfigured` 曾在 `v4.7.0` 被误判 `ok`，现已并入 `COVERAGE_HARD_FAIL`；ADR `0075` + 契约 `docs/contracts/loop-health.md` 扩写（新增 §4.6 / §8）；真机实测裁决 `degraded`（brief 停更 + 真实样本 3<20，供数已恢复 ✅）、`degradedStreak=1` |
 | **T2** | 调度与回补执行台账 + brief 连续性守卫 | M | `v4.9.1`（小） | **done（2026-10-14）** 新增 `research.ops_ledger` 单点 + CLI `stock-platform-ops-ledger`：append-only 台账 `data/logs/runs.jsonl`（`record_run` 唯一写、**fail-open**、`task` 为空拒绝、超 400 行裁旧）汇总「每任务最近一次 时刻/退出码/耗时/**连续失败** + 最近 N 次」（`read_runs` / `summarize_runs` 纯函数 / `collect_ops_ledger` 段形状，缺失 → `unavailable` fail-closed）；新增**调度包装器** `scripts/ops/Invoke-ScheduledRun.ps1`（任务预设 `daily` 08:30 / `postmarket` 15:30 / `marketdb-backfill` 18:30，**子进程**运行目标保证总能记行、best-effort 记账不改退出码、退出码原样透传），三个既有自动化已切到包装器；`loop_health` 增两路信号 —— `briefContinuity`（近 5 个**交易日**的 brief 覆盖，**缺日逐个列出** + `coverageRatio`）与 `opsLedger`（只读汇总）；**brief 缺日 / 任务连续失败 ≥2 次 → degraded**（观测面信号，**永不阻断**）；ADR `0076` + 契约 `docs/contracts/ops-ledger.md`；真机实测台账 `status=ok`、`briefContinuity` 标出 3 个缺日（`10-08`/`10-13`/`10-14`） |
-| **T3** | 数据质量体检单点 | M | `v4.11.0`（大，**因 `Y1` 先落地而顺延**） | 新增 `research.data_quality` 单点 + CLI `stock-platform-data-quality`：**零网络只读**扫 `market.db` —— 单位口径一致性（复用 `pct_scale` 拟合投票，标出疑似 小数/百分点 混用的码）/ 停牌与零成交占比 / 除权跳变（`close` 单日跳变超阈值且无对应复权）/ 脏码（非 6 位码、ETF 前缀表外）/ 指数·ETF 覆盖缺口 → JSON + Markdown；并入 `loop_health` 作为**又一路**信号（严重项 → degraded，但**永不阻断**选股） |
+| **T3** | 数据质量体检单点 | M | `v4.14.0`（大；原槽 `v4.11.0` 被 `Y3` 占用后再顺延，见 §5） | 新增 `research.data_quality` 单点 + CLI `stock-platform-data-quality`：**零网络只读**扫 `market.db` —— 单位口径一致性（复用 `pct_scale` 拟合投票，标出疑似 小数/百分点 混用的码）/ 停牌与零成交占比 / 除权跳变（`close` 单日跳变超阈值且无对应复权）/ 脏码（非 6 位码、ETF 前缀表外）/ 指数·ETF 覆盖缺口 → JSON + Markdown；并入 `loop_health` 作为**又一路**信号（严重项 → degraded，但**永不阻断**选股） |
 
 **约束（承接 R 域 / C 域 / ADR 0058）**：T 域**只读** —— 体检与台账只读 `market.db`（`mode=ro`）与平台自有 `data/`；**不做生产侧回补、不写行情库**；面板不引入前端框架（手写 SVG，对齐 `B6` 口径）。
 
@@ -382,3 +384,7 @@ Y1 ← B5（规则单点）+ X4（回放单点）+ S3/S4（候选来源）；Y2 
 | 2026-10-28 | **简报盘前/盘后分线 + 双 profile 二次精选（`v4.13.0`）**：08:30 与 15:30 此前参数完全相同、产出两份只有生成时间不同的简报。新增展示参数 `-Session pre\|post`（流水线参数、asof=T-1 均不动），包装脚本在改写 asof 前记下运行日并显式传 `--run-date`；digest **不调 `date.today()`**。产物 `{asof}-pre.*` 与 `{asof}-post.*` 并存（此前只留最后一份），`latest.*` 降级为最后渲染的别名。盘后补当日开/收/涨跌（外部日线 + A6 同形缓存，涨跌自算）。新增纯展示层 `secondary_pick.py`：②A 10 进 N、②B pool 扩到 10 后同样 10 进 N，带落选原因、不足 N 只如实少给；生产榜 / 同花顺 / 命中追踪 / picks 回测**零变动**。**同轮修两个设计硬伤**：① 草案的短线 `rs20 >= -3` 绝对门槛使 ②B **10 进 0 全灭**（`rs20` 是 `close/ma20-1`，不是 RS，而内核按构造只选 MA20 下方的票）→ 删除门槛、成交额 3000 万降到 1000 万；② 短线「位置」钟形恒 0 分使 50% 权重空转 → 改动量 45% / 量能 30% / 波动活跃 25%。另修 11 处展示层缺陷（空标题 / 章节编号断档 / ②B 0 入选仍给导入码 / ③A·③C 备注恒 `-` / HTML 双 H1 等）。ADR `0083` + 方案 `docs/plans/digest-pre-post-redesign.md`；全量 **1293 passed**。**`T3` 顺延至 `v4.14.0`** |
 | 2026-10-28 | **简报标题日期口径修正（`v4.13.1`）**：`v4.13.0` 的标题为 `# 每日简报 · 盘后 · {asof}`，盘前与盘后**共用同一个 `asof`（T-1）**，而盘后正文第一列是 `开盘(T)/收盘(T)/涨跌(T)` ⇒ 标题日期与内容日期冲突，且两份产物都叫 `{asof}-pre/post`。修正为「**报告日 = 运行日**」：标题 `…· 2026-10-28（选股基准 2026-10-27）`（`reportDay == asof` 时无括注），文件名同改 `{reportDay}-pre|post`，`build_digest` 增 `reportDate`；`asof` 语义与 brief 主键不动，流水线参数（`-PrevSession`）不动。全量 **1295 passed**（+2 锁口径用例）。|
 | 2026-10-28 | **同花顺导入 txt 文件名改用报告日（`v4.13.2`）**：`v4.13.1` 只改了 digest 本体，`data/ths_import/{asof}.txt` / `{asof}_short.txt` 仍以选股基准日命名 ⇒ 报告标题 10-28、导入文件 10-27。`write_ths_import` 的日期参数由 `asof` 正名为 `day`，调用点传 `report_day`；产物改 `{reportDay}.txt` / `{reportDay}_short.txt`，`latest*` 指针不变；导入码内容仍取生产榜，口径零变动。历史文件不重命名。全量 **1295 passed** |
+| 2026-10-29 | **二次精选同花顺导入块（`v4.13.3`）**：②A / ②B 各给一块可复制导入码，并落 `data/ths_import/{reportDay}_quality_sec.txt` / `_short_sec.txt`。短线 md 块回到生产榜，与 `_short.txt` 对齐；二次精选单独成块。ADR `0084` |
+| 2026-10-30 | **盘后 OHLC 三列兜底（`v4.13.4`–`v4.13.6`）**：东财整批失败改为分批重试；腾讯 / 新浪当日快照作第二、第三源（ADR `0085`）；本机出口同时打挂时再加 westock CLI 第四源（ADR `0086`）。生产默认仍是 `cn_astock_http`。顺带记下、未修：`5` 开头沪市基金前缀判错，以及 `000905` 基准不是中证 500 |
+| 2026-11-04 | **体检 brief 到期口径（`v4.13.7`）**：`loop_health` 新增 `briefDue`，供数日当晚不再把尚未到期的 brief 判成落后；`--on-ok summary` 在裁决 `ok` 时只写一行结论。ADR `0087` |
+| 2026-11-04 | **文档对齐现行快照**：新增 `docs/STATUS.md`；v4.2–v4.4 交接迁入 `docs/archive/handoffs/`；`ROADMAP` 顶部焦点、本文件文首与 `T3` 目标 tag 改为 `v4.14.0`。不改任何运行时口径 |

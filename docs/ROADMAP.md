@@ -6,11 +6,10 @@
 
 状态图例：`planned` / `in_progress` / `done`
 
-> **当前产品焦点（M0–M47 / `v3.x` 已完成后）**：真实可用的「选股推荐 + 复盘」→ 执行计划 [`plans/usable-recommend-review-milestones.md`](plans/usable-recommend-review-milestones.md)（U1–U7；不改写本表已 done 叙事）。  
-> 多仓能力盘点（合并输入）：[`plans/workspace-projects-capability-inventory.md`](plans/workspace-projects-capability-inventory.md)。  
-> **按能力域合并**（非整仓）：[`plans/capability-domain-merge-roadmap.md`](plans/capability-domain-merge-roadmap.md)（**Now / Next / Later 余量已 done**；**M-E4 实盘仍门禁**；见 v3.12.0）。  
-> **情报报告 Skill 配方**（非整仓）：[`plans/market-report-dashboard-merge-milestones.md`](plans/market-report-dashboard-merge-milestones.md)（**MR-1…MR-5** 见 v3.12.5；实盘 M-E4 仍门禁）。
-> **自有主线路线图（G/B/S/X/L/C/R/T 八域）**：[`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md)（**G/B/S/X 域全 done**，`C` 域收官；`R` 域进行中（`R4`/`R5` 待做）；**`T` 域（循环可信度与运营）开局**；关键路径推进至 `L1` 实盘立项门禁）。双线边界：[`plans/dual-line-responsibility.md`](plans/dual-line-responsibility.md)。
+> **现行快照（2026-11-04，`v4.13.7`）**：[`STATUS.md`](STATUS.md)。本表 M0–M47 / Phase A–E **全部 done**，不要从下面的旧焦点开工。  
+> 自有主线（G/B/S/X/L/C/R/T/Y **九域**）：[`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md)。开放项只剩 **T3**（数据质量体检，目标 `v4.14.0`）、**R5**（ETF 进宇宙，卡在生产侧回补）、**Y2**（采纳落地，须人工签核）。双线边界：[`plans/dual-line-responsibility.md`](plans/dual-line-responsibility.md)。  
+> 已完成且不再指导开工的交接：[`archive/`](archive/README.md)。  
+> U 线（选股推荐 + 复盘）与 MR 线（情报报告）均已 done；**M-E4 / L2 / L3 实盘仍门禁**。能力盘点与合并路线图见 [`plans/`](plans/)。  
 > 文档总索引：[`README.md`](README.md)。
 
 ---

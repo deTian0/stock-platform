@@ -12,7 +12,7 @@
 
 ## 1. 背景：计数有了，收益没有
 
-路线图上一块砖（`v4.2.0`：调度上线 + 用户可读日报）收官后，`docs/plans/handoff-v4.2.0.md`
+路线图上一块砖（`v4.2.0`：调度上线 + 用户可读日报）收官后，[`docs/archive/handoffs/handoff-v4.2.0.md`](../archive/handoffs/handoff-v4.2.0.md)
 把下一块砖定为 **"绩效 PnL 闭环（performance JSONL → 用户可见收益归因）"**，并点名两个未解问题：
 
 > 1. **为什么全是 pending？** …可能是：结算窗口判定、market.db 缺该票该区间 bar、或 settle 路径未被实际触发过。

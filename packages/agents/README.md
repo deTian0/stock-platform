@@ -2,6 +2,8 @@
 
 轻量投研 Agent 插件。安装名：`stock-platform-agents`。
 
+> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.13.7**）。全仓快照见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表只保留早期里程碑锚点。辩论进主路径仍默认 `off`（ADR 0065）。
+
 ## 状态
 
 | 版本 | 能力 |

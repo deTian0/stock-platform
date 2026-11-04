@@ -3,16 +3,17 @@
 修改本仓库前先读：
 
 1. [`CONTRIBUTING.md`](CONTRIBUTING.md)
-2. [`docs/README.md`](docs/README.md)（文档分类索引）
-3. [`docs/ROADMAP.md`](docs/ROADMAP.md)
-4. [`docs/plans/`](docs/plans/)（能力盘点 / 合并路线图 / U 线 / MR 情报报告里程碑）
-5. [`docs/versioning.md`](docs/versioning.md)
-6. [`docs/upstream-archive.md`](docs/upstream-archive.md) · [`docs/upstream/`](docs/upstream/)（含 [`market-report-templates/`](docs/upstream/market-report-templates/)）
-7. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
-8. [`docs/architecture/0012-v1-product-boundary.md`](docs/architecture/0012-v1-product-boundary.md)
-9. [`docs/contracts/`](docs/contracts/)（改口径先写 ADR）
-10. [`docs/engineering/`](docs/engineering/)（OpenAPI / 测试 / CI）
-11. [`docs/ops/skills-governance.md`](docs/ops/skills-governance.md)（Skill 软链；禁止 pip / 平行抓取）
+2. [`docs/STATUS.md`](docs/STATUS.md)（现行快照：版本、未完成项、下一刀）
+3. [`docs/README.md`](docs/README.md)（文档分类索引；正文只在 `docs/`）
+4. [`docs/ROADMAP.md`](docs/ROADMAP.md)（M0–M47 已全部 done，不要从旧焦点开工）
+5. [`docs/plans/`](docs/plans/)（仍有效的计划；历史交接在 [`docs/archive/`](docs/archive/README.md)）
+6. [`docs/versioning.md`](docs/versioning.md)
+7. [`docs/upstream-archive.md`](docs/upstream-archive.md) · [`docs/upstream/`](docs/upstream/)（含 [`market-report-templates/`](docs/upstream/market-report-templates/)）
+8. [`docs/architecture/0001-target-architecture.md`](docs/architecture/0001-target-architecture.md)
+9. [`docs/architecture/0012-v1-product-boundary.md`](docs/architecture/0012-v1-product-boundary.md)
+10. [`docs/contracts/`](docs/contracts/)（改口径先写 ADR）
+11. [`docs/engineering/`](docs/engineering/)（OpenAPI / 测试 / CI）
+12. [`docs/ops/skills-governance.md`](docs/ops/skills-governance.md)（Skill 软链；禁止 pip / 平行抓取）
 
 ## 硬性规则
 
@@ -22,8 +23,8 @@
 - 执行层默认 SIMULATE；禁止引入 live 券商开关。
 - 不提交密钥、行情缓存、SQLite 大数据。
 - 保持改动最小；不处理无关问题。
-- **文档 SSOT**：正式正文在 `docs/`；`.cursor/plans` 仅索引指针。
+- **文档 SSOT**：正式正文在 `docs/`，现行状态只写 [`docs/STATUS.md`](docs/STATUS.md)。`.cursor/plans` 仅索引指针。历史交接在 `docs/archive/`，不要按其中的「下一块砖」开工。
 
 ## 完成标准
 
-以 ROADMAP 验收清单为准。打 tag 前：`check_docs` + `check_versions` + pytest 全绿，且 `CHANGELOG` 有对应节。发版步骤见 [`docs/release-checklist.md`](docs/release-checklist.md)。
+M0–M47 以 [`docs/ROADMAP.md`](docs/ROADMAP.md) 为准（已全部 done）。自有线以 [`docs/STATUS.md`](docs/STATUS.md) 与 [`docs/plans/trading-system-roadmap.md`](docs/plans/trading-system-roadmap.md) 为准。打 tag 前：`check_docs` + `check_versions` + pytest 全绿，且 `CHANGELOG` 有对应节。发版步骤见 [`docs/release-checklist.md`](docs/release-checklist.md)。

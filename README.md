@@ -2,7 +2,7 @@
 
 可发布的量化**研究与纸面决策**平台：统一 Vendor、选股/PIT、工作台 API、投研 Agent 槽位、纸面执行安全模型，收敛在单一产品仓。
 
-> 当前版本见 [`VERSION`](VERSION)。文档索引 [`docs/README.md`](docs/README.md)；路线图 [`docs/ROADMAP.md`](docs/ROADMAP.md)；计划 [`docs/plans/`](docs/plans/)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
+> 当前版本见 [`VERSION`](VERSION)（`v4.13.7`）。现行快照 [`docs/STATUS.md`](docs/STATUS.md)；文档索引 [`docs/README.md`](docs/README.md)；历史里程碑 [`docs/ROADMAP.md`](docs/ROADMAP.md)；仍有效的计划 [`docs/plans/`](docs/plans/)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
 
 ## v1.0 交付面
 
@@ -83,16 +83,18 @@ stock-platform-brief path\to\panel.csv --asof 2026-09-02 --top 10 -o picks.csv
 stock-platform/
 ├── apps/workbench/
 ├── packages/{providers,research,agents,execution}/
-├── docs/
-│   ├── README.md              # 文档分类索引
-│   ├── ROADMAP.md
+├── docs/                      # 产品文档 SSOT（不要把正文摊到仓库根）
+│   ├── STATUS.md              # 现行快照
+│   ├── README.md              # 分类索引
+│   ├── ROADMAP.md             # M0–M47（已全部 done）
 │   ├── upstream-archive.md
 │   ├── release-checklist.md
 │   ├── versioning.md
 │   ├── architecture/          # ADR
 │   ├── contracts/
 │   ├── ops/
-│   ├── plans/                 # 能力盘点 / 合并 / U 线（SSOT）
+│   ├── plans/                 # 仍有效的计划
+│   ├── archive/               # 已落地的历史交接
 │   ├── engineering/           # OpenAPI / 测试 / CI
 │   └── upstream/              # 上游配方只读摘要
 └── scripts/{check_docs,check_versions,release_tag}.ps1
@@ -113,8 +115,12 @@ stock-platform/
 | **v3.9.0** | M47 生产 live 行情默认（交易仍 SIMULATE） |
 | **v3.9.1** | Workbench UI 渐进披露 + 推荐卡片 |
 | **v3.9.2** | Workbench UI 结构化扫读（步骤/键值/状态） |
+| **v4.0–v4.1** | 全市场选股、策略深化、实盘立项（不解禁红线） |
+| **v4.2–v4.9** | 日调度、绩效闭环、循环自足、健康度与执行台账 |
+| **v4.10–v4.11** | 策略采纳闸门、负收益归因 |
+| **v4.12–v4.13.7** | 盘后行情台账、简报盘前/盘后、多源 OHLC、体检到期口径 |
 
-细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+M0–M47 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。现行开放项见 [`docs/STATUS.md`](docs/STATUS.md)。
 
 ## 上游参考（只读）
 

@@ -2,6 +2,8 @@
 
 统一行情 / 基本面 Vendor。安装名：`stock-platform-providers`；导入名：`stock_platform_providers`。
 
+> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.13.7**）。全仓快照与下一刀见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表只保留早期里程碑锚点。`v4.13.5` 起另有腾讯/新浪快照与 westock 第四源，见 ADR 0085 / 0086。
+
 ## 状态
 
 | 版本 | 能力 |
