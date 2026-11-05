@@ -18,6 +18,7 @@
 3. `market.db` 仅 `mode=ro`；报告写入平台 `local/health/`（或 `STOCK_PLATFORM_LOOP_HEALTH_DIR`）；**不写行情库**。
 4. `loop_health` 增段 `dataQuality`；裁决：**仅** `warn`（含段级 `degraded`），**永不** `fail` / `blocked`。
 5. CLI 退出码恒 0；providers 函数内懒导入。
+6. **Schema 兼容**：以 `PRAGMA table_info(daily_price)` 检测实际列（真实库仅 `code,date,close,pct_chg,vol,amount`，无 OHLC；`vol`/`volume` 等别名兼容）。缺可选列 → 跳过依赖检查并在 `notes` / `skippedChecks` 标注，不计入汇总；缺必需列 `code`/`date` → `unavailable` + `missing_columns` 原因；均不抛错。
 
 ## 后果
 

@@ -68,14 +68,65 @@ def _latest_trade_date(con: sqlite3.Connection) -> str | None:
     return str(row[0])[:10]
 
 
+# Logical column → accepted physical aliases in ``daily_price`` (first hit wins).
+# Real a-stock-engine schema is ``code, date, close, pct_chg, vol, amount`` (no OHLC).
+REQUIRED_COLUMNS: tuple[str, ...] = ("code", "date")
+COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    # code/date are used verbatim by other checks' SQL; no aliases (keep scope minimal).
+    "code": ("code",),
+    "date": ("date",),
+    "open": ("open",),
+    "high": ("high",),
+    "low": ("low",),
+    "close": ("close",),
+    "vol": ("vol", "volume"),
+    "pct_chg": ("pct_chg", "pct_change", "pctchg"),
+}
+OPTIONAL_COLUMNS: tuple[str, ...] = ("open", "high", "low", "close", "vol", "pct_chg")
+
+
+def _resolve_columns(con: sqlite3.Connection) -> tuple[list[str], dict[str, str]]:
+    """Return (physical columns, logical→physical mapping) via ``PRAGMA table_info``."""
+    physical = [str(r[1]) for r in con.execute("PRAGMA table_info(daily_price)").fetchall()]
+    lower = {c.lower(): c for c in physical}
+    mapping: dict[str, str] = {}
+    for logical, aliases in COLUMN_ALIASES.items():
+        for alias in aliases:
+            if alias.lower() in lower:
+                mapping[logical] = lower[alias.lower()]
+                break
+    return physical, mapping
+
+
+def _quote_ident(name: str) -> str:
+    return '"%s"' % name.replace('"', '""')
+
+
+def _skipped(check_id: str, missing: str) -> dict[str, Any]:
+    """Check not runnable on this schema; excluded from roll-up."""
+    return {
+        "id": check_id,
+        "status": SECTION_EMPTY,
+        "skipped": True,
+        "missingColumn": missing,
+        "detail": f"跳过：daily_price 缺列 {missing}",
+    }
+
+
 def _load_window_bars(
     con: sqlite3.Connection,
     *,
     start: str,
     end: str,
     sample_codes: int,
+    columns: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Load a bounded recent window; optionally subsample codes for scale voting."""
+    """Load a bounded recent window; optionally subsample codes for scale voting.
+
+    ``columns`` maps logical → physical names (see :func:`_resolve_columns`); only
+    columns present are selected, so missing OHLC never raises.
+    """
+    cols = dict(columns) if columns is not None else {c: c for c in COLUMN_ALIASES}
     codes = [
         str(r[0])
         for r in con.execute(
@@ -87,19 +138,20 @@ def _load_window_bars(
     if not codes:
         return pd.DataFrame()
     placeholders = ",".join("?" for _ in codes)
+    present = [c for c in OPTIONAL_COLUMNS if c in cols]
+    select_sql = ", ".join(
+        ["code", "date"] + [f"{_quote_ident(cols[c])} AS {c}" for c in present]
+    )
     rows = con.execute(
-        f"SELECT code, date, open, high, low, close, vol, pct_chg "
+        f"SELECT {select_sql} "
         f"FROM daily_price WHERE date >= ? AND date <= ? AND code IN ({placeholders})",
         [start, end, *codes],
     ).fetchall()
     if not rows:
         return pd.DataFrame()
-    df = pd.DataFrame(
-        rows,
-        columns=["code", "date", "open", "high", "low", "close", "vol", "pct_chg"],
-    )
+    df = pd.DataFrame(rows, columns=["code", "date", *present])
     df["date"] = df["date"].astype(str).str[:10]
-    for col in ("open", "high", "low", "close", "vol", "pct_chg"):
+    for col in present:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
@@ -220,7 +272,8 @@ def _check_close_jumps(
         prev = closes["close"].shift(1)
         ret = (closes["close"] - prev) / prev.replace(0, pd.NA)
         for dt, r in zip(closes["date"], ret):
-            if r is None or (isinstance(r, float) and (r != r)):
+            # close=0 → pd.NA；float(pd.NA) 会抛 TypeError，统一用 pd.isna 跳过
+            if r is None or pd.isna(r):
                 continue
             if abs(float(r)) < CLOSE_JUMP_FRACTION:
                 continue
@@ -395,6 +448,8 @@ def _roll_status(checks: Sequence[Mapping[str, Any]]) -> str:
     }
     worst = SECTION_OK
     for c in checks:
+        if c.get("skipped"):
+            continue  # schema-skipped checks do not drag the roll-up
         st = str(c.get("status") or SECTION_UNAVAILABLE)
         if ranks.get(st, 2) > ranks.get(worst, 0):
             worst = st if st in ranks else SECTION_WARN
@@ -470,22 +525,59 @@ def collect_data_quality(
                 "reason": "missing_table: daily_price",
                 "checks": [],
             }
+        physical, colmap = _resolve_columns(con)
+        missing_required = [c for c in REQUIRED_COLUMNS if c not in colmap]
+        if missing_required:
+            return {
+                **base,
+                "status": SECTION_UNAVAILABLE,
+                "reason": (
+                    "missing_columns: daily_price 缺必需列 "
+                    + ",".join(missing_required)
+                    + f"（实际列：{','.join(physical) or '—'}）"
+                ),
+                "columns": physical,
+                "checks": [],
+            }
+        missing_optional = [c for c in OPTIONAL_COLUMNS if c not in colmap]
+        # open/high/low are not consumed by any check; only note them.
+        notes: list[str] = []
+        if missing_optional:
+            notes.append(
+                "daily_price 缺可选列 "
+                + ",".join(missing_optional)
+                + "：依赖它们的检查已跳过/降级"
+            )
+
         latest = _latest_trade_date(con) or asof_day
         end = min(asof_day, latest)
         start = (date.fromisoformat(end) - timedelta(days=max(1, int(lookback_days)))).isoformat()
-        bars = _load_window_bars(con, start=start, end=end, sample_codes=sample_codes)
+        bars = _load_window_bars(
+            con, start=start, end=end, sample_codes=sample_codes, columns=colmap
+        )
 
         checks: list[dict[str, Any]] = []
         try:
-            checks.append(_check_pct_scale(bars))
+            if "pct_chg" not in colmap:
+                checks.append(_skipped("pctScale", "pct_chg"))
+            elif "close" not in colmap:
+                checks.append(_skipped("pctScale", "close"))
+            else:
+                checks.append(_check_pct_scale(bars))
         except Exception as exc:  # noqa: BLE001
             checks.append({"id": "pctScale", "status": SECTION_UNAVAILABLE, "detail": type(exc).__name__})
         try:
-            checks.append(_check_halts(bars))
+            if "vol" not in colmap:
+                checks.append(_skipped("halts", "vol"))
+            else:
+                checks.append(_check_halts(bars))
         except Exception as exc:  # noqa: BLE001
             checks.append({"id": "halts", "status": SECTION_UNAVAILABLE, "detail": type(exc).__name__})
         try:
-            checks.append(_check_close_jumps(con, bars, tables))
+            if "close" not in colmap:
+                checks.append(_skipped("closeJumps", "close"))
+            else:
+                checks.append(_check_close_jumps(con, bars, tables))
         except Exception as exc:  # noqa: BLE001
             checks.append({"id": "closeJumps", "status": SECTION_UNAVAILABLE, "detail": type(exc).__name__})
         try:
@@ -504,6 +596,9 @@ def collect_data_quality(
             )
 
         status = _roll_status(checks)
+        skipped = [str(c["id"]) for c in checks if c.get("skipped")]
+        if skipped:
+            notes.append("已跳过检查：" + ",".join(skipped))
         return {
             **base,
             "asof": end,
@@ -511,6 +606,10 @@ def collect_data_quality(
             "latestTradeDate": latest,
             "sampledRows": int(len(bars)),
             "status": status,
+            "columns": physical,
+            "missingOptionalColumns": missing_optional,
+            "skippedChecks": skipped,
+            "notes": notes,
             "checks": checks,
         }
     finally:
@@ -552,7 +651,11 @@ def data_quality_section(payload: Mapping[str, Any] | None) -> dict[str, Any]:
             {"id": c.get("id"), "status": c.get("status"), "detail": c.get("detail")}
             for c in checks
         ],
+        "skippedChecks": list(p.get("skippedChecks") or []),
+        "notes": list(p.get("notes") or []),
         "reason": p.get("reason"),
+        "notes": list(p.get("notes") or []),
+        "skippedChecks": list(p.get("skippedChecks") or []),
         "marketDb": p.get("marketDb"),
     }
 
@@ -578,6 +681,8 @@ def render_data_quality_markdown(payload: Mapping[str, Any]) -> str:
         )
     if payload.get("reason"):
         lines.extend(["", f"> {payload['reason']}"])
+    for note in payload.get("notes") or []:
+        lines.extend(["", f"> 注：{note}"])
     lines.extend(["", str(payload.get("disclaimer") or ""), ""])
     return "\n".join(lines)
 

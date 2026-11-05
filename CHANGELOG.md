@@ -16,6 +16,10 @@
 - **A1 CLI 面**：`stock-platform-debate`（agents）、`stock-platform-paper`（execution，SIMULATE）；一览 [`docs/ops/cli-catalog.md`](docs/ops/cli-catalog.md)。
 - **R5-P ETF 平台侧**（ADR [`0092`](docs/architecture/0092-etf-universe-platform-side.md)）：空 ETF 宇宙 fail-closed 文案；`all` 无 ETF 时 notes；观察 ETF 大半缺失 → T3 `degraded`；③A ETF 标注。不写 `market.db`、不改日用默认宇宙。
 
+### Fixed
+
+- **T3 `data-quality` 兼容真实 `daily_price` 缺列 schema**：真实库无 `open/high/low`，原 SQL 抛 `no such column: open` 致 `loop_health.dataQuality` 为 unavailable；现用 `PRAGMA table_info` 按实际列构造 SELECT（`vol`/`volume` 等别名兼容），缺可选列跳过依赖检查并在 `notes` / `skippedChecks` 标注，缺必需列 `code`/`date` 返回 `unavailable` + 原因；同时修 `closeJumps` 在 `pd.NA` 上的 `TypeError`。
+
 ### Changed
 
 - **`exchange_prefix`：`5xxxxx` → `sh`**（沪市基金/ETF，如 `588080`）；深市 `1xxxxx` 仍 `sz`。
