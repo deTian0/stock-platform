@@ -414,6 +414,61 @@ SHADOW_BOARD_RECENT = 20
 _SHADOW_FAILED_STATUSES = frozenset({"error", "failed"})
 
 
+def _collect_s2_forward(root: Path, window: Sequence[str]) -> dict[str, Any]:
+    """S2-P1 前向观测（只读）：近窗内每日 S2 快照是否落盘、S2 候选池是否非空。
+
+    读 ``<root>/s2_snapshots/s2_snapshot_{day}.json`` 与 ``<root>/final_board_{day}.json``
+    的 ``schools.S2``。只作观测，**不产生检查项**（最多由调用方 warn）。
+    """
+    snap_dir = root / "s2_snapshots"
+    days: list[dict[str, Any]] = []
+    for day in window:
+        snap_status: str | None = None
+        snap_file = snap_dir / f"s2_snapshot_{day}.json"
+        if snap_file.is_file():
+            try:
+                snap_status = str(
+                    (json.loads(snap_file.read_text(encoding="utf-8")) or {}).get("status")
+                    or "unknown"
+                )
+            except (OSError, json.JSONDecodeError):
+                snap_status = "corrupt"
+        pool_status: str | None = None
+        cand = 0
+        board_file = root / f"final_board_{day}.json"
+        if board_file.is_file():
+            try:
+                board = json.loads(board_file.read_text(encoding="utf-8")) or {}
+                pool = ((board.get("schools") or {}).get("S2")) or {}
+                pool_status = str(pool.get("status") or "") or None
+                cand = len(pool.get("candidates") or [])
+            except (OSError, json.JSONDecodeError, AttributeError):
+                pool_status = "corrupt"
+        days.append(
+            {
+                "asof": day,
+                "snapshotStatus": snap_status,
+                "poolStatus": pool_status,
+                "candidates": cand,
+            }
+        )
+    with_snapshot = [d for d in days if d["snapshotStatus"] not in (None, "corrupt")]
+    non_empty = [d for d in days if d["candidates"] > 0]
+    latest = days[-1] if days else {}
+    return {
+        "status": SECTION_OK if with_snapshot else SECTION_EMPTY,
+        "windowDays": len(days),
+        "snapshotDays": len(with_snapshot),
+        "nonEmptyPoolDays": len(non_empty),
+        "nonEmptyPoolRatio": round(len(non_empty) / len(days), 4) if days else 0.0,
+        "latestAsof": latest.get("asof"),
+        "latestSnapshotStatus": latest.get("snapshotStatus"),
+        "latestCandidates": latest.get("candidates"),
+        "days": days,
+        "note": "验收看 S2 非空池比例（候选池有票），不看入榜席位；仲裁另线评估",
+    }
+
+
 def _collect_shadow_board(
     shadow_dir: str | Path | None, *, recent: int = SHADOW_BOARD_RECENT
 ) -> dict[str, Any]:
@@ -458,7 +513,12 @@ def _collect_shadow_board(
     failed = [d for d in window if str(by_day[d].get("status") or "") in _SHADOW_FAILED_STATUSES]
     latest = by_day[days[-1]]
     latest_status = str(latest.get("status") or "")
+    try:
+        s2 = _collect_s2_forward(root, window)
+    except Exception as exc:  # noqa: BLE001 — 观测附加段，永不影响裁决
+        s2 = {"status": SECTION_UNAVAILABLE, "reason": f"{type(exc).__name__}: {exc}"[:200]}
     return {
+        "s2": s2,
         "status": SECTION_WARN if latest_status in _SHADOW_FAILED_STATUSES else SECTION_OK,
         "dir": str(root),
         "latestAsof": days[-1],
@@ -723,6 +783,16 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
                 )
                 if sb_status == SECTION_OK
                 else "影子终榜台账无有效记录",
+            )
+        # S2-P1 前向快照：仅当最新一天快照明确失败/损坏时 warn；永不 fail。
+        s2 = sb.get("s2") or {}
+        s2_latest = str(s2.get("latestSnapshotStatus") or "")
+        if s2_latest in {"failed", "corrupt"}:
+            add(
+                "shadowS2Snapshot",
+                _LEVEL_WARN,
+                f"S2 当日快照 asof={s2.get('latestAsof')} status={s2_latest}"
+                "（影子链 fail-soft，不阻断主链）",
             )
 
     failed = [c["id"] for c in checks if c["level"] == _LEVEL_FAIL]
@@ -1176,6 +1246,14 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             n=_cell(sb.get("latestFinalCount")),
             w=_cell(sb.get("windowDays")),
             e=_cell(sb.get("emptyBoardDays")),
+        ),
+        "| 影子 S2 快照 | {s} | 近 {w} 日落盘 {k} 日 · S2 非空池 {n} 日 · 最新 `{a}` 快照 {t}（观测，不阻断） |".format(
+            s=_status_zh((sb.get("s2") or {}).get("status")),
+            w=_cell((sb.get("s2") or {}).get("windowDays")),
+            k=_cell((sb.get("s2") or {}).get("snapshotDays")),
+            n=_cell((sb.get("s2") or {}).get("nonEmptyPoolDays")),
+            a=_cell((sb.get("s2") or {}).get("latestAsof")),
+            t=_cell((sb.get("s2") or {}).get("latestSnapshotStatus")),
         ),
         "| 下一个结算日 | {s} | {d} |".format(
             s="有" if nxt.get("available") else "未知",
