@@ -41,7 +41,7 @@ from ..neutralization import attach_industry
 from ..portfolio import compute_metrics, is_etf, is_fund, norm_code
 from ..secondary_pick import AMOUNT_MIN
 from ..strategy_ab import AB_METRIC_KEYS, _delta_metrics, _review_block
-from .round2 import apply_round2_set_a
+from .round2 import DEFAULT_ARBITRATION, DEFAULT_MIN_SEATS, apply_round2_set_a
 from .schools import SCHOOL_IDS, run_round1
 
 #: Columns the shadow schools read from a cross-section row.
@@ -138,11 +138,20 @@ def shadow_board_for_frame(
     name_map: Mapping[str, str] | None = None,
     top_k: int = 8,
     regime: Mapping[str, bool] | None = None,
+    arbitration: str = DEFAULT_ARBITRATION,
+    min_seats: int = DEFAULT_MIN_SEATS,
 ) -> dict[str, Any]:
-    """Round1 → Round2 Set A for one session (the daily hook's exact functions)."""
+    """Round1 → Round2 Set A for one session (the daily hook's exact functions).
+
+    ``arbitration`` / ``min_seats`` are the offline experiment knob of
+    :func:`round2.apply_round2_set_a`; the default ``"d"`` is the factory rule.
+    """
     universe = frame_to_universe(frame, name_map=name_map)
     schools = run_round1(universe, top_k=top_k, asof=day, regime=regime)
-    round2 = apply_round2_set_a(schools)
+    if arbitration == DEFAULT_ARBITRATION:
+        round2 = apply_round2_set_a(schools)
+    else:
+        round2 = apply_round2_set_a(schools, arbitration=arbitration, min_seats=min_seats)
     return {"schools": schools, "round2": round2, "universeSize": len(universe)}
 
 
@@ -152,12 +161,16 @@ def shadow_entry_provider(
     top_k: int = 8,
     regime: Mapping[str, bool] | None = None,
     stats: dict[str, Any] | None = None,
+    arbitration: str = DEFAULT_ARBITRATION,
+    min_seats: int = DEFAULT_MIN_SEATS,
 ) -> EntryProvider:
     """Entry provider that opens the day's shadow Final Board (Set A order).
 
     ``stats`` (optional, mutated) collects empty-board days and per-school
     coverage for the report. The loop still applies max_positions / held-code /
     max_picks_per_day / limit-up / cooldown — the provider cannot bypass them.
+    ``stats["entrySchool"]`` maps ``(day_index, raw_code) → school`` so the caller
+    can attribute the fills the loop actually made back to a school.
     """
     acc = stats if stats is not None else {}
     acc.setdefault("days", 0)
@@ -165,10 +178,17 @@ def shadow_entry_provider(
     acc.setdefault("boardSizeSum", 0)
     acc.setdefault("schoolNonEmptyDays", {sid: 0 for sid in SCHOOL_IDS})
     acc.setdefault("schoolSeats", {sid: 0 for sid in SCHOOL_IDS})
+    acc.setdefault("entrySchool", {})
 
     def _provider(ctx: EntryContext) -> list[dict[str, Any]]:
         result = shadow_board_for_frame(
-            ctx.frame, day=ctx.day, name_map=name_map, top_k=top_k, regime=regime
+            ctx.frame,
+            day=ctx.day,
+            name_map=name_map,
+            top_k=top_k,
+            regime=regime,
+            arbitration=arbitration,
+            min_seats=min_seats,
         )
         passed = result["round2"].get("passed") or []
         acc["days"] += 1
@@ -195,6 +215,7 @@ def shadow_entry_provider(
             raw_code, px, pct = hit
             out.append({"code": str(raw_code), "close": float(px), "pct_chg": pct,
                         "school": row.get("school")})
+            acc["entrySchool"].setdefault((ctx.day_index, str(raw_code)), row.get("school"))
         return out
 
     return _provider
@@ -233,12 +254,56 @@ def _shadow_stats_block(stats: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _school_fills(
+    loop: Mapping[str, Any], entry_school: Mapping[tuple[int, str], Any]
+) -> dict[str, Any]:
+    """Attribute the loop's actual fills (closed trades + still-open) to a school.
+
+    Board seats ≠ fills: the loop only buys the head of the board and only while
+    slots are free, so a school can hold seats yet never be bought. This block
+    reports what was really traded; unattributable fills land in ``_unknown``.
+    """
+    out: dict[str, dict[str, Any]] = {}
+
+    def _slot(sid: str) -> dict[str, Any]:
+        return out.setdefault(sid, {"fills": 0, "closed": 0, "open": 0, "wins": 0, "netRetSum": 0.0})
+
+    for t in loop.get("trades") or []:
+        sid = str(entry_school.get((int(t["entry_idx"]), str(t["code"]))) or "_unknown")
+        s = _slot(sid)
+        s["fills"] += 1
+        s["closed"] += 1
+        r = float(t.get("net_ret") or 0.0)
+        s["netRetSum"] += r
+        if r > 0:
+            s["wins"] += 1
+    for pos in loop.get("open_positions") or []:
+        sid = str(entry_school.get((int(pos["entry_idx"]), str(pos["code"]))) or "_unknown")
+        s = _slot(sid)
+        s["fills"] += 1
+        s["open"] += 1
+    block: dict[str, Any] = {}
+    for sid in [*SCHOOL_IDS, *sorted(k for k in out if k not in SCHOOL_IDS)]:
+        s = out.get(sid) or {"fills": 0, "closed": 0, "open": 0, "wins": 0, "netRetSum": 0.0}
+        closed = s["closed"]
+        block[sid] = {
+            "fills": s["fills"],
+            "closed": closed,
+            "open": s["open"],
+            "winRate": (s["wins"] / closed) if closed else None,
+            "avgNetRetPct": (s["netRetSum"] / closed) if closed else None,
+        }
+    return block
+
+
 def run_shadow_book(
     feats: pd.DataFrame,
     *,
     name_map: Mapping[str, str] | None = None,
     params: ReplayParams | None = None,
     top_k: int = 8,
+    arbitration: str = DEFAULT_ARBITRATION,
+    min_seats: int = DEFAULT_MIN_SEATS,
 ) -> dict[str, Any]:
     """Replay the shadow Final Board alone through the shared loop."""
     p = params or ReplayParams()
@@ -246,12 +311,21 @@ def run_shadow_book(
     loop = replay_book(
         feats,
         entry_provider=shadow_entry_provider(
-            name_map=name_map, top_k=top_k, regime=p.regime, stats=stats
+            name_map=name_map,
+            top_k=top_k,
+            regime=p.regime,
+            stats=stats,
+            arbitration=arbitration,
+            min_seats=min_seats,
         ),
         params=p,
     )
     out = _arm(loop, p.initial_capital)
     out["shadow"] = _shadow_stats_block(stats)
+    out["shadow"]["schoolFills"] = _school_fills(loop, stats.get("entrySchool") or {})
+    out["shadow"]["arbitration"] = arbitration
+    if arbitration == "b":
+        out["shadow"]["minSeats"] = int(min_seats)
     out["trades"] = loop["trades"]
     out["equityCurve"] = loop["equity_curve"]
     return out
@@ -274,11 +348,16 @@ def compare_shadow_vs_lvrev(
     params: ReplayParams | None = None,
     top_k: int = 8,
     index_close: Mapping[str, float] | None = None,
+    arbitration: str = DEFAULT_ARBITRATION,
+    min_seats: int = DEFAULT_MIN_SEATS,
 ) -> dict[str, Any]:
     """lvrev 出厂基线 vs 影子 Final Board on one frame, one engine.
 
     ``delta = shadow − lvrev``. ``index_close`` (optional ``date → close``)
     adds an excess-return line; missing → ``None`` (never fabricated).
+    ``arbitration`` is the offline seat-allocation experiment knob (default
+    ``"d"`` = factory); the lvrev arm is untouched by it, so the baseline column
+    stays comparable across runs.
     """
     from ..book_replay import screener_entry_provider
 
@@ -292,7 +371,14 @@ def compare_shadow_vs_lvrev(
         }
     base_loop = replay_book(feats, entry_provider=screener_entry_provider(), params=p)
     base = _arm(base_loop, p.initial_capital)
-    shadow = run_shadow_book(feats, name_map=name_map, params=p, top_k=top_k)
+    shadow = run_shadow_book(
+        feats,
+        name_map=name_map,
+        params=p,
+        top_k=top_k,
+        arbitration=arbitration,
+        min_seats=min_seats,
+    )
     bench = _benchmark_return(base_loop["equity_curve"], index_close)
     for arm in (base, shadow):
         tr = (arm["metrics"] or {}).get("total_return")
@@ -362,6 +448,9 @@ def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
         "",
         f"- 区间：{payload.get('start')} ~ {payload.get('end')}",
         "- 引擎：book_replay.replay_book（T+1 / 涨跌停 / 成本与主回测同源）",
+        f"- 仲裁模式：`{sh.get('arbitration') or DEFAULT_ARBITRATION}`"
+        + (f"（min_seats={sh.get('minSeats')}）" if sh.get("minSeats") is not None else "")
+        + ("（出厂默认）" if (sh.get("arbitration") or DEFAULT_ARBITRATION) == DEFAULT_ARBITRATION else "（离线实验，非出厂）"),
         f"- 影子空榜比例：{_pct(sh.get('emptyBoardRatio'))}"
         f"（{sh.get('emptyBoardDays')}/{sh.get('evaluatedDays')} 个评估日），"
         f"平均席位 {_num(sh.get('avgBoardSize'), 2)}",
@@ -372,11 +461,20 @@ def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "## 学校覆盖",
         "",
-        "| 学校 | 非空池日 | 入终榜席位 |",
-        "|------|----------|------------|",
+        "| 学校 | 非空池日 | 入终榜席位 | 实际成交 | 已平仓胜率 | 已平仓均净收益 |",
+        "|------|----------|------------|----------|------------|----------------|",
     ]
+    fills = sh.get("schoolFills") or {}
     for sid, cov in (sh.get("schoolCoverage") or {}).items():
-        lines.append(f"| {sid} | {cov.get('nonEmptyDays')} | {cov.get('seats')} |")
+        f = fills.get(sid) or {}
+        avg = f.get("avgNetRetPct")
+        lines.append(
+            f"| {sid} | {cov.get('nonEmptyDays')} | {cov.get('seats')} | {f.get('fills', '-')} | "
+            f"{_pct(f.get('winRate'))} | {(f'{float(avg):.2f}%') if avg is not None else '-'} |"
+        )
+    unk = fills.get("_unknown")
+    if unk and unk.get("fills"):
+        lines.append(f"| _unknown | - | - | {unk.get('fills')} | - | - |")
     lines += ["", "## 已知限制", ""]
     lines += [f"- {x}" for x in payload.get("limitations") or []]
     lines += ["", f"> {payload.get('disclaimer')}", ""]

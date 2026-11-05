@@ -118,6 +118,8 @@ def _run_backtest(args: argparse.Namespace) -> int:
         ),
         top_k=args.top_k,
         index_close=_index_close(db, args.start, end) or None,
+        arbitration=args.arbitration,
+        min_seats=args.min_seats,
     )
     if not payload.get("ok"):
         print(f"[fail] {payload.get('reason')}", file=sys.stderr)
@@ -127,10 +129,13 @@ def _run_backtest(args: argparse.Namespace) -> int:
     print(md)
     out_dir = Path(args.bt_out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "shadow_backtest.json").write_text(
+    # Factory mode keeps the historical file name; experiment modes get a suffix
+    # so a D/A/B comparison never overwrites the factory artefact.
+    stem = "shadow_backtest" if args.arbitration == "d" else f"shadow_backtest_{args.arbitration}"
+    (out_dir / f"{stem}.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
     )
-    (out_dir / "shadow_backtest.md").write_text(md, encoding="utf-8")
+    (out_dir / f"{stem}.md").write_text(md, encoding="utf-8")
     print(f"[write] {out_dir}", file=sys.stderr)
     return 0
 
@@ -186,6 +191,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--end", default=None, help="回测终点（默认库内最后交易日）")
     p.add_argument("--initial-capital", type=float, default=50000.0)
     p.add_argument("--max-positions", type=int, default=15)
+    p.add_argument(
+        "--arbitration",
+        choices=("d", "a", "b"),
+        default="d",
+        help=(
+            "仅 --backtest：Round2 席位仲裁实验开关。d=出厂（优先级先于分数，默认）；"
+            "a=优先级只用于同票去重，按校内分位排序；b=每个非空池学校保底 --min-seats 席。"
+            "硬闸三种模式一致；不改出厂默认"
+        ),
+    )
+    p.add_argument(
+        "--min-seats",
+        type=int,
+        default=1,
+        help="仅 --arbitration b：每个非空池学校保底席位数（默认 1；空池不保底、不凑满）",
+    )
     p.add_argument(
         "--bt-out-dir",
         type=Path,
