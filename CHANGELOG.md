@@ -6,7 +6,8 @@
 
 ### Added
 
-- **多策略影子 Final Board MVP**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md)，契约 [`docs/contracts/multi-strategy-shadow.md`](docs/contracts/multi-strategy-shadow.md)）：`stock_platform_research.shadow_board` + CLI `stock-platform-shadow-board`；Round1 五校（S3/S4 复用二次精选，S1/S2/S5 fail-closed stub）→ Round2 硬闸集 A → 只写 `local/shadow/`；集 B 顾问占位；恒 `excludedFromPerformance`；不改出厂 picks / 主绩效 / digest。
+- **多策略影子 Final Board MVP**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md)，契约 [`docs/contracts/multi-strategy-shadow.md`](docs/contracts/multi-strategy-shadow.md)）：`stock_platform_research.shadow_board` + CLI `stock-platform-shadow-board`；Round1 五校 → Round2 硬闸集 A → 只写 `local/shadow/`；集 B 顾问占位；恒 `excludedFromPerformance`；不改出厂 picks / 主绩效。
+- **影子校富化 + digest 只读附录**：S1 薄择时（regime / 指数 MA20 / 截面宽度）；S2 DI（`concept_blocks` / `sector_fund_flow` / `lhb` / `unlock`，缺 provider 空池）；S5 资金流或 amount/illiq 流动性薄规则；S3/S4 仍二次精选。digest 在绩效台账后按 `local/shadow/final_board_{asof}.json` 存在与否追加附录（缺则整段省略，不改 picks/同花顺语义）。
 - **`local/` 本机运行时目录 + `stock-platform-init`。** 平台自有产物（SQLite、digest、持仓、日志、健康度、绩效 JSONL、`.env`）默认落在被忽略的 `local/`；`.env.example` 复制目标改为 `local/.env`。新增 `Settings`（`pydantic-settings`）、`platform_runtime_config` 落库与 `stock-platform-init` CLI（缺行 seed、幂等、fail-closed，**不**打开 live）。说明见 [`docs/ops/local-runtime.md`](docs/ops/local-runtime.md)。
 - **LLM 顾问侧车包面 `stock_platform_agents.llm`。** 集中再导出预算 / 可选辩论 / deep graph；确定性路径不再急切加载 LLM 模块（ADR [`0088`](docs/architecture/0088-llm-sidecar-package-boundary.md)；计划 [`docs/plans/llm-vs-deterministic-boundary.md`](docs/plans/llm-vs-deterministic-boundary.md)）。
 - Workbench **`routes/agents_llm.py`**：`/api/debate/status` 与 deep-graph 从可用性 agent 槽拆出。

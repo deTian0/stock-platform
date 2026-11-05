@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence  # Any used for optional DI hooks
 
 from .advisory import advisory_set_b
 from .ledger import write_shadow_ledger
@@ -45,10 +45,28 @@ def run_shadow_board(
     write: bool = True,
     enable_advisory_b: bool = False,
     llm_path: bool = False,
+    regime: Mapping[str, bool] | None = None,
+    index_bars: Sequence[Mapping[str, Any]] | None = None,
+    concept_blocks: Any = None,
+    sector_fund_flow: Any = None,
+    lhb: Any = None,
+    unlock: Any = None,
+    **hooks: Any,
 ) -> dict[str, Any]:
     """Build Final Board payload; optionally write shadow ledger only."""
     day = asof or date.today().isoformat()
-    schools = run_round1(universe, top_k=top_k)
+    schools = run_round1(
+        universe,
+        top_k=top_k,
+        asof=day,
+        regime=regime,
+        index_bars=index_bars,
+        concept_blocks=concept_blocks,
+        sector_fund_flow=sector_fund_flow,
+        lhb=lhb,
+        unlock=unlock,
+        **hooks,
+    )
     round2 = apply_round2_set_a(schools)
     passed = list(round2.get("passed") or [])
     final, degraded = _validate_structured_reasons(passed, llm_path=llm_path)

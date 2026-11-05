@@ -21,13 +21,13 @@
 
 ## 2. 学校 ID
 
-| ID | 名称 | MVP |
-|----|------|-----|
-| `S1` | 宏观/择时 | 缺数据 → 空池 + reason |
-| `S2` | 事件/主题 | 缺数据 → 空池 + reason；未过 `FACTOR_LIBRARY` 不得进生产权重 |
+| ID | 名称 | MVP / 现行 |
+|----|------|------------|
+| `S1` | 宏观/择时 | 薄规则：`regime` 闸 → 可注入 `index_bars` MA20 → 否则截面 `rs20`/`ma20`/`trend_up` 宽度；仍缺 → 空池 + reason |
+| `S2` | 事件/主题 | DI：`concept_blocks` / `sector_fund_flow` / `lhb` / `unlock`；未注入或无信号 → 空池；未过 `FACTOR_LIBRARY` 不得进生产权重 |
 | `S3` | 质量/防守 | 可复用 lvrev-like / quality 二次精选权重 |
 | `S4` | 短线动量 | 可复用 short secondary 权重 |
-| `S5` | 资金流/流动性 | 缺数据 → 空池 + reason |
+| `S5` | 资金流/流动性 | `main_net`/`fund_flow` 排序；否则 amount/illiq 流动性薄规则；全缺 → 空池 |
 
 学校优先级（集 A 同票冲突，高者胜）：`S3 > S4 > S5 > S2 > S1`。
 
@@ -83,6 +83,19 @@
 
 **禁止**写入：`local/recommend_decisions.jsonl`、hits 表、生产 brief picks。
 
-## 5. 非目标
+## 5. digest 只读附录（可选）
 
-改 digest 结构；Workbench 影子页；集 B 真实贝叶斯/LLM；改 `W_DEFAULT`。
+若存在 `local/shadow/final_board_{asof}.json`（或 `STOCK_PLATFORM_SHADOW_DIR`），盘前/盘后 digest 在「绩效台账」后追加 **附录 · 影子 Final Board（只读）**；文件缺失则**整段省略**（不 pad、不编造）。不改 picks / 同花顺导入语义。
+
+## 6. 仍 stub / 延后
+
+| 项 | 状态 |
+|----|------|
+| 集 B 真实贝叶斯先验 + LLM 胜率 | 仍 experimental 占位（可有学校优先级 `rankHints`）；不可覆盖硬闸 |
+| S2 自动拉东财主题（无 DI 时） | 不默认发网；须调用方注入 |
+| Workbench 影子只读页 | 延后 |
+| 改 `W_DEFAULT` / 出厂 picks | 禁止（须 Y1→Y2） |
+
+## 7. 非目标
+
+改出厂 picks 写路径；开 live；默认开 LLM；主题校绕过 `FACTOR_LIBRARY`。

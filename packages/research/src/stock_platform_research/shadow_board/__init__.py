@@ -7,6 +7,7 @@ Never mutates production picks / hits / main performance JSONL.
 from __future__ import annotations
 
 from .advisory import advisory_set_b
+from .digest_hook import render_shadow_board_appendix, shadow_board_json_path
 from .ledger import (
     DEFAULT_SHADOW_DIR,
     ENV_SHADOW_DIR,
@@ -25,7 +26,9 @@ __all__ = [
     "advisory_set_b",
     "apply_round2_set_a",
     "default_shadow_dir",
+    "render_shadow_board_appendix",
     "run_round1",
     "run_shadow_board",
+    "shadow_board_json_path",
     "write_shadow_ledger",
 ]

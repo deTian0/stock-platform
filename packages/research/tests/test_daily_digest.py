@@ -106,6 +106,44 @@ def test_build_digest_text_contains_picks_and_disclaimer(env):
     assert "非投资建议" in text
     assert "SIMULATE" in text
     assert "绩效台账" in text
+    # Shadow appendix omitted when file missing (fail-closed; no pad).
+    assert "影子 Final Board" not in text
+
+
+def test_digest_shadow_board_appendix_omit_and_include(env, tmp_path: Path):
+    from stock_platform_research.persistence import open_brief_repository
+    from stock_platform_research.shadow_board import write_shadow_ledger
+
+    record = open_brief_repository().save(BRIEF, symbols=BRIEF["symbols"])
+    missing = build_digest_text(record, hits_repo=None, shadow_dir=tmp_path)
+    assert "影子 Final Board" not in missing
+
+    write_shadow_ledger(
+        {
+            "schemaVersion": 1,
+            "asof": "2026-10-09",
+            "status": "ok",
+            "excludedFromPerformance": True,
+            "shadowOnly": True,
+            "finalBoard": [
+                {
+                    "code": "600519",
+                    "name": "贵州茅台",
+                    "school": "S3",
+                    "score": 0.82,
+                    "holdingPeriod": "10–20 交易日",
+                }
+            ],
+        },
+        shadow_dir=tmp_path,
+        asof="2026-10-09",
+    )
+    present = build_digest_text(record, hits_repo=None, shadow_dir=tmp_path)
+    assert "附录 · 影子 Final Board" in present
+    assert "600519" in present
+    assert "excludedFromPerformance=True" in present
+    # 同花顺块语义未因附录改动（导入块仍只来自 picks）
+    assert "非投资建议" in present
 
 
 def test_build_digest_text_title_uses_run_date_with_basis_note(env):

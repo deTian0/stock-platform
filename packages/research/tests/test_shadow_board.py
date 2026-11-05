@@ -53,15 +53,113 @@ def _universe() -> list[dict]:
     ]
 
 
-def test_round1_s3_s4_ok_stubs_empty() -> None:
+def test_round1_s3_s4_ok_s1_breadth_off_s2_no_provider() -> None:
+    """Default universe: rs20 all negative → S1 risk-off; S2 no DI → empty; S5 uses amount."""
     pools = run_round1(_universe(), top_k=3)
     assert pools["S1"]["status"] == "empty"
+    assert "择时" in (pools["S1"].get("reason") or "") or "宽度" in (pools["S1"].get("reason") or "")
     assert pools["S2"]["status"] == "empty"
-    assert pools["S5"]["status"] == "empty"
+    assert "provider" in (pools["S2"].get("reason") or "") or "FACTOR_LIBRARY" in (
+        pools["S2"].get("reason") or ""
+    )
+    assert pools["S5"]["status"] == "ok"
+    assert len(pools["S5"]["candidates"]) >= 1
     assert pools["S3"]["status"] == "ok"
     assert pools["S4"]["status"] == "ok"
     assert len(pools["S3"]["candidates"]) >= 1
     assert len(pools["S4"]["candidates"]) >= 1
+
+
+def test_s1_breadth_on_picks() -> None:
+    uni = [
+        {**_row("600519", name="贵州茅台"), "rs20": 2.0},
+        {**_row("000858", name="五粮液"), "rs20": 1.5},
+        {**_row("600036", name="招商银行"), "rs20": 0.5},
+        {**_row("601318", name="中国平安"), "rs20": 0.2},
+        {**_row("300750", name="宁德时代"), "rs20": -0.5},
+        {**_row("002594", name="比亚迪"), "rs20": 1.0},
+    ]
+    pool = run_round1(uni, top_k=3)["S1"]
+    assert pool["status"] == "ok"
+    assert len(pool["candidates"]) >= 1
+    assert all(c.get("excludedFromPerformance") for c in pool["candidates"])
+
+
+def test_s1_regime_closed() -> None:
+    from stock_platform_research.shadow_board.schools import school_s1_macro
+
+    pool = school_s1_macro(
+        _universe(),
+        asof="2026-11-05",
+        regime={"2026-11-05": False},
+    )
+    assert pool["status"] == "empty"
+    assert "regime" in (pool.get("reason") or "")
+
+
+def test_s1_index_ma_rule() -> None:
+    from stock_platform_research.shadow_board.schools import school_s1_macro
+
+    # 20 closes rising → last above MA20
+    bars = [{"close": 100.0 + i} for i in range(25)]
+    pool = school_s1_macro(
+        [
+            {**_row("600519", name="贵州茅台"), "rs20": -1.0},  # breadth would be off
+            {**_row("000858", name="五粮液"), "rs20": -1.0},
+            {**_row("600036", name="招商银行"), "rs20": -1.0},
+            {**_row("601318", name="中国平安"), "rs20": -1.0},
+            {**_row("300750", name="宁德时代"), "rs20": -1.0},
+        ],
+        index_bars=bars,
+        top_k=3,
+    )
+    # Index open overrides weak breadth; picks still need above-MA or unmeasured
+    # All rs20 negative → filtered out → empty with timing-open note OR picks with flag None skipped
+    assert pool["status"] in {"ok", "empty"}
+    assert "MA" in (pool.get("reason") or "") or "择时" in (pool.get("reason") or "")
+
+    bars_down = [{"close": 200.0 - i} for i in range(25)]
+    closed = school_s1_macro(_universe(), index_bars=bars_down)
+    assert closed["status"] == "empty"
+    assert "跌破" in (closed.get("reason") or "") or "择时关闭" in (closed.get("reason") or "")
+
+
+def test_s2_concept_blocks_di() -> None:
+    from stock_platform_research.shadow_board.schools import school_s2_theme
+
+    concepts = {
+        "boards": [
+            {"name": "白酒概念", "lead_stock": "600519", "change_pct": 2.0},
+        ]
+    }
+    pool = school_s2_theme(_universe(), concept_blocks=concepts, top_k=3)
+    assert pool["status"] == "ok"
+    codes = {c["code"] for c in pool["candidates"]}
+    assert "600519" in codes
+    assert pool.get("advisoryOnly") is True
+
+
+def test_s2_provider_missing_still_empty() -> None:
+    from stock_platform_research.shadow_board.schools import school_s2_theme
+
+    assert school_s2_theme(_universe())["status"] == "empty"
+
+
+def test_s5_flow_and_amount() -> None:
+    from stock_platform_research.shadow_board.schools import school_s5_flow
+
+    with_flow = [
+        {**_row("600519", name="贵州茅台"), "main_net": 5e8},
+        {**_row("000858", name="五粮液"), "main_net": 1e8},
+        {**_row("600036", name="招商银行"), "main_net": -1e7},
+    ]
+    pool = school_s5_flow(with_flow, top_k=2)
+    assert pool["status"] == "ok"
+    assert pool["candidates"][0]["code"] == "600519"
+
+    amount_only = school_s5_flow(_universe(), top_k=2)
+    assert amount_only["status"] == "ok"
+    assert "流动性" in (amount_only.get("reason") or "")
 
 
 def test_empty_universe_legal_empty_board(tmp_path: Path) -> None:

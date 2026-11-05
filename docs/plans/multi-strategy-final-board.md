@@ -1,6 +1,6 @@
 # 多策略 Final Board（影子链）产品设计
 
-> **状态**：MVP 已落（2026-11-05）— ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；CLI `stock-platform-shadow-board`；**不改**出厂 lvrev、不打 tag。  
+> **状态**：MVP + 校富化（2026-11-05）— ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；CLI `stock-platform-shadow-board`；S1/S5 薄规则、S2 DI、digest 只读附录；**不改**出厂 lvrev、不打 tag。  
 > **版本基线**：`v4.13.7`（累计发版目标仍 `v4.14.0`）  
 > **现行快照**：[`../STATUS.md`](../STATUS.md)  
 > **升级路径**：影子链证据 → **Y1 采纳闸门** → 人工签核 → **Y2 落档**；禁止跳过 Y1/Y2 直接改出厂 lvrev。  
@@ -150,17 +150,17 @@ Final Board / 辩论侧车凡产出「理由」，须尽量满足：
 | ADR 0065 / 辩论车道 | 延续 `excludedFromPerformance`；多策略不得削弱该不变量 |
 | S2 因子库 / `W_DEFAULT` | 主题与新因子仍走准入；本设计**强化**「禁止绕过」 |
 
-**本计划不做 / MVP 仍不做**：改 `W_DEFAULT`、改生产 picks 写路径、开实盘、默认开 LLM、改 digest 结构。
+**本计划不做**：改 `W_DEFAULT`、改生产 picks 写路径、开实盘、默认开 LLM。digest **仅**允许缺文件则省略的影子只读附录。
 
 ---
 
-## 9. 仍开放的问题（实施前可再拍）
+## 9. 仍开放的问题
 
 1. ~~影子落盘路径~~ → ADR 0093：`local/shadow/` + `STOCK_PLATFORM_SHADOW_DIR`。  
 2. ~~规则集 A 学校优先级初值~~ → 契约：`S3 > S4 > S5 > S2 > S1`。  
-3. 集 B 的贝叶斯先验与 LLM 胜率字段 schema——Y1 前保持 experimental（MVP 占位 `null`）。  
+3. 集 B 的贝叶斯先验与 LLM 胜率字段 schema——Y1 前保持 experimental（占位 + 可选 `rankHints`）。  
 4. Final Board 是否进 Workbench 只读页（与生产「今日推荐」并排）——UI 可后置。  
-5. S1/S2/S5 富 alpha、主题数据源——仍开放。
+5. ~~S1/S5 薄规则~~ → 已接；S2 默认不发网，须 DI；更深主题 alpha / 备用数据源仍开放。
 
 ---
 
@@ -169,7 +169,10 @@ Final Board / 辩论侧车凡产出「理由」，须尽量满足：
 - [x] Final Board 写入路径与生产 picks **字节级隔离**（测试锁）  
 - [x] 主绩效 JSONL 无影子列混入；影子有独立产物  
 - [x] Round2 无 pad-to-N；空板用例通过  
-- [x] 主题信号未过 `FACTOR_LIBRARY` 不得出现在生产权重路径（S2 stub 空池）  
+- [x] 主题信号未过 `FACTOR_LIBRARY` 不得出现在生产权重路径（S2 无 DI → 空池；有信号亦标 advisory）  
 - [x] LLM/辩论载荷恒 `excludedFromPerformance`  
 - [x] 结构化理由缺字段 → 可观测 degrade，不进绩效  
 - [x] 集 B 数字不能单独放行未过硬闸的票  
+- [x] S1 宽度/指数/regime 薄规则 + 缺数据 fail-closed  
+- [x] S5 资金流或 amount/illiq 薄规则  
+- [x] digest 影子附录：有文件才渲染，缺失整段省略  

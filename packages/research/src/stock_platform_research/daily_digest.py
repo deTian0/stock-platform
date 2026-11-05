@@ -966,6 +966,7 @@ def build_digest_text(
     extra_notes: list[str] | None = None,
     benchmark_name: str | None = None,
     benchmark_asof_close: float | None = None,
+    shadow_dir: Path | str | None = None,
 ) -> str:
     """Render one BriefRecord as the human-readable markdown digest."""
     payload = record.payload or {}
@@ -1129,6 +1130,17 @@ def build_digest_text(
         else:
             lines.append("- 暂无已结算样本，暂无收益数字（待持有期到期后结算）")
     lines.append("")
+
+    # Optional read-only shadow Final Board appendix (ADR 0093). Omit entirely when
+    # local/shadow/final_board_{asof}.json is missing — never pad / fabricate.
+    try:
+        from .shadow_board.digest_hook import render_shadow_board_appendix
+    except ImportError:  # pragma: no cover — package always ships together
+        render_shadow_board_appendix = None  # type: ignore[assignment]
+    if render_shadow_board_appendix is not None:
+        appendix = render_shadow_board_appendix(asof, shadow_dir=shadow_dir)
+        if appendix:
+            lines.extend(appendix)
 
     lines.append("---")
     lines.append("*digest 由 `stock-platform-digest` 渲染；权威数据以 SQLite brief 仓库为准。*")
