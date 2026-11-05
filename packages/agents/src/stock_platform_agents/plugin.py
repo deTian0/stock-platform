@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from .debate import DebateReport
-from .llm_debate import run_debate
+from .debate import DebateReport, build_debate_report
+from .errors import AgentError
 from .report import ResearchReport, SupportsMarketData, build_research_report, build_review_report
 
 
@@ -37,7 +37,11 @@ class ReviewAgentPlugin:
 
 
 class DebateAgentPlugin:
-    """Bull/Bear/Risk debate slot — deterministic by default; optional LLM."""
+    """Bull/Bear/Risk debate slot — deterministic by default; optional LLM.
+
+    ``engine=deterministic`` (default) never imports the LLM module face (ADR 0088).
+    ``engine=llm`` lazy-loads ``llm_debate.run_debate``.
+    """
 
     slot = "stock-debate"
 
@@ -51,7 +55,17 @@ class DebateAgentPlugin:
         asof: str | date | None = None,
         engine: str = "deterministic",
     ) -> dict[str, Any]:
-        report: DebateReport = run_debate(
-            self.provider, symbol, asof=asof, engine=engine
-        )
-        return report.to_dict()
+        eng = (engine or "deterministic").strip().lower()
+        if eng in {"", "deterministic", "rules", "m12"}:
+            report: DebateReport = build_debate_report(
+                self.provider, symbol, asof=asof
+            )
+            return report.to_dict()
+        if eng in {"llm", "openai"}:
+            from .llm_debate import run_debate
+
+            report = run_debate(
+                self.provider, symbol, asof=asof, engine="llm"
+            )
+            return report.to_dict()
+        raise AgentError(f"unknown debate engine={engine!r}; use deterministic|llm")

@@ -19,6 +19,7 @@
 | [../archive/README.md](../archive/README.md) | v4.2.0–v4.4.0 交接（下一块砖均已落地） | 归档 |
 | [digest-pre-post-redesign.md](digest-pre-post-redesign.md) | 每日简报「盘前 / 盘后」重构（展示分线 + 运行日 OHLC + ②A/②B 双 profile 二次精选 + ③B 详解） | **done（`v4.13.0`）**；`T3` 顺延 `v4.14.0` |
 | [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **本地收束 + 远端历史消毒已执行；公开开源发布仍延后** |
+| [llm-vs-deterministic-boundary.md](llm-vs-deterministic-boundary.md) | LLM vs 确定性主链边界（实测路径 + 包/导入收口） | **第一刀 done**（ADR [`0088`](../architecture/0088-llm-sidecar-package-boundary.md)）；不替代下一刀 `T3` |
 
 ## 与其它文档的关系
 

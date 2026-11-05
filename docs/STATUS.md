@@ -1,8 +1,8 @@
 # 现行快照
 
-> 日期：2026-11-04  
+> 日期：2026-11-05  
 > 版本：`v4.13.7`（tag `v4.13.7`；历史消毒后 SHA 会变）  
-> 工作区：本轮完成 `local/` 运行时收口、`stock-platform-init`、历史作者/路径消毒与 force push（公开开源仍延后）。详见 [`plans/opensource-sanitization.md`](plans/opensource-sanitization.md)、[`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 工作区：含未提交的 LLM 提供商单点（ADR [`0089`](architecture/0089-llm-provider-selection.md)：默认 workbuddy / 可选 deepseek·`DEEPSEEK_*`）。另有 ADR [`0088`](architecture/0088-llm-sidecar-package-boundary.md) 侧车边界。`local/` 运行时见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 文档放哪
@@ -36,6 +36,13 @@
 - **v4.13.1–.3** 报告日文件名、同花顺导入块与 txt 对齐
 - **v4.13.4–.6** 盘后开/收/涨跌：东财分批重试 → 腾讯/新浪 → westock 第四源
 - **v4.13.7** 体检 `briefDue`：修掉每晚「brief 落后 1 日」的假阳性；裁决 `ok` 时报告只留一行结论
+
+## LLM 边界（现行）
+
+- **确定性主链**（默认、无 key）：`research` 日更 / digest / 回测 / attribution / adoption / 绩效；`agents` 研报·复盘·`engine=off|deterministic` 辩论；执行 SIMULATE。
+- **LLM 提供商**（ADR [`0089`](architecture/0089-llm-provider-selection.md)，运维 [`ops/llm-providers.md`](ops/llm-providers.md)）：`STOCK_PLATFORM_LLM_PROVIDER` 默认 **`workbuddy`**（进程内不打商业 LLM；数据用 workbuddy bridge）。生产 LLM 选 **`deepseek`**，只用 `DEEPSEEK_*`；或 `openai` 兼容栈。另需 `STOCK_PLATFORM_LLM_DEBATE=1` + `[llm]` extra。
+- **可选 LLM 侧车**：`stock_platform_agents.llm`；CLI `--debate-engine llm`；API `engine=llm` / `/api/debate/status` / deep-graph。
+- **不变量**：辩论判决不进 brief / picks 账本 / 命中 / 绩效（ADR 0065 测试锁）。
 
 ## 已记账、另立版本的缺陷
 

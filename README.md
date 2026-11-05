@@ -23,20 +23,24 @@ CI / 本地测试设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 保持零公网。�
 ## 日用路径（Phase E）
 
 ```powershell
-# 1) CLI 日流水线（replay / CI，零公网；默认样例宇宙对齐 fixtures）
-stock-platform-daily --asof 2026-09-02 --provider replay --fixtures .\packages\providers\tests\fixtures --out $env:TEMP\sp-daily
-# 细节与 --skip-refresh 变体：docs/ops/daily-pipeline.md
+# 1) 本机 WorkBuddy 数据（推荐日用）
+stock-platform-workbuddy-bridge --symbols sh600519 --limit 60
+stock-platform-daily --provider workbuddy --debate-engine off
+# 细节：docs/ops/daily-pipeline.md · docs/ops/llm-providers.md
 
-# 2) Windows 调度（交易日跳过休市）
+# 2) CI / 零公网（replay fixtures）
+stock-platform-daily --asof 2026-09-02 --provider replay --fixtures .\packages\providers\tests\fixtures --out $env:TEMP\sp-daily
+
+# 3) Windows 调度（交易日跳过休市）
 powershell -NoProfile -File .\scripts\ops\Invoke-DailyPipeline.ps1 -Asof 2026-09-02
 # 安装步骤：docs/ops/scheduler.md
 
-# 3) Workbench 一键向导
+# 4) Workbench 一键向导
 python -m stock_platform_workbench
 # → http://127.0.0.1:3018/#wizard  （刷新→推荐→纸面；默认 skip refresh）
 ```
 
-默认 **paper + SIMULATE**；行情默认 live（可用 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 强制 fixtures）。日用宇宙样例见 `docs/ops/daily-universe.md`。
+默认 **paper + SIMULATE**。LLM 提供商默认 `workbuddy`（进程内不打商业模型）；要用 DeepSeek：`STOCK_PLATFORM_LLM_PROVIDER=deepseek` + `DEEPSEEK_*`，见 [`docs/ops/llm-providers.md`](docs/ops/llm-providers.md)。CI 用 `STOCK_PLATFORM_PROVIDER_PRESET=replay`。日用宇宙样例见 `docs/ops/daily-universe.md`。
 
 ## 快速开始
 

@@ -15,9 +15,7 @@ from stock_platform_execution.timing import market_now
 from stock_platform_providers import get_market_strategy
 from stock_platform_agents import (
     AgentError,
-    LlmUnavailableError,
     attach_debate_lane,
-    debate_brief_picks,
     normalize_lane_engine,
 )
 from stock_platform_research import (
@@ -1162,6 +1160,9 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
         universe_tier=body.universe_tier,
     )
     daily = request.app.state.workbench.resolve("daily")
+    # LLM face only when this endpoint runs (ADR 0088); deterministic is default.
+    from stock_platform_agents.llm import debate_brief_picks
+
     try:
         return debate_brief_picks(
             daily,
@@ -1169,8 +1170,6 @@ def brief_debate(request: Request, body: BriefDebateRequest) -> dict[str, Any]:
             engine=body.engine,
             max_picks=body.max_picks,
         )
-    except LlmUnavailableError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (AgentError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1222,9 +1221,8 @@ def post_daily_debate(request: Request, body: DailyDebateRequest) -> dict[str, A
     daily = request.app.state.workbench.resolve("daily")
     try:
         lane = attach_debate_lane(daily, brief, engine=engine, max_picks=body.max_picks)
-    except LlmUnavailableError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (AgentError, ValueError) as exc:
+        # LlmUnavailableError subclasses AgentError — both map to 400.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     verdicts = [

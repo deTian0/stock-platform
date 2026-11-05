@@ -4,7 +4,8 @@
 > **上游**：`docs/plans/trading-system-roadmap.md` §3.3 ｜ ADR [`0065`](../architecture/0065-llm-debate-lane.md)
 > **承接**：ADR [`0017`](../architecture/0017-light-debate.md)（确定性辩论）·
 > ADR [`0034`](../architecture/0034-optional-llm-debate.md)（可选 LLM 辩论）·
-> ADR [`0045`](../architecture/0045-llm-cost-quality.md)（LLM 成本 / 质量）
+> ADR [`0045`](../architecture/0045-llm-cost-quality.md)（LLM 成本 / 质量）·
+> ADR [`0088`](../architecture/0088-llm-sidecar-package-boundary.md)（包/导入边界）
 
 ---
 
@@ -59,6 +60,7 @@ budget=None, llm_call=None)` —— **只读** `brief`（只读 `asof` 与 `pick
 
 - 未传 → 回落环境变量 `STOCK_PLATFORM_LLM_MAX_CALLS`（默认 `6`）/
   `STOCK_PLATFORM_LLM_MAX_TOKENS`（软估计 `len/4`，未设则不设上限）。
+- 提供商由 `STOCK_PLATFORM_LLM_PROVIDER` 决定（默认 `workbuddy`；生产 LLM 用 `deepseek` + `DEEPSEEK_*`）。见 ADR [`0089`](../architecture/0089-llm-provider-selection.md)。
 - 显式传入 → **覆盖**环境变量（主链可为单次运行定预算，不必改环境）。
 - 超预算 → `LlmBudgetExceeded`；随后按 `STOCK_PLATFORM_LLM_FALLBACK` 处理：
   `deterministic`（默认）**显式降级**并在 `warnings` 写明；其它值 **fail-closed** 抛错。

@@ -47,46 +47,26 @@ _RESPONSES_INCOMPLETE_REASONS = {"max_output_tokens", "max_tokens"}
 
 def llm_debate_status() -> dict[str, Any]:
     """Describe whether optional LLM debate can run (no network)."""
-    enabled = os.environ.get("STOCK_PLATFORM_LLM_DEBATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    key = (
-        os.environ.get("STOCK_PLATFORM_LLM_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or ""
-    ).strip()
-    openai_ok = False
-    openai_err: str | None = None
-    try:
-        import openai  # noqa: F401
+    from .llm_provider import llm_provider_status
 
-        openai_ok = True
-    except Exception as exc:  # noqa: BLE001
-        openai_err = f"{type(exc).__name__}: {exc}"
-    ready = bool(enabled and key and openai_ok)
-    reasons: list[str] = []
-    if not enabled:
-        reasons.append("set STOCK_PLATFORM_LLM_DEBATE=1 to opt in")
-    if not key:
-        reasons.append("missing STOCK_PLATFORM_LLM_API_KEY or OPENAI_API_KEY")
-    if not openai_ok:
-        reasons.append(
-            "openai package missing — pip install 'stock-platform-agents[llm]' "
-            f"({openai_err})"
-        )
+    provider = llm_provider_status()
     return {
-        "enabled": enabled,
-        "hasApiKey": bool(key),
-        "openaiImportOk": openai_ok,
-        "ready": ready,
-        "reasons": reasons,
+        "enabled": bool(provider.get("debateOptIn")),
+        "provider": provider.get("provider"),
+        "hasApiKey": bool(provider.get("hasApiKey")),
+        "baseUrl": provider.get("baseUrl"),
+        "model": provider.get("model"),
+        "visionEnabled": bool(provider.get("visionEnabled")),
+        "visionModel": provider.get("visionModel"),
+        "openaiImportOk": bool(provider.get("openaiImportOk")),
+        "ready": bool(provider.get("ready")),
+        "reasons": list(provider.get("reasons") or []),
         "defaultEngine": "deterministic",
         "fallback": _llm_fallback_mode(),
         "maxCalls": _max_calls(),
         "maxTokensSoft": _max_tokens_soft(),
+        "dataHint": provider.get("dataHint"),
+        "knownProviders": provider.get("knownProviders"),
     }
 
 
@@ -221,42 +201,14 @@ def _require_llm_env(*, llm_call: LlmCall | None) -> None:
 
 
 def _default_openai_call(system: str, user: str) -> str:
+    """In-process LLM call via :mod:`llm_provider` (deepseek / openai)."""
+    from .llm_provider import LlmProviderError, chat_completion
+
     try:
-        from openai import OpenAI
-    except Exception as exc:  # noqa: BLE001
-        raise LlmUnavailableError(
-            "openai import failed (fail-closed); "
-            "pip install 'stock-platform-agents[llm]'"
-        ) from exc
-    api_key = (
-        os.environ.get("STOCK_PLATFORM_LLM_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or ""
-    ).strip()
-    if not api_key:
-        raise LlmUnavailableError("missing LLM API key (fail-closed)")
-    model = os.environ.get("STOCK_PLATFORM_LLM_MODEL", "gpt-4o-mini").strip()
-    client = OpenAI(api_key=api_key)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0,
-    )
-    meta: dict[str, Any] = {}
-    try:
-        choice0 = resp.choices[0]
-        fr = getattr(choice0, "finish_reason", None)
-        if fr is not None:
-            meta["finish_reason"] = fr
-    except Exception:  # noqa: BLE001
-        pass
+        content, meta = chat_completion(system, user)
+    except LlmProviderError as exc:
+        raise LlmUnavailableError(str(exc)) from exc
     warn_if_truncated(meta)
-    content = resp.choices[0].message.content or ""
-    if not content.strip():
-        raise LlmUnavailableError("empty LLM response (fail-closed)")
     return content
 
 

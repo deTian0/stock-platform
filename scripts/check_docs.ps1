@@ -105,6 +105,9 @@ $required = @(
   'docs/architecture/0085-ohlc-multi-source-fallback.md',
   'docs/architecture/0086-westock-fourth-source-and-provider.md',
   'docs/architecture/0087-brief-due-and-ok-summary.md',
+  'docs/architecture/0088-llm-sidecar-package-boundary.md',
+  'docs/architecture/0089-llm-provider-selection.md',
+  'docs/ops/llm-providers.md',
   'docs/ops/refresh-and-fixtures.md',
   'docs/ops/daily-universe.md',
   'docs/ops/daily-pipeline.md',
@@ -132,6 +135,7 @@ $required = @(
   'docs/plans/dual-line-responsibility.md',
   'docs/plans/duplicate-implementation-convergence.md',
   'docs/plans/opensource-sanitization.md',
+  'docs/plans/llm-vs-deterministic-boundary.md',
   'docs/ops/local-runtime.md',
   'docs/archive/README.md',
   'docs/archive/handoffs/handoff-v4.2.0.md',
@@ -225,6 +229,8 @@ if ($changelog -notmatch [regex]::Escape("[$ver]")) {
 $mdFiles = Get-ChildItem -Path $root -Recurse -Filter *.md |
   Where-Object {
     $_.FullName -notmatch '\\\.git\\' -and
+    $_.FullName -notmatch '\\\.venv\\' -and
+    $_.FullName -notmatch '\\node_modules\\' -and
     $_.FullName -notmatch '\\local\\' -and
     $_.FullName -notmatch '\\data\\' -and
     $_.FullName -notmatch '\\\.cursor\\' -and

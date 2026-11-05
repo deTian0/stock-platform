@@ -16,7 +16,8 @@
 | [`archive/`](archive/README.md) | 已落地的历史交接；文中「下一块砖」作废 |
 | [`architecture/`](architecture/) | ADR（编号递增） |
 | [`contracts/`](contracts/) | 对外契约（数据集、能力矩阵、市场策略、东财 HTTP 等） |
-| [`ops/`](ops/) | 运维：刷新、调度、live 启动、Skills 治理、诚实性说明 |
+| [`ops/`](ops/) | 运维：刷新、调度、live 启动、LLM 提供商、Skills 治理、诚实性说明 |
+| [`ops/llm-providers.md`](ops/llm-providers.md) | LLM：`workbuddy` 默认 / `deepseek`（`DEEPSEEK_*`）/ `openai` |
 | [`engineering/`](engineering/) | OpenAPI、测试分层、CI |
 | [`upstream/`](upstream/) | 上游配方只读归档（摘要副本，非运行时） |
 | [`upstream-archive.md`](upstream-archive.md) | 上游仓总清单与红线 |

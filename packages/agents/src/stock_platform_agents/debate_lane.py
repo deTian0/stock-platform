@@ -15,19 +15,21 @@ recommendation accounting. Two hard properties, both asserted in the tests:
 Engines (default ``off`` → zero LLM, zero side effects):
 
 - ``off``            — no debate at all (default); the lane is a no-op.
-- ``deterministic``  — ``build_debate_report`` (ADR 0017); no key, no network.
+- ``deterministic``  — ``build_debate_report`` (ADR 0017); no key, no network;
+  does **not** import the LLM module face.
 - ``llm``            — ``build_llm_debate_report`` (ADR 0034) with the ADR 0045
   budget / truncation / degradation guarantees; missing deps → non-silent degrade
   to deterministic (``STOCK_PLATFORM_LLM_FALLBACK=deterministic``, the default) or
-  fail-closed when set otherwise.
+  fail-closed when set otherwise. LLM modules are **lazy-imported** only on this
+  engine (ADR 0088).
 """
 
 from __future__ import annotations
 
 from typing import Any, Mapping
 
+from .debate import build_debate_report
 from .errors import AgentError
-from .llm_debate import LlmBudget, run_debate
 
 #: Engines accepted by the lane (``off`` is the product default).
 DEBATE_LANE_ENGINES: tuple[str, ...] = ("off", "deterministic", "llm")
@@ -56,23 +58,53 @@ def normalize_lane_engine(engine: str | None) -> str:
     )
 
 
+def _env_budget_dict() -> dict[str, Any]:
+    """Report env-derived budget caps without importing the LLM module face.
+
+    Used for ``off`` / ``deterministic`` so the lane payload shape stays stable
+    (``maxCalls`` / ``maxTokensSoft`` / counters) while callsUsed stays 0.
+    """
+    import os
+
+    raw_calls = os.environ.get("STOCK_PLATFORM_LLM_MAX_CALLS", "6").strip() or "6"
+    try:
+        max_calls = max(0, int(raw_calls))
+    except ValueError:
+        max_calls = 6
+    raw_tok = os.environ.get("STOCK_PLATFORM_LLM_MAX_TOKENS", "").strip()
+    max_tokens: int | None
+    if not raw_tok:
+        max_tokens = None
+    else:
+        try:
+            max_tokens = max(0, int(raw_tok))
+        except ValueError:
+            max_tokens = None
+    return {
+        "maxCalls": max_calls,
+        "maxTokensSoft": max_tokens,
+        "callsUsed": 0,
+        "tokensEst": 0,
+    }
+
+
 def attach_debate_lane(
     provider: Any,
     brief: Mapping[str, Any],
     *,
     engine: str | None = _OFF,
     max_picks: int | None = None,
-    budget: LlmBudget | None = None,
+    budget: Any = None,
     llm_call: Any = None,
 ) -> dict[str, Any]:
     """Attach an advisory debate lane to ``brief``'s TopN picks.
 
     Returns a **lane payload** (not the brief). The brief is only read — callers can
-    assert the picks are unchanged. ``budget`` is an explicit :class:`LlmBudget`;
-    when omitted it falls back to the env-derived defaults (ADR 0045).
+    assert the picks are unchanged. ``budget`` is an explicit :class:`LlmBudget`
+    (LLM face); when omitted on ``engine=llm`` it falls back to env-derived defaults
+    (ADR 0045). Deterministic / off paths never construct an LLM budget object.
     """
     eng = normalize_lane_engine(engine)
-    lane_budget = budget if budget is not None else LlmBudget()
     picks = list(brief.get("picks") or [])
     if max_picks is not None:
         picks = picks[: max(0, int(max_picks))]
@@ -89,7 +121,7 @@ def attach_debate_lane(
         "degraded": False,
         "advisory": True,
         "excludedFromPerformance": True,
-        "budget": lane_budget.to_dict(),
+        "budget": _env_budget_dict(),
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
         "disclaimer": (
@@ -100,6 +132,32 @@ def attach_debate_lane(
         lane["note"] = "debate lane off (default): deterministic picks only, zero LLM."
         return lane
 
+    if eng == "deterministic":
+        for pick in picks:
+            sym = str(pick.get("symbol") or "").strip()
+            if not sym:
+                continue
+            try:
+                report = build_debate_report(provider, sym, asof=brief.get("asof"))
+            except AgentError as exc:  # per-pick failure never aborts the lane
+                lane["warnings"].append(f"{sym}: {exc}")
+                continue
+            lane["debates"].append(
+                {
+                    "rank": pick.get("rank"),
+                    "symbol": report.symbol,
+                    "debate": report.to_dict(),
+                }
+            )
+        lane["debateCount"] = len(lane["debates"])
+        return lane
+
+    # engine == llm — load LLM face only here (ADR 0088).
+    from .llm_debate import LlmBudget, run_debate
+
+    lane_budget = budget if budget is not None else LlmBudget()
+    lane["budget"] = lane_budget.to_dict()
+
     for pick in picks:
         sym = str(pick.get("symbol") or "").strip()
         if not sym:
@@ -109,14 +167,14 @@ def attach_debate_lane(
                 provider,
                 sym,
                 asof=brief.get("asof"),
-                engine=eng,
+                engine="llm",
                 llm_call=llm_call,
                 budget=lane_budget,
             )
         except AgentError as exc:  # per-pick failure never aborts the lane
             lane["warnings"].append(f"{sym}: {exc}")
             continue
-        if eng == "llm" and report.kind != "llm_debate":
+        if report.kind != "llm_debate":
             lane["degraded"] = True
             lane["engine"] = "deterministic"
         lane["debates"].append(

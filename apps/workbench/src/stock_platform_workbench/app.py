@@ -18,7 +18,7 @@ from .openapi_models import (
     UpstreamHttpErrorBody,
     UpstreamTimeoutBody,
 )
-from .routes import agents, broker, market, meta, ops, paper, research, settings
+from .routes import agents, agents_llm, broker, market, meta, ops, paper, research, settings
 from .state import CapabilityUnavailable, WorkbenchState, build_default_state
 
 _PKG_DIR = Path(__file__).resolve().parent
@@ -106,6 +106,7 @@ def create_app(
     app.include_router(settings.router)
     app.include_router(market.router)
     app.include_router(agents.router)
+    app.include_router(agents_llm.router)
     app.include_router(paper.router)
     app.include_router(broker.router)
     app.include_router(research.router)

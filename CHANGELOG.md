@@ -7,12 +7,16 @@
 ### Added
 
 - **`local/` 本机运行时目录 + `stock-platform-init`。** 平台自有产物（SQLite、digest、持仓、日志、健康度、绩效 JSONL、`.env`）默认落在被忽略的 `local/`；`.env.example` 复制目标改为 `local/.env`。新增 `Settings`（`pydantic-settings`）、`platform_runtime_config` 落库与 `stock-platform-init` CLI（缺行 seed、幂等、fail-closed，**不**打开 live）。说明见 [`docs/ops/local-runtime.md`](docs/ops/local-runtime.md)。
+- **LLM 顾问侧车包面 `stock_platform_agents.llm`。** 集中再导出预算 / 可选辩论 / deep graph；确定性路径不再急切加载 LLM 模块（ADR [`0088`](docs/architecture/0088-llm-sidecar-package-boundary.md)；计划 [`docs/plans/llm-vs-deterministic-boundary.md`](docs/plans/llm-vs-deterministic-boundary.md)）。
+- Workbench **`routes/agents_llm.py`**：`/api/debate/status` 与 deep-graph 从确定性 agent 槽拆出。
 
 ### Changed
 
 - **文档对齐 `v4.13.7`，并收进 `docs/`。** 新增 [`docs/STATUS.md`](docs/STATUS.md) 作为现行快照（开放项：`T3` → `v4.14.0`，`R5` 等生产侧 ETF 回补，`Y2` 等人工签核）。v4.2.0–v4.4.0 交接从 `docs/plans/` 迁到 [`docs/archive/handoffs/`](docs/archive/README.md)，文中「下一块砖」标明作废。`ROADMAP` 顶部焦点、自有线路线图文首与 `T3` 目标 tag 改为 `v4.14.0`；修订记录补到 `v4.13.7`。仓库根与各包 README 只保留入口，并链回 `STATUS.md`。
 - **dotenv / 默认路径收口。** 加载优先 `local/.env`，过渡期仍可读根 `.env`；digest / workbench 入口调用 `get_settings()`；调度 XML / 脚本去掉本机绝对路径占位；测试引擎库路径只认环境变量；`conftest` 扩大运行时路径守卫。
 - **历史消毒（破坏性，非发版）。** 全历史 author/committer → `63516 <635161624@qq.com>`；`--replace-text` 脱敏本机路径与持仓敏感串；本地+远端 tag 仅保留 11 个时代边界；`main` force push 到现有 origin。公开许可证与「已开源」叙事仍延后。
+- **LLM vs 确定性边界收口（行为兼容）。** `debate_lane` / `DebateAgentPlugin` 在 `off|deterministic` 不 import `llm_debate`；包根对 LLM 符号 `__getattr__` 懒加载；research 仍无 agents 硬依赖。误判不进绩效不变量不变。
+- **LLM 提供商单点（ADR 0089）。** `STOCK_PLATFORM_LLM_PROVIDER` 默认 `workbuddy`（进程内不打商业模型）；`deepseek` 只用 `DEEPSEEK_*`；`openai` 为兼容栈。辩论 / deep-graph 经 `llm_provider.chat_completion` 显式传 `base_url`+`model`。运维见 [`docs/ops/llm-providers.md`](docs/ops/llm-providers.md)。
 
 ## [4.13.7] - 2026-11-04
 
