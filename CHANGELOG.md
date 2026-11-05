@@ -12,6 +12,7 @@
 - **F1 基准身份单点** `stock_platform_research.benchmark`（ADR [`0090`](docs/architecture/0090-benchmark-identity-and-sh-fund-prefix.md)，契约 [`docs/contracts/benchmark-identity.md`](docs/contracts/benchmark-identity.md)）：名称碰撞 fail-closed → `alphaAvailable=false`，day-quote / settle / sameday 不编造指数超额。
 - **T3 数据质量体检** `stock_platform_research.data_quality` + CLI `stock-platform-data-quality`（ADR [`0091`](docs/architecture/0091-data-quality-scan.md)）；`loop_health` 增段 `dataQuality`（仅 warn，永不 blocked）。
 - **A1 CLI 面**：`stock-platform-debate`（agents）、`stock-platform-paper`（execution，SIMULATE）；一览 [`docs/ops/cli-catalog.md`](docs/ops/cli-catalog.md)。
+- **R5-P ETF 平台侧**（ADR [`0092`](docs/architecture/0092-etf-universe-platform-side.md)）：空 ETF 宇宙 fail-closed 文案；`all` 无 ETF 时 notes；观察 ETF 大半缺失 → T3 `degraded`；③A ETF 标注。不写 `market.db`、不改日用默认宇宙。
 
 ### Changed
 

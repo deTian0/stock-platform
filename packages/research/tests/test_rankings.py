@@ -176,6 +176,21 @@ def test_holdings_without_price_is_fail_closed() -> None:
     assert any("缺成本价" in n or "缺" in n for n in out["notes"])
 
 
+def test_etf_holding_outside_panel_tagged_asset_class() -> None:
+    """R5-P: book ETF not in stock cross-section still listed with ETF copy."""
+    df = _scored(20)
+    out = build_rankings(
+        df,
+        holdings=[{"code": "510300", "price": 4.2, "entry_price": 4.0}],
+        asof="2026-09-03",
+    )
+    items = out["boards"]["holdings"]["items"]
+    etf = next(i for i in items if str(i.get("symbol", "")).startswith("510300"))
+    assert etf["assetClass"] == "etf"
+    assert "ETF" in (etf.get("reasonSummary") or "")
+    assert "T+1" in (etf.get("reasonSummary") or "")
+
+
 def test_no_holdings_means_empty_book_boards_with_a_note() -> None:
     out = build_rankings(_scored(20))
     assert out["boards"]["holdings"]["items"] == []

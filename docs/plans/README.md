@@ -20,7 +20,7 @@
 | [digest-pre-post-redesign.md](digest-pre-post-redesign.md) | 每日简报「盘前 / 盘后」重构（展示分线 + 运行日 OHLC + ②A/②B 双 profile 二次精选 + ③B 详解） | **done（`v4.13.0`）**；`T3` 顺延 `v4.14.0` |
 | [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **本地收束 + 远端历史消毒已执行；公开开源发布仍延后** |
 | [llm-vs-deterministic-boundary.md](llm-vs-deterministic-boundary.md) | LLM vs 确定性主链边界（实测路径 + 包/导入收口） | **第一刀 done**（ADR [`0088`](../architecture/0088-llm-sidecar-package-boundary.md)）；提供商见 ADR [`0089`](../architecture/0089-llm-provider-selection.md) |
-| [next-milestones-t3-cli-y2-fix-r5.md](next-milestones-t3-cli-y2-fix-r5.md) | 下一组：F1 符号/基准 · T3 数据质量 · A1 CLI 面 · Y2 采纳 · R5-P ETF 平台侧 | **planned**（2026-11-05）；建议顺序 F1→T3→A1 |
+| [next-milestones-t3-cli-y2-fix-r5.md](next-milestones-t3-cli-y2-fix-r5.md) | F1 · T3 · A1 · R5-P · Y2 | F1/T3/A1/R5-P 代码已落；**Y2** 等签核；全量 R5 等生产回补 |
 
 ## 与其它文档的关系
 

@@ -62,12 +62,24 @@ resolve_market_universe(
 | 情形 | 行为 |
 |---|---|
 | 解析结果为空 | 抛 `UniverseEmptyError`（中文，附 `counts`）——**绝不静默退化成"0 只股票的一天"** |
+| `asset_type=etf` 滤空 | 抛 `UniverseEmptyError`，文案含「ETF 日线未回补 / 禁止当股票池」（R5-P / ADR [0092](../architecture/0092-etf-universe-platform-side.md)） |
+| `asset_type=all` 但 0 只 ETF | **不抛**；`counts.etf=0` + `notes` 标明缺口；默认日用仍建议 `stock` |
 | `market_db` 但没注入 source | 抛 `UniverseEmptyError`（提示需注入 `list_symbols` 对象） |
 | 未知 `source` / `asset_type` | 抛 `UniverseEmptyError` |
 | `daily_price` 为空 | provider 返回 `[]` → research 抛 `UniverseEmptyError` |
 | DB 文件缺失 | `FileNotFoundError`（中文，提示 `STOCK_PLATFORM_ENGINE_MARKET_DB`） |
 
 **禁止**：空宇宙回落到样例 fixture。那会伪装成"选股跑通了"——实际只跑了个位数代码。
+
+### 2.1 缺 ETF 日线时（R5-P）
+
+| 路径 | 行为 |
+|------|------|
+| 日用默认 | 仍 `universe-source=config` + `asset-type=stock`（**不**因 R5-P 改默认） |
+| 显式 `asset-type=etf` | 空 → 抛错（上表） |
+| T3 / `loop_health.dataQuality` | 观察 ETF 大半整码缺失 → `coverageGaps=degraded`；**不** blocked 选股 |
+| ③A 持仓 | 截面外 ETF 可列示；`assetClass=etf`；无股票式 T+1 冻结句 |
+| 写库 | **永不**由平台回补 `market.db`（ADR 0058） |
 
 ---
 

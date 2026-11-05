@@ -2,7 +2,7 @@
 
 > 日期：2026-11-05  
 > 版本：`v4.13.7`（tag `v4.13.7`；工作区含未提交的 F1 + LLM 提供商改动，**累计后再打 tag**）  
-> 工作区：F1（ADR [`0090`](architecture/0090-benchmark-identity-and-sh-fund-prefix.md)）+ T3（ADR [`0091`](architecture/0091-data-quality-scan.md)）+ A1（`debate`/`paper` CLI + [`ops/cli-catalog.md`](ops/cli-catalog.md)）+ LLM 提供商（ADR [`0089`](architecture/0089-llm-provider-selection.md)）；侧车 ADR [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。**累计后再打 tag**。  
+> 工作区：F1/T3/A1/R5-P 已落（ADR [`0092`](architecture/0092-etf-universe-platform-side.md)）；LLM ADR [`0089`](architecture/0089-llm-provider-selection.md) / [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。**累计后再打 tag（建议并入 v4.14.0）**。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 文档放哪
@@ -23,14 +23,14 @@
 | 域 | 状态 |
 |----|------|
 | G / B / S / X / C | 收官 |
-| R | R1–R4 done。**R5** ETF 进宇宙未做：`market.db` 的 ETF 日线要生产侧回补，平台只读 |
+| R | R1–R4 done。**R5-P**（平台形状）已落（ADR 0092）；全量 **R5** 仍等生产侧 ETF 日线回补 |
 | T | T1、T2 done。**T3** 代码已落（`data_quality` + CLI + `loop_health.dataQuality`）；发版目标仍 **`v4.14.0`**（累计后再打 tag） |
 | Y | Y1 采纳闸门、Y3 负收益归因 done。**Y2** 落档必须等人工签核；没有 `adopt` 证据不改生产默认档 |
 | L | L1 立项 `Accepted`（华宝、1 万、Phase 0 纯模拟）。L2/L3 与实盘红线仍关闭 |
 
 下一组里程碑与技术方案：[`plans/next-milestones-t3-cli-y2-fix-r5.md`](plans/next-milestones-t3-cli-y2-fix-r5.md)。
 
-建议顺序：F1 / T3 / A1 代码已落（不打小 tag）→ 累计发版 **`v4.14.0`**；下一刀 **Y2**（须人工签核）或 **R5-P**（ETF 平台侧形状，不写 `market.db`）。
+建议顺序：F1 / T3 / A1 / R5-P 代码已落（不打小 tag）→ 累计发版 **`v4.14.0`**；下一刀 **Y2**（须人工签核；无 `adopt` 不开工）。
 
 ## v4.13 已落地
 

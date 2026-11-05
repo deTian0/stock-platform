@@ -83,6 +83,23 @@ def test_missing_db_unavailable(tmp_path: Path) -> None:
     assert payload["checks"] == []
 
 
+def test_watch_etf_mostly_missing_degrades(tmp_path: Path) -> None:
+    """R5-P: ≥半数观察 ETF 整码缺失 → coverageGaps degraded + 中文原因."""
+    db = tmp_path / "market.db"
+    _make_db(db)
+    payload = collect_data_quality(
+        market_db=db,
+        asof="2026-10-07",
+        lookback_days=30,
+        benchmark="000905",
+        watch_etfs=("510300", "510500", "159915", "159919"),
+    )
+    gap = next(c for c in payload["checks"] if c["id"] == "coverageGaps")
+    assert gap["etfMissingAllCount"] >= 2
+    assert gap["status"] == SECTION_DEGRADED
+    assert "未回补 ETF" in (gap.get("detail") or "")
+
+
 def test_loop_health_section_never_blocks() -> None:
     section = data_quality_section(
         {

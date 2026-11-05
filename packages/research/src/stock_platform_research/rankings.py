@@ -30,6 +30,8 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from .portfolio import asset_class
+
 QUALITY_KEY = "②A_质量榜"
 SHORT_TERM_KEY = "②B_短线榜"
 HOLDINGS_KEY = "③A_持仓"
@@ -388,15 +390,22 @@ def build_rankings(
                 if px is None or not pd.notna(px):
                     # No price anywhere ⇒ nothing truthful to show (fail-closed).
                     continue
+                ac = asset_class(k)
+                reason = (
+                    "未在当前评分截面内（ETF）：仅列示持仓，不参与推荐排名；无股票式 T+1 冻结句"
+                    if ac == "etf"
+                    else "未在当前评分截面内（如停牌/基金）：仅列示持仓，不参与推荐排名"
+                )
                 entry = {
                     "rank": len(holding_items) + 1,
                     "symbol": bow.get("code") or bow.get("symbol") or "",
                     "composite_score": None,
                     "close": float(px),
                     "reasons": [],
-                    "reasonSummary": "未在当前评分截面内（如 ETF / 停牌）：仅列示持仓，不参与推荐排名",
+                    "reasonSummary": reason,
                     "belowMedian": False,
                     "crossSectionRank": None,
+                    "assetClass": ac,
                 }
                 display = _display_name(bow, name_map)
                 if display:

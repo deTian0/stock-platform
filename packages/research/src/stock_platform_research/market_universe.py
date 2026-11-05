@@ -55,6 +55,19 @@ MSG_EMPTY = (
     "min_bars={min_bars}, lookback_days={lookback_days}, counts={counts}）："
     "请检查 market.db 覆盖窗口或放宽 min_bars；禁止空宇宙静默继续。"
 )
+# R5-P：显式要 ETF / all 却滤空时，禁止伪装成「股票池跑通」。
+MSG_EMPTY_ETF = (
+    "ETF 宇宙为空（source={source}, asset_type={asset_type}, "
+    "min_bars={min_bars}, lookback_days={lookback_days}, counts={counts}）："
+    "market.db 窗口内无匹配 ETF 日线（多为生产侧未回补）。"
+    "平台只读、不写行情库；默认日用仍是 stock。"
+    "禁止把空 ETF 宇宙静默当成股票池继续。"
+)
+MSG_EMPTY_ALL_NO_ETF = (
+    "asset_type=all 解析后无标的（source={source}, "
+    "min_bars={min_bars}, lookback_days={lookback_days}, counts={counts}）："
+    "请检查 market.db；若仅缺 ETF 日线，可先用 asset_type=stock。"
+)
 
 
 class MarketSymbolSource(Protocol):
@@ -86,6 +99,7 @@ class MarketUniverse:
     counts: Mapping[str, int] = field(default_factory=dict)
     elapsed_s: float = 0.0
     peak_memory_mb: float | None = None
+    notes: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,6 +115,7 @@ class MarketUniverse:
             "counts": dict(self.counts),
             "elapsed_s": round(self.elapsed_s, 4),
             "peak_memory_mb": self.peak_memory_mb,
+            "notes": list(self.notes),
         }
 
 
@@ -180,8 +195,14 @@ def resolve_market_universe(
     counts["final"] = len(kept)
 
     if not kept:
+        if key == "etf":
+            template = MSG_EMPTY_ETF
+        elif key == "all":
+            template = MSG_EMPTY_ALL_NO_ETF
+        else:
+            template = MSG_EMPTY
         raise UniverseEmptyError(
-            MSG_EMPTY.format(
+            template.format(
                 source="market_db",
                 asset_type=key,
                 min_bars=min_bars,
@@ -189,6 +210,19 @@ def resolve_market_universe(
                 counts=counts,
             )
         )
+
+    notes: list[str] = []
+    if key == "all":
+        etf_n = sum(1 for c in kept if asset_class(c) == "etf")
+        counts = dict(counts)
+        counts["etf"] = etf_n
+        counts["stock"] = sum(1 for c in kept if asset_class(c) == "stock")
+        counts["fund"] = sum(1 for c in kept if asset_class(c) == "fund")
+        if etf_n == 0 and len(kept) > 0:
+            notes.append(
+                "asset_type=all 但窗口内 0 只 ETF：可能 market.db 未回补 ETF 日线；"
+                "股票结果可用，勿宣称全市场含 ETF（R5-P）。"
+            )
 
     return MarketUniverse(
         symbols=tuple(kept),
@@ -202,6 +236,7 @@ def resolve_market_universe(
         counts=counts,
         elapsed_s=elapsed,
         peak_memory_mb=peak_mb,
+        notes=tuple(notes),
     )
 
 

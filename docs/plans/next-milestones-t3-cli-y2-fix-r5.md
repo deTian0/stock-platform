@@ -206,9 +206,9 @@ stock-platform-data-quality [--asof] [--market-db] [--out-dir] [--json|--md]
 
 ### 5.3 验收（R5-P）
 
-- [ ] 文档写明「缺 ETF 日线时行为」；CLI/榜单有显式标注
-- [ ] 单测：无 ETF bar 时 fail-closed 文案稳定
-- [ ] **不**宣称 R5 全 done，直到生产侧回补 + 全市场 ETF 宇宙验收另开刀
+- [x] 文档写明「缺 ETF 日线时行为」；CLI/榜单有显式标注
+- [x] 单测：无 ETF bar 时 fail-closed 文案稳定
+- [x] **不**宣称 R5 全 done，直到生产侧回补 + 全市场 ETF 宇宙验收另开刀
 
 ### 5.4 全量 R5（后续）
 

@@ -350,11 +350,27 @@ def _check_coverage_gaps(
             etf_gaps.append(
                 {"code": etf, "missingAll": False, "missingDays": len(missing), "examples": missing[:5]}
             )
+    missing_all = [g for g in etf_gaps if g.get("missingAll")]
     status = SECTION_OK
     if bench_missing or not bench_days:
         status = SECTION_DEGRADED
+    elif missing_all and len(missing_all) >= max(1, (len(watch_etfs) + 1) // 2):
+        # R5-P：观察池大半整码缺失 → degraded（平台不写库；日用默认仍 stock）
+        status = SECTION_DEGRADED
     elif etf_gaps:
         status = SECTION_WARN
+    if bench_missing or not bench_days:
+        detail = f"基准 {benchmark} 缺 {len(bench_missing)}/{len(day_set)} 日"
+    elif missing_all and status == SECTION_DEGRADED:
+        codes = ",".join(str(g["code"]) for g in missing_all[:8])
+        detail = (
+            f"观察 ETF 整码缺失 {len(missing_all)}/{len(watch_etfs)}（{codes}）："
+            "疑似 market.db 未回补 ETF 日线；不静默当股票池（R5-P）"
+        )
+    elif etf_gaps:
+        detail = f"基准齐；{len(etf_gaps)} 只观察 ETF 有缺口"
+    else:
+        detail = "基准与观察 ETF 覆盖正常"
     return {
         "id": "coverageGaps",
         "status": status,
@@ -364,15 +380,8 @@ def _check_coverage_gaps(
         "benchmarkMissingDays": len(bench_missing),
         "benchmarkMissingExamples": bench_missing[:8],
         "etfGaps": etf_gaps,
-        "detail": (
-            f"基准 {benchmark} 缺 {len(bench_missing)}/{len(day_set)} 日"
-            if (bench_missing or not bench_days)
-            else (
-                f"基准齐；{len(etf_gaps)} 只观察 ETF 有缺口"
-                if etf_gaps
-                else "基准与观察 ETF 覆盖正常"
-            )
-        ),
+        "etfMissingAllCount": len(missing_all),
+        "detail": detail,
     }
 
 

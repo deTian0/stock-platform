@@ -109,6 +109,7 @@ $required = @(
   'docs/architecture/0089-llm-provider-selection.md',
   'docs/architecture/0090-benchmark-identity-and-sh-fund-prefix.md',
   'docs/architecture/0091-data-quality-scan.md',
+  'docs/architecture/0092-etf-universe-platform-side.md',
   'docs/contracts/benchmark-identity.md',
   'docs/contracts/data-quality.md',
   'docs/ops/llm-providers.md',

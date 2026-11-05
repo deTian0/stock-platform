@@ -121,6 +121,26 @@ def test_empty_universe_fails_closed() -> None:
     assert "全市场宇宙解析结果为空" in str(exc.value)
 
 
+def test_empty_etf_universe_mentions_unbackfilled_bars() -> None:
+    """R5-P: stock-only warehouse + asset_type=etf → explicit Chinese fail-closed."""
+    with pytest.raises(UniverseEmptyError) as exc:
+        resolve_market_universe(
+            FakeMarketSource(["600519", "000001"]), asset_type="etf"
+        )
+    msg = str(exc.value)
+    assert "ETF 宇宙为空" in msg
+    assert "未回补" in msg
+    assert "禁止把空 ETF 宇宙静默当成股票池" in msg
+
+
+def test_all_without_etf_notes_gap() -> None:
+    u = resolve_market_universe(
+        FakeMarketSource(["600519", "000001"]), asset_type="all"
+    )
+    assert u.counts.get("etf") == 0
+    assert any("0 只 ETF" in n for n in u.notes)
+
+
 def test_missing_source_fails_closed() -> None:
     for bad in (None, object()):
         with pytest.raises(UniverseEmptyError) as exc:
