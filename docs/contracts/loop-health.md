@@ -55,6 +55,7 @@
   "symbolMaster":   { ... §4.5 ... },
   "opsLedger":      { ... §4.8 ... },
   "dataQuality":    { ... §4.10 ... },
+  "shadowBoard":    { ... §4.11 ... },
   "nextSettlement": { "available": bool, "entryAsof", "holdingDays",
                       "expectedSettlementDate" | "reason" },
   "history":        { ... §4.6 ... },
@@ -189,6 +190,18 @@ briefContinuity 的 `incomplete`）。
 `degradedChecks[]`、`warnChecks[]`、`summary[]`、`reason`、`marketDb`。
 细则见 [data-quality](data-quality.md)。**永不**产生 `fail`。
 
+### 4.11 `shadowBoard` —— 影子 Final Board（ADR 0093 增补；opt-in）
+
+只读 `<shadow_dir>/final_board.jsonl`（`STOCK_PLATFORM_SHADOW_DIR`，默认 `./local/shadow`）。字段：
+`status`（`disabled` / `empty` / `ok` / `warn` / `unavailable`）、`dir`、`latestAsof`、`latestStatus`、
+`latestFinalCount`、`daysRecorded`、`windowDays`（近 20 条）、`emptyBoardDays`、`emptyBoardRatio`、
+`failedDays[]`、`excludedFromPerformance=true`、`reason`。同日重跑后写覆盖。
+
+- 台账不存在 → `disabled`，**不产生检查项**（影子链默认关，不改既有裁决）。
+- **空榜是 fail-closed 合法态**：只统计比例，不判异常；`degraded` 终榜同样算 `ok`。
+- 最近一次 `status ∈ {error, failed}` → `warn`；**永不** `fail`，不阻断主链。
+- 影子指标不并入 `performance` / `hits`。
+
 ## 5. 裁决规则（`roll_up_verdict`，纯函数）
 
 | 段 | `fail`（→ `blocked`） | `warn`（→ `degraded`） | `ok` |
@@ -201,6 +214,7 @@ briefContinuity 的 `incomplete`）。
 | `symbolMaster` | — | `unavailable` / `total==0` | `ok` |
 | `opsLedger` | — | `unavailable` / `empty` / `failingTasks` 非空 | 无连续失败 |
 | `dataQuality` | —（**永不 fail**） | `degraded` / `warn` / `unavailable` | `ok` / `empty` |
+| `shadowBoard` | —（**永不 fail**；`disabled` 不产生检查项） | 最近一次 `error`/`failed`、`unavailable` | `ok` / `empty`（空榜合法） |
 | `history` | —（**不参与裁决**） | — | — |
 
 - 任一 `fail` → `blocked`；否则任一 `warn` → `degraded`；否则 `ok`。

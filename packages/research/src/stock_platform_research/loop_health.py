@@ -406,6 +406,79 @@ def _collect_symbol_master(db_url: str | Path | None) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# 5b. 影子 Final Board（ADR 0093 增补；opt-in，永不 fail）
+# --------------------------------------------------------------------------- #
+SECTION_DISABLED = "disabled"
+SHADOW_BOARD_RECENT = 20
+# 视为「这一天影子链跑失败」的 status（空榜 / degraded 都是合法态，不算失败）。
+_SHADOW_FAILED_STATUSES = frozenset({"error", "failed"})
+
+
+def _collect_shadow_board(
+    shadow_dir: str | Path | None, *, recent: int = SHADOW_BOARD_RECENT
+) -> dict[str, Any]:
+    """只读 ``<shadow_dir>/final_board.jsonl``：最近一次影子终榜 + 近 N 次空榜比例。
+
+    未启用（目录或台账不存在）→ ``disabled``（不参与 warn：影子链默认关）。
+    空榜是 fail-closed 合法态，只统计比例，不判异常。
+    """
+    from .shadow_board.ledger import default_shadow_dir
+
+    root = Path(shadow_dir) if shadow_dir is not None else default_shadow_dir()
+    jsonl = root / "final_board.jsonl"
+    if not jsonl.is_file():
+        return {
+            "status": SECTION_DISABLED,
+            "dir": str(root),
+            "excludedFromPerformance": True,
+            "reason": "影子终榜未启用（无 final_board.jsonl；opt-in，默认关）。",
+        }
+    by_day: dict[str, dict[str, Any]] = {}
+    for line in jsonl.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            rec = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        day = str((rec or {}).get("asof") or "")[:10] if isinstance(rec, dict) else ""
+        if day:
+            by_day[day] = rec  # 同日重跑：后写覆盖
+    if not by_day:
+        return {
+            "status": SECTION_EMPTY,
+            "dir": str(root),
+            "excludedFromPerformance": True,
+            "reason": "final_board.jsonl 无有效记录。",
+        }
+    days = sorted(by_day)
+    window = days[-max(1, int(recent)) :]
+    empty = sum(1 for d in window if int(by_day[d].get("finalCount") or 0) == 0)
+    failed = [d for d in window if str(by_day[d].get("status") or "") in _SHADOW_FAILED_STATUSES]
+    latest = by_day[days[-1]]
+    latest_status = str(latest.get("status") or "")
+    return {
+        "status": SECTION_WARN if latest_status in _SHADOW_FAILED_STATUSES else SECTION_OK,
+        "dir": str(root),
+        "latestAsof": days[-1],
+        "latestStatus": latest_status or None,
+        "latestFinalCount": int(latest.get("finalCount") or 0),
+        "daysRecorded": len(days),
+        "windowDays": len(window),
+        "emptyBoardDays": empty,
+        "emptyBoardRatio": round(empty / len(window), 4) if window else 0.0,
+        "failedDays": failed,
+        "excludedFromPerformance": True,
+        **(
+            {"reason": f"最近一次影子终榜失败（status={latest_status}）"}
+            if latest_status in _SHADOW_FAILED_STATUSES
+            else {}
+        ),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # 6. 下一个预期结算日（提示，非承诺）
 # --------------------------------------------------------------------------- #
 def _trading_day_lag(start: str | None, end: str | None) -> int | None:
@@ -627,6 +700,31 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
             f"数据质量 {dq_status}（{dq.get('checkCount') or 0} 项）",
         )
 
+    # shadowBoard（ADR 0093 增补）：opt-in。未启用（disabled/缺段）不产生检查项，
+    # 保持既有裁决不变；启用后最多 warn，永不 fail/blocked，不阻断主链。
+    sb = sections.get("shadowBoard") or {}
+    sb_status = str(sb.get("status") or "")
+    if sb_status and sb_status != SECTION_DISABLED:
+        if sb_status in {SECTION_WARN, SECTION_UNAVAILABLE}:
+            add(
+                "shadowBoard",
+                _LEVEL_WARN,
+                str(sb.get("reason") or f"影子终榜异常（status={sb_status}）"),
+            )
+        else:
+            add(
+                "shadowBoard",
+                _LEVEL_OK,
+                "影子终榜 asof={a} 入选 {n} 只 · 近 {w} 日空榜 {e} 日".format(
+                    a=sb.get("latestAsof"),
+                    n=sb.get("latestFinalCount"),
+                    w=sb.get("windowDays"),
+                    e=sb.get("emptyBoardDays"),
+                )
+                if sb_status == SECTION_OK
+                else "影子终榜台账无有效记录",
+            )
+
     failed = [c["id"] for c in checks if c["level"] == _LEVEL_FAIL]
     warned = [c["id"] for c in checks if c["level"] == _LEVEL_WARN]
     if failed:
@@ -816,8 +914,12 @@ def collect_loop_health(
     brief_window_days: int = DEFAULT_BRIEF_WINDOW_DAYS,
     brief_due_cutoff: str = BRIEF_DUE_CUTOFF_HHMM,
     now: datetime | None = None,
+    shadow_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """聚合一次日用循环健康度快照（**永不抛**）。
+
+    ``shadowBoard``（ADR 0093 增补）：只读 ``<shadow_dir>/final_board.jsonl``；未启用 →
+    ``disabled`` 且不产生检查项；启用后最多 ``warn``，永不阻断。
 
     每一段独立 try/except：失败段 → ``status="unavailable"`` + ``reason``，
     其余段照常产出，最终仍给出一份完整 payload。
@@ -884,6 +986,7 @@ def collect_loop_health(
         )
 
     data_quality = _safe(_dq)
+    shadow_board = _safe(lambda: _collect_shadow_board(shadow_dir))
 
     sections = {
         "coverage": coverage,
@@ -895,6 +998,7 @@ def collect_loop_health(
         "symbolMaster": symbol_master,
         "opsLedger": ops_ledger,
         "dataQuality": data_quality,
+        "shadowBoard": shadow_board,
         "nextSettlement": _next_settlement_hint(
             latest_brief.get("asof"), int(holding_days)
         ),
@@ -937,6 +1041,7 @@ _STATUS_ZH: dict[str, str] = {
     "stale": "滞后",
     "thin": "偏薄",
     "missing_table": "缺表",
+    "disabled": "未启用",
 }
 _VERDICT_ZH: dict[str, str] = {
     VERDICT_OK: "✅ 正常",
@@ -976,6 +1081,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
     ops = payload.get("opsLedger") or {}
     due = payload.get("briefDue") or {}
     dq = payload.get("dataQuality") or {}
+    sb = payload.get("shadowBoard") or {}
 
     lines = [
         "# 日用循环健康度（loop health）",
@@ -1063,6 +1169,13 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             n=_cell(dq.get("checkCount")),
             d=_cell(dq.get("degradedChecks") or []),
             w=_cell(dq.get("warnChecks") or []),
+        ),
+        "| 影子终榜 | {s} | asof `{a}` · 入选 {n} 只 · 近 {w} 日空榜 {e} 日（不计绩效） |".format(
+            s=_status_zh(sb.get("status")),
+            a=_cell(sb.get("latestAsof")),
+            n=_cell(sb.get("latestFinalCount")),
+            w=_cell(sb.get("windowDays")),
+            e=_cell(sb.get("emptyBoardDays")),
         ),
         "| 下一个结算日 | {s} | {d} |".format(
             s="有" if nxt.get("available") else "未知",
