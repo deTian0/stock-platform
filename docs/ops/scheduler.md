@@ -73,8 +73,8 @@ cd <repo-root>
 
 ## Windows Task Scheduler
 
-1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest -Session pre` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。`-Session` 只区分展示，不改 asof（ADR [`0083`](../architecture/0083-digest-pre-post-and-secondary-pick.md)）。
-2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest -Session post`，`ExecutionTimeLimit=PT30M`）。
+1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session pre` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。`-Session` 只区分展示，不改 asof（ADR [`0083`](../architecture/0083-digest-pre-post-and-secondary-pick.md)）。
+2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session post`，`ExecutionTimeLimit=PT30M`）。
 3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。
 4. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
 5. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
@@ -136,9 +136,9 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 见 `scripts/ops/cron-daily.example`。推荐每日调用包装脚本，由日历决定 skip：
 
 ```text
-# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -Session pre
+# 30 8 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session pre
 
-# 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -Session post
+# 30 15 * * * cd /path/to/stock-platform && pwsh -NoProfile -File ./scripts/ops/Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session post
 ```
 
 （cron 行里的 `&&` 仅出现在 Linux crontab 示例中；Windows PowerShell 运维脚本本身不使用 `&&`。）

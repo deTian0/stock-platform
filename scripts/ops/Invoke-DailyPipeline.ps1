@@ -55,6 +55,19 @@
 .PARAMETER NoHoldings
   Explicitly skip holdings even when ``data\holdings.json`` exists.
 
+.PARAMETER ShadowBoard
+  ADR 0093: also build the multi-strategy shadow Final Board for the same PIT
+  panel. Writes **only** under local/shadow/ (final_board_{asof}.json,
+  final_board.jsonl, shadow_decisions.jsonl); never touches the production
+  picks / hits / recommend_decisions.jsonl, and a shadow failure lands on
+  report.shadowBoard without changing the pipeline result. The scheduled tasks
+  pass this so the forward shadow ledger accumulates real days; the **library
+  default stays OFF** (opt-in per ADR 0093).
+
+.PARAMETER NoShadowBoard
+  Force the shadow board off for this run even when STOCK_PLATFORM_SHADOW_BOARD=1
+  is set in the environment / local .env (maps to --no-shadow-board).
+
 .PARAMETER StrictCoverage
   market_db only. When the engine warehouse does not cover the resolved asof, FAIL
   instead of falling back to the newest covered trading day. Acceptance / forensics
@@ -90,6 +103,8 @@ param(
   [string]$Session = 'pre',
   [switch]$NoHoldings,
   [switch]$StrictCoverage,
+  [switch]$ShadowBoard,
+  [switch]$NoShadowBoard,
   [switch]$Force
 )
 
@@ -311,6 +326,15 @@ if ($SettleAfter) {
   $cliArgs += '--settle-after'
 }
 
+# ADR 0093 shadow Final Board: explicit off wins over on; neither -> CLI falls
+# back to STOCK_PLATFORM_SHADOW_BOARD (library default OFF).
+if ($NoShadowBoard) {
+  $cliArgs += '--no-shadow-board'
+}
+elseif ($ShadowBoard) {
+  $cliArgs += '--shadow-board'
+}
+
 # X2: ③A 持仓 / ③B 操作建议 need a holdings file. Default to the repo-local book
 # so the scheduled tasks are wired with zero XML change; fail-closed when absent.
 if (-not $NoHoldings) {
@@ -333,7 +357,7 @@ if (-not $NoHoldings) {
   }
 }
 
-Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb prevSession=$PrevSession digest=$Digest holdings=$Holdings"
+Write-Host "RUN stock-platform-daily asof=$Asof provider=$Provider out=$Out settleAfter=$SettleAfter liveDay=$LiveDay marketDb=$MarketDb prevSession=$PrevSession digest=$Digest shadowBoard=$ShadowBoard noShadowBoard=$NoShadowBoard holdings=$Holdings"
 $cmd = Get-Command stock-platform-daily -ErrorAction SilentlyContinue
 if ($null -ne $cmd) {
   & stock-platform-daily @cliArgs

@@ -80,7 +80,7 @@
       <!-- Edit WorkingDirectory to your clone path before import.
            Prefer pwsh.exe when PowerShell 7+ is installed; else powershell.exe. -->
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest -Session pre</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\Invoke-DailyPipeline.ps1" -MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session pre</Arguments>
       <WorkingDirectory>CHANGE_ME_TO_REPO_ROOT</WorkingDirectory>
     </Exec>
   </Actions>

@@ -60,8 +60,12 @@
 
 | `task` | `label` | `plannedAt` | 包装器预设参数 |
 |--------|---------|-------------|----------------|
-| `daily` | 盘前选股 | `08:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest` |
-| `postmarket` | 盘后台账 | `15:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest` |
+| `daily` | 盘前选股 | `08:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session pre` |
+| `postmarket` | 盘后台账 | `15:30` | `Invoke-DailyPipeline.ps1 -MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session post` |
+
+> `-ShadowBoard`（2026-11-05 起）：生产日循环开启影子 Final Board（ADR 0093），只写 `local/shadow/`，
+> 不改 picks / 命中 / `recommend_decisions.jsonl`；异常只落 `report.shadowBoard`，不改退出码。
+> 库默认仍关；回滚 = 从预设删掉该开关，或单次加 `-NoShadowBoard`。
 | `marketdb-backfill` | 行情回补 | `18:30` | `Invoke-MarketDbBackfill.ps1 -Mode apply` |
 
 > `daily` 与 `postmarket` 都带 `-SettleAfter`：两个任务用**同一个** T-1 `asof`，写入幂等

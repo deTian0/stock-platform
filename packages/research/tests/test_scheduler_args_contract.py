@@ -32,7 +32,14 @@ ADR_0079 = REPO_ROOT / "docs" / "architecture" / "0079-settle-after-on-premarket
 #: Switches both daily runs must carry. ``-SettleAfter`` is the one that regressed:
 #: without it the run never writes the performance JSONL, so a missed post-market
 #: run loses that ``asof`` for good (both tasks share the same T-1 ``asof``).
-REQUIRED_SWITCHES = ("-MarketDb", "-PrevSession", "-SettleAfter", "-Digest")
+REQUIRED_SWITCHES = ("-MarketDb", "-PrevSession", "-SettleAfter", "-Digest", "-ShadowBoard")
+
+#: ADR 0093: the shadow Final Board is opt-in in the **library** (default OFF) but
+#: switched ON for the **production schedule** so the forward shadow ledger
+#: accumulates real days. The switch only ever writes ``local/shadow/`` — pinning
+#: it here keeps the three artifacts from drifting the way ``-SettleAfter`` did.
+SHADOW_SWITCH = "-ShadowBoard"
+WRAPPER_DAILY = REPO_ROOT / "scripts" / "ops" / "Invoke-DailyPipeline.ps1"
 
 #: Pre-ADR-0079 pre-market args. Nowhere in a live artifact may this survive —
 #: it is the exact string whose absence-of-a-switch caused the loss. Historical
@@ -99,3 +106,44 @@ def test_live_artifacts_carry_no_stale_daily_args() -> None:
 def test_adr_is_recorded_and_indexed(path: Path) -> None:
     assert path.is_file(), f"missing ADR {path.name}"
     assert "0079" in CHECK_DOCS.read_text(encoding="utf-8"), "ADR 0079 not in check_docs.ps1"
+
+
+def test_shadow_board_switch_on_both_scheduled_runs() -> None:
+    """Production schedule turns the shadow board ON (ADR 0093 forward ledger)."""
+    for task in ("daily", "postmarket"):
+        assert SHADOW_SWITCH in _preset_args(task).split(), f"{task} preset lacks {SHADOW_SWITCH}"
+    for xml_path in (DAILY_XML, POSTMARKET_XML):
+        assert SHADOW_SWITCH in _task_arguments(xml_path).split(), f"{xml_path.name} lacks {SHADOW_SWITCH}"
+
+
+def test_wrapper_maps_shadow_switches_to_cli_flags() -> None:
+    """-NoShadowBoard must win over -ShadowBoard; neither -> env/library default."""
+    text = WRAPPER_DAILY.read_text(encoding="utf-8")
+    assert re.search(r"\[switch\]\$ShadowBoard", text)
+    assert re.search(r"\[switch\]\$NoShadowBoard", text)
+    m = re.search(
+        r"if \(\$NoShadowBoard\)\s*\{\s*\$cliArgs \+= '--no-shadow-board'\s*\}\s*"
+        r"elseif \(\$ShadowBoard\)\s*\{\s*\$cliArgs \+= '--shadow-board'\s*\}",
+        text,
+    )
+    assert m, "Invoke-DailyPipeline.ps1 shadow switch mapping drifted"
+
+
+def test_library_default_for_shadow_board_stays_off() -> None:
+    """The schedule opts in; the library/CLI default must remain OFF."""
+    from stock_platform_research.shadow_board.daily_hook import shadow_board_enabled
+
+    assert shadow_board_enabled(None, env={}) is False
+    assert shadow_board_enabled(None, env={"STOCK_PLATFORM_SHADOW_BOARD": "1"}) is True
+    assert shadow_board_enabled(False, env={"STOCK_PLATFORM_SHADOW_BOARD": "1"}) is False
+
+
+def test_daily_cli_shadow_flags_parse() -> None:
+    """--shadow-board / --no-shadow-board / absent -> True / False / None."""
+    import inspect
+
+    from stock_platform_research import daily_cli
+
+    src = inspect.getsource(daily_cli)
+    assert '"--shadow-board"' in src and '"--no-shadow-board"' in src
+    assert 'dest="shadow_board"' in src
