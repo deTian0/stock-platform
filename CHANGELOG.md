@@ -24,6 +24,7 @@
 - **T3 数据质量体检** `stock_platform_research.data_quality` + CLI `stock-platform-data-quality`（ADR [`0091`](docs/architecture/0091-data-quality-scan.md)）；`loop_health` 增段 `dataQuality`（仅 warn，永不 blocked）。
 - **A1 CLI 面**：`stock-platform-debate`（agents）、`stock-platform-paper`（execution，SIMULATE）；一览 [`docs/ops/cli-catalog.md`](docs/ops/cli-catalog.md)。
 - **R5-P ETF 平台侧**（ADR [`0092`](docs/architecture/0092-etf-universe-platform-side.md)）：空 ETF 宇宙 fail-closed 文案；`all` 无 ETF 时 notes；观察 ETF 大半缺失 → T3 `degraded`；③A ETF 标注。不写 `market.db`、不改日用默认宇宙。
+- **S2-P1 事件/题材每日快照**（[`docs/plans/s2-event-theme-data.md`](docs/plans/s2-event-theme-data.md)）：影子链开启时经 `em_get` 拉当日全市场龙虎榜 / 概念与行业板块资金流排名 / 30 日解禁日程，落 `local/shadow/s2_snapshots/s2_snapshot_{asof}.json`（同日 `ok` 快照复用零网络；实测 4 次请求/日，预算 `STOCK_PLATFORM_S2_EM_BUDGET` 默认 300）；S2 读快照出候选池，失败 / 超预算只记 note 不阻断；回测无快照仍空池（不回放当前快照）；`loop_health.shadowBoard.s2` 观测落盘与非空池比例（最多 warn）。
 
 ### Fixed
 
