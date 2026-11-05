@@ -53,18 +53,18 @@ from .backtest_cli import ENV_DB, filter_universe, load_engine_bars, load_engine
 from .book_replay import ReplayParams
 from .dotenv import load_dotenv
 from .neutralization_ab import run_neutralization_book
-from .performance import resolve_benchmark_symbol
+from .benchmark import engine_benchmark_code, resolve_benchmark_symbol
 
 #: Extra calendar span loaded *before* the window start so ``ma60`` is warm.
 WARMUP_DAYS = 180
 
 
 def _resolve_benchmark_code(raw: str) -> str:
-    """``'000905'`` → ``'000905.SZ'``（引擎库的指数代码带 ``.SZ`` 后缀）。"""
+    """Bare code → ``XXXXXX.<EX>`` via :func:`engine_benchmark_code` (F1)."""
     code = (raw or "").strip()
-    if not code:
-        code = resolve_benchmark_symbol()
-    return code if "." in code else f"{code}.SZ"
+    if code and "." in code:
+        return code
+    return engine_benchmark_code(code or None)
 
 
 def _last_bar_date(db_path: str) -> str | None:
@@ -90,7 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--end", default=None, help="窗口终点 YYYY-MM-DD（默认：库内最后交易日）")
     p.add_argument("--years", type=int, default=1, help="窗口长度（年，仅当未给 --start）")
     p.add_argument("--universe", choices=list(UNIVERSES), default="stock", help="stock (默认) | etf | all")
-    p.add_argument("--benchmark", default="", help=f"基准代码（默认 {resolve_benchmark_symbol()} → 补 .SZ 后缀）")
+    p.add_argument(
+        "--benchmark",
+        default="",
+        help=f"基准代码（默认 {resolve_benchmark_symbol()} → {engine_benchmark_code()}）",
+    )
     p.add_argument("--no-benchmark", action="store_true", help="不给基准：曲线退用裸收益")
     p.add_argument("--score-floor", type=float, default=DEFAULT_SCORE_FLOOR, help="评分闸门（生产默认 0.80）")
     p.add_argument("--horizons", default=",".join(str(k) for k in DEFAULT_HORIZONS), help="持有期（交易日，逗号分隔）")

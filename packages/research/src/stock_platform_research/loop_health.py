@@ -91,6 +91,8 @@ BRIEF_DUE_CUTOFF_HHMM = "08:30"
 SECTION_OK = "ok"
 SECTION_EMPTY = "empty"
 SECTION_UNAVAILABLE = "unavailable"
+SECTION_WARN = "warn"
+SECTION_DEGRADED = "degraded"
 # brief 连续性专用：窗口内缺日（可跑但要打折看）。
 SECTION_INCOMPLETE = "incomplete"
 
@@ -487,6 +489,8 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
       窗口内**有缺日**（``incomplete``）→ warn；否则 ok
     - opsLedger（T2）：``unavailable`` / ``empty`` → warn（观测面缺口，**不**判 blocked）；
       有任务**连续失败**（``failingTasks`` 非空）→ warn；否则 ok
+    - dataQuality（T3）：``degraded`` / ``warn`` / ``unavailable`` → warn（**永不** fail/blocked）；
+      ``ok`` / ``empty`` → ok（empty 表示无样本，不阻断）
     """
     checks: list[dict[str, Any]] = []
 
@@ -602,6 +606,25 @@ def roll_up_verdict(sections: Mapping[str, Any]) -> dict[str, Any]:
             "opsLedger",
             _LEVEL_OK,
             f"{ops.get('taskCount')} 个任务 / {ops.get('totalRuns')} 次执行无连续失败",
+        )
+
+    dq = sections.get("dataQuality") or {}
+    dq_status = str(dq.get("status") or SECTION_UNAVAILABLE)
+    if dq_status in {"degraded", "warn", SECTION_UNAVAILABLE}:
+        deg = dq.get("degradedChecks") or []
+        warn = dq.get("warnChecks") or []
+        add(
+            "dataQuality",
+            _LEVEL_WARN,
+            "数据质量 {st}（degraded={d} warn={w}）".format(
+                st=dq_status, d=deg or "[]", w=warn or "[]"
+            ),
+        )
+    else:
+        add(
+            "dataQuality",
+            _LEVEL_OK,
+            f"数据质量 {dq_status}（{dq.get('checkCount') or 0} 项）",
         )
 
     failed = [c["id"] for c in checks if c["level"] == _LEVEL_FAIL]
@@ -853,6 +876,15 @@ def collect_loop_health(
         lambda: collect_ops_ledger(path=ops_ledger_path, recent_limit=int(ops_recent))
     )
 
+    def _dq() -> dict[str, Any]:
+        from .data_quality import collect_data_quality, data_quality_section
+
+        return data_quality_section(
+            collect_data_quality(market_db=market_db, asof=asof_day)
+        )
+
+    data_quality = _safe(_dq)
+
     sections = {
         "coverage": coverage,
         "latestBrief": latest_brief,
@@ -862,6 +894,7 @@ def collect_loop_health(
         "performance": performance,
         "symbolMaster": symbol_master,
         "opsLedger": ops_ledger,
+        "dataQuality": data_quality,
         "nextSettlement": _next_settlement_hint(
             latest_brief.get("asof"), int(holding_days)
         ),
@@ -899,6 +932,8 @@ _STATUS_ZH: dict[str, str] = {
     SECTION_EMPTY: "空",
     SECTION_UNAVAILABLE: "不可用",
     SECTION_INCOMPLETE: "缺日",
+    SECTION_WARN: "需留意",
+    SECTION_DEGRADED: "降级",
     "stale": "滞后",
     "thin": "偏薄",
     "missing_table": "缺表",
@@ -940,6 +975,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
     bc = payload.get("briefContinuity") or {}
     ops = payload.get("opsLedger") or {}
     due = payload.get("briefDue") or {}
+    dq = payload.get("dataQuality") or {}
 
     lines = [
         "# 日用循环健康度（loop health）",
@@ -1022,6 +1058,12 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
                 else ""
             ),
         ),
+        "| 数据质量 | {s} | {n} 项 · degraded={d} · warn={w} |".format(
+            s=_status_zh(dq.get("status")),
+            n=_cell(dq.get("checkCount")),
+            d=_cell(dq.get("degradedChecks") or []),
+            w=_cell(dq.get("warnChecks") or []),
+        ),
         "| 下一个结算日 | {s} | {d} |".format(
             s="有" if nxt.get("available") else "未知",
             d=_cell(nxt.get("expectedSettlementDate")),
@@ -1044,6 +1086,7 @@ def render_loop_health_markdown(payload: Mapping[str, Any]) -> str:
             ("绩效闭环", perf),
             ("名称主表", sm),
             ("调度执行台账", ops),
+            ("数据质量", dq),
         )
         if sec.get("reason")
     ]

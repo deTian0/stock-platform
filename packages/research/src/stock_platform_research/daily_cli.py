@@ -468,13 +468,14 @@ def _build_debate_runner():
 
 def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:
     """Log brief → performance JSONL, then settle pending with provider/engine daily."""
+    from .benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
     from .performance import (
         default_performance_log_path,
         log_brief_decisions,
-        resolve_benchmark_symbol,
         settle_performance_log,
     )
     from .performance_cli import _build_settle_get_daily
+    from .symbol_master import name_map_from_master
 
     meta: dict[str, Any] = {
         "logged": 0,
@@ -514,16 +515,23 @@ def _settle_after_pipeline(provider: object, report: object) -> dict[str, Any]:
         meta["ok"] = meta["logged"] > 0
         return meta
 
+    bench = resolve_benchmark_symbol()
+    identity = resolve_benchmark_identity(bench, names=name_map_from_master() or {})
+    alpha_ok = bool(identity.get("alphaAvailable", True))
     summary = settle_performance_log(
         log_path,
         get_daily=get_daily,
-        benchmark_get_daily=get_daily,
-        benchmark_symbol=resolve_benchmark_symbol(),
+        benchmark_get_daily=get_daily if alpha_ok else None,
+        benchmark_symbol=bench,
+        alpha_available=alpha_ok,
     )
     meta["settledNewly"] = int(summary.get("settledNewly") or 0)
     meta["alphaSettledNewly"] = int(summary.get("alphaSettledNewly") or 0)
     meta["settledCount"] = int(summary.get("settledCount") or 0)
     meta["pendingCount"] = int(summary.get("pendingCount") or 0)
+    meta["alphaAvailable"] = alpha_ok
+    if identity.get("warning"):
+        meta["benchmarkWarning"] = identity["warning"]
     metrics = summary.get("metrics") or {}
     meta["direction_accuracy"] = metrics.get("direction_accuracy")
     meta["settleSource"] = source

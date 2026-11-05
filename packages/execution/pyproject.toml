@@ -14,6 +14,9 @@ dependencies = [
   "stock-platform-providers",
 ]
 
+[project.scripts]
+stock-platform-paper = "stock_platform_execution.paper_cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 

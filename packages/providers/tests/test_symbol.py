@@ -67,6 +67,16 @@ def test_normalize_accepts_us_market() -> None:
         ("830001", "bj"),
         ("430001", "bj"),
         ("920001", "bj"),
+        # Shanghai funds / ETFs (F1): must not fall through to sz
+        ("510300", "sh"),
+        ("511010", "sh"),
+        ("512000", "sh"),
+        ("513100", "sh"),
+        ("515000", "sh"),
+        ("518880", "sh"),
+        ("588080", "sh"),
+        ("159915", "sz"),  # Shenzhen ETF stays sz
+        ("160706", "sz"),  # Shenzhen fund
     ],
 )
 def test_exchange_prefix(code: str, prefix: str) -> None:

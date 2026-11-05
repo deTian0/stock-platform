@@ -29,6 +29,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+from .benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
 from .day_quote import (
     OHLC_CACHE,
     OHLC_MISSING,
@@ -261,7 +262,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--db", default=None, help="平台 SQLite（默认 STOCK_PLATFORM_DB_URL）")
     p.add_argument("--market-db", default=None, help="引擎 market.db（默认环境变量）")
     p.add_argument("--holdings", default=str(DEFAULT_HOLDINGS), help="持仓账本 JSON")
-    p.add_argument("--benchmark", default="000905", help="基准代码（默认中证500 000905）")
+    p.add_argument(
+        "--benchmark",
+        default=resolve_benchmark_symbol(),
+        help=f"基准代码（默认 {resolve_benchmark_symbol()}；身份经 resolve_benchmark_identity 校验）",
+    )
     p.add_argument("--cache-dir", default=str(DEFAULT_CACHE_DIR), help="OHLC 缓存目录")
     p.add_argument("--no-ohlc", action="store_true", help="完全不联网，只用引擎库（无开盘价）")
     p.add_argument("--json-out", type=Path, help="payload 写入 JSON")
@@ -353,14 +358,10 @@ def main(argv: list[str] | None = None) -> int:
         status["degraded"] = "--no-ohlc：未取开盘价（离线模式）"
     status["filled"] = sum(1 for s in fetch_symbols if s in ohlc)
 
-    bench_name = names.get(str(args.benchmark).split(".")[0].zfill(6)) or None
-    bench_warning = None
-    if bench_name:
-        bench_warning = (
-            f"平台基准 `{args.benchmark}` 在引擎库中解析为 **{bench_name}**（个股），"
-            "并非中证500 指数点位；因此「相对基准」列是相对该**个股**的超额，"
-            "**不能读作指数超额**（A4 绩效台账的 avgAlpha 用的是同一口径）。"
-        )
+    identity = resolve_benchmark_identity(args.benchmark, names=names)
+    bench_name = identity.get("name")
+    bench_warning = identity.get("warning")
+    alpha_ok = bool(identity.get("alphaAvailable", True))
 
     payload = build_day_quote(
         targets,
@@ -373,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
         ohlc_status=status,
         benchmark_name=bench_name,
         benchmark_warning=bench_warning,
+        alpha_available=alpha_ok,
+        benchmark_identity=identity,
     )
     payload["engineMarketDb"] = engine_path
     payload["briefAsof"] = str(record.asof)[:10] if record is not None else None

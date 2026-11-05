@@ -253,6 +253,24 @@ def test_day_alpha_relative_to_benchmark():
     assert abs(rows["600000"]["dayAlpha"] - (0.05 - (-0.01))) < 1e-9
 
 
+def test_alpha_unavailable_nulls_day_alpha():
+    bars_a = _flat(25, 10.0)
+    bars_a.append({"symbol": "600000", "date": ASOF, "close": 10.5, "volume": 1000.0})
+    bench = _flat(25, 8.0)
+    bench.append({"symbol": "000905", "date": ASOF, "close": 7.92, "volume": 1000.0})
+    payload = build_day_quote(
+        [{"symbol": "600000", "name": "浦发银行", "bucket": "pick"}],
+        asof=ASOF,
+        bars_by_symbol={"600000": bars_a},
+        benchmark_symbol="000905",
+        benchmark_bars=bench,
+        alpha_available=False,
+        benchmark_warning="collision",
+    )
+    assert payload["alphaAvailable"] is False
+    assert payload["rows"][0]["dayAlpha"] is None
+
+
 def test_benchmark_row_has_no_alpha():
     payload = _payload_two_rows()
     assert payload["benchmark"]["dayAlpha"] is None

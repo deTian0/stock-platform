@@ -387,11 +387,14 @@ def build_day_quote(
     ohlc_status: Mapping[str, Any] | None = None,
     benchmark_name: str | None = None,
     benchmark_warning: str | None = None,
+    alpha_available: bool = True,
+    benchmark_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """组装当日行情台账 payload。
 
     ``targets`` 每项需 ``symbol`` + ``name`` + ``bucket``（``pick`` / ``holding``）。
     基准由 ``benchmark_symbol`` 单独算，不进涨跌家数统计。
+    ``alpha_available=False``（基准身份失败）时不编造 dayAlpha。
     """
     ohlc_map = dict(ohlc_by_symbol or {})
     src_map = dict(ohlc_sources or {})
@@ -404,7 +407,7 @@ def build_day_quote(
         ohlc=ohlc_map.get(benchmark_symbol),
         ohlc_source=src_map.get(benchmark_symbol, OHLC_MISSING),
     )
-    bench_pct = _num(bench_row.get("pct"))
+    bench_pct = _num(bench_row.get("pct")) if alpha_available else None
 
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -433,6 +436,8 @@ def build_day_quote(
         "benchmarkSymbol": benchmark_symbol,
         "benchmarkName": benchmark_name,
         "benchmarkWarning": benchmark_warning,
+        "benchmarkIdentity": dict(benchmark_identity) if benchmark_identity else None,
+        "alphaAvailable": bool(alpha_available),
         "benchmark": bench_row,
         "attributionKind": ATTRIBUTION_KIND,
         "summary": _summarize(rows),

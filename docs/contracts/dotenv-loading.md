@@ -67,7 +67,7 @@ load_dotenv(path=None, *, override=False, env=None, required=None, force=False) 
 
 ## 6. 接入点
 
-`load_dotenv()` / `get_settings()` 是 research 各 console script 与 `stock-platform-workbench` 的入口约定。契约初版写「14 个 CLI」是 `v4.1.6` 数字；其后又增加 symbol-master、adoption、attribution、workbuddy-bridge、sameday、day-quote、loop-health、ops-ledger、performance-proxy、digest、init 等。**以 `packages/research/pyproject.toml` 的 `[project.scripts]` 为准。**
+`load_dotenv()` / `get_settings()` 是 research 各 console script 与 `stock-platform-workbench` 的入口约定。契约初版写「14 个 CLI」是 `v4.1.6` 数字；其后又增加 symbol-master、adoption、attribution、workbuddy-bridge、sameday、day-quote、loop-health、data-quality、ops-ledger、performance-proxy、digest、init，以及 agents 的 `stock-platform-debate`、execution 的 `stock-platform-paper` 等。**命令一览 SSOT：[`docs/ops/cli-catalog.md`](../ops/cli-catalog.md)**（以各包 `pyproject.toml` 的 `[project.scripts]` 为准）。
 
 特别约定：
 

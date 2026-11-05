@@ -24,12 +24,16 @@ def exchange_prefix(code: str) -> str:
 
     ``92`` must be checked before the leading-``9`` Shanghai B-share rule,
     otherwise BSE ``920xxx`` is misrouted to Shanghai.
+
+    Shanghai **funds / ETFs** are ``5xxxxx`` (e.g. ``588080``); Shenzhen funds
+    stay ``1xxxxx`` and correctly fall through to ``sz``.
     """
     if not (isinstance(code, str) and code.isdigit() and len(code) == 6):
         raise SymbolError(f"exchange_prefix expects a 6-digit code, got {code!r}")
     if code.startswith("92") or code.startswith(("4", "8")):
         return "bj"
-    if code.startswith(("6", "9")):
+    # 5 = SH fund/ETF, 6 = SH A-share, 9 = SH B-share (after 92→bj above).
+    if code.startswith(("5", "6", "9")):
         return "sh"
     return "sz"
 

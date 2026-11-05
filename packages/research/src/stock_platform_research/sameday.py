@@ -47,18 +47,20 @@ def summarize_sameday(
     benchmark_get_daily: GetDaily | None = None,
     benchmark_symbol: str | None = None,
     with_benchmark: bool = True,
+    alpha_available: bool = True,
     holding: str = "1d",
 ) -> dict[str, Any]:
     """把若干归档 brief 按 ``holding`` 窗口结算，聚合成「当日战绩」payload。
 
     ``records`` 每项需含 ``asof`` 与 ``picks``（``BriefRecord.to_dict()`` 即满足）。
     ``benchmark_get_daily=None`` 表示**复用** ``get_daily`` 取基准；
-    ``with_benchmark=False`` 则完全不算 alpha（``avgAlpha`` 为 ``None``）。
+    ``with_benchmark=False`` 或 ``alpha_available=False``（基准身份失败，F1）
+    则完全不算 alpha（``avgAlpha`` 为 ``None``）。
     """
     holding_days = parse_holding_days(holding) or 1
     bench_symbol = benchmark_symbol or resolve_benchmark_symbol()
     bench_source: GetDaily | None = None
-    if with_benchmark:
+    if with_benchmark and alpha_available:
         bench_source = benchmark_get_daily if benchmark_get_daily is not None else get_daily
 
     days: list[dict[str, Any]] = []
@@ -140,6 +142,7 @@ def summarize_sameday(
         "avgAlpha": _mean(all_alphas),
         "beatBenchmarkRate": _rate(all_alphas),
         "benchmarkSampleCount": len(all_alphas),
+        "alphaAvailable": bool(with_benchmark and alpha_available),
         "sampleNote": (
             f"sample_size={sample} < {MIN_MEANINGFUL_SAMPLE}; "
             "ratios are noisy — do not over-interpret"

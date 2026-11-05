@@ -114,7 +114,7 @@ westock quote  <codes> [--date D]                        ─┴─► parse Mark
 | 24 | uint32 | volume（手） |
 | 28 | uint32 | reserved |
 
-路径：`{root}/vipdoc/{sh|sz|bj}/lday/{prefix}{code}.day`，`prefix` 经 `exchange_prefix`（`6`/`9`→sh、`4`/`8`/`92`→bj、其余→sz）。
+路径：`{root}/vipdoc/{sh|sz|bj}/lday/{prefix}{code}.day`，`prefix` 经 `exchange_prefix`（`5`/`6`/`9`→sh、`4`/`8`/`92`→bj、其余→sz；ADR [0090](../architecture/0090-benchmark-identity-and-sh-fund-prefix.md)）。
 
 ### 2.2 边界
 

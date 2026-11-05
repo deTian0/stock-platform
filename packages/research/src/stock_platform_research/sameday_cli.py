@@ -16,9 +16,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .benchmark import resolve_benchmark_identity
 from .dotenv import load_dotenv
 from .persistence import open_brief_repository
 from .sameday import render_sameday_markdown, summarize_sameday
+from .symbol_master import name_map_from_master
 
 
 def _build_get_daily(market_db: str | None):
@@ -82,14 +84,22 @@ def main(argv: list[str] | None = None) -> int:
             payload["error"] = "归档 brief 为空：无 asof 可结算"
             md = "# 当日战绩（选股 → 次日收盘）\n\n**归档 brief 为空，无可结算的 asof。**\n"
         else:
+            identity = resolve_benchmark_identity(
+                args.benchmark, names=name_map_from_master() or {}
+            )
+            alpha_ok = bool(identity.get("alphaAvailable", True))
             summary = summarize_sameday(
                 records,
                 get_daily=get_daily,
-                benchmark_get_daily=get_daily,
+                benchmark_get_daily=get_daily if alpha_ok else None,
                 benchmark_symbol=args.benchmark,
+                alpha_available=alpha_ok,
                 holding=args.holding,
             )
+            if identity.get("warning"):
+                summary["benchmarkWarning"] = identity["warning"]
             payload["summary"] = summary
+            payload["benchmarkIdentity"] = identity
             md = render_sameday_markdown(summary)
 
     if args.json_out:

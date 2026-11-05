@@ -209,6 +209,7 @@ def _sections(**over: object) -> dict[str, object]:
         },
         "symbolMaster": {"status": "ok", "total": 5200},
         "opsLedger": {"status": "ok", "failingTasks": [], "taskCount": 3, "totalRuns": 9},
+        "dataQuality": {"status": "ok", "checkCount": 5, "degradedChecks": [], "warnChecks": []},
     }
     base.update(over)
     return base

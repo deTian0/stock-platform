@@ -8,6 +8,7 @@
 > [0075](../architecture/0075-loop-health-export-and-history.md)（T1 出口与台账）·
 > [0076](../architecture/0076-ops-run-ledger-and-brief-continuity.md)（T2 执行台账与 brief 连续性）·
 > [0087](../architecture/0087-brief-due-and-ok-summary.md)（brief 到期基准与 ok 极简报告）·
+> [0091](../architecture/0091-data-quality-scan.md)（T3 数据质量）·
 > [0058](../architecture/0058-market-db-source-of-truth.md)（market.db 只读真相源）·
 > [0049](../architecture/0049-sqlite-first-persistence.md)（brief 权威）·
 > [0057](../architecture/0057-hit-tracking.md)（命中追踪）·
@@ -53,6 +54,7 @@
   "performance":    { ... §4.4 ... },
   "symbolMaster":   { ... §4.5 ... },
   "opsLedger":      { ... §4.8 ... },
+  "dataQuality":    { ... §4.10 ... },
   "nextSettlement": { "available": bool, "entryAsof", "holdingDays",
                       "expectedSettlementDate" | "reason" },
   "history":        { ... §4.6 ... },
@@ -180,6 +182,13 @@ briefContinuity 的 `incomplete`）。
 > 才生成。旧口径直接拿供数日当基准，导致每晚体检固定「落后 1 日 + 缺 1 日」——
 > 连续 14 次 `degraded` 全部由此产生，属**结构性假阳性**。
 
+### 4.10 `dataQuality` —— 数据质量（T3 / ADR 0091）
+
+复用 `research.data_quality.collect_data_quality` → `data_quality_section`。字段：
+`status`（`ok` / `warn` / `degraded` / `unavailable` / `empty`）、`asof`、`checkCount`、
+`degradedChecks[]`、`warnChecks[]`、`summary[]`、`reason`、`marketDb`。
+细则见 [data-quality](data-quality.md)。**永不**产生 `fail`。
+
 ## 5. 裁决规则（`roll_up_verdict`，纯函数）
 
 | 段 | `fail`（→ `blocked`） | `warn`（→ `degraded`） | `ok` |
@@ -191,6 +200,7 @@ briefContinuity 的 `incomplete`）。
 | `performance` | — | `unavailable` / `empty` / `settledCount < 20` | ≥ 20 |
 | `symbolMaster` | — | `unavailable` / `total==0` | `ok` |
 | `opsLedger` | — | `unavailable` / `empty` / `failingTasks` 非空 | 无连续失败 |
+| `dataQuality` | —（**永不 fail**） | `degraded` / `warn` / `unavailable` | `ok` / `empty` |
 | `history` | —（**不参与裁决**） | — | — |
 
 - 任一 `fail` → `blocked`；否则任一 `warn` → `degraded`；否则 `ok`。

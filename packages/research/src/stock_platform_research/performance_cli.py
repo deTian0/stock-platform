@@ -6,17 +6,18 @@ import argparse
 import json
 from pathlib import Path
 
+from .benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
 from .dotenv import load_dotenv
 from .performance import (
     align_fills_to_performance,
     default_performance_log_path,
     load_jsonl,
     performance_summary,
-    resolve_benchmark_symbol,
     rewrite_jsonl,
     settle_pending_entries,
     settle_performance_log,
 )
+from .symbol_master import name_map_from_master
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -83,13 +84,18 @@ def main(argv: list[str] | None = None) -> int:
         rewrite_jsonl(log_path, entries)
     elif args.settle_daily:
         get_daily = _build_settle_get_daily()
-        benchmark_get_daily = None if args.no_benchmark else get_daily
+        bench = args.benchmark or resolve_benchmark_symbol()
+        identity = resolve_benchmark_identity(bench, names=name_map_from_master() or {})
+        alpha_ok = (not args.no_benchmark) and bool(identity.get("alphaAvailable", True))
         summary = settle_performance_log(
             log_path,
             get_daily=get_daily,
-            benchmark_get_daily=benchmark_get_daily,
-            benchmark_symbol=args.benchmark or resolve_benchmark_symbol(),
+            benchmark_get_daily=get_daily if alpha_ok else None,
+            benchmark_symbol=bench,
+            alpha_available=alpha_ok,
         )
+        if identity.get("warning"):
+            summary["benchmarkWarning"] = identity["warning"]
         entries = load_jsonl(log_path)
 
     if summary is None:

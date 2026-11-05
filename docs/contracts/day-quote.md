@@ -3,7 +3,8 @@
 - 里程碑：`A6`（`v4.12.0`）
 - 单点：`stock_platform_research.day_quote`
 - CLI：`stock-platform-day-quote`
-- ADR：[0082](../architecture/0082-day-quote-attribution.md)
+- ADR：[0082](../architecture/0082-day-quote-attribution.md) · [0090](../architecture/0090-benchmark-identity-and-sh-fund-prefix.md)
+- 基准身份：[benchmark-identity.md](benchmark-identity.md)
 - 状态：生效（SIMULATE / 只读 / 研究口径）
 
 ## 1. 目的与范围
@@ -26,7 +27,7 @@
 | `volRatio` | `volume / mean(volume[t−20 .. t−1])`，**分母不含当日** | `null` |
 | `ma20` | 含当日的 20 根收盘均值（需满 20 根） | `null` |
 | `vsMa20` | `close / ma20 − 1` | `null` |
-| `dayAlpha` | `pct − 基准当日 pct`（百分点差以小数表示） | `null` |
+| `dayAlpha` | `pct − 基准当日 pct`（百分点差以小数表示）；`alphaAvailable=false` 时强制 `null` | `null` |
 | `staleBars` | asof 当日无 K 线（停牌/未到）→ `1` | 恒存在 |
 
 **只有 `close` 存在且 `prevClose` 存在**时才会产出 `pct`；`null` 一律表示「算不出」，

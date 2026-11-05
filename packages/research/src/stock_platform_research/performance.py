@@ -20,6 +20,13 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
+from .benchmark import (
+    DEFAULT_BENCHMARK_SYMBOL,
+    ENV_BENCHMARK_SYMBOL,
+    resolve_benchmark_identity,
+    resolve_benchmark_symbol,
+)
+
 Rating = str
 
 # Direction: long=+1, short=-1, Hold=0 (excluded from direction_accuracy).
@@ -36,20 +43,6 @@ MIN_MEANINGFUL_SAMPLE = 20
 # Single point for the default holding tag, shared by log / settle / digest so the
 # 记账口径 never drifts (the daily CLI used to log "1d" while the workbench used "5d").
 DEFAULT_HOLDING = "5d"
-
-# Alpha benchmark. ``market.db`` stores index series with an SZ suffix (the engine maps
-# every 0-prefixed code to SZ), e.g. 中证500 = ``000905.SZ``; 沪深300 (000300) is absent
-# from the warehouse, so 中证500 is the default proxy. Override via env.
-DEFAULT_BENCHMARK_SYMBOL = "000905"
-ENV_BENCHMARK_SYMBOL = "STOCK_PLATFORM_BENCHMARK_SYMBOL"
-
-
-def resolve_benchmark_symbol() -> str:
-    """Benchmark symbol for alpha: env override, else :data:`DEFAULT_BENCHMARK_SYMBOL`."""
-    import os
-
-    raw = str(os.environ.get(ENV_BENCHMARK_SYMBOL) or "").strip()
-    return raw or DEFAULT_BENCHMARK_SYMBOL
 
 
 def _parse_pct(value: Any) -> float | None:
@@ -440,18 +433,23 @@ def settle_pending_entries(
     alpha_returns: Mapping[tuple[str, str], float] | None = None,
     benchmark_get_daily: GetDaily | None = None,
     benchmark_symbol: str | None = None,
+    alpha_available: bool = True,
     end_buffer_calendar_days: int = 40,
 ) -> list[dict[str, Any]]:
     """Settle pending rows using injected returns map or get_daily closes.
 
     ``returns`` keys are ``(date, symbol)`` → raw holding-period return as float.
 
-    When ``benchmark_get_daily`` is supplied, ``alpha = raw − benchmark`` is computed
-    over the **same entry/exit dates** (single window definition, ``_holding_window``).
-    Already-settled rows whose ``alpha`` is still null are back-filled the same way, so
-    a JSONL written before the benchmark existed catches up on the next settle.
+    When ``benchmark_get_daily`` is supplied **and** ``alpha_available``,
+    ``alpha = raw − benchmark`` is computed over the **same entry/exit dates**
+    (single window definition, ``_holding_window``). Already-settled rows whose
+    ``alpha`` is still null are back-filled the same way, so a JSONL written
+    before the benchmark existed catches up on the next settle.
+
+    ``alpha_available=False`` (F1 identity fail-closed) skips all alpha writes.
     """
     bench_sym = benchmark_symbol or resolve_benchmark_symbol()
+    use_bench = alpha_available and benchmark_get_daily is not None
     out: list[dict[str, Any]] = []
     for e in entries:
         row = dict(e)
@@ -459,7 +457,7 @@ def settle_pending_entries(
         key = (str(row.get("date") or "")[:10], str(row.get("symbol") or ""))
         if not row.get("pending"):
             if (
-                benchmark_get_daily is not None
+                use_bench
                 and get_daily is not None
                 and row.get("alpha") is None
                 and key[0]
@@ -503,7 +501,7 @@ def settle_pending_entries(
                 entry_d, entry_c, exit_d, exit_c = win
                 if entry_c:
                     raw_f = exit_c / entry_c - 1.0
-                    if benchmark_get_daily is not None:
+                    if use_bench:
                         alpha_f = _window_alpha(
                             raw_f=raw_f,
                             entry_date=entry_d,
@@ -516,7 +514,7 @@ def settle_pending_entries(
             out.append(row)
             continue
         row["raw"] = format_pct(raw_f)
-        if alpha_returns is not None and key in alpha_returns:
+        if alpha_available and alpha_returns is not None and key in alpha_returns:
             row["alpha"] = format_pct(float(alpha_returns[key]))
         elif alpha_f is not None:
             row["alpha"] = format_pct(alpha_f)
@@ -541,6 +539,7 @@ def settle_performance_log(
     alpha_returns: Mapping[tuple[str, str], float] | None = None,
     benchmark_get_daily: GetDaily | None = None,
     benchmark_symbol: str | None = None,
+    alpha_available: bool = True,
     end_buffer_calendar_days: int = 40,
     recent_days: int = 5,
 ) -> dict[str, Any]:
@@ -548,7 +547,8 @@ def settle_performance_log(
 
     Reuses ``settle_pending_entries`` + ``direction_accuracy`` 口径; never invents
     returns when bars are missing (rows stay pending). ``benchmark_get_daily`` adds
-    ``alpha`` (raw − benchmark) and back-fills alpha on rows settled without it.
+    ``alpha`` (raw − benchmark) and back-fills alpha on rows settled without it
+    when ``alpha_available``.
     """
     log_path = Path(path)
     entries = load_jsonl(log_path)
@@ -561,6 +561,7 @@ def settle_performance_log(
         alpha_returns=alpha_returns,
         benchmark_get_daily=benchmark_get_daily,
         benchmark_symbol=benchmark_symbol,
+        alpha_available=alpha_available,
         end_buffer_calendar_days=end_buffer_calendar_days,
     )
     after_pending = sum(1 for e in settled if e.get("pending"))
@@ -577,6 +578,7 @@ def settle_performance_log(
     summary["pendingBefore"] = before_pending
     summary["alphaSettledNewly"] = alpha_newly
     summary["benchmarkSymbol"] = benchmark_symbol or resolve_benchmark_symbol()
+    summary["alphaAvailable"] = bool(alpha_available)
     return summary
 
 
