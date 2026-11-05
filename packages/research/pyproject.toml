@@ -45,6 +45,7 @@ stock-platform-ops-ledger = "stock_platform_research.ops_ledger_cli:main"
 stock-platform-performance-proxy = "stock_platform_research.performance_proxy_cli:main"
 stock-platform-report-html = "stock_platform_research.report_html_cli:main"
 stock-platform-init = "stock_platform_research.init_cli:main"
+stock-platform-shadow-board = "stock_platform_research.shadow_board.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

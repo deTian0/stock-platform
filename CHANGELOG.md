@@ -6,6 +6,7 @@
 
 ### Added
 
+- **多策略影子 Final Board MVP**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md)，契约 [`docs/contracts/multi-strategy-shadow.md`](docs/contracts/multi-strategy-shadow.md)）：`stock_platform_research.shadow_board` + CLI `stock-platform-shadow-board`；Round1 五校（S3/S4 复用二次精选，S1/S2/S5 fail-closed stub）→ Round2 硬闸集 A → 只写 `local/shadow/`；集 B 顾问占位；恒 `excludedFromPerformance`；不改出厂 picks / 主绩效 / digest。
 - **`local/` 本机运行时目录 + `stock-platform-init`。** 平台自有产物（SQLite、digest、持仓、日志、健康度、绩效 JSONL、`.env`）默认落在被忽略的 `local/`；`.env.example` 复制目标改为 `local/.env`。新增 `Settings`（`pydantic-settings`）、`platform_runtime_config` 落库与 `stock-platform-init` CLI（缺行 seed、幂等、fail-closed，**不**打开 live）。说明见 [`docs/ops/local-runtime.md`](docs/ops/local-runtime.md)。
 - **LLM 顾问侧车包面 `stock_platform_agents.llm`。** 集中再导出预算 / 可选辩论 / deep graph；确定性路径不再急切加载 LLM 模块（ADR [`0088`](docs/architecture/0088-llm-sidecar-package-boundary.md)；计划 [`docs/plans/llm-vs-deterministic-boundary.md`](docs/plans/llm-vs-deterministic-boundary.md)）。
 - Workbench **`routes/agents_llm.py`**：`/api/debate/status` 与 deep-graph 从可用性 agent 槽拆出。
@@ -23,6 +24,7 @@
 - **LLM vs 确定性边界收口（行为兼容）。** `debate_lane` / `DebateAgentPlugin` 在 `off|deterministic` 不 import `llm_debate`；包根对 LLM 符号 `__getattr__` 懒加载；research 仍无 agents 硬依赖。误判不进绩效不变量不变。
 - **LLM 提供商单点（ADR 0089）。** `STOCK_PLATFORM_LLM_PROVIDER` 默认 `workbuddy`（进程内不打商业模型）；`deepseek` 只用 `DEEPSEEK_*`；`openai` 为兼容栈。辩论 / deep-graph 经 `llm_provider.chat_completion` 显式传 `base_url`+`model`。运维见 [`docs/ops/llm-providers.md`](docs/ops/llm-providers.md)。
 - **下一组里程碑方案** [`docs/plans/next-milestones-t3-cli-y2-fix-r5.md`](docs/plans/next-milestones-t3-cli-y2-fix-r5.md)：F1 符号/基准 → T3 数据质量 → A1 CLI 面；Y2 签核；R5-P ETF 平台侧。
+- **多策略 Final Board**：产品设计 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) + MVP 代码（见 Unreleased Added）；根 README「LLM 理由约束」链 ADR 0093。
 
 ## [4.13.7] - 2026-11-04
 

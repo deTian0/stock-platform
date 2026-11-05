@@ -28,6 +28,7 @@ if (Test-Path .env) { Copy-Item .env local\.env -Force }
 | `sqlite:///./data/stock_platform.db` | `sqlite:///./local/stock_platform.db` |
 | `./data/recommend_decisions.jsonl` | `./local/recommend_decisions.jsonl` |
 | `./data/digests` 等 | `./local/` 下同名子目录 |
+| （新）多策略影子账本 | `./local/shadow/`（`STOCK_PLATFORM_SHADOW_DIR`；**禁止**混入主绩效 JSONL） |
 | 仓库根 `.env` | `local/.env`（过渡期仍可读根 `.env`） |
 
 ## 配置初始化 CLI

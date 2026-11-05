@@ -261,3 +261,4 @@ stock-platform-data-quality [--asof] [--market-db] [--out-dir] [--json|--md]
 - 平台写 `market.db` / 代替生产侧 ETF 回补  
 - React 第二前端、平行行情链  
 - 无签核改出厂 `min_pick_score` / 中性化默认开  
+- **多策略五校 Final Board**（并行影子链；见 [`multi-strategy-final-board.md`](multi-strategy-final-board.md) / ADR 0093 MVP；本组 F1–R5-P 不替代）  

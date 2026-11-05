@@ -52,6 +52,10 @@ class Settings(BaseSettings):
         default="./local/logs",
         alias="STOCK_PLATFORM_OPS_LEDGER_DIR",
     )
+    stock_platform_shadow_dir: str = Field(
+        default="./local/shadow",
+        alias="STOCK_PLATFORM_SHADOW_DIR",
+    )
     stock_platform_broker: str = Field(default="paper", alias="STOCK_PLATFORM_BROKER")
     stock_platform_provider_preset: str | None = Field(
         default=None, alias="STOCK_PLATFORM_PROVIDER_PRESET"

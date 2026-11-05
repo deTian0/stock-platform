@@ -1,0 +1,88 @@
+# 契约：多策略影子 Final Board
+
+- 里程碑：多策略影子链 MVP（目标累计发版 `v4.14.0`）
+- 单点：`stock_platform_research.shadow_board`
+- CLI：`stock-platform-shadow-board`
+- ADR：[0093](../architecture/0093-multi-strategy-shadow-board.md)
+- 计划：[../plans/multi-strategy-final-board.md](../plans/multi-strategy-final-board.md)
+- 状态：生效（SIMULATE / 影子只写 / 不改出厂）
+
+## 1. 硬约束
+
+| 约束 | 含义 |
+|------|------|
+| 影子隔离 | 只写 `local/shadow/`（或 `STOCK_PLATFORM_SHADOW_DIR`）；禁止写生产 picks / hits / 主绩效 JSONL |
+| 空板合法 | Round2 禁止 pad-to-N；Final 可为空 |
+| 集 A 硬仲裁 | ST / 流动性 / 涨停 / 集中度 / 学校优先级；fail-closed |
+| 集 B 顾问 | 贝叶斯+LLM 不可放行未过硬闸票；`excludedFromPerformance=true` |
+| LLM | 不可覆盖硬闸；理由缺结构化字段 → degrade / 不采用正式解释 |
+| market.db | 只读；东财 HTTP 仍经 `em_get`（本 MVP 默认不发网） |
+| 升级门 | 证据只喂 Y1；Y2 签核前不改出厂默认档 |
+
+## 2. 学校 ID
+
+| ID | 名称 | MVP |
+|----|------|-----|
+| `S1` | 宏观/择时 | 缺数据 → 空池 + reason |
+| `S2` | 事件/主题 | 缺数据 → 空池 + reason；未过 `FACTOR_LIBRARY` 不得进生产权重 |
+| `S3` | 质量/防守 | 可复用 lvrev-like / quality 二次精选权重 |
+| `S4` | 短线动量 | 可复用 short secondary 权重 |
+| `S5` | 资金流/流动性 | 缺数据 → 空池 + reason |
+
+学校优先级（集 A 同票冲突，高者胜）：`S3 > S4 > S5 > S2 > S1`。
+
+## 3. Payload 形状
+
+顶层：
+
+```json
+{
+  "schemaVersion": 1,
+  "asof": "YYYY-MM-DD",
+  "status": "ok | empty | degraded",
+  "excludedFromPerformance": true,
+  "shadowOnly": true,
+  "schools": { "S1": { "candidates": [], "status": "empty", "reason": "…" }, "…" },
+  "round2": {
+    "rejected": [{ "code": "…", "school": "S3", "reason": "…" }],
+    "passed": [{ "code": "…", "school": "S3", "score": 0.0 }],
+    "arbiter": "set_a"
+  },
+  "advisoryB": null,
+  "finalBoard": [
+    {
+      "code": "600519",
+      "name": "…",
+      "school": "S3",
+      "score": 0.82,
+      "holdingPeriod": "10–20 交易日",
+      "trigger": "…",
+      "expectation": "…",
+      "invalidation": "…",
+      "excludedFromPerformance": true
+    }
+  ],
+  "ledgerPath": "local/shadow/…"
+}
+```
+
+`status`：
+
+| 值 | 含义 |
+|----|------|
+| `ok` | Final 至少 1 只 |
+| `empty` | 合法空板（无候选或硬闸后空） |
+| `degraded` | 有顾问/LLM 路径缺字段等可观测降级，仍可空板或短板 |
+
+## 4. 落盘
+
+| 文件 | 内容 |
+|------|------|
+| `local/shadow/final_board_{asof}.json` | 当日完整 payload |
+| `local/shadow/final_board.jsonl` | 追加一行（摘要 + finalBoard 计数） |
+
+**禁止**写入：`local/recommend_decisions.jsonl`、hits 表、生产 brief picks。
+
+## 5. 非目标
+
+改 digest 结构；Workbench 影子页；集 B 真实贝叶斯/LLM；改 `W_DEFAULT`。

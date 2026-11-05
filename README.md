@@ -20,6 +20,19 @@ CI / 本地测试设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 保持零公网。�
 **同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。分档说明见 [`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md)。**M-E4 实盘仍门禁，未开工。**
 **交易**：始终 paper / SIMULATE（`liveTradingEnabled=false`）——「真实」仅指行情 API。
 
+## LLM 理由约束
+
+辩论 / Final Board 等 LLM 产出的「理由」须尽量压住空话与口号（产品要求；影子链见 ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md)）：
+
+| 要求 | 说明 |
+|------|------|
+| **结构化字段** | 至少含：持有期、触发条件、可证伪预期、失效条件；缺字段 → degrade / 不采用为正式解释 |
+| **Prompt + Skill** | 用模板与 Skill 配方约束输出形状，禁止只交「看好/情绪好」类空口号 |
+| **硬闸优先** | LLM / 顾问数字**不能**覆盖合规、流动性等硬闸 |
+| **不进绩效** | 判决与 LLM 理由恒 `excludedFromPerformance`；不写 picks / 命中 / 主绩效 JSONL |
+
+多策略（五校 → 硬 Round2 → Final Board → **仅影子账本**）MVP：`stock-platform-shadow-board`；计划 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md)。出厂 lvrev 仍走 Y1→Y2 才可能改。
+
 ## 日用路径（Phase E）
 
 ```powershell
