@@ -49,6 +49,7 @@ class DailyPipelineReport:
     picksReplay: dict[str, Any] | None = None
     picksReplayPath: str | None = None
     debates: dict[str, Any] | None = None
+    shadowBoard: dict[str, Any] | None = None
     error: str | None = None
     failures: list[dict[str, Any]] = field(default_factory=list)
 
@@ -184,6 +185,8 @@ def run_daily_pipeline(
     debate_max_picks: int | None = None,
     session: str = "pre",
     run_date: str | None = None,
+    shadow_board: bool | None = None,
+    shadow_dir: str | Path | None = None,
 ) -> DailyPipelineReport:
     """Run refresh (optional) then build+persist premarket brief.
 
@@ -440,6 +443,30 @@ def run_daily_pipeline(
                     "error": f"{type(exc).__name__}: {exc}",
                 }
 
+        # ADR 0093 增补: opt-in shadow Final Board (default OFF; env
+        # STOCK_PLATFORM_SHADOW_BOARD=1). Reads the same PIT panel, writes only
+        # under the shadow dir; failure lands on report.shadowBoard, never raises.
+        shadow_payload: dict[str, Any] | None = None
+        try:
+            from .shadow_board.daily_hook import (
+                run_shadow_board_daily,
+                shadow_board_enabled,
+            )
+
+            if shadow_board_enabled(shadow_board):
+                shadow_payload = run_shadow_board_daily(
+                    asof=asof_s,
+                    panel=panel,
+                    name_map=name_map,
+                    shadow_dir=shadow_dir,
+                )
+        except Exception as exc:  # noqa: BLE001 — shadow chain never blocks production
+            shadow_payload = {
+                "ok": False,
+                "status": "error",
+                "error": f"{type(exc).__name__}: {exc}"[:500],
+            }
+
         ok_report = DailyPipelineReport(
             asof=asof_s,
             ok=True,
@@ -462,6 +489,7 @@ def run_daily_pipeline(
             picksReplay=_replay_summary(replay_payload) if replay_payload else None,
             picksReplayPath=replay_path,
             debates=debate_lane,
+            shadowBoard=shadow_payload,
         )
         latest = {
             "asof": asof_s,

@@ -440,6 +440,63 @@ def test_daily_pipeline_can_opt_out_of_the_ledger(tmp_path: Path) -> None:
     assert not (tmp_path / "picks_ledger.jsonl").is_file()
 
 
+# --- ADR 0093: opt-in shadow Final Board, default OFF -----------------------
+
+
+def test_daily_pipeline_shadow_board_defaults_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default (no flag, no env) must not touch the shadow chain at all."""
+    monkeypatch.delenv("STOCK_PLATFORM_SHADOW_BOARD", raising=False)
+    report = run_daily_pipeline(**_pipeline_kwargs(tmp_path, date(2026, 9, 2)))
+    assert report.ok
+    assert report.shadowBoard is None
+    assert not (tmp_path / "shadow").exists()
+
+
+def test_daily_pipeline_shadow_board_opt_in_writes_isolated_output(
+    tmp_path: Path,
+) -> None:
+    """--shadow-board (here: shadow_board=True) must run the 5-school chain and
+    write only under shadow_dir — never touching picks_ledger / hits."""
+    shadow_dir = tmp_path / "shadow"
+    report = run_daily_pipeline(
+        **_pipeline_kwargs(tmp_path, date(2026, 9, 2)),
+        shadow_board=True,
+        shadow_dir=shadow_dir,
+    )
+    assert report.ok
+    assert report.shadowBoard is not None
+    assert report.shadowBoard["ok"] is True
+    assert report.shadowBoard["excludedFromPerformance"] is True
+    assert report.shadowBoard["shadowOnly"] is True
+    # Shadow output lives only under shadow_dir; production ledger untouched.
+    assert shadow_dir.exists()
+    assert any(shadow_dir.glob("final_board_*.json")) or any(
+        shadow_dir.glob("*.jsonl")
+    )
+    assert report.picksLedger is not None  # production chain unaffected
+
+
+def test_daily_pipeline_shadow_board_failure_never_blocks_the_brief(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A broken shadow chain must degrade to shadowBoard.ok=False, not raise."""
+
+    def _boom(**_kwargs: Any) -> Any:
+        raise RuntimeError("shadow chain exploded")
+
+    monkeypatch.setattr(
+        "stock_platform_research.shadow_board.daily_hook.run_shadow_board_daily",
+        _boom,
+    )
+    report = run_daily_pipeline(
+        **_pipeline_kwargs(tmp_path, date(2026, 9, 2)),
+        shadow_board=True,
+    )
+    assert report.ok  # production brief must still succeed
+
+
 # --- P0-1: dataset narrowing + persist control ------------------------------
 
 

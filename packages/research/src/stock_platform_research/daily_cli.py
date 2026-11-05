@@ -351,6 +351,22 @@ def main(argv: list[str] | None = None) -> int:
         help="S5: 参与辩论的 picks 上限（默认全部 TopN）",
     )
     p.add_argument(
+        "--shadow-board",
+        dest="shadow_board",
+        action="store_true",
+        default=None,
+        help=(
+            "ADR 0093: 额外产出影子 Final Board（只写 local/shadow/，不改 picks/绩效；"
+            "默认关，或 STOCK_PLATFORM_SHADOW_BOARD=1）"
+        ),
+    )
+    p.add_argument(
+        "--no-shadow-board",
+        dest="shadow_board",
+        action="store_false",
+        help="强制关闭影子 Final Board（覆盖环境变量）",
+    )
+    p.add_argument(
         "--session",
         choices=("pre", "post"),
         default="pre",
@@ -410,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         debate_runner=debate_runner,
         debate_engine=debate_engine,
         debate_max_picks=args.debate_max_picks,
+        shadow_board=args.shadow_board,
         session=args.session,
         run_date=args.run_date,
     )
@@ -428,6 +445,7 @@ def main(argv: list[str] | None = None) -> int:
                 "rankingsCounts": (payload.get("brief") or {}).get("rankingsCounts") or None,
                 "hits": payload.get("hits") or None,
                 "debates": payload.get("debates") or None,
+                "shadowBoard": payload.get("shadowBoard") or None,
                 "provider": args.provider,
                 "refresh": payload.get("refresh") or None,
                 "error": payload.get("error"),
