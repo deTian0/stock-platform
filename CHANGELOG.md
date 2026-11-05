@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- **`GET /api/research/performance` 夹具 fallback 不再写盘**：默认决策日志缺失而回落到包内 `tests/fixtures/recommend_decisions.jsonl` 时强制只读汇总，即便 `autoSettle=true` 且日线源可用也不结算改写夹具（此前配置真实 `market.db` 会用真实日线写穿测试夹具）；正常日志路径行为不变。根 `conftest` 新增 `UNSET_ENV`（`STOCK_PLATFORM_ENGINE_MARKET_DB` / `STOCK_PLATFORM_TUSHARE_TOKEN`），每个用例前移除，外部会话变量不再影响测试结果。
 - **T3 `data-quality` 兼容真实 `daily_price` 缺列 schema**：真实库无 `open/high/low`，原 SQL 抛 `no such column: open` 致 `loop_health.dataQuality` 为 unavailable；现用 `PRAGMA table_info` 按实际列构造 SELECT（`vol`/`volume` 等别名兼容），缺可选列跳过依赖检查并在 `notes` / `skippedChecks` 标注，缺必需列 `code`/`date` 返回 `unavailable` + 原因；同时修 `closeJumps` 在 `pd.NA` 上的 `TypeError`。
 
 ### Changed

@@ -1218,6 +1218,51 @@ def test_performance_auto_settle_keeps_pending_without_enough_bars(
     assert "direction_accuracy" in body["metrics"] or body["settledCount"] == 0
 
 
+def test_performance_fixture_fallback_never_settles_to_disk(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """默认日志缺失 → fallback 到包内夹具：即便 autoSettle 默认开、日线源可用，也绝不改写夹具。"""
+    import sqlite3
+
+    import stock_platform_research
+    from stock_platform_providers import EngineSqliteProvider
+
+    packaged = (
+        Path(stock_platform_research.__file__).resolve().parents[2]
+        / "tests"
+        / "fixtures"
+        / "recommend_decisions.jsonl"
+    )
+    before = packaged.read_bytes()
+    assert b'"pending": true' in before  # 夹具含可被结算的 pending 行
+
+    monkeypatch.setenv("STOCK_PLATFORM_PERFORMANCE_LOG", str(tmp_path / "missing.jsonl"))
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE daily_price (code TEXT, date TEXT, close REAL, pct_chg REAL, "
+        "vol REAL, amount REAL, PRIMARY KEY(code,date))"
+    )
+    dates = [f"2026-08-{d:02d}" for d in (5, 6, 7, 10, 11, 12, 13, 14, 17, 18)]
+    for i, d in enumerate(dates):
+        for code in ("000002.SZ", "000300.SH"):
+            conn.execute(
+                "INSERT INTO daily_price VALUES (?,?,?,?,?,?)",
+                (code, d, 10.0 + i, 0.0, 1.0, 1.0),
+            )
+    conn.commit()
+    conn.close()
+    client.app.state.workbench.providers["engine_sqlite"] = EngineSqliteProvider(db)
+
+    r = client.get("/api/research/performance")  # autoSettle 默认 True
+    assert r.status_code == 200
+    body = r.json()
+    assert body["settledNewly"] == 0
+    assert body["autoSettled"] is False
+    assert body["pendingCount"] >= 1
+    assert packaged.read_bytes() == before
+
+
 def test_performance_settle_endpoint_with_injected_engine(
     client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

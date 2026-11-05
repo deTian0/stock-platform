@@ -50,8 +50,21 @@ GUARDED_ENV = (
     "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR",
 )
 
+#: Env vars that point tests at *real* external data / credentials. They are not
+#: redirected but **removed**: tests that need them inject their own value via
+#: ``monkeypatch.setenv`` (or rely on the documented unset → fail-closed path).
+#: A developer shell with ``STOCK_PLATFORM_ENGINE_MARKET_DB`` pointing at the real
+#: market.db must not change test outcomes nor let a route settle fixtures against
+#: real bars. Opt-in real-db tests (e.g. ``test_market_db_bulk``) therefore skip.
+UNSET_ENV = (
+    "STOCK_PLATFORM_ENGINE_MARKET_DB",
+    "STOCK_PLATFORM_TUSHARE_TOKEN",
+)
+
 _scratch = Path(tempfile.mkdtemp(prefix="stock-platform-tests-"))
-_saved: dict[str, str | None] = {key: os.environ.get(key) for key in GUARDED_ENV}
+_saved: dict[str, str | None] = {
+    key: os.environ.get(key) for key in (*GUARDED_ENV, *UNSET_ENV)
+}
 
 _REDIRECT: dict[str, str] = {
     "STOCK_PLATFORM_DB_URL": f"sqlite:///{(_scratch / 'briefs.db').as_posix()}",
@@ -64,6 +77,8 @@ _REDIRECT: dict[str, str] = {
     "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR": str(_scratch / "workbuddy_cache"),
 }
 os.environ.update(_REDIRECT)
+for _key in UNSET_ENV:
+    os.environ.pop(_key, None)
 
 
 @pytest.fixture(autouse=True)
@@ -71,6 +86,8 @@ def _enforce_test_data_isolation() -> None:
     """Re-assert the redirect before **every** test (self-healing guard)."""
     for key, value in _REDIRECT.items():
         os.environ[key] = value
+    for key in UNSET_ENV:
+        os.environ.pop(key, None)
     yield
 
 

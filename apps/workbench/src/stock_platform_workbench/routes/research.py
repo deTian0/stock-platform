@@ -916,17 +916,22 @@ def get_performance(
     import stock_platform_research
 
     path = Path(log) if log else default_performance_log_path()
+    # 夹具 fallback 仅供只读展示：绝不允许 auto_settle 把测试夹具写回磁盘
+    # （否则配置了真实 market.db 时会用真实日线结算并改写夹具文件）。
+    fixture_fallback = False
     if not path.is_file():
         pkg_root = Path(stock_platform_research.__file__).resolve().parents[2]
         packaged = pkg_root / "tests" / "fixtures" / "recommend_decisions.jsonl"
         alt = Path(request.app.state.workbench.fixtures_dir) / "recommend_decisions.jsonl"
         if packaged.is_file():
             path = packaged
+            fixture_fallback = True
         elif alt.is_file():
             path = alt
+            fixture_fallback = True
 
     settle_source = None
-    if auto_settle and path.is_file():
+    if auto_settle and path.is_file() and not fixture_fallback:
         get_daily, settle_source = _settle_get_daily(request)
         if get_daily is not None:
             summary = settle_performance_log(
