@@ -41,6 +41,9 @@ FUND_FLOW_URL = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 NEWS_URL = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
 CONCEPT_BLOCKS_URL = "https://push2.eastmoney.com/api/qt/slist/get"
 DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+BOARD_RANK_URL = "https://push2.eastmoney.com/api/qt/clist/get"
+# clist ``fs`` filters for EM boards: concept (t:3) / industry (t:2).
+_BOARD_RANK_FS: dict[str, str] = {"concept": "m:90+t:3", "industry": "m:90+t:2"}
 SINA_FINANCE_URL = (
     "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
 )
@@ -582,15 +585,39 @@ class AStockHttpProvider:
         page_size: int = 50,
         sort_columns: str = "",
         sort_types: str = "-1",
+        page_number: int = 1,
     ) -> list[dict[str, Any]]:
         """East Money datacenter-web query via em_get / injected get_json."""
-        payload = self._fetch(
+        payload = self._datacenter_page(
+            report_name,
+            filter_str=filter_str,
+            page_size=page_size,
+            sort_columns=sort_columns,
+            sort_types=sort_types,
+            page_number=page_number,
+        )
+        result = payload.get("result") or {}
+        data = result.get("data") or []
+        return list(data) if isinstance(data, list) else []
+
+    def _datacenter_page(
+        self,
+        report_name: str,
+        *,
+        filter_str: str = "",
+        page_size: int = 50,
+        sort_columns: str = "",
+        sort_types: str = "-1",
+        page_number: int = 1,
+    ) -> dict[str, Any]:
+        """One raw datacenter-web page (keeps ``result.pages`` for pagination)."""
+        return self._fetch(
             DATACENTER_URL,
             {
                 "reportName": report_name,
                 "columns": "ALL",
                 "filter": filter_str,
-                "pageNumber": "1",
+                "pageNumber": str(max(1, int(page_number))),
                 "pageSize": str(page_size),
                 "sortColumns": sort_columns,
                 "sortTypes": sort_types,
@@ -598,9 +625,6 @@ class AStockHttpProvider:
                 "client": "WEB",
             },
         )
-        result = payload.get("result") or {}
-        data = result.get("data") or []
-        return list(data) if isinstance(data, list) else []
 
     def get_lhb(
         self,
@@ -787,6 +811,214 @@ class AStockHttpProvider:
                 )
             )
         return items
+
+    # ------------------------------------------------------------------ #
+    # Market-wide day cross-sections (S2-P1 shadow snapshots).
+    # One query covers the whole market (vs. per-symbol ``get_lhb`` /
+    # ``get_unlock``), so the daily request count stays in single digits.
+    # ------------------------------------------------------------------ #
+    def _datacenter_all(
+        self,
+        report_name: str,
+        *,
+        filter_str: str,
+        sort_columns: str,
+        sort_types: str,
+        page_size: int,
+        max_pages: int,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Paginate a datacenter report. Returns ``(rows, truncated)``."""
+        rows: list[dict[str, Any]] = []
+        pages_cap = max(1, int(max_pages))
+        page = 1
+        total_pages = 1
+        while page <= min(total_pages, pages_cap):
+            payload = self._datacenter_page(
+                report_name,
+                filter_str=filter_str,
+                page_size=page_size,
+                sort_columns=sort_columns,
+                sort_types=sort_types,
+                page_number=page,
+            )
+            result = payload.get("result") or {}
+            data = result.get("data") or []
+            if isinstance(data, list):
+                rows.extend(r for r in data if isinstance(r, dict))
+            try:
+                total_pages = max(1, int(result.get("pages") or 1))
+            except (TypeError, ValueError):
+                total_pages = 1
+            page += 1
+        return rows, total_pages > pages_cap
+
+    def get_lhb_daily(
+        self,
+        trade_date: date,
+        *,
+        page_size: int = 500,
+        max_pages: int = 4,
+    ) -> dict[str, Any]:
+        """Whole-market dragon-tiger list for one trade date (amounts 元; pct decimal).
+
+        Same report as :meth:`get_lhb` (``RPT_DAILYBILLBOARD_DETAILSNEW``) but
+        filtered by ``TRADE_DATE`` only. One row per (symbol, reason).
+        """
+        day = trade_date.isoformat()
+        raw, truncated = self._datacenter_all(
+            "RPT_DAILYBILLBOARD_DETAILSNEW",
+            filter_str=f"(TRADE_DATE='{day}')",
+            sort_columns="SECURITY_CODE",
+            sort_types="1",
+            page_size=page_size,
+            max_pages=max_pages,
+        )
+        records: list[dict[str, Any]] = []
+        for r in raw:
+            code_raw = str(r.get("SECURITY_CODE") or "").strip()
+            if not code_raw:
+                continue
+            row_day = str(r.get("TRADE_DATE") or "")[:10]
+            if row_day and row_day != day:
+                continue
+            records.append(
+                {
+                    "date": row_day or day,
+                    "symbol": code_raw,
+                    "name": str(r.get("SECURITY_NAME_ABBR") or "").strip() or None,
+                    "reason": str(r.get("EXPLANATION") or "").strip() or None,
+                    "net_buy": _opt_float(r.get("BILLBOARD_NET_AMT")),
+                    "buy_amt": _opt_float(r.get("BILLBOARD_BUY_AMT")),
+                    "sell_amt": _opt_float(r.get("BILLBOARD_SELL_AMT")),
+                    "deal_amt": _opt_float(r.get("BILLBOARD_DEAL_AMT")),
+                    "close": _opt_float(r.get("CLOSE_PRICE")),
+                    "change_pct": _pct_decimal(r.get("CHANGE_RATE")),
+                    "turnover_rate": _pct_decimal(r.get("TURNOVERRATE")),
+                }
+            )
+        return {
+            "trade_date": day,
+            "source": self.name,
+            "records": records,
+            "truncated": truncated,
+        }
+
+    def get_unlock_calendar(
+        self,
+        start: date,
+        end: date,
+        *,
+        page_size: int = 500,
+        max_pages: int = 4,
+    ) -> dict[str, Any]:
+        """Whole-market lockup-expiry schedule ``start ≤ FREE_DATE ≤ end``.
+
+        Shares in 万股 (EM raw); ``ratio`` = ``FREE_RATIO`` (decimal of float shares).
+        """
+        s, e = start.isoformat(), end.isoformat()
+        raw, truncated = self._datacenter_all(
+            "RPT_LIFT_STAGE",
+            filter_str=f"(FREE_DATE>='{s}')(FREE_DATE<='{e}')",
+            sort_columns="FREE_DATE",
+            sort_types="1",
+            page_size=page_size,
+            max_pages=max_pages,
+        )
+        events: list[dict[str, Any]] = []
+        for r in raw:
+            code_raw = str(r.get("SECURITY_CODE") or "").strip()
+            free_day = str(r.get("FREE_DATE") or "")[:10]
+            if not code_raw or not free_day:
+                continue
+            events.append(
+                {
+                    "symbol": code_raw,
+                    "name": str(r.get("SECURITY_NAME_ABBR") or "").strip() or None,
+                    "date": free_day,
+                    "type": str(r.get("FREE_SHARES_TYPE") or "").strip() or None,
+                    "shares": _opt_float(r.get("FREE_SHARES")),
+                    "able_shares": _opt_float(r.get("ABLE_FREE_SHARES")),
+                    "ratio": _opt_float(r.get("FREE_RATIO")),
+                }
+            )
+        return {
+            "start": s,
+            "end": e,
+            "source": self.name,
+            "events": events,
+            "truncated": truncated,
+        }
+
+    def get_board_rank(
+        self,
+        kind: str = "concept",
+        *,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """Current EM board ranking by main net inflow (push2 ``clist``).
+
+        **Snapshot only** (no date parameter): ``updated_at`` is the vendor
+        update time (Asia/Shanghai), callers must check it against their asof
+        before using it as point-in-time data. ``change_pct`` is decimal; nets 元.
+        """
+        if kind not in _BOARD_RANK_FS:
+            raise ValueError(f"board kind must be one of {sorted(_BOARD_RANK_FS)}, got {kind!r}")
+        size = max(1, min(int(limit), 100))  # clist caps a page at 100 rows
+        payload = self._fetch(
+            BOARD_RANK_URL,
+            {
+                "pn": "1",
+                "pz": str(size),
+                "po": "1",
+                "np": "1",
+                "fltt": "2",
+                "invt": "2",
+                "fid": "f62",
+                "fs": _BOARD_RANK_FS[kind],
+                "fields": "f3,f12,f14,f62,f124,f128,f140",
+            },
+        )
+        data = payload.get("data") or {}
+        diff = data.get("diff") or []
+        if isinstance(diff, dict):
+            diff = list(diff.values())
+        boards: list[dict[str, Any]] = []
+        latest_ts: int | None = None
+        for item in diff:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("f12") or "").strip()
+            if not code:
+                continue
+            ts = item.get("f124")
+            try:
+                ts_i = int(ts) if ts not in (None, "", "-") else None
+            except (TypeError, ValueError):
+                ts_i = None
+            if ts_i is not None:
+                latest_ts = ts_i if latest_ts is None else max(latest_ts, ts_i)
+            lead_code = str(item.get("f140") or "").strip()
+            boards.append(
+                {
+                    "code": code,
+                    "name": str(item.get("f14") or "").strip() or code,
+                    "kind": kind,
+                    "change_pct": _pct_decimal(item.get("f3")),
+                    "main_net": _opt_float(item.get("f62")),
+                    "lead_stock": lead_code if lead_code and lead_code != "-" else None,
+                    "lead_name": str(item.get("f128") or "").strip() or None,
+                }
+            )
+        updated_at = (
+            datetime.fromtimestamp(latest_ts, _CN_TZ).isoformat() if latest_ts else None
+        )
+        return {
+            "kind": kind,
+            "source": self.name,
+            "updated_at": updated_at,
+            "total": data.get("total"),
+            "boards": boards,
+        }
 
     def get_depth5(
         self,
@@ -1012,6 +1244,23 @@ def _parse_sina_finance_report(payload: dict[str, Any], *, num: int) -> list[dic
             rec[title] = it.get("item_value")
         rows.append(rec)
     return rows
+
+
+def _opt_float(value: Any) -> float | None:
+    """EM numeric field → float; ``None`` / ``"-"`` / NaN → ``None``."""
+    if value is None or value in ("", "-"):
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if out != out else out
+
+
+def _pct_decimal(value: Any) -> float | None:
+    """EM percent (``2.68`` = 2.68%) → decimal (``0.0268``)."""
+    n = _opt_float(value)
+    return None if n is None else n / 100.0
 
 
 def _parse_fund_flow_csv(line: str) -> dict[str, Any]:
