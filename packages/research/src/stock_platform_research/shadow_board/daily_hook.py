@@ -130,8 +130,20 @@ def run_shadow_board_daily(
             **hooks,
         )
         schools = payload.get("schools") or {}
+        # Independent forward ledger (isolated from recommend_decisions.jsonl).
+        perf_meta: dict[str, Any]
+        try:
+            from .performance import log_shadow_board
+
+            logged = log_shadow_board(
+                payload, shadow_dir=shadow_dir or default_shadow_dir()
+            )
+            perf_meta = {"ok": True, "logged": len(logged)}
+        except Exception as exc:  # noqa: BLE001 — ledger failure never blocks
+            perf_meta = {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
         return {
             "ok": True,
+            "performanceLedger": perf_meta,
             "status": payload.get("status"),
             "finalCount": len(payload.get("finalBoard") or []),
             "universeSize": len(universe),

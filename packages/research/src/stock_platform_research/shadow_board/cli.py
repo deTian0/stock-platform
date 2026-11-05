@@ -82,7 +82,44 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--json-out", type=Path, default=None, help="额外写一份 payload JSON")
     p.add_argument("--quiet", action="store_true", help="少打 Markdown 摘要")
+    p.add_argument(
+        "--perf-summary",
+        action="store_true",
+        help="只读：打印影子前向绩效账本摘要（A/B 两套指标，不跑终榜）",
+    )
+    p.add_argument(
+        "--settle-daily",
+        action="store_true",
+        help="结算影子账本 pending 行（引擎 market.db 日线；与主结算同一窗口/alpha 口径），不跑终榜",
+    )
     args = p.parse_args(argv)
+
+    if args.perf_summary or args.settle_daily:
+        from .performance import settle_shadow_ledger, shadow_performance_summary
+
+        shadow_dir = args.shadow_dir or default_shadow_dir()
+        if args.settle_daily:
+            from ..benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
+            from ..performance_cli import _build_settle_get_daily
+            from ..symbol_master import name_map_from_master
+
+            get_daily = _build_settle_get_daily()
+            bench = resolve_benchmark_symbol()
+            identity = resolve_benchmark_identity(
+                bench, names=name_map_from_master() or {}
+            )
+            alpha_ok = bool(identity.get("alphaAvailable", True))
+            summary = settle_shadow_ledger(
+                shadow_dir=shadow_dir,
+                get_daily=get_daily,
+                benchmark_get_daily=get_daily if alpha_ok else None,
+                benchmark_symbol=bench,
+                alpha_available=alpha_ok,
+            )
+        else:
+            summary = shadow_performance_summary(shadow_dir=shadow_dir)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return 0
 
     universe = _load_universe(args.universe)
     payload = run_shadow_board(

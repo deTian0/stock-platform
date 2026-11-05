@@ -80,6 +80,17 @@
 |------|------|
 | `local/shadow/final_board_{asof}.json` | 当日完整 payload |
 | `local/shadow/final_board.jsonl` | 追加一行（摘要 + finalBoard 计数） |
+| `local/shadow/shadow_decisions.jsonl` | 影子**前向绩效账本**（每个终榜席位一行 pending，`(date, symbol)` 幂等；空榜不落行） |
+
+### 4.1 影子前向绩效账本（`shadow_board.performance`）
+
+- 与主账本 `recommend_decisions.jsonl` 物理隔离（文件名守卫 `FORBIDDEN_BASENAMES`），**不混算**。
+- 结算复用主结算单点 `settle_pending_entries`（同一持有窗口、同一 alpha=raw−benchmark 口径），缺行情则保持 pending，不编造。
+- 行内 `setA`（确定性仲裁通过）与 `setB`（顾问排序/分数/胜率/期望）并存；摘要分别报告：
+  - 集 A：主 `compute_performance` 口径 + 分校（bySchool）；
+  - 集 B：顾问排序上半区 vs 下半区平均收益差（`topMinusBottom`）、胜率 Brier；无顾问字段 → `available=false`。
+- 入口：`run_daily_pipeline(shadow_board=True)` 自动追加 pending；`stock-platform-shadow-board --settle-daily` 结算；`--perf-summary` 只读摘要。
+- 样本 < `MIN_MEANINGFUL_SAMPLE`(20) 时 `sampleSufficient=false`，不得据此下结论。
 
 **禁止**写入：`local/recommend_decisions.jsonl`、hits 表、生产 brief picks。
 

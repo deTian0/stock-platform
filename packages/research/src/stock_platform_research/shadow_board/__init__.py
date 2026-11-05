@@ -14,6 +14,14 @@ from .ledger import (
     default_shadow_dir,
     write_shadow_ledger,
 )
+from .performance import (
+    SHADOW_PERF_FILENAME,
+    board_to_pending,
+    default_shadow_perf_path,
+    log_shadow_board,
+    settle_shadow_ledger,
+    shadow_performance_summary,
+)
 from .pipeline import run_shadow_board
 from .reasons import (
     BANNED_PHRASES,
@@ -43,4 +51,10 @@ __all__ = [
     "run_shadow_board",
     "shadow_board_json_path",
     "write_shadow_ledger",
+    "SHADOW_PERF_FILENAME",
+    "board_to_pending",
+    "default_shadow_perf_path",
+    "log_shadow_board",
+    "settle_shadow_ledger",
+    "shadow_performance_summary",
 ]
