@@ -8,7 +8,7 @@
 | 命令 | 用途 | 读 local/.env |
 |------|------|---------------|
 | `stock-platform-init` | 初始化 `local/` 运行时配置行 | 是 |
-| `stock-platform-shadow-board` | 多策略影子 Final Board（五校→硬 Round2→只写 `local/shadow/`；不改出厂） | 是（`--universe` JSON） |
+| `stock-platform-shadow-board` | 多策略影子 Final Board（五校→硬 Round2→只写 `local/shadow/`；不改出厂；`--perf-summary` / `--settle-daily` 前向账本；`--backtest` 历史对照 lvrev） | 是（`--universe` JSON；`--backtest` 读 market.db） |
 | `stock-platform-daily` | 日更流水线 | 是 |
 | `stock-platform-brief` | 只建 brief | 是 |
 | `stock-platform-digest` | 盘前/盘后简报 | 是 |

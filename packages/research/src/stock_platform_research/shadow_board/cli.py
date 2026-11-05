@@ -51,6 +51,90 @@ def _render_summary(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _index_close(db: str, start: str, end: str, code: str = "000300.SH") -> dict[str, float]:
+    """Read-only benchmark closes from ``daily_price``; empty when the index is absent."""
+    import sqlite3
+
+    uri = "file:%s?mode=ro" % str(db).replace("\\", "/")
+    con = sqlite3.connect(uri, uri=True)
+    try:
+        rows = con.execute(
+            "SELECT date, close FROM daily_price WHERE code=? AND date>=? AND date<=?",
+            (code, start, end),
+        ).fetchall()
+    finally:
+        con.close()
+    return {str(d)[:10]: float(c) for d, c in rows if c is not None}
+
+
+def _run_backtest(args: argparse.Namespace) -> int:
+    """Walk-forward shadow Final Board vs lvrev over a read-only ``market.db``."""
+    import os
+    from datetime import date, timedelta
+
+    from ..adoption_gate_cli import _last_bar_date
+    from ..backtest_cli import (
+        ENV_DB,
+        filter_universe,
+        load_engine_bars,
+        load_engine_industry,
+        load_engine_names,
+    )
+    from ..book_replay import ReplayParams
+    from .backtest import (
+        compare_shadow_vs_lvrev,
+        prepare_shadow_frame,
+        render_shadow_backtest_markdown,
+    )
+
+    db = (args.db or os.environ.get(ENV_DB, "")).strip()
+    if not db or not Path(db).is_file():
+        print(f"[fail] market.db 不可用：{db or '未设置 ' + ENV_DB}", file=sys.stderr)
+        return 2
+    end = (args.end or "").strip() or _last_bar_date(db)
+    if not end:
+        print("[fail] daily_price 无数据", file=sys.stderr)
+        return 2
+    load_start = (date.fromisoformat(args.start) - timedelta(days=180)).isoformat()
+    print(f"[db] {db}  区间 {args.start}~{end}（预热自 {load_start}）", file=sys.stderr)
+
+    bars = filter_universe(load_engine_bars(db, start=load_start, end=end, with_amount=True))
+    if bars.empty:
+        print("[fail] 区间内无行情", file=sys.stderr)
+        return 2
+    try:
+        industry = load_engine_industry(db)
+    except KeyError:
+        industry = None
+    names = load_engine_names(db)
+    print(f"[load] rows={len(bars)} names={len(names)} industry={len(industry or {})}", file=sys.stderr)
+
+    feats = prepare_shadow_frame(bars, start=args.start, end=end, industry_map=industry)
+    payload = compare_shadow_vs_lvrev(
+        feats,
+        name_map=names,
+        params=ReplayParams(
+            initial_capital=args.initial_capital, max_positions=args.max_positions
+        ),
+        top_k=args.top_k,
+        index_close=_index_close(db, args.start, end) or None,
+    )
+    if not payload.get("ok"):
+        print(f"[fail] {payload.get('reason')}", file=sys.stderr)
+        return 2
+    payload["db"] = str(db)
+    md = render_shadow_backtest_markdown(payload)
+    print(md)
+    out_dir = Path(args.bt_out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "shadow_backtest.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
+    (out_dir / "shadow_backtest.md").write_text(md, encoding="utf-8")
+    print(f"[write] {out_dir}", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     p = argparse.ArgumentParser(
@@ -92,7 +176,26 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="结算影子账本 pending 行（引擎 market.db 日线；与主结算同一窗口/alpha 口径），不跑终榜",
     )
+    p.add_argument(
+        "--backtest",
+        action="store_true",
+        help="历史 walk-forward 回测：影子终榜 vs lvrev 基线（同一 book_replay 引擎；只读 market.db）",
+    )
+    p.add_argument("--db", default=None, help="market.db 路径（默认 $STOCK_PLATFORM_ENGINE_MARKET_DB）")
+    p.add_argument("--start", default="2024-01-01", help="回测起点 YYYY-MM-DD")
+    p.add_argument("--end", default=None, help="回测终点（默认库内最后交易日）")
+    p.add_argument("--initial-capital", type=float, default=50000.0)
+    p.add_argument("--max-positions", type=int, default=15)
+    p.add_argument(
+        "--bt-out-dir",
+        type=Path,
+        default=Path("local/shadow/backtest"),
+        help="回测产物目录（默认 local/shadow/backtest，不提交）",
+    )
     args = p.parse_args(argv)
+
+    if args.backtest:
+        return _run_backtest(args)
 
     if args.perf_summary or args.settle_daily:
         from .performance import settle_shadow_ledger, shadow_performance_summary

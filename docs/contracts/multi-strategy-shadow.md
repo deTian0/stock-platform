@@ -94,6 +94,14 @@
 
 **禁止**写入：`local/recommend_decisions.jsonl`、hits 表、生产 brief picks。
 
+### 4.2 历史 walk-forward 回测（`shadow_board.backtest`）
+
+- 入口：`stock-platform-shadow-board --backtest --start YYYY-MM-DD [--end ...] [--db ...] [--bt-out-dir local/shadow/backtest]`（只读 `market.db`，产物不提交）。
+- 同一引擎：影子终榜与 lvrev 基线都走 `book_replay.replay_book`（X4 单点），T+1 / 涨跌停 / 冷静期 / 成本口径与主回测一致；差异只在 entry provider。
+- 无未来函数：每个交易日只用截至当日的截面（`compute_features` 为 PIT-safe），逐日调用与日循环相同的 `run_round1` → `apply_round2_set_a`。
+- 报告：总收益 / 年化 / 超额（沪深300，缺则 `None`）/ 回撤 / 夏普 / 胜率 / 笔数 / 换手 / 空榜比例 / 分校覆盖，`delta = 影子 − lvrev`。
+- 已知限制（写入报告 `limitations`）：`name`/`industry` 取 fundamentals 当前快照（非 PIT）；S2 无历史 DI → 恒空池；S5 走流动性薄规则；仅回放集 A，集 B / LLM 不进回测。
+
 ## 5. digest 只读附录（可选）
 
 若存在 `local/shadow/final_board_{asof}.json`（或 `STOCK_PLATFORM_SHADOW_DIR`），盘前/盘后 digest 在「绩效台账」后追加 **附录 · 影子 Final Board（只读）**；文件缺失则**整段省略**（不 pad、不编造）。不改 picks / 同花顺导入语义。
