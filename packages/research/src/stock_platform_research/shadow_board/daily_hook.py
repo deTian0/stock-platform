@@ -120,6 +120,23 @@ def run_shadow_board_daily(
         universe = panel_to_shadow_universe(
             panel, name_map=name_map, industry_map=industry_map
         )
+        # S2-P1: daily event/theme snapshot (em_get, budgeted, fail-soft). Explicit
+        # caller hooks win; the snapshot only fills S2 hooks the caller left unset.
+        s2_meta: dict[str, Any]
+        try:
+            from .s2_snapshot import (
+                collect_s2_snapshot,
+                s2_hooks_from_snapshot,
+                s2_snapshot_summary,
+            )
+
+            snap = collect_s2_snapshot(asof, shadow_dir=shadow_dir or default_shadow_dir())
+            for key, value in s2_hooks_from_snapshot(snap).items():
+                if hooks.get(key) is None:
+                    hooks[key] = value
+            s2_meta = s2_snapshot_summary(snap)
+        except Exception as exc:  # noqa: BLE001 — S2 snapshot never blocks
+            s2_meta = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"[:300]}
         payload = run_shadow_board(
             universe,
             asof=asof,
@@ -155,6 +172,11 @@ def run_shadow_board_daily(
                 for sid, pool in schools.items()
             },
             "ledgerPath": payload.get("ledgerPath"),
+            "s2Snapshot": {
+                **s2_meta,
+                "s2PoolStatus": (schools.get("S2") or {}).get("status"),
+                "s2Candidates": len((schools.get("S2") or {}).get("candidates") or []),
+            },
             "excludedFromPerformance": True,
             "shadowOnly": True,
         }

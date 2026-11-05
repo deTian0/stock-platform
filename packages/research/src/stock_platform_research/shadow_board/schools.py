@@ -420,13 +420,39 @@ def school_s2_theme(
     sector_fund_flow: ProviderLike = None,
     lhb: ProviderLike = None,
     unlock: ProviderLike = None,
+    s2_snapshot_meta: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     """Event/theme: DI concept_blocks / sector_fund_flow / lhb / unlock; empty if absent.
 
     Signals are advisory for the shadow chain only — not admitted to ``FACTOR_LIBRARY`` /
-    production ``W_DEFAULT``.
+    production ``W_DEFAULT``. ``s2_snapshot_meta`` (S2-P1 daily snapshot summary) is
+    only echoed into the pool for observability; it never adds candidates itself.
     """
+    pool = _school_s2_theme_core(
+        universe,
+        top_k=top_k,
+        concept_blocks=concept_blocks,
+        sector_fund_flow=sector_fund_flow,
+        lhb=lhb,
+        unlock=unlock,
+        s2_snapshot_meta=s2_snapshot_meta,
+    )
+    if s2_snapshot_meta is not None:
+        pool["snapshot"] = dict(s2_snapshot_meta)
+    return pool
+
+
+def _school_s2_theme_core(
+    universe: Sequence[Mapping[str, Any]] | None,
+    *,
+    top_k: int,
+    concept_blocks: ProviderLike,
+    sector_fund_flow: ProviderLike,
+    lhb: ProviderLike,
+    unlock: ProviderLike,
+    s2_snapshot_meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
     rows = [r for r in (universe or []) if isinstance(r, Mapping)]
     if (
         concept_blocks is None
@@ -434,6 +460,13 @@ def school_s2_theme(
         and lhb is None
         and unlock is None
     ):
+        if s2_snapshot_meta is not None:
+            snap_status = str(s2_snapshot_meta.get("status") or "missing")
+            return _empty(
+                "S2",
+                f"S2 当日快照 status={snap_status}，无 PIT 可用信号"
+                "（龙虎榜/板块排名/解禁均缺或非当日）；fail-closed 空池",
+            )
         return _empty(
             "S2",
             "未注入主题/事件 provider（concept_blocks / sector_fund_flow / lhb / unlock）；"
