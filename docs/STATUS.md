@@ -30,7 +30,8 @@
 
 下一组里程碑与技术方案：[`plans/next-milestones-t3-cli-y2-fix-r5.md`](plans/next-milestones-t3-cli-y2-fix-r5.md)。
 
-建议顺序：F1 / T3 / A1 / R5-P 代码已落（不打小 tag）→ 累计发版 **`v4.14.0`**；下一刀 **Y2**（须人工签核；无 `adopt` 不开工）。
+建议顺序：F1 / T3 / A1 / R5-P 代码已落（不打小 tag）→ 累计发版 **`v4.14.0`**。  
+**Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
 
 ## v4.13 已落地
 
