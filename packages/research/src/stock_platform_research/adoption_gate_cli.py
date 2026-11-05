@@ -31,15 +31,24 @@ from .adoption_gate import (
     DEFAULT_WINDOW_COUNT,
     DEFAULT_WINDOW_WARMUP_DAYS,
     DEFAULT_WINDOW_YEARS,
+    SHADOW_CANDIDATE_SPEC,
     AdoptionRule,
+    CandidateSpec,
     build_windows,
     evaluate_adoption,
     render_adoption_markdown,
 )
-from .backtest import UNIVERSES, prepare_book_frame
-from .backtest_cli import ENV_DB, filter_universe, load_engine_bars, load_engine_industry
+from .backtest import UNIVERSES
+from .backtest_cli import (
+    ENV_DB,
+    filter_universe,
+    load_engine_bars,
+    load_engine_industry,
+    load_engine_names,
+)
 from .book_replay import ReplayParams
 from .dotenv import load_dotenv
+from .shadow_board.backtest import prepare_shadow_frame
 
 
 def _last_bar_date(db_path: str) -> str | None:
@@ -78,23 +87,35 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", default=None, help="Markdown 输出路径（默认 <out-dir>/adoption_gate.md）")
     p.add_argument("--html-out", default=None, help="HTML 输出路径（默认 <out-dir>/adoption_gate.html）")
     p.add_argument("--no-write", action="store_true", help="只打印，不落盘")
+    p.add_argument(
+        "--include-shadow",
+        action="store_true",
+        help=(
+            "额外把多策略影子终榜（ADR 0093）作为 Y1 候选加入裁决（逐日 Round1，较慢）；"
+            "默认不含，不影响既有候选的裁决结果"
+        ),
+    )
     return p
 
 
-def _resolve_candidates(raw: str):
+def _resolve_candidates(raw: str, *, include_shadow: bool = False) -> list[CandidateSpec]:
     raw = (raw or "").strip()
     if not raw:
-        return list(DEFAULT_CANDIDATES)
-    if raw.lower() == "none":
-        return []
-    names = [n.strip() for n in raw.split(",") if n.strip()]
-    unknown = [n for n in names if n not in CANDIDATE_REGISTRY]
-    if unknown:
-        raise SystemExit(
-            f"unknown candidate(s): {', '.join(unknown)} — available: "
-            f"{', '.join(CANDIDATE_REGISTRY)}"
-        )
-    return [CANDIDATE_REGISTRY[n] for n in names]
+        out = list(DEFAULT_CANDIDATES)
+    elif raw.lower() == "none":
+        out = []
+    else:
+        names = [n.strip() for n in raw.split(",") if n.strip()]
+        unknown = [n for n in names if n not in CANDIDATE_REGISTRY]
+        if unknown:
+            raise SystemExit(
+                f"unknown candidate(s): {', '.join(unknown)} — available: "
+                f"{', '.join(CANDIDATE_REGISTRY)}"
+            )
+        out = [CANDIDATE_REGISTRY[n] for n in names]
+    if include_shadow:
+        out = [*out, SHADOW_CANDIDATE_SPEC]
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -132,7 +153,9 @@ def main(argv: list[str] | None = None) -> int:
         " | ".join(f"{w['label']}:{w['start']}~{w['end']}" for w in windows),
         file=sys.stderr,
     )
-    bars = filter_universe(load_engine_bars(db, start=load_start, end=end_date))
+    bars = filter_universe(
+        load_engine_bars(db, start=load_start, end=end_date, with_amount=args.include_shadow)
+    )
     print(f"[load] rows={len(bars)} codes={bars['code'].nunique()} (warmup from {load_start})", file=sys.stderr)
     if bars.empty:
         print("[fail] no bars in range", file=sys.stderr)
@@ -145,7 +168,11 @@ def main(argv: list[str] | None = None) -> int:
         industry = None
     print(f"[industry] codes={len(industry or {})}", file=sys.stderr)
 
-    feats = prepare_book_frame(bars, universe=args.universe, industry_map=industry)
+    # ``prepare_shadow_frame`` is a superset of ``prepare_book_frame`` (adds
+    # ``amount``/``rs20`` on top of the same features + universe + window
+    # filter), so the screener candidates run unchanged whether or not
+    # ``--include-shadow`` is set — one frame for every candidate (``X4``).
+    feats = prepare_shadow_frame(bars, universe=args.universe, industry_map=industry)
     if feats.empty:
         print("[fail] empty feature frame", file=sys.stderr)
         return 2
@@ -167,7 +194,15 @@ def main(argv: list[str] | None = None) -> int:
         require_all_windows=not args.any_window,
     )
     params = ReplayParams(initial_capital=args.initial_capital, max_positions=args.max_positions)
-    candidates = _resolve_candidates(args.candidates)
+    candidates = _resolve_candidates(args.candidates, include_shadow=args.include_shadow)
+    if args.include_shadow:
+        names = load_engine_names(db)
+        print(f"[shadow] names={len(names)}（纳入影子终榜候选，逐日 Round1 较慢）", file=sys.stderr)
+        from dataclasses import replace as _dc_replace
+
+        candidates = [
+            _dc_replace(c, name_map=names) if c.engine == "shadow" else c for c in candidates
+        ]
 
     payload = evaluate_adoption(
         feats,

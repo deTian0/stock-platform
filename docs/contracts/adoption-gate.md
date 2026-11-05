@@ -64,6 +64,11 @@ class CandidateSpec:
 | `BASELINE_SPEC` | 生产基线：`min_pick_score=0.80`、无中性化；**不是**候选（不在注册表内） |
 | `DEFAULT_CANDIDATES` | `neutralized` / `neutralized_capped`（+`max_per_industry=3`）/ `gate_070` / `neutralized_capped_gate_070` |
 | `CANDIDATE_REGISTRY` | `name → CandidateSpec` 映射（CLI `--candidates` 按名引用） |
+| `SHADOW_CANDIDATE_SPEC` | 多策略影子终榜（ADR 0093，`engine="shadow"`）；**opt-in**，不在 `DEFAULT_CANDIDATES` / `CANDIDATE_REGISTRY`，CLI `--include-shadow` 才加入 |
+
+#### 3.1 `engine` 字段（ADR 0093 增补）
+
+`CandidateSpec.engine ∈ {"screener"（默认，lvrev TopN）, "shadow"（多策略终榜）}`；`name_map`（`code → 中文名`，供 ST 闸）是数据而非旋钮，不进 `to_summary()`。两种引擎都走同一 `book_replay.replay_book`，基线与窗口切分逻辑不变。`shadow` 候选需要含 `amount` / `rs20` 的帧（`shadow_board.backtest.prepare_shadow_frame`，为 `prepare_book_frame` 的超集，screener 候选可原样复用）。通过闸门仅产出**建议**，Y2 仍为独立人工签核；默认不加入，不影响既有候选裁决。
 
 ## 4. 窗口
 
@@ -133,7 +138,7 @@ class CandidateSpec:
 
 ### 5.3 `run_candidate(feats, spec, *, params=None)`
 
-把单个 `CandidateSpec` 经 `run_neutralization_book` 跑一遍，返回
+把单个 `CandidateSpec` 经 `run_neutralization_book`（`engine="shadow"` 时经 `shadow_board.backtest.run_shadow_book`）跑一遍，返回
 `{metrics, review, tradeCount, finalEquity, nDays}`。
 
 ### 5.4 `evaluate_adoption(feats, *, baseline, candidates, windows, rule, params, generated_at)`

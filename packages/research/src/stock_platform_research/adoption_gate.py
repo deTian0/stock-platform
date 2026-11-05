@@ -31,7 +31,7 @@ SIMULATE only；不构成投资建议。
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from typing import Any, Mapping, Sequence
 
@@ -102,10 +102,16 @@ class CandidateSpec:
     reversal_q: float | None = None
     weights: Mapping[str, float] | None = None
     gate_params: Any = None
+    #: ``"screener"`` (lvrev TopN, default) | ``"shadow"`` (multi-strategy Final Board,
+    #: ADR 0093). Both run through the same ``book_replay`` loop.
+    engine: str = "screener"
+    #: ``code -> 中文名`` for the shadow ST filter (data, not a knob; never serialised).
+    name_map: Mapping[str, str] | None = field(default=None, compare=False, repr=False)
 
     def to_summary(self) -> dict[str, Any]:
         """JSON-safe description (``NeutralizeParams`` expanded, weights copied)."""
         return {
+            "engine": self.engine,
             "name": self.name,
             "label": self.label,
             "description": self.description,
@@ -183,6 +189,19 @@ CANDIDATE_REGISTRY: dict[str, CandidateSpec] = {
     spec.name: spec for spec in DEFAULT_CANDIDATES
 }
 
+#: Multi-strategy shadow Final Board (ADR 0093) as a Y1 candidate. **Opt-in only**:
+#: it is deliberately *not* in ``DEFAULT_CANDIDATES`` / ``CANDIDATE_REGISTRY`` because
+#: it needs an ``amount``/``rs20`` frame (``shadow_board.backtest.prepare_shadow_frame``)
+#: and a slow per-session Round1. Enable with ``stock-platform-strategy-adoption
+#: --include-shadow``. Passing the gate only yields a *recommendation*; Y2 stays manual.
+SHADOW_CANDIDATE_NAME = "shadow_board"
+SHADOW_CANDIDATE_SPEC = CandidateSpec(
+    name=SHADOW_CANDIDATE_NAME,
+    label="多策略影子终榜",
+    description="五校 Round1 → 硬闸集 A 终榜（ADR 0093），同一 book_replay 引擎逐日 walk-forward。",
+    engine="shadow",
+)
+
 
 # --------------------------------------------------------------------------- #
 # Windows
@@ -236,6 +255,20 @@ def run_candidate(
     params: Any = None,
 ) -> dict[str, Any]:
     """Replay one :class:`CandidateSpec` through the shared loop; return its block."""
+    if spec.engine == "shadow":
+        from .shadow_board.backtest import run_shadow_book
+
+        book = run_shadow_book(feats, name_map=spec.name_map, params=params)
+        return {
+            "metrics": book["metrics"],
+            "review": book["review"],
+            "tradeCount": book["tradeCount"],
+            "finalEquity": book["finalEquity"],
+            "nDays": book["nDays"],
+            "shadow": book.get("shadow"),
+        }
+    if spec.engine != "screener":
+        raise ValueError(f"unknown candidate engine: {spec.engine!r}")
     neutralize = None
     if spec.neutralize:
         neutralize = spec.neutralize_params or NeutralizeParams()
@@ -622,6 +655,8 @@ __all__ = [
     "DEFAULT_WINDOW_WARMUP_DAYS",
     "DEFAULT_WINDOW_YEARS",
     "CandidateSpec",
+    "SHADOW_CANDIDATE_NAME",
+    "SHADOW_CANDIDATE_SPEC",
     "VERDICT_ADOPT",
     "VERDICT_INSUFFICIENT",
     "VERDICT_REJECT",
