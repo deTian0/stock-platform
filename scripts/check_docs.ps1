@@ -146,6 +146,7 @@ $required = @(
   'docs/plans/llm-vs-deterministic-boundary.md',
   'docs/plans/next-milestones-t3-cli-y2-fix-r5.md',
   'docs/plans/multi-strategy-final-board.md',
+  'docs/plans/s2-event-theme-data.md',
   'docs/ops/local-runtime.md',
   'docs/archive/README.md',
   'docs/archive/handoffs/handoff-v4.2.0.md',

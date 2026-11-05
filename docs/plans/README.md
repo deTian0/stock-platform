@@ -21,7 +21,8 @@
 | [opensource-sanitization.md](opensource-sanitization.md) | 开源化前的私密收束（脱敏、`local/`、配置、tag、历史身份）。平行准备线，不替代下一刀 `T3` | **本地收束 + 远端历史消毒已执行；公开开源发布仍延后** |
 | [llm-vs-deterministic-boundary.md](llm-vs-deterministic-boundary.md) | LLM vs 确定性主链边界（实测路径 + 包/导入收口） | **第一刀 done**（ADR [`0088`](../architecture/0088-llm-sidecar-package-boundary.md)）；提供商见 ADR [`0089`](../architecture/0089-llm-provider-selection.md) |
 | [next-milestones-t3-cli-y2-fix-r5.md](next-milestones-t3-cli-y2-fix-r5.md) | F1 · T3 · A1 · R5-P · Y2 | F1/T3/A1/R5-P 代码已落；**Y2** 等签核；全量 R5 等生产回补 |
-| [multi-strategy-final-board.md](multi-strategy-final-board.md) | 多策略五校 → 硬 Round2 → Final Board → **仅影子账本**；双轨仲裁 A/B；升级走 Y1→Y2 | **MVP 已落**（ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；S1/S2/S5 stub；不改出厂） |
+| [multi-strategy-final-board.md](multi-strategy-final-board.md) | 多策略五校 → 硬 Round2 → Final Board → **仅影子账本**；双轨仲裁 A/B；升级走 Y1→Y2 | **MVP 已落**（ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；S1/S2/S5 stub；不改出厂）；§11 记录 S1/S5 仲裁偏置（待签核） |
+| [s2-event-theme-data.md](s2-event-theme-data.md) | S2 事件/主题数据源盘点（PIT 可回放 vs 仅当日截面）与分阶段接入 | 规划（未实现抓取） |
 
 ## 与其它文档的关系
 
