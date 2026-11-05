@@ -8,32 +8,9 @@ from typing import Any, Mapping, Sequence  # Any used for optional DI hooks
 
 from .advisory import advisory_set_b
 from .ledger import write_shadow_ledger
+from .reasons import REQUIRED_REASON_FIELDS, ReasonProvider, apply_reason_policy
 from .round2 import apply_round2_set_a
 from .schools import run_round1
-
-REQUIRED_REASON_FIELDS = ("holdingPeriod", "trigger", "expectation", "invalidation")
-
-
-def _validate_structured_reasons(
-    rows: Sequence[Mapping[str, Any]],
-    *,
-    llm_path: bool,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Keep rows with required fields; on LLM path missing fields → degrade drop."""
-    kept: list[dict[str, Any]] = []
-    degraded: list[dict[str, Any]] = []
-    for row in rows:
-        missing = [f for f in REQUIRED_REASON_FIELDS if not str(row.get(f) or "").strip()]
-        if missing:
-            item = dict(row)
-            item["degradeReason"] = f"结构化理由缺字段: {', '.join(missing)}"
-            degraded.append(item)
-            if llm_path:
-                continue
-            # Rule-only MVP should already fill fields; still fail-closed if not.
-            continue
-        kept.append(dict(row))
-    return kept, degraded
 
 
 def run_shadow_board(
@@ -45,6 +22,7 @@ def run_shadow_board(
     write: bool = True,
     enable_advisory_b: bool = False,
     llm_path: bool = False,
+    reason_provider: ReasonProvider | Mapping[str, Mapping[str, Any]] | None = None,
     regime: Mapping[str, bool] | None = None,
     index_bars: Sequence[Mapping[str, Any]] | None = None,
     concept_blocks: Any = None,
@@ -69,12 +47,19 @@ def run_shadow_board(
     )
     round2 = apply_round2_set_a(schools)
     passed = list(round2.get("passed") or [])
-    final, degraded = _validate_structured_reasons(passed, llm_path=llm_path)
+    # LLM reasons (if injected) may only rewrite the text of names Set A already
+    # passed; invalid / vacuous LLM text falls back to the deterministic reason.
+    final, degraded, reason_stats = apply_reason_policy(
+        passed, reason_provider=reason_provider
+    )
     advisory = advisory_set_b(final, enable=enable_advisory_b)
 
-    if final:
+    llm_degraded = bool(reason_stats.get("llmFallback"))
+    if final and not llm_degraded:
         status = "ok"
-    elif degraded and llm_path:
+    elif final and llm_degraded:
+        status = "degraded"
+    elif degraded and (llm_path or reason_provider is not None):
         status = "degraded"
     else:
         status = "empty"
@@ -91,6 +76,7 @@ def run_shadow_board(
         "advisoryB": advisory,
         "finalBoard": final,
         "degradedReasons": degraded,
+        "reasonStats": reason_stats,
         "notes": [
             "影子链产物；不写生产 picks / hits / 主绩效 JSONL",
             "升级须经 Y1 采纳闸门 → 人工签核 → Y2；禁止跳过",

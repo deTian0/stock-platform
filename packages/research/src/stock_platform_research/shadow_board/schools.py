@@ -97,8 +97,11 @@ def _candidate(
         "industry": industry,
         "holdingPeriod": _HOLDING.get(school, "5–10 交易日"),
         "trigger": reason_seed,
-        "expectation": f"相对同校池在评分窗口内排名靠前（规则预期；学校 {school}）",
-        "invalidation": "跌破硬闸条件，或评分所需字段缺失 / 学校池撤销",
+        "expectation": (
+            f"{_HOLDING.get(school, '5–10 交易日')}内收益不低于同校池中位数"
+            f"（规则预期；学校 {school}）"
+        ),
+        "invalidation": "收盘跌破 MA20 或触发硬闸（ST/成交额低于 1000 万/涨停封板），或学校池撤销",
         "excludedFromPerformance": True,
         "sourceFields": {k: row.get(k) for k in keep_keys if k in row},
     }

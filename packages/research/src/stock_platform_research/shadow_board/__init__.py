@@ -15,10 +15,22 @@ from .ledger import (
     write_shadow_ledger,
 )
 from .pipeline import run_shadow_board
+from .reasons import (
+    BANNED_PHRASES,
+    LLM_REASON_SCHEMA,
+    apply_reason_policy,
+    build_reason_prompt,
+    validate_reason,
+)
 from .round2 import SCHOOL_PRIORITY, apply_round2_set_a
 from .schools import SCHOOL_IDS, run_round1
 
 __all__ = [
+    "BANNED_PHRASES",
+    "LLM_REASON_SCHEMA",
+    "apply_reason_policy",
+    "build_reason_prompt",
+    "validate_reason",
     "DEFAULT_SHADOW_DIR",
     "ENV_SHADOW_DIR",
     "SCHOOL_IDS",
