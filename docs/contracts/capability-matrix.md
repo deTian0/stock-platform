@@ -78,6 +78,17 @@ CapabilityStatus {
 
 返回含 `truncated`（分页上限截断）/ `updated_at`（板块排名）供调用方判定；fail-closed 由调用方处理（S2 快照 fail-soft 记 `sources.*.status`）。
 
+## 补充行情库（ADR 0095，非路由能力）
+
+`stock_platform_providers.aux_market` 经 `em_get` 拉 push2his `kline/get`（`klt=101`、`fqt=0`），写平台自有 `local/aux_market/aux_market.db`。**不**进入上表能力清单与 `build_capability_matrix` 路由，不影响 `usable` 探测。
+
+| 方法 | 内容 | secid | 校验 | 单位 |
+|------|------|-------|------|------|
+| 指数日线 | `000300` / `000905` / `000852` / `000016` / `399006` | 指数表：`1.000xxx`、`0.399xxx`（**不**用个股 `em_secid`） | `data.code` 一致 + `data.name` 命中指数别名，否则拒写 | OHLC 原始价；`vol` 手；`amount` 元；`pct_chg` 小数 |
+| 个股 OHLC | 调用方传入代码列表（默认不全市场） | `em_secid` | `data.code` 一致 | 同上 |
+
+每日逻辑请求预算 `STOCK_PLATFORM_AUX_MARKET_EM_BUDGET`（默认 60）；单代码失败 fail-soft。
+
 ## 插件失败隔离
 
 加载失败不得拖垮未启用插件的主流程；失败源不得出现在该能力的 `candidates` 正向列表（可进 `pending`）。

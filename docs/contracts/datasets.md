@@ -277,6 +277,21 @@ PIT：`lhb` 盘后公布，仅可用于 asof 次日入场；板块排名仅 `pit
 | `setB` | `advisoryRank`、`advisoryScore`、`winRate`、`expectedReturn`（**小数**；无顾问为 `null`） |
 | `excludedFromPerformance` / `shadowOnly` | 恒 `true`；不并入主绩效 |
 
+## 补充行情库（平台自有 SQLite，ADR 0095）
+
+路径默认 `local/aux_market/aux_market.db`（`STOCK_PLATFORM_AUX_MARKET_DB` 覆盖），**不是** `market.db`，不提交。写入方唯一：`stock_platform_providers.aux_market.sync_aux_market`（CLI `stock-platform-aux-market`）；东财经 `em_get`。读方：`aux_market.read_index_closes` / `read_ohlc`（`mode=ro`，缺库返回 `None`）。
+
+| 表 | 主键 | 字段 |
+|----|------|------|
+| `index_daily` | `(code, date)` | `code`（裸 6 位，如 `000905`）、`date`、`open/high/low/close`、`vol`（**手**）、`amount`（**元**）、`pct_chg`（**小数**）、`source`、`fetched_at` |
+| `stock_ohlc` | `(code, date)` | 同上；`code` 为 `XXXXXX.SH/SZ/BJ`（与 `market.db` 一致） |
+| `index_meta` | `code` | `secid`、`name`（东财返回名）、`verified_hint`（命中的别名）、`verified_at` |
+| `fetch_log` | 自增 | `run_at`、`kind`（`index`/`stock`）、`code`、`status`（`ok`/`rejected`/`failed`/`empty`/`budget_exceeded`）、`rows`、`reason` |
+| `em_budget` | `day` | Asia/Shanghai 自然日 → 已用逻辑请求数 |
+
+- 指数行**仅在名称校验通过后**写入（别名见 `benchmark.KNOWN_INDEX_NAME_HINTS` + `AUX_EXTRA_INDEX_NAME_HINTS`）；读侧再核一次。
+- 价格不复权；`vol` 单位与 `market.db.vol`（股）不同，跨库比较须 ×100。
+
 ## Enriched 层（消费侧，非 Provider 原始出口）
 
 | 主题 | 规则 |
