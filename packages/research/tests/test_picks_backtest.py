@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import multiprocessing
+
 import pandas as pd
 import pytest
 
 from stock_platform_research import backtest
+from stock_platform_research import picks_backtest as pb
 from stock_platform_research.picks_backtest import (
     append_picks_ledger,
     compare_picks_vs_screener,
@@ -267,3 +270,46 @@ def test_ledger_round_trips_into_a_replay(tmp_path):
     append_picks_ledger(path, [{"date": DAYS[70], "code": "600519.SH", "rank": 1}])
     res = run_picks_backtest(load_picks_ledger(path), BARS, min_hold=5)
     assert res["trades"], "a ledger round-trip must still be replayable"
+
+
+def test_ledger_lock_is_released_after_a_serial_append(tmp_path):
+    path = tmp_path / "picks_ledger.jsonl"
+    append_picks_ledger(path, [{"date": "2026-10-09", "code": "600519.SH"}])
+    append_picks_ledger(path, [{"date": "2026-10-09", "code": "600519.SH"}])
+    assert len(load_picks_ledger(path)) == 1
+    assert not (tmp_path / "picks_ledger.jsonl.lock").exists()
+
+
+def test_ledger_lock_timeout_is_fail_closed(tmp_path, monkeypatch):
+    path = tmp_path / "picks_ledger.jsonl"
+    lock = tmp_path / "picks_ledger.jsonl.lock"
+    lock.write_text("held-by-someone-else", encoding="ascii")
+    monkeypatch.setattr(pb, "PICK_LEDGER_LOCK_TIMEOUT_S", 0.2)
+
+    with pytest.raises(pb.PicksLedgerLockError):
+        append_picks_ledger(path, [{"date": "2026-10-09", "code": "600519.SH"}])
+
+    # nothing written, and the foreign lock is left alone (not stolen, not skipped)
+    assert not path.exists()
+    assert lock.read_text(encoding="ascii") == "held-by-someone-else"
+
+
+def _ledger_worker(path: str, rows: list[dict]) -> None:
+    """Module-level so the ``spawn`` start method can pickle it on Windows."""
+    append_picks_ledger(path, rows)
+
+
+def test_concurrent_appends_of_the_same_asof_do_not_duplicate(tmp_path):
+    path = tmp_path / "picks_ledger.jsonl"
+    rows = [{"date": "2026-10-09", "code": f"{600000 + i:06d}.SH", "rank": i + 1} for i in range(30)]
+    ctx = multiprocessing.get_context("spawn")
+    procs = [ctx.Process(target=_ledger_worker, args=(str(path), rows)) for _ in range(4)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(120)
+    assert all(p.exitcode == 0 for p in procs), [p.exitcode for p in procs]
+
+    keys = [(r["date"], r["code"]) for r in load_picks_ledger(path)]
+    assert len(keys) == len(set(keys)) == 30
+    assert not (tmp_path / "picks_ledger.jsonl.lock").exists()
