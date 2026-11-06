@@ -54,6 +54,18 @@ POOLS: tuple[str, ...] = ("S3", "S4", "S5", "S4inv", "S5amt", "RANDOM")
 S5_SATURATION_AMOUNT = 8e8
 DEFAULT_OUT_DIR = Path("local/shadow/diagnostics")
 
+#: E1 short-term-reversal candidate (pre-registered in shadow-s4-s5-diagnosis §8; not searched).
+E1_AMOUNT_MIN = 5e7
+E1_POOLS: tuple[str, ...] = ("E1", "S4inv", "RANDOM")
+E1_HORIZONS: tuple[int, ...] = (1, 3, 5, 10)
+#: (label, first signal date, last signal date) — inclusive ISO strings.
+E1_SEGMENTS: tuple[tuple[str, str, str], ...] = (
+    ("2021-23", "2021-01-04", "2023-12-31"),
+    ("2024-26", "2024-01-01", "2026-11-05"),
+)
+E1_MIN_POSITIVE_YEARS = 4
+E1_MIN_NONEMPTY_SHARE = 0.5
+
 _RUNNERS = {"S3": school_s3_quality, "S4": school_s4_short, "S5": school_s5_flow}
 
 
@@ -264,6 +276,255 @@ def simulate_exits(
     out["ex_held"] = helds
     out["ex_reason"] = reasons
     return out
+
+
+def e1_pick(
+    s4_full: Sequence[Mapping[str, Any]],
+    frame: pd.DataFrame,
+    idx_by_code: Mapping[str, int],
+    *,
+    top_k: int = POOL_K,
+    amount_min: float = E1_AMOUNT_MIN,
+) -> list[tuple[str, float]]:
+    """E1 = S4 ``short`` composite **lowest first**, keep no-seal-in-5 & amount ≥ ``amount_min``.
+
+    ``s4_full`` is the full ``select_secondary(profile="short")`` ranking (best first).
+    ``_lu5`` is computed from the signal day and the 4 sessions before it (PIT).
+    Fewer than ``top_k`` survivors are kept as-is (no padding).
+    """
+    out: list[tuple[str, float]] = []
+    for r in reversed(list(s4_full)):
+        i = idx_by_code.get(str(r["code"]))
+        if i is None:
+            continue
+        row = frame.loc[i]
+        amt = pd.to_numeric(row.get("amount"), errors="coerce")
+        if bool(row["_lu5"]) or pd.isna(amt) or float(amt) < amount_min:
+            continue
+        out.append((str(r["code"]), float(r["secondaryScore"])))
+        if len(out) >= top_k:
+            break
+    return out
+
+
+def collect_e1_pools(
+    fwd: pd.DataFrame,
+    *,
+    name_map: Mapping[str, str] | None,
+    top_k: int = POOL_K,
+    seed: int = RANDOM_SEED,
+    every: int = 1,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Per-session E1 / S4inv / RANDOM pools (same cross-section as :func:`collect_pools`).
+
+    ``RANDOM`` consumes the RNG exactly like :func:`collect_pools`, so with the same
+    seed and ``every`` it draws the same names. ``days`` has one row per session with
+    ``e1_n`` (0 = empty pool) and the S4 full-composite IC as background.
+    """
+    rng = np.random.default_rng(seed)
+    cand_rows: list[dict[str, Any]] = []
+    day_rows: list[dict[str, Any]] = []
+    for di, (day, frame) in enumerate(fwd.groupby("trade_date", sort=True)):
+        if every > 1 and di % every:
+            continue
+        universe = frame_to_universe(frame, name_map=name_map)
+        if not universe:
+            continue
+        day_s = pd.Timestamp(day).date().isoformat()
+        idx_by_code = {norm_code(c): i for c, i in zip(frame["code"], frame.index)}
+        regime = s1_regime_state(universe)["state"]
+        eligible = [r["code"] for r in universe if r.get("name") and not _is_st(r["name"])]
+        elig = frame.loc[[idx_by_code[c] for c in eligible if c in idx_by_code]]
+        mkt = {h: float(elig[f"fwd_{h}"].mean()) if len(elig) else math.nan for h in E1_HORIZONS}
+
+        s4_full = _full_rank(universe, "short")
+        pools: dict[str, list[tuple[str, float]]] = {"E1": e1_pick(s4_full, frame, idx_by_code, top_k=top_k)}
+        if len(s4_full) >= 2 * top_k:
+            pools["S4inv"] = [(str(r["code"]), float(r["secondaryScore"])) for r in s4_full[-top_k:]]
+        draw = rng.permutation(len(eligible))[:top_k] if len(eligible) >= top_k else []
+        pools["RANDOM"] = [(eligible[int(i)], 0.0) for i in draw]
+
+        for pid, members in pools.items():
+            for rank, (code, score) in enumerate(members, start=1):
+                i = idx_by_code.get(code)
+                if i is None:
+                    continue
+                row = frame.loc[i]
+                rec: dict[str, Any] = {
+                    "date": day_s, "pool": pid, "rank": rank, "code": code, "row": int(i),
+                    "score": score, "regime": regime,
+                    "amount": float(row["amount"]) if pd.notna(row.get("amount")) else math.nan,
+                    "lu5": bool(row["_lu5"]),
+                }
+                for h in E1_HORIZONS:
+                    rec[f"fwd_{h}"] = float(row[f"fwd_{h}"])
+                    rec[f"mkt_{h}"] = mkt[h]
+                cand_rows.append(rec)
+
+        drow: dict[str, Any] = {"date": day_s, "regime": regime, "eligible": len(elig),
+                                "s4_scoreable": len(s4_full), "e1_n": len(pools["E1"])}
+        keep = [(r, idx_by_code.get(str(r["code"]))) for r in s4_full]
+        keep = [(r, i) for r, i in keep if i is not None]
+        if keep:
+            sub = frame.loc[[i for _, i in keep]]
+            drow["ic_s4_5"] = _spearman([float(r["secondaryScore"]) for r, _ in keep], sub["fwd_5"].to_numpy())
+        day_rows.append(drow)
+    return pd.DataFrame(cand_rows), pd.DataFrame(day_rows)
+
+
+def _segment_of(date_s: pd.Series) -> pd.Series:
+    seg = pd.Series(pd.NA, index=date_s.index, dtype="object")
+    for label, lo, hi in E1_SEGMENTS:
+        seg[(date_s >= lo) & (date_s <= hi)] = label
+    return seg
+
+
+def _e1_block(sub: pd.DataFrame) -> dict[str, Any]:
+    """Forward / excess / win / exit-sim stats of one pool slice (fractions)."""
+    blk: dict[str, Any] = {"n": int(len(sub)), "days": int(sub["date"].nunique()), "horizons": {}}
+    for h in E1_HORIZONS:
+        s = sub[sub[f"fwd_{h}"].notna()]
+        blk["horizons"][str(h)] = {
+            "n": int(len(s)),
+            "meanFwd": _f(s[f"fwd_{h}"].mean()),
+            "meanExcess": _f(s[f"ex_{h}"].mean()),
+            "winRate": _f((s[f"fwd_{h}"] > 0).mean()),
+            "excessWinRate": _f((s[f"ex_{h}"] > 0).mean()),
+            "tExcess": _tstat_daily(s, f"ex_{h}", h) if len(s) else None,
+        }
+    if "ex_net" in sub.columns:
+        closed = sub[sub["ex_reason"] != "open"]
+        blk["exitSim"] = {
+            "closed": int(len(closed)),
+            "winRate": _f((closed["ex_net"] > 0).mean()),
+            "meanNet": _f(closed["ex_net"].mean()),
+            "medianNet": _f(closed["ex_net"].median()),
+            "meanHeld": _f(closed["ex_held"].mean()),
+            "stopShare": _f((closed["ex_reason"] == "stop_loss").mean()),
+        }
+    blk["medianAmount"] = _f(sub["amount"].median())
+    return blk
+
+
+def summarize_e1(cands: pd.DataFrame, days: pd.DataFrame) -> dict[str, Any]:
+    """E1 study summary: whole / segment / year / regime blocks, capacity, IC background."""
+    c = cands.copy()
+    for h in E1_HORIZONS:
+        c[f"ex_{h}"] = c[f"fwd_{h}"] - c[f"mkt_{h}"]
+    c["year"] = c["date"].str[:4]
+    c["segment"] = _segment_of(c["date"])
+    out: dict[str, Any] = {"pools": {}}
+    for pid in E1_POOLS:
+        sub = c[c["pool"] == pid]
+        if sub.empty:
+            continue
+        blk = _e1_block(sub)
+        blk["bySegment"] = {lab: _e1_block(sub[sub["segment"] == lab]) for lab, _, _ in E1_SEGMENTS
+                            if (sub["segment"] == lab).any()}
+        blk["byYear"] = {str(y): _e1_block(g) for y, g in sub.groupby("year")}
+        s5 = sub[sub["fwd_5"].notna()]
+        blk["byRegime5"] = {
+            str(k): {"n": int(len(g)), "meanExcess": _f(g["ex_5"].mean()), "winRate": _f((g["fwd_5"] > 0).mean())}
+            for k, g in s5.groupby("regime")
+        }
+        out["pools"][pid] = blk
+    if not days.empty:
+        d = days.copy()
+        d["segment"] = _segment_of(d["date"])
+        nonempty = d["e1_n"] > 0
+        out["capacity"] = {
+            "sessions": int(len(d)),
+            "nonEmptyShare": _f(nonempty.mean()),
+            "meanPoolSize": _f(d["e1_n"].mean()),
+            "fullPoolShare": _f((d["e1_n"] >= POOL_K).mean()),
+            "nonEmptyShareBySegment": {lab: _f(nonempty[d["segment"] == lab].mean()) for lab, _, _ in E1_SEGMENTS},
+            "medianAmountE1": _f(c.loc[c["pool"] == "E1", "amount"].median()),
+            "minAmountE1": _f(c.loc[c["pool"] == "E1", "amount"].min()),
+            "lu5ShareE1": _f(c.loc[c["pool"] == "E1", "lu5"].mean()),
+        }
+        ic = pd.to_numeric(d.get("ic_s4_5"), errors="coerce").dropna()
+        if len(ic) > 1:
+            out["icS4Full5"] = {"mean": _f(ic.mean()), "ir": _f(ic.mean() / ic.std(ddof=1)),
+                                "positiveShare": _f((ic > 0).mean()), "days": int(len(ic))}
+        out["regimeDays"] = {str(k): int(v) for k, v in d["regime"].value_counts().items()}
+    out["verdict"] = e1_verdict(out)
+    return out
+
+
+def e1_verdict(summary: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply the pre-registered criteria (a)–(d); any failure (or missing data) ⇒ not passed."""
+    e1 = (summary.get("pools") or {}).get("E1") or {}
+    seg = e1.get("bySegment") or {}
+    labels = [lab for lab, _, _ in E1_SEGMENTS]
+
+    def seg_ex5(lab: str) -> float | None:
+        return _f(((seg.get(lab) or {}).get("horizons") or {}).get("5", {}).get("meanExcess"))
+
+    def seg_net(lab: str) -> float | None:
+        return _f(((seg.get(lab) or {}).get("exitSim") or {}).get("meanNet"))
+
+    years = {y: _f((b.get("horizons") or {}).get("5", {}).get("meanExcess")) for y, b in (e1.get("byYear") or {}).items()}
+    pos_years = sum(1 for v in years.values() if v is not None and v > 0)
+    cap = summary.get("capacity") or {}
+    med = _f(cap.get("medianAmountE1"))
+    share = _f(cap.get("nonEmptyShare"))
+    checks = {
+        "a_segmentExcess5": all(seg_ex5(l) is not None and seg_ex5(l) > 0 for l in labels),
+        "b_positiveYears": pos_years >= E1_MIN_POSITIVE_YEARS and len(years) == 6,
+        "c_segmentExitNet": all(seg_net(l) is not None and seg_net(l) > 0 for l in labels),
+        "d_capacity": med is not None and med >= E1_AMOUNT_MIN and share is not None and share >= E1_MIN_NONEMPTY_SHARE,
+    }
+    return {
+        "checks": checks,
+        "passed": all(checks.values()),
+        "segmentExcess5": {l: seg_ex5(l) for l in labels},
+        "segmentExitNet": {l: seg_net(l) for l in labels},
+        "yearExcess5": years,
+        "positiveYears": pos_years,
+        "medianAmount": med,
+        "nonEmptyShare": share,
+    }
+
+
+def render_e1_markdown(summary: Mapping[str, Any], meta: Mapping[str, Any] | None = None) -> str:
+    pools = summary.get("pools") or {}
+    lines = ["# E1 短期反转候选前向池研究（事先登记见 shadow-s4-s5-diagnosis §8）", ""]
+    for k, v in (meta or {}).items():
+        lines.append(f"- {k}: {v}")
+    lines += ["", "## 全区间 / 分段（h 前向；超额 = 减合格宇宙等权）", "",
+              "| 池 | 区间 | h | n | 均收益 | 均超额 | 胜率 | t(超额) |", "|----|------|---|---|--------|--------|------|---------|"]
+    for pid, blk in pools.items():
+        for lab, b in [("全区间", blk)] + list((blk.get("bySegment") or {}).items()):
+            for h, r in b["horizons"].items():
+                lines.append(f"| {pid} | {lab} | {h} | {r['n']} | {_pct(r['meanFwd'])} | {_pct(r['meanExcess'])} | "
+                             f"{_pct(r['winRate'], 1)} | {_n(r['tExcess'], 2)} |")
+    lines += ["", "## 分年 h=5 均超额 / 逐票模拟均净", ""]
+    for pid, blk in pools.items():
+        parts = [f"{y} {_pct(b['horizons']['5']['meanExcess'])} / {_pct((b.get('exitSim') or {}).get('meanNet'))}"
+                 for y, b in (blk.get("byYear") or {}).items()]
+        lines.append(f"- {pid}: " + "；".join(parts))
+    lines += ["", "## 按 regime（h=5 均超额 / 胜率）", ""]
+    for pid, blk in pools.items():
+        parts = [f"{k}: {_pct(v['meanExcess'])} / {_pct(v['winRate'], 1)} (n={v['n']})" for k, v in blk["byRegime5"].items()]
+        lines.append(f"- {pid}: " + "；".join(parts))
+    lines += ["", "## 逐票退出模拟（无席位竞争）", "",
+              "| 池 | 区间 | 已平仓 | 胜率 | 均净 | 中位净 | 均持有 | 止损占比 | 成交额中位 |",
+              "|----|------|--------|------|------|--------|--------|----------|------------|"]
+    for pid, blk in pools.items():
+        for lab, b in [("全区间", blk)] + list((blk.get("bySegment") or {}).items()):
+            x = b.get("exitSim") or {}
+            lines.append(f"| {pid} | {lab} | {x.get('closed', '-')} | {_pct(x.get('winRate'), 1)} | {_pct(x.get('meanNet'))} | "
+                         f"{_pct(x.get('medianNet'))} | {_n(x.get('meanHeld'), 1)} | {_pct(x.get('stopShare'), 1)} | "
+                         f"{_n((b.get('medianAmount') or 0) / 1e8, 2)} 亿 |")
+    cap = summary.get("capacity") or {}
+    if cap:
+        lines += ["", f"容量：{json.dumps(cap, ensure_ascii=False)}"]
+    if summary.get("icS4Full5"):
+        lines += ["", f"背景 IC（S4 全量综合分 → fwd5）：{json.dumps(summary['icS4Full5'], ensure_ascii=False)}"]
+    v = summary.get("verdict") or {}
+    lines += ["", f"## 判定：{'通过' if v.get('passed') else '不通过'}", "", f"`{json.dumps(v, ensure_ascii=False)}`",
+              "", "> 前向池研究（研究指标）；SIMULATE；不进终榜、不改学校默认。", ""]
+    return "\n".join(lines)
 
 
 def _f(v: Any) -> float | None:
@@ -477,6 +738,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--every", type=int, default=1, help="每 N 个交易日取一次截面（默认 1=每日）")
     ap.add_argument("--seed", type=int, default=RANDOM_SEED)
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    ap.add_argument("--e1", action="store_true", help="改跑 E1 短期反转候选研究（产物写 <out-dir>/e1/）")
     args = ap.parse_args(argv)
 
     db = (args.db or os.environ.get(ENV_DB, "")).strip()
@@ -499,6 +761,8 @@ def main(argv: list[str] | None = None) -> int:
     checks = _data_checks(db, bars, feats)
     print(f"[load] rows={len(feats)} checks={checks}", file=sys.stderr)
     fwd = add_forward_returns(feats)
+    if args.e1:
+        return _main_e1(fwd, feats, names, checks, args)
     cands, days = collect_pools(fwd, name_map=names, top_k=args.top_k, seed=args.seed, every=args.every)
     cands = simulate_exits(fwd, cands)
     summary = summarize(cands, days)
@@ -524,11 +788,43 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def _main_e1(fwd: pd.DataFrame, feats: pd.DataFrame, names: Any, checks: Mapping[str, Any], args: Any) -> int:
+    cands, days = collect_e1_pools(fwd, name_map=names, top_k=args.top_k, seed=args.seed, every=args.every)
+    cands = simulate_exits(fwd, cands)
+    summary = summarize_e1(cands, days)
+    summary["dataChecks"] = dict(checks)
+    meta = {
+        "区间": f"{feats['trade_date'].min().date()} ~ {feats['trade_date'].max().date()}",
+        "截面步长": args.every,
+        "top_k": args.top_k,
+        "seed": args.seed,
+        "E1 成交额下限": E1_AMOUNT_MIN,
+        "regime 天数": summary.get("regimeDays"),
+    }
+    summary["meta"] = {k: str(v) for k, v in meta.items()}
+    out = Path(args.out_dir) / "e1"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "e1_study.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    md = render_e1_markdown(summary, meta)
+    (out / "e1_study.md").write_text(md, encoding="utf-8")
+    cands.to_csv(out / "e1_candidates.csv.gz", index=False, compression="gzip")
+    days.to_csv(out / "e1_days.csv.gz", index=False, compression="gzip")
+    print(md)
+    print(f"[write] {out}", file=sys.stderr)
+    return 0
+
+
 __all__ = [
+    "E1_POOLS",
     "HORIZONS",
     "POOLS",
     "add_forward_returns",
+    "collect_e1_pools",
     "collect_pools",
+    "e1_pick",
+    "e1_verdict",
+    "render_e1_markdown",
+    "summarize_e1",
     "render_markdown",
     "simulate_exits",
     "summarize",
