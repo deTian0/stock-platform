@@ -15,6 +15,8 @@
 - **E1 短期反转候选前向池研究**（`diagnostics --e1`，只读，产物 `local/shadow/diagnostics/e1/`）：S4 综合分最低 8 只 + 近 5 日无涨停 + 成交额 ≥ 5000 万，按事先登记标准（诊断 §8）判**不通过**：2021–23 h=5 超额 −0.13%、六年仅 2 年为正、2021–23 逐票均净 −0.23%；反向池的正超额主要来自成交额 < 5000 万的小票。不进 E2、不建 S6（诊断 §9）。不改任何学校默认。
 - **S3 alpha/beta 拆解（方向 5，只读诊断）**：`stock_platform_research.shadow_board.s3_decomp` 把 S3 池日收益对沪深300 / 中证500 / 中证1000 做回归（Newey-West 标准误）；段 A 2021–23 α 年化 −19.06%（t −2.38），段 B 2024–26 +6.23%（t 0.69），全区间 t −1.04，按事先登记标准判**未证明选股 alpha**。不改学校、仲裁或默认值；产物 `local/shadow/diagnostics/s3_decomp/` 不入库（[`docs/plans/shadow-s3-decomposition.md`](docs/plans/shadow-s3-decomposition.md) §8）。
 
+- **Set B 贝叶斯先验仓位（离线实验，默认关）**：`shadow_board/bayes_sizing.py` 按学派滚动 60 笔已平仓 PIT 战绩（Beta(2,2) 先验、R0=5%、乘数 clip 0.5–1.5）调整已入榜票的买入预算；CLI `stock-platform-shadow-board --backtest --bayes-compare`。2021–2026 对照按事先登记标准**不通过**（C1/C2/C4 失败，C3 4/6），出厂默认不变（[`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.10）。
+
 ### Changed
 
 - **影子终榜 S4 / S5 下线**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md) 增补 2，用户 2026-11-06 签核）：学校启用表 `schools.DEFAULT_ENABLED_SCHOOLS=(S1,S2,S3)`，日循环影子链与 walk-forward 回测中 S4/S5 恒空池，`reason="retired: see shadow-s4-s5-diagnosis"`、`retired=true`。原实现保留；`run_round1(enabled_schools=...)` 或 `STOCK_PLATFORM_SHADOW_SCHOOLS=S1,S2,S3,S4,S5` 可重新开启（显式开启后行为与下线前一致，单测钉住）。S3 不升权，S1 维持 `pick`，仲裁维持 `d`；回测报告新增 `shadow.enabledSchools` 并在 `limitations` 注明下线学校；`loop_health.shadowBoard` 不因下线空池告警。下线后回测对照见 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.8。
