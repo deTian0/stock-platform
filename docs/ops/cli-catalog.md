@@ -18,6 +18,7 @@
 | `stock-platform-performance-proxy` | 代理台账 | 是 |
 | `stock-platform-loop-health` | 日用循环体检 | 是 |
 | `stock-platform-data-quality` | market.db 数据质量（T3） | 是 |
+| `stock-platform-aux-market` | 平台自有补充库 `local/aux_market/aux_market.db`（指数日线名称校验 + `--codes` 个股 OHLC；经 `em_get`；`--indices/--codes/--start/--end/--dry-run`；不写 market.db；ADR 0095） | 是 |
 | `stock-platform-ops-ledger` | 调度执行台账 | 是 |
 | `stock-platform-attribution` | 收益归因 | 是 |
 | `stock-platform-strategy-adoption` | 采纳闸门 | 是 |

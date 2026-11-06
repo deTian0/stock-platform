@@ -47,6 +47,7 @@ stock-platform-report-html = "stock_platform_research.report_html_cli:main"
 stock-platform-init = "stock_platform_research.init_cli:main"
 stock-platform-shadow-board = "stock_platform_research.shadow_board.cli:main"
 stock-platform-lvrev-enhancement = "stock_platform_research.lvrev_enhancement_cli:main"
+stock-platform-aux-market = "stock_platform_research.aux_market_cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
