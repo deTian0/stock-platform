@@ -41,6 +41,7 @@ from ..neutralization import attach_industry
 from ..portfolio import compute_metrics, is_etf, is_fund, norm_code
 from ..secondary_pick import AMOUNT_MIN
 from ..strategy_ab import AB_METRIC_KEYS, _delta_metrics, _review_block
+from .bayes_sizing import bayes_school_mults
 from .round2 import DEFAULT_ARBITRATION, DEFAULT_MIN_SEATS, apply_round2_set_a
 from .schools import (
     ENV_SHADOW_SCHOOLS,
@@ -276,6 +277,7 @@ def shadow_entry_provider(
     s1_mode: str = DEFAULT_S1_MODE,
     s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
     s1_scale: Mapping[str, float] | None = None,
+    bayes_sizing: bool = False,
 ) -> EntryProvider:
     """Entry provider that opens the day's shadow Final Board (Set A order).
 
@@ -370,6 +372,11 @@ def shadow_entry_provider(
             out.append({"code": str(raw_code), "close": float(px), "pct_chg": pct,
                         "school": row.get("school")})
             acc["entrySchool"].setdefault((ctx.day_index, str(raw_code)), row.get("school"))
+        if bayes_sizing and out:
+            # Set B (§11.9): per-school budget multiplier from PIT closed trades only.
+            mults = bayes_school_mults(ctx.trades, acc["entrySchool"], ctx.day_index)
+            for r in out:
+                r["slot_mult"] = mults.get(str(r["school"]), 1.0)
         return out
 
     return _provider
@@ -461,6 +468,7 @@ def run_shadow_book(
     s1_mode: str = DEFAULT_S1_MODE,
     s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
     s1_scale: Mapping[str, float] | None = None,
+    bayes_sizing: bool = False,
 ) -> dict[str, Any]:
     """Replay the shadow Final Board alone through the shared loop.
 
@@ -480,6 +488,7 @@ def run_shadow_book(
             stats=stats,
             arbitration=arbitration,
             min_seats=min_seats,
+            bayes_sizing=bayes_sizing,
         )
     else:
         provider = shadow_entry_provider(
@@ -492,12 +501,15 @@ def run_shadow_book(
             s1_mode=mode,
             s1_gate_weak=s1_gate_weak,
             s1_scale=s1_scale,
+            bayes_sizing=bayes_sizing,
         )
     loop = replay_book(feats, entry_provider=provider, params=p)
     out = _arm(loop, p.initial_capital)
     out["shadow"] = _shadow_stats_block(stats)
     out["shadow"]["schoolFills"] = _school_fills(loop, stats.get("entrySchool") or {})
     out["shadow"]["arbitration"] = arbitration
+    if bayes_sizing:
+        out["shadow"]["bayesSizing"] = True
     if arbitration == "b":
         out["shadow"]["minSeats"] = int(min_seats)
     if mode != DEFAULT_S1_MODE:

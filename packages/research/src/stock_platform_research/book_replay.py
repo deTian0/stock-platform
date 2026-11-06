@@ -89,6 +89,8 @@ class EntryContext:
     equity: float
     last_exit_idx: Mapping[str, int]
     params: ReplayParams
+    # Closed trades so far (read-only view of the loop's log; Set B sizing reads it PIT).
+    trades: Sequence[Mapping[str, Any]] = ()
 
 
 EntryProvider = Callable[[EntryContext], Sequence[EntryCandidate]]
@@ -276,6 +278,7 @@ def replay_book(
                 equity=total,
                 last_exit_idx=last_exit_idx,
                 params=p,
+                trades=trades,
             )
         )
         if not candidates:
@@ -300,7 +303,8 @@ def replay_book(
             ):
                 continue
             fill = cost_model.fill_price(px, is_buy=True)
-            budget = min(cash, slot_value)
+            # Optional per-row slot multiplier (Set B, default 1.0 → budget unchanged).
+            budget = min(cash, slot_value * float(row.get("slot_mult", 1.0)))
             shares = math.floor(budget / fill / p.lot_size) * p.lot_size
             if shares <= 0:
                 continue

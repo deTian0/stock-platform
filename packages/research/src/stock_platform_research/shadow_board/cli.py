@@ -152,6 +152,29 @@ def _run_backtest(args: argparse.Namespace) -> int:
         + ("ok" if index_close else f"unavailable：{bench_block.get('reason')}"),
         file=sys.stderr,
     )
+    if args.bayes_compare:
+        from .bayes_sizing import compare_bayes_vs_d, render_bayes_markdown
+
+        bpay = compare_bayes_vs_d(
+            feats,
+            name_map=names,
+            params=ReplayParams(
+                initial_capital=args.initial_capital, max_positions=args.max_positions
+            ),
+            top_k=args.top_k,
+            index_close=index_close,
+        )
+        bpay["db"] = str(db)
+        bmd = render_bayes_markdown(bpay)
+        print(bmd)
+        bdir = Path(args.bt_out_dir)
+        bdir.mkdir(parents=True, exist_ok=True)
+        (bdir / "bayes_sizing.json").write_text(
+            json.dumps(bpay, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+        )
+        (bdir / "bayes_sizing.md").write_text(bmd, encoding="utf-8")
+        print(f"[write] {bdir}", file=sys.stderr)
+        return 0
     payload = compare_shadow_vs_lvrev(
         feats,
         name_map=names,
@@ -277,6 +300,11 @@ def main(argv: list[str] | None = None) -> int:
         "--s1-scale",
         default=None,
         help="仅 --s1-mode scale：强,中,弱 三档仓位系数（默认 1,0.5,0；unknown 同弱）",
+    )
+    p.add_argument(
+        "--bayes-compare",
+        action="store_true",
+        help="仅 --backtest：Set B 贝叶斯先验仓位对照（D vs Set B，§11.9；产物 bayes_sizing.*）",
     )
     p.add_argument(
         "--bt-out-dir",
