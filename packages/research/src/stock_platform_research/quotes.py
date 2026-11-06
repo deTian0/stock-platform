@@ -182,7 +182,111 @@ def load_prior_closes(
     return out
 
 
+def _bars_to_intraday_last(bars: list[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Collapse minute bars → one ``{open, high, low, close}`` per symbol.
+
+    ``open`` = first bar open of the day; ``close`` = last bar close (现价);
+    ``high`` / ``low`` = day extrema across bars. Missing fields are omitted.
+    """
+    by_sym: dict[str, list[Mapping[str, Any]]] = {}
+    for bar in bars:
+        key = _sym6(bar.get("symbol"))
+        if not key:
+            continue
+        by_sym.setdefault(key, []).append(bar)
+    out: dict[str, dict[str, Any]] = {}
+    for key, rows in by_sym.items():
+        ordered = sorted(rows, key=lambda r: str(r.get("datetime") or r.get("date") or ""))
+        if not ordered:
+            continue
+        first = ordered[0]
+        last = ordered[-1]
+        cleaned: dict[str, Any] = {}
+        try:
+            cleaned["open"] = float(first.get("open"))
+        except (TypeError, ValueError):
+            pass
+        try:
+            cleaned["close"] = float(last.get("close"))
+        except (TypeError, ValueError):
+            pass
+        highs: list[float] = []
+        lows: list[float] = []
+        for row in ordered:
+            try:
+                highs.append(float(row["high"]))
+            except (TypeError, ValueError, KeyError):
+                pass
+            try:
+                lows.append(float(row["low"]))
+            except (TypeError, ValueError, KeyError):
+                pass
+        if highs:
+            cleaned["high"] = max(highs)
+        if lows:
+            cleaned["low"] = min(lows)
+        if cleaned.get("open") is not None or cleaned.get("close") is not None:
+            out[key] = cleaned
+    return out
+
+
+def _default_fetch_minute(symbols: list[str], quote_date: str) -> tuple[dict[str, dict[str, Any]], str | None]:
+    """Live path: ``AStockHttpProvider.get_minute`` (em_get)."""
+    try:
+        from datetime import date as _date
+
+        from stock_platform_providers.astock_http import AStockHttpProvider
+    except Exception as exc:  # noqa: BLE001
+        return {}, f"{type(exc).__name__}: {exc}"
+    day = _date.fromisoformat(str(quote_date)[:10])
+    try:
+        provider = AStockHttpProvider()
+        bars = list(
+            provider.get_minute(list(symbols), freq="1m", start=day, end=day) or []
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {}, f"{type(exc).__name__}: {exc}"
+    return _bars_to_intraday_last(bars), None
+
+
+def load_intraday_last(
+    symbols: list[str],
+    quote_date: str,
+    *,
+    allow_network: bool = True,
+    fetch: Callable[[list[str], str], tuple[dict[str, Any], str | None]] | None = None,
+) -> tuple[dict[str, dict[str, Any]], str | None]:
+    """Last-known intraday quote per symbol for midday digest (ADR 0096).
+
+    Returns the same three-key shape as :func:`load_ohlc` (``open`` / ``high`` /
+    ``low`` / ``close``), where ``close`` is the **last minute close** (现价),
+    not the official daily close. Fail-soft: empty dict + note on any error.
+    Does not write ``market.db``; does not invent prices.
+    """
+    wanted = [_sym6(s) for s in symbols if _sym6(s)]
+    if not wanted:
+        return {}, None
+    if not allow_network and fetch is None:
+        return {}, "分钟行情未取（allow_network=false）"
+    caller = fetch or _default_fetch_minute
+    try:
+        fetched, err = caller(wanted, str(quote_date)[:10])
+    except Exception as exc:  # noqa: BLE001
+        return {}, f"分钟行情不可用（{type(exc).__name__}: {exc}）"
+    have: dict[str, dict[str, Any]] = {}
+    for key, row in (fetched or {}).items():
+        cleaned = _clean_bar(row if isinstance(row, Mapping) else {})
+        if cleaned:
+            have[_sym6(key)] = cleaned
+    if err and not have:
+        return {}, f"分钟行情不可用（{err}）"
+    if not have:
+        return {}, err or "分钟行情不可用"
+    return have, (f"分钟行情部分失败（{err}）" if err else None)
+
+
 __all__ = [
+    "load_intraday_last",
     "load_ohlc",
     "load_prior_closes",
     "resolve_prev_close",

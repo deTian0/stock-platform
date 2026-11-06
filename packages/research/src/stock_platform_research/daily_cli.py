@@ -368,9 +368,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument(
         "--session",
-        choices=("pre", "post"),
+        choices=("pre", "post", "midday"),
         default="pre",
-        help="展示用会话（盘前 pre / 盘后 post）。不改变 asof，也不改变命中 session_type",
+        help="展示用会话（盘前 pre / 盘后 post / 午间 midday）。不改变 asof，也不改变命中 session_type",
     )
     p.add_argument(
         "--run-date",

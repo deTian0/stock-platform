@@ -317,7 +317,7 @@ def run_daily_pipeline(
             name_map=name_map,
         )
         sess = str(session or "pre").strip().lower()
-        brief["session"] = sess if sess in {"pre", "post"} else "pre"
+        brief["session"] = sess if sess in {"pre", "post", "midday"} else "pre"
         if run_date:
             brief["runDate"] = str(run_date)[:10]
             try:

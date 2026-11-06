@@ -620,6 +620,57 @@ def test_pre_and_post_files_both_remain(env):
     assert post["session"] == "post"
 
 
+def test_midday_file_keeps_pre_post_and_uses_xianjia(env):
+    """ADR 0096: midday writes its own file; table header says 现价; injected minute fetch."""
+    _save_brief(env)
+    build_digest(out_dir=env / "digests", session="pre", run_date="2026-10-09", ohlc=False)
+    build_digest(out_dir=env / "digests", session="post", run_date="2026-10-09", ohlc=False)
+
+    def _fake_minute(symbols, day):
+        return {
+            "600519": {"open": 1200.0, "high": 1260.0, "low": 1190.0, "close": 1255.0},
+            "000001": {"open": 10.0, "high": 10.5, "low": 9.8, "close": 10.2},
+        }, None
+
+    mid = build_digest(
+        out_dir=env / "digests",
+        session="midday",
+        run_date="2026-10-09",
+        fetch_ohlc=_fake_minute,
+    )
+    mid_path = env / "digests" / "2026-10-09-midday.md"
+    pre_path = env / "digests" / "2026-10-09-pre.md"
+    post_path = env / "digests" / "2026-10-09-post.md"
+    assert mid_path.is_file()
+    assert pre_path.is_file() and post_path.is_file()
+    text = mid_path.read_text(encoding="utf-8")
+    assert "午间" in text
+    assert "现价(10-09)" in text
+    assert "收盘(10-09)" not in text
+    assert "1255.00" in text or "1255" in text
+    assert mid["session"] == "midday"
+    assert mid["digestPath"].endswith("2026-10-09-midday.md")
+    assert (env / "digests" / "latest-midday.md").is_file()
+
+
+def test_midday_minute_failure_is_fail_soft(env):
+    _save_brief(env)
+
+    def _fail(symbols, day):
+        return {}, "minute down"
+
+    result = build_digest(
+        out_dir=env / "digests",
+        session="midday",
+        run_date="2026-10-09",
+        fetch_ohlc=_fail,
+    )
+    text = Path(result["digestPath"]).read_text(encoding="utf-8")
+    assert "分钟行情不可用" in text
+    assert "现价(10-09)" in text
+    assert "| — | — | — |" in text or text.count("—") >= 3
+
+
 def test_pre_quote_columns_are_blank_without_run_date(env):
     _save_brief(env)
     text = Path(build_digest(out_dir=env / "digests")["digestPath"]).read_text(encoding="utf-8")

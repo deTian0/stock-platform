@@ -1,10 +1,53 @@
 # 现行快照
 
-> 日期：2026-11-06  
-> 版本：**`v4.14.0` 已发布**（tag `v4.14.0`；收录 F1 / T3 / A1 / R5-P / 多策略影子终榜全套 / S2-P1 快照 / 影子链契约补齐，详见 [`CHANGELOG.md`](../CHANGELOG.md) `[4.14.0]`）  
-> 工作区：F1/T3/A1/R5-P 已落（ADR [`0090`](architecture/0090-benchmark-identity-and-sh-fund-prefix.md) / [`0091`](architecture/0091-data-quality-scan.md) / [`0092`](architecture/0092-etf-universe-platform-side.md)）；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)（含 2026-11-06 增补）；LLM ADR [`0089`](architecture/0089-llm-provider-selection.md) / [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
-> 进行中：lvrev 增强实验**已收口**（仅 `trail_tp` 通过 → Proposed ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) 等签核；出厂默认仍关）；影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
+> 日期：2026-11-07  
+> 版本：**`v4.14.0` 已发布**（tag 未动；本晚未发版，保持 4.14.0）  
+> 分支：**仅 `main`**（功能分支 `feat/multistrategy-lvrev-trail-tp-s3-setb-202611` 已 fast-forward 合入并删除本地/远端）  
+> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
+
+## 通宵迭代纪要（2026-11-06 → 11-07）
+
+### 分支状态
+
+- `git branch -a`：**仅** `main` / `origin/main`
+- 工作区干净；`origin/main` 已含功能分支全部提交（含 picks 账本锁、quotes 兜底撤回、ADR 0094/0095 登记、S3/Set B 结论、午间 midday）
+
+### 今晚完成的 commits 摘要（合入 main 后新增）
+
+- 分支收束：功能分支 → `main`（fast-forward）并删除远端/本地功能分支
+- **午间休盘简报** ADR [`0096`](architecture/0096-midday-digest-session.md) + 计划 [`plans/midday-session.md`](plans/midday-session.md) + 实现：`--session midday`、`{reportDay}-midday.md`、分钟现价经 `em_get` 限候选池、表头「现价」
+- 同花顺模拟盘：mock 端到端真实试跑日志 → `local/ths_sim_trial/`（**不入库**）
+
+### 测试结果
+
+| 检查 | 结果 |
+|------|------|
+| `pytest packages apps -q`（清空 `STOCK_PLATFORM_ENGINE_MARKET_DB`，replay） | **1629 passed, 11 skipped**（含 midday / intraday 增量） |
+| `check_docs.ps1` | OK（含 ADR 0096 / midday 计划） |
+| `check_versions.ps1` | OK（`VERSION=4.14.0`） |
+
+### 策略实验结论
+
+| 项 | 结论 |
+|----|------|
+| lvrev `trail_tp` | **通过**（既有严格对照 + aux 超额：基线超额 43.26% / trail_tp 70.52%；MaxDD 不恶化）。**出厂默认仍关**（安全优先）。**推荐生产日循环 opt-in**：调度或包装脚本设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（或回测显式 `trail_tp=True`）；若要改库默认须另开 ADR + 全量回测 |
+| S3 alpha/beta 拆解 | **不通过**（未证明选股 alpha）— 只读诊断，不改默认 |
+| Set B 贝叶斯仓位 | **不通过** — 默认关；下一刀不要再碰仓位贝叶斯，可改**退出规则**或**候选过滤**（事先登记标准） |
+| S4 E1 短期反转 | **不通过**（既有） |
+
+### 同花顺模拟盘
+
+- **成功到**：`STOCK_PLATFORM_BROKER=ths_sim` + `THS_MODE=mock` → authenticate / build_draft / execute / positions / account 全绿；`liveTradingEnabled=false`
+- **卡点**：无 `STOCK_PLATFORM_THS_BASE_URL` / `TOKEN`；`ExperimentalThsHttpTransport` 无稳定公开零售 API，缺注入即 fail-closed（ADR 0037）。未伪造成交。操作说明与日志：`local/ths_sim_trial/README.md`
+
+### 建议的下一刀
+
+1. 生产日循环文档化 `trail_tp` opt-in（不改代码默认）；或若盈利证据继续强化且用户确认，再开 ADR 改出厂默认  
+2. 从 Set B / S3 失败挖：**候选过滤或退出规则**实验（事先登记，默认关）  
+3. 用户自建 11:30 调 `stock-platform-digest --session midday --run-date <今天>`  
+4. 影子前向账本攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`
 
 ## 文档放哪
 
@@ -37,7 +80,7 @@
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
 **ADR 0094 已签核 Accepted（opt-in，出厂默认关）**：开关 `STOCK_PLATFORM_LVREV_TRAIL_TP=1` 或 `run_portfolio_backtest(trail_tp=True)`，回滚去掉该环境变量；生产默认未改。
-**下一刀**（v4.14.0 之后）：若要把 lvrev 出厂默认改为 `trail_tp=True`，须另开提交并先更新契约（当前不做）；此前为签核 ADR 0094（依据 [`plans/lvrev-enhancement.md`](plans/lvrev-enhancement.md) §5，其余四变体不通过、不起 ADR）；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；S4「短期反转」候选（E1）已按事先登记标准判不通过（[`plans/shadow-s4-s5-diagnosis.md`](plans/shadow-s4-s5-diagnosis.md) §9），S5 PIT 资金流（E3）仍为后续前向研究待办；全量 R5 仍等生产侧 ETF 回补。  
+**下一刀**（v4.14.0 之后）：① 生产侧 **`trail_tp` opt-in 文档化**（环境变量 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`；代码默认仍关；改出厂默认须另 ADR）；② 从 Set B/S3 失败挖**退出规则或候选过滤**（不做默认启用仓位贝叶斯）；③ 午间 midday 由用户 11:30 手动/自建任务触发；④ 影子前向账本攒样本；Y2 仍等 `adopt`；全量 R5 仍等 ETF 回补。  
 **补充行情库**（ADR [`0095`](architecture/0095-aux-market-store.md)）：5 指数日线已入 `local/aux_market/`（2020-01-02~2026-11-05），离线回测超额可算；日循环 settle 仍不读、需定期跑 `stock-platform-aux-market` 增量；data_quality 读 OHLC 未接。  
 **Set B 贝叶斯先验仓位**（[`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11.9–§11.10）：离线对照判 **不通过**（总收益/夏普低于 D、回撤深于 D 超 2pp），实验开关默认关，出厂不变。  
 **S3 alpha/beta 拆解**（[`plans/shadow-s3-decomposition.md`](plans/shadow-s3-decomposition.md) §8）：判**未证明选股 alpha**（段 A α 年化 −19.06%，全区间 NW t −1.04）；只读诊断，不改学校 / 仲裁 / 默认值。  

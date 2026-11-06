@@ -119,7 +119,8 @@ def _fmt_price(value: Any) -> str:
 
 
 _DASH = "—"
-_SESSION_LABEL = {"pre": "盘前", "post": "盘后"}
+DIGEST_SESSIONS = frozenset({"pre", "post", "midday"})
+_SESSION_LABEL = {"pre": "盘前", "post": "盘后", "midday": "午间"}
 _BENCHMARK = "000905"
 _SECONDARY_DISCLAIMER = (
     "二次精选是呈现口径，不参与评分、不改 picks、不改变仓位建议；入选不是更强的推荐。"
@@ -219,11 +220,12 @@ def _quote_table(
     quotes: Mapping[str, Mapping[str, Any]] | None,
     prior_closes: Mapping[str, Any] | None,
     reason_key: str = "reasonSummary",
+    last_col: str = "收盘",
 ) -> list[str]:
     label = _quote_label(quote_date)
     lines = [
         "| # | 代码 | 名称 | 综合分 | 收盘(asof) | "
-        f"开盘({label}) | 收盘({label}) | 涨跌({label}) | 入选理由 |",
+        f"开盘({label}) | {last_col}({label}) | 涨跌({label}) | 入选理由 |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for i, row in enumerate(rows, start=1):
@@ -370,6 +372,7 @@ def _picks_table(
     show_quotes: bool,
     quotes: Mapping[str, Mapping[str, Any]] | None,
     prior_closes: Mapping[str, Any] | None,
+    last_col: str = "收盘",
 ) -> list[str]:
     return _quote_table(
         picks,
@@ -378,6 +381,7 @@ def _picks_table(
         show_quotes=show_quotes,
         quotes=quotes,
         prior_closes=prior_closes,
+        last_col=last_col,
     )
 
 
@@ -558,6 +562,7 @@ def _secondary_lines(
     prior_closes: Mapping[str, Any] | None,
     import_label: str | None = None,
     import_note: str | None = None,
+    last_col: str = "收盘",
 ) -> list[str]:
     selected = list(result.get("selected") or [])
     rejected = list(result.get("rejected") or [])
@@ -577,6 +582,7 @@ def _secondary_lines(
                 quotes=quotes,
                 prior_closes=prior_closes,
                 reason_key="secondaryReason",
+                last_col=last_col,
             )
         )
         lines.append("")
@@ -713,6 +719,7 @@ def _rankings_section(
     prior_closes: Mapping[str, Any] | None = None,
     benchmark_name: str | None = None,
     benchmark_asof_close: float | None = None,
+    last_col: str = "收盘",
 ) -> list[str]:
     rankings = payload.get("rankings") or {}
     boards = rankings.get("boards") or {}
@@ -793,6 +800,7 @@ def _rankings_section(
                         "导入码 = 上方②A 二次精选入选（已剔除 ST/地量，"
                         "与「一、今日 Top10」的生产榜不同）。"
                     ),
+                    last_col=last_col,
                 )
             )
             continue
@@ -821,6 +829,7 @@ def _rankings_section(
                         import_note=(
                             "导入码 = 上方②B 二次精选入选（与下方生产榜的短线块不同）。"
                         ),
+                        last_col=last_col,
                     )
                 )
                 lines.extend(
@@ -943,7 +952,7 @@ def _human_ts(iso: Any) -> str:
 def _coerce_session(session: str | None, payload: Mapping[str, Any]) -> str:
     raw = session if session is not None else payload.get("session")
     text = str(raw or "pre").strip().lower()
-    return text if text in {"pre", "post"} else "pre"
+    return text if text in DIGEST_SESSIONS else "pre"
 
 
 def _coerce_run_date(run_date: str | None, payload: Mapping[str, Any]) -> str | None:
@@ -995,6 +1004,11 @@ def build_digest_text(
     )
     if sess == "pre":
         lines.append("> 盘前：运行日行情尚未作为本报告的报价使用，开盘/收盘/涨跌留空（—）。盘后报告补齐。")
+    elif sess == "midday":
+        lines.append(
+            "> 午间：现价取自运行日分钟线最后一根（经 em_get，仅候选池）；"
+            "不是日线收盘。盘后报告再补官方收盘。"
+        )
     lines.append("")
     lines.append(f"- 环境：{record.environment}（{_DISCLAIMER}）")
     provider = record.provider or payload.get("provider") or "未记录"
@@ -1018,6 +1032,7 @@ def build_digest_text(
         lines.append(f"- 生成时间：{generated_local or _gen_raw or '-'}")
     lines.append("")
 
+    last_col = "现价" if sess == "midday" else "收盘"
     picks = record.picks or []
     lines.append(f"## 一、今日 Top10 · 长线（{len(picks)} 条）")
     lines.append("")
@@ -1039,11 +1054,15 @@ def build_digest_text(
                 show_quotes=show_quotes,
                 quotes=quotes,
                 prior_closes=prior_closes,
+                last_col=last_col,
             )
         )
         lines.append("")
         if not show_quotes:
-            lines.append(f"盘后报告补齐 {qd or 'quoteDate'} 行情。")
+            if sess == "midday":
+                lines.append(f"午间现价未取到（{qd or 'quoteDate'}）；请检查运行日与分钟源。")
+            else:
+                lines.append(f"盘后报告补齐 {qd or 'quoteDate'} 行情。")
             lines.append("")
         else:
             lines.extend(
@@ -1069,6 +1088,7 @@ def build_digest_text(
             prior_closes=prior_closes,
             benchmark_name=benchmark_name,
             benchmark_asof_close=benchmark_asof_close,
+            last_col=last_col,
         )
     )
 
@@ -1215,34 +1235,48 @@ def build_digest(
             from .quotes import resolve_quote_date
 
             qd = resolve_quote_date(date.fromisoformat(rd)).isoformat()
-        want_ohlc = ohlc if ohlc is not None else (sess == "post")
-        show = bool(want_ohlc and sess == "post" and rd and qd)
+        # post → 外部日线；midday → 分钟现价（候选池）；pre → 不取行情。
+        default_want = sess in {"post", "midday"}
+        want_ohlc = ohlc if ohlc is not None else default_want
+        show = bool(want_ohlc and sess in {"post", "midday"} and rd and qd)
         if show and loaded is None:
             symbols = [_sym6(p.get("symbol")) for p in (record.picks or [])]
-            pool = (
-                ((payload.get("rankings") or {}).get("boards") or {})
-                .get("short_term", {})
-                .get("pool")
-                or []
+            short_board = (
+                ((payload.get("rankings") or {}).get("boards") or {}).get("short_term")
+                or {}
             )
+            pool = short_board.get("pool")
+            if pool is None:
+                pool = short_board.get("items") or []
             symbols.extend(_sym6(it.get("symbol")) for it in pool if isinstance(it, Mapping))
             symbols.append(_BENCHMARK)
-            from .quotes import load_ohlc
+            wanted = [s for s in symbols if s]
+            if sess == "midday":
+                from .quotes import load_intraday_last
 
-            cache = Path(cache_dir) if cache_dir is not None else Path("./local/quotes")
-            loaded, err = load_ohlc(
-                [s for s in symbols if s],
-                qd or rd,
-                cache_dir=cache,
-                allow_network=True,
-                fetch=fetch_ohlc,
-            )
+                loaded, err = load_intraday_last(
+                    wanted,
+                    qd or rd,
+                    allow_network=True,
+                    fetch=fetch_ohlc,
+                )
+            else:
+                from .quotes import load_ohlc
+
+                cache = Path(cache_dir) if cache_dir is not None else Path("./local/quotes")
+                loaded, err = load_ohlc(
+                    wanted,
+                    qd or rd,
+                    cache_dir=cache,
+                    allow_network=True,
+                    fetch=fetch_ohlc,
+                )
             if err:
                 notes.append(err)
             if qd == record.asof and not prior:
                 from .quotes import load_prior_closes
 
-                prior = load_prior_closes(symbols, record.asof)
+                prior = load_prior_closes(wanted, record.asof)
         if sess == "pre":
             show = False
         render_kw = {
@@ -1360,6 +1394,7 @@ __all__ = [
     "DEFAULT_OUT_DIR",
     "DEFAULT_PERF_LOG",
     "DEFAULT_THS_DIR",
+    "DIGEST_SESSIONS",
     "ENV_PERF_LOG",
     "THS_IMPORT_PER_LINE",
     "build_digest",

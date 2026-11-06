@@ -30,9 +30,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--asof", default=None, help="Trade date YYYY-MM-DD; default = latest brief")
     parser.add_argument(
         "--session",
-        choices=("pre", "post"),
+        choices=("pre", "post", "midday"),
         default=None,
-        help="盘前 pre / 盘后 post。缺省读 brief payload，再缺省为 pre。不使用今天的日期",
+        help="盘前 pre / 盘后 post / 午间 midday（ADR 0096）。缺省读 brief payload，再缺省为 pre。不使用今天的日期",
     )
     parser.add_argument(
         "--run-date",

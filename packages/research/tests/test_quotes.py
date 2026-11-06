@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 
 import stock_platform_research.quotes as quotes
-from stock_platform_research.quotes import load_ohlc, resolve_prev_close, resolve_quote_date
+from stock_platform_research.quotes import (
+    load_intraday_last,
+    load_ohlc,
+    resolve_prev_close,
+    resolve_quote_date,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -358,3 +363,40 @@ def test_quotes_module_has_no_top_level_providers_import():
     hits = [line for line in text.splitlines() if "stock_platform_providers" in line]
     assert hits
     assert all(line[:1].isspace() for line in hits)
+
+
+def test_load_intraday_last_collapses_minute_bars():
+    def _fetch(symbols, day):
+        assert set(symbols) == {"600519"}
+        assert day == "2026-10-09"
+        return {
+            "600519": {"open": 1200.0, "high": 1260.0, "low": 1190.0, "close": 1255.5},
+        }, None
+
+    rows, err = load_intraday_last(
+        ["600519.SH"], "2026-10-09", allow_network=True, fetch=_fetch
+    )
+    assert err is None
+    assert rows["600519"]["open"] == 1200.0
+    assert rows["600519"]["close"] == 1255.5
+
+
+def test_load_intraday_last_fail_soft():
+    def _fail(symbols, day):
+        return {}, "boom"
+
+    rows, err = load_intraday_last(["600000"], "2026-10-09", fetch=_fail)
+    assert rows == {}
+    assert "分钟行情不可用" in (err or "")
+
+
+def test_bars_to_intraday_last_uses_first_open_last_close():
+    bars = [
+        {"symbol": "000001", "datetime": "2026-10-09 09:31:00", "open": 10.0, "high": 10.2, "low": 9.9, "close": 10.1},
+        {"symbol": "000001", "datetime": "2026-10-09 11:29:00", "open": 10.3, "high": 10.5, "low": 10.2, "close": 10.4},
+    ]
+    out = quotes._bars_to_intraday_last(bars)
+    assert out["000001"]["open"] == 10.0
+    assert out["000001"]["close"] == 10.4
+    assert out["000001"]["high"] == 10.5
+    assert out["000001"]["low"] == 9.9

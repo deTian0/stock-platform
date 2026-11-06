@@ -11,7 +11,7 @@
 | `stock-platform-shadow-board` | 多策略影子 Final Board（五校→硬 Round2→只写 `local/shadow/`；不改出厂；`--perf-summary` / `--settle-daily` 前向账本；`--backtest` 历史对照 lvrev） | 是（`--universe` JSON；`--backtest` 读 market.db） |
 | `stock-platform-daily` | 日更流水线 | 是 |
 | `stock-platform-brief` | 只建 brief | 是 |
-| `stock-platform-digest` | 盘前/盘后简报 | 是 |
+| `stock-platform-digest` | 盘前/盘后/午间简报（`--session pre|post|midday`） | 是 |
 | `stock-platform-day-quote` | 当日行情台账 | 是 |
 | `stock-platform-sameday` | 选股→次日收盘战绩 | 是 |
 | `stock-platform-performance` | 绩效 JSONL / settle | 是 |
