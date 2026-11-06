@@ -3,7 +3,7 @@
 > 日期：2026-11-06  
 > 版本：**`v4.14.0` 已发布**（tag `v4.14.0`；收录 F1 / T3 / A1 / R5-P / 多策略影子终榜全套 / S2-P1 快照 / 影子链契约补齐，详见 [`CHANGELOG.md`](../CHANGELOG.md) `[4.14.0]`）  
 > 工作区：F1/T3/A1/R5-P 已落（ADR [`0090`](architecture/0090-benchmark-identity-and-sh-fund-prefix.md) / [`0091`](architecture/0091-data-quality-scan.md) / [`0092`](architecture/0092-etf-universe-platform-side.md)）；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)（含 2026-11-06 增补）；LLM ADR [`0089`](architecture/0089-llm-provider-selection.md) / [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
-> 进行中：S1 整板开关对照**已收口、维持 D**（§11.7）；影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
+> 进行中：lvrev 增强实验**已收口**（仅 `trail_tp` 通过 → Proposed ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) 等签核；出厂默认仍关）；影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 文档放哪
@@ -36,7 +36,7 @@
 **已知偏置**：回测 402 日 `schoolCoverage` 显示 S1 有 235 天非空池却 **0 席**、S5 仅 3 席——Round2 把学校优先级排在分数之前，S3/S4 先填满 10 席。现象、证据与可选改法记在 [`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11；**改仲裁须先签核 + ADR**，本轮未改。S2 数据源规划见 [`plans/s2-event-theme-data.md`](plans/s2-event-theme-data.md)。  
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
-**下一刀**（v4.14.0 之后）：S1 整板开关对照已收口——gate/弱日空榜 按 §11.7 事先标准**不通过**（分年夏普 3/6、2024 单年贡献 81%），影子默认维持 D、不起 ADR；**S4/S5 已下线**（2026-11-06 签核，ADR 0093 增补 2；启用表默认 `S1,S2,S3`，`STOCK_PLATFORM_SHADOW_SCHOOLS` 可回退；依据 [`plans/shadow-s4-s5-diagnosis.md`](plans/shadow-s4-s5-diagnosis.md)，下线后回测见计划 §11.8）；S4「短期反转」候选（E1）与 S5 PIT 资金流（E3）列为后续前向研究待办；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；全量 R5 仍等生产侧 ETF 回补。  
+**下一刀**（v4.14.0 之后）：**签核 ADR 0094**（是否把 lvrev 出厂退出改为 `trail_tp=True`；依据 [`plans/lvrev-enhancement.md`](plans/lvrev-enhancement.md) §5，其余四变体不通过、不起 ADR）；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；S4「短期反转」候选（E1）与 S5 PIT 资金流（E3）仍为后续前向研究待办；全量 R5 仍等生产侧 ETF 回补。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
 
 ## v4.14 已落地

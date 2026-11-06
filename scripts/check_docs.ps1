@@ -111,6 +111,7 @@ $required = @(
   'docs/architecture/0091-data-quality-scan.md',
   'docs/architecture/0092-etf-universe-platform-side.md',
   'docs/architecture/0093-multi-strategy-shadow-board.md',
+  'docs/architecture/0094-lvrev-trail-tp-exit.md',
   'docs/contracts/benchmark-identity.md',
   'docs/contracts/data-quality.md',
   'docs/contracts/multi-strategy-shadow.md',
