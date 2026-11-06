@@ -67,6 +67,27 @@ def _index_close(db: str, start: str, end: str, code: str = "000300.SH") -> dict
     return {str(d)[:10]: float(c) for d, c in rows if c is not None}
 
 
+def _parse_s1_scale(text: str | None) -> dict[str, float] | None:
+    """``"1,0.5,0"`` → ``{strong, mid, weak, unknown=weak}``; ``None`` → module default."""
+    if not text:
+        return None
+    parts = [float(x) for x in str(text).split(",")]
+    if len(parts) != 3 or any(not (0.0 <= v <= 1.0) for v in parts):
+        raise SystemExit(f"--s1-scale 需要 3 个 0~1 系数（强,中,弱），得到：{text!r}")
+    return {"strong": parts[0], "mid": parts[1], "weak": parts[2], "unknown": parts[2]}
+
+
+def _s1_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    """Factory ``pick`` passes nothing, so the call is exactly the pre-knob one."""
+    if args.s1_mode == "pick":
+        return {}
+    out: dict[str, Any] = {"s1_mode": args.s1_mode, "s1_gate_weak": args.s1_gate_weak}
+    scale = _parse_s1_scale(args.s1_scale)
+    if scale is not None:
+        out["s1_scale"] = scale
+    return out
+
+
 def _run_backtest(args: argparse.Namespace) -> int:
     """Walk-forward shadow Final Board vs lvrev over a read-only ``market.db``."""
     import os
@@ -120,6 +141,7 @@ def _run_backtest(args: argparse.Namespace) -> int:
         index_close=_index_close(db, args.start, end) or None,
         arbitration=args.arbitration,
         min_seats=args.min_seats,
+        **_s1_kwargs(args),
     )
     if not payload.get("ok"):
         print(f"[fail] {payload.get('reason')}", file=sys.stderr)
@@ -132,6 +154,12 @@ def _run_backtest(args: argparse.Namespace) -> int:
     # Factory mode keeps the historical file name; experiment modes get a suffix
     # so a D/A/B comparison never overwrites the factory artefact.
     stem = "shadow_backtest" if args.arbitration == "d" else f"shadow_backtest_{args.arbitration}"
+    if args.s1_mode != "pick":
+        stem += f"_s1{args.s1_mode}"
+        if args.s1_mode == "gate":
+            stem += f"_{args.s1_gate_weak}"
+        if args.s1_mode == "scale" and args.s1_scale:
+            stem += "_" + args.s1_scale.replace(",", "-").replace(".", "p")
     (out_dir / f"{stem}.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
     )
@@ -206,6 +234,27 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=1,
         help="仅 --arbitration b：每个非空池学校保底席位数（默认 1；空池不保底、不凑满）",
+    )
+    p.add_argument(
+        "--s1-mode",
+        choices=("pick", "gate", "scale"),
+        default="pick",
+        help=(
+            "仅 --backtest：S1 大势实验开关。pick=出厂（S1 照常出票，默认）；"
+            "gate=S1 不出票，截面宽度弱势/未知日按 --s1-gate-weak 关榜；"
+            "scale=S1 不出票，按 regime 缩当日持仓上限。不改出厂默认"
+        ),
+    )
+    p.add_argument(
+        "--s1-gate-weak",
+        choices=("empty", "s3"),
+        default="empty",
+        help="仅 --s1-mode gate：弱势日动作。empty=空榜；s3=只放 S3（默认 empty）",
+    )
+    p.add_argument(
+        "--s1-scale",
+        default=None,
+        help="仅 --s1-mode scale：强,中,弱 三档仓位系数（默认 1,0.5,0；unknown 同弱）",
     )
     p.add_argument(
         "--bt-out-dir",

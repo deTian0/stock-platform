@@ -200,6 +200,40 @@ def _index_timing_from_bars(bars: Sequence[Mapping[str, Any]] | None) -> tuple[b
     return False, f"指数收盘跌破 MA{_S1_INDEX_MA_WINDOW}（{last:.2f}<{ma:.2f}）"
 
 
+#: S1 regime states for the board-level gate / scale experiment (§11.6).
+S1_REGIME_STATES: tuple[str, ...] = ("strong", "mid", "weak", "unknown")
+#: ``strong`` threshold for the experiment; ``weak`` reuses S1's own floor.
+S1_STRONG_BREADTH = 0.50
+
+
+def s1_regime_state(
+    universe: Sequence[Mapping[str, Any]] | None,
+    *,
+    weak_below: float = _S1_BREADTH_FLOOR,
+    strong_at: float = S1_STRONG_BREADTH,
+) -> dict[str, Any]:
+    """S1's breadth judgement as a board-level regime (no picks).
+
+    Same measurement as :func:`school_s1_macro`'s breadth path (``_above_ma`` over
+    the session universe, ≥ ``_S1_MIN_BREADTH_ROWS`` measurable rows), so it only
+    sees the asof cross-section — PIT by construction. ``breadth < weak_below`` →
+    ``weak`` (S1's existing 择时关闭 floor); ``≥ strong_at`` → ``strong``; between →
+    ``mid``; too few measurable rows → ``unknown`` (callers treat it fail-closed).
+    """
+    measured = [f for f in (_above_ma(r) for r in (universe or []) if isinstance(r, Mapping)) if f is not None]
+    n = len(measured)
+    if n < _S1_MIN_BREADTH_ROWS:
+        return {"state": "unknown", "breadth": None, "measured": n}
+    breadth = sum(1 for x in measured if x) / n
+    if breadth < weak_below:
+        state = "weak"
+    elif breadth >= strong_at:
+        state = "strong"
+    else:
+        state = "mid"
+    return {"state": state, "breadth": breadth, "measured": n}
+
+
 def school_s1_macro(
     universe: Sequence[Mapping[str, Any]] | None,
     *,

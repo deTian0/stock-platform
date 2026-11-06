@@ -42,7 +42,21 @@ from ..portfolio import compute_metrics, is_etf, is_fund, norm_code
 from ..secondary_pick import AMOUNT_MIN
 from ..strategy_ab import AB_METRIC_KEYS, _delta_metrics, _review_block
 from .round2 import DEFAULT_ARBITRATION, DEFAULT_MIN_SEATS, apply_round2_set_a
-from .schools import SCHOOL_IDS, run_round1
+from .schools import SCHOOL_IDS, S1_REGIME_STATES, run_round1, s1_regime_state
+
+#: S1 experiment knob (docs/plans/multi-strategy-final-board.md §11.6).
+#: ``pick`` = factory (S1 picks like any school); ``gate`` = S1 stops picking and
+#: its breadth regime closes the board on weak days; ``scale`` = S1 stops picking
+#: and its regime scales the day's open-position cap.
+S1_MODES: tuple[str, ...] = ("pick", "gate", "scale")
+DEFAULT_S1_MODE = "pick"
+#: ``gate`` weak-day action: ``empty`` = empty board; ``s3`` = only S3 may seat.
+S1_GATE_WEAK_ACTIONS: tuple[str, ...] = ("empty", "s3")
+DEFAULT_S1_GATE_WEAK = "empty"
+#: Regime states treated as weak by ``gate`` (``unknown`` → fail-closed).
+S1_WEAK_STATES: frozenset[str] = frozenset({"weak", "unknown"})
+#: ``scale`` factors per regime state (fraction of ``max_positions``).
+DEFAULT_S1_SCALE: dict[str, float] = {"strong": 1.0, "mid": 0.5, "weak": 0.0, "unknown": 0.0}
 
 #: Columns the shadow schools read from a cross-section row.
 _ROW_FIELDS = ("close", "amount", "vol20", "rev_chg", "ma20", "ma60", "rs20", "pct_chg")
@@ -140,19 +154,107 @@ def shadow_board_for_frame(
     regime: Mapping[str, bool] | None = None,
     arbitration: str = DEFAULT_ARBITRATION,
     min_seats: int = DEFAULT_MIN_SEATS,
+    s1_mode: str = DEFAULT_S1_MODE,
+    s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
 ) -> dict[str, Any]:
     """Round1 → Round2 Set A for one session (the daily hook's exact functions).
 
     ``arbitration`` / ``min_seats`` are the offline experiment knob of
     :func:`round2.apply_round2_set_a`; the default ``"d"`` is the factory rule.
+    ``s1_mode`` (default ``"pick"`` = factory, payload unchanged) is the S1
+    board-regime experiment: in ``gate`` / ``scale`` S1 contributes no picks and
+    the result carries ``s1Regime`` from :func:`schools.s1_regime_state`. Its
+    seats are released to the other schools under the same arbitration rule.
     """
     universe = frame_to_universe(frame, name_map=name_map)
     schools = run_round1(universe, top_k=top_k, asof=day, regime=regime)
+    mode = _check_s1_mode(s1_mode, s1_gate_weak)
+    s1_regime: dict[str, Any] | None = None
+    if mode != DEFAULT_S1_MODE:
+        # Experiment: S1 stops picking; its breadth call becomes a board-level regime.
+        s1_regime = s1_regime_state(universe)
+        schools = dict(schools)
+        schools["S1"] = {
+            "school": "S1",
+            "status": "empty",
+            "reason": f"s1_mode={mode}：S1 只给大势判定（{s1_regime['state']}），不出票",
+            "candidates": [],
+        }
+        if mode == "gate" and s1_regime["state"] in S1_WEAK_STATES:
+            if s1_gate_weak == "empty":
+                schools = {sid: {**(pool or {}), "candidates": []} for sid, pool in schools.items()}
+            else:  # "s3": only the defensive school may seat on a weak day
+                schools = {
+                    sid: (pool if sid == "S3" else {**(pool or {}), "candidates": []})
+                    for sid, pool in schools.items()
+                }
     if arbitration == DEFAULT_ARBITRATION:
         round2 = apply_round2_set_a(schools)
     else:
         round2 = apply_round2_set_a(schools, arbitration=arbitration, min_seats=min_seats)
-    return {"schools": schools, "round2": round2, "universeSize": len(universe)}
+    out = {"schools": schools, "round2": round2, "universeSize": len(universe)}
+    if s1_regime is not None:
+        out["s1Regime"] = s1_regime
+    return out
+
+
+def _check_s1_mode(s1_mode: str, s1_gate_weak: str) -> str:
+    mode = str(s1_mode or DEFAULT_S1_MODE).strip().lower()
+    if mode not in S1_MODES:
+        raise ValueError(f"s1_mode must be one of {S1_MODES}, got {s1_mode!r}")
+    if s1_gate_weak not in S1_GATE_WEAK_ACTIONS:
+        raise ValueError(f"s1_gate_weak must be one of {S1_GATE_WEAK_ACTIONS}, got {s1_gate_weak!r}")
+    return mode
+
+
+def scale_position_cap(state: str, max_positions: int, scale: Mapping[str, float]) -> int:
+    """``scale`` mode: open-position cap for the day = ``floor(factor × max_positions)``.
+
+    Unknown / missing state → factor of ``weak`` (fail-closed). The cap only limits
+    *new* buys; positions already held are never force-sold by it.
+    """
+    factor = scale.get(state)
+    if factor is None:
+        factor = scale.get("weak", 0.0)
+    factor = min(max(float(factor), 0.0), 1.0)
+    return int(math.floor(factor * int(max_positions) + 1e-9))
+
+
+def s1_regime_distribution(feats: pd.DataFrame) -> dict[str, int]:
+    """S1 regime state count over every session of ``feats`` (report only).
+
+    Vectorised equivalent of ``s1_regime_state(frame_to_universe(day))``: same
+    liquidity pre-filter, same ``close ≥ ma20`` measurement (``rs20`` is derived
+    from the same two columns, so it adds no measurable row). Pinned against the
+    row-wise path by a unit test.
+    """
+    from .schools import _S1_BREADTH_FLOOR, _S1_MIN_BREADTH_ROWS, S1_STRONG_BREADTH
+
+    out = {s: 0 for s in S1_REGIME_STATES}
+    if feats is None or feats.empty:
+        return out
+    sub = feats
+    if "amount" in sub.columns:
+        sub = sub[sub["amount"].astype("float64") >= AMOUNT_MIN]
+    close = sub["close"].astype("float64")
+    ma20 = sub["ma20"].astype("float64")
+    ok = close.notna() & ma20.notna()
+    tmp = pd.DataFrame({"d": sub["trade_date"], "m": ok, "u": ok & (close >= ma20)})
+    g = tmp.groupby("d", sort=True).agg(m=("m", "sum"), u=("u", "sum"))
+    all_days = feats["trade_date"].drop_duplicates()
+    g = g.reindex(all_days, fill_value=0)
+    for m, u in zip(g["m"], g["u"]):
+        if m < _S1_MIN_BREADTH_ROWS:
+            out["unknown"] += 1
+            continue
+        b = u / m
+        if b < _S1_BREADTH_FLOOR:
+            out["weak"] += 1
+        elif b >= S1_STRONG_BREADTH:
+            out["strong"] += 1
+        else:
+            out["mid"] += 1
+    return out
 
 
 def shadow_entry_provider(
@@ -163,6 +265,9 @@ def shadow_entry_provider(
     stats: dict[str, Any] | None = None,
     arbitration: str = DEFAULT_ARBITRATION,
     min_seats: int = DEFAULT_MIN_SEATS,
+    s1_mode: str = DEFAULT_S1_MODE,
+    s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
+    s1_scale: Mapping[str, float] | None = None,
 ) -> EntryProvider:
     """Entry provider that opens the day's shadow Final Board (Set A order).
 
@@ -171,7 +276,14 @@ def shadow_entry_provider(
     max_picks_per_day / limit-up / cooldown — the provider cannot bypass them.
     ``stats["entrySchool"]`` maps ``(day_index, raw_code) → school`` so the caller
     can attribute the fills the loop actually made back to a school.
+
+    ``s1_mode="scale"`` needs no engine change: the provider drops already-held
+    codes and returns at most ``cap − held`` rows, where ``cap`` is
+    :func:`scale_position_cap` of the day's S1 regime. Slot sizing stays
+    ``equity / max_positions``, so a lower cap means less capital deployed.
     """
+    mode = _check_s1_mode(s1_mode, s1_gate_weak)
+    scale = dict(DEFAULT_S1_SCALE if s1_scale is None else s1_scale)
     acc = stats if stats is not None else {}
     acc.setdefault("days", 0)
     acc.setdefault("emptyBoardDays", 0)
@@ -179,18 +291,52 @@ def shadow_entry_provider(
     acc.setdefault("schoolNonEmptyDays", {sid: 0 for sid in SCHOOL_IDS})
     acc.setdefault("schoolSeats", {sid: 0 for sid in SCHOOL_IDS})
     acc.setdefault("entrySchool", {})
+    if mode != DEFAULT_S1_MODE:
+        acc.setdefault("s1RegimeEvalDays", {s: 0 for s in S1_REGIME_STATES})
+        acc.setdefault("scaleCapZeroDays", 0)
 
     def _provider(ctx: EntryContext) -> list[dict[str, Any]]:
-        result = shadow_board_for_frame(
-            ctx.frame,
-            day=ctx.day,
-            name_map=name_map,
-            top_k=top_k,
-            regime=regime,
-            arbitration=arbitration,
-            min_seats=min_seats,
-        )
+        if mode == DEFAULT_S1_MODE:
+            result = shadow_board_for_frame(
+                ctx.frame,
+                day=ctx.day,
+                name_map=name_map,
+                top_k=top_k,
+                regime=regime,
+                arbitration=arbitration,
+                min_seats=min_seats,
+            )
+        else:
+            result = shadow_board_for_frame(
+                ctx.frame,
+                day=ctx.day,
+                name_map=name_map,
+                top_k=top_k,
+                regime=regime,
+                arbitration=arbitration,
+                min_seats=min_seats,
+                s1_mode=mode,
+                s1_gate_weak=s1_gate_weak,
+            )
+            state = str((result.get("s1Regime") or {}).get("state") or "unknown")
+            acc["s1RegimeEvalDays"][state] = acc["s1RegimeEvalDays"].get(state, 0) + 1
         passed = result["round2"].get("passed") or []
+        if mode == "scale":
+            cap = scale_position_cap(state, ctx.params.max_positions, scale)
+            room = max(0, cap - len(ctx.positions))
+            if room == 0:
+                acc["scaleCapZeroDays"] += 1
+            held = {norm_code(h) for h in ctx.positions}
+            kept: list[dict[str, Any]] = []
+            for row in passed:
+                if len(kept) >= room:
+                    break
+                # Held codes are dropped by the loop anyway; skip them so they
+                # do not consume the scaled room.
+                if str(row.get("code")) in held:
+                    continue
+                kept.append(row)
+            passed = kept
         acc["days"] += 1
         acc["boardSizeSum"] += len(passed)
         if not passed:
@@ -304,28 +450,59 @@ def run_shadow_book(
     top_k: int = 8,
     arbitration: str = DEFAULT_ARBITRATION,
     min_seats: int = DEFAULT_MIN_SEATS,
+    s1_mode: str = DEFAULT_S1_MODE,
+    s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
+    s1_scale: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
-    """Replay the shadow Final Board alone through the shared loop."""
+    """Replay the shadow Final Board alone through the shared loop.
+
+    ``s1_mode`` defaults to ``"pick"`` (factory): the provider call and the
+    payload are exactly the pre-knob ones. Other modes add ``shadow.s1Mode`` and a
+    ``shadow.s1Regime`` block (state distribution over **all** sessions and over
+    provider-evaluated sessions).
+    """
     p = params or ReplayParams()
+    mode = _check_s1_mode(s1_mode, s1_gate_weak)
     stats: dict[str, Any] = {}
-    loop = replay_book(
-        feats,
-        entry_provider=shadow_entry_provider(
+    if mode == DEFAULT_S1_MODE:
+        provider = shadow_entry_provider(
             name_map=name_map,
             top_k=top_k,
             regime=p.regime,
             stats=stats,
             arbitration=arbitration,
             min_seats=min_seats,
-        ),
-        params=p,
-    )
+        )
+    else:
+        provider = shadow_entry_provider(
+            name_map=name_map,
+            top_k=top_k,
+            regime=p.regime,
+            stats=stats,
+            arbitration=arbitration,
+            min_seats=min_seats,
+            s1_mode=mode,
+            s1_gate_weak=s1_gate_weak,
+            s1_scale=s1_scale,
+        )
+    loop = replay_book(feats, entry_provider=provider, params=p)
     out = _arm(loop, p.initial_capital)
     out["shadow"] = _shadow_stats_block(stats)
     out["shadow"]["schoolFills"] = _school_fills(loop, stats.get("entrySchool") or {})
     out["shadow"]["arbitration"] = arbitration
     if arbitration == "b":
         out["shadow"]["minSeats"] = int(min_seats)
+    if mode != DEFAULT_S1_MODE:
+        out["shadow"]["s1Mode"] = mode
+        if mode == "gate":
+            out["shadow"]["s1GateWeak"] = s1_gate_weak
+        if mode == "scale":
+            out["shadow"]["s1Scale"] = dict(DEFAULT_S1_SCALE if s1_scale is None else s1_scale)
+            out["shadow"]["scaleCapZeroDays"] = int(stats.get("scaleCapZeroDays") or 0)
+        out["shadow"]["s1Regime"] = {
+            "allDays": s1_regime_distribution(feats),
+            "evaluatedDays": dict(stats.get("s1RegimeEvalDays") or {}),
+        }
     out["trades"] = loop["trades"]
     out["equityCurve"] = loop["equity_curve"]
     return out
@@ -350,14 +527,18 @@ def compare_shadow_vs_lvrev(
     index_close: Mapping[str, float] | None = None,
     arbitration: str = DEFAULT_ARBITRATION,
     min_seats: int = DEFAULT_MIN_SEATS,
+    s1_mode: str = DEFAULT_S1_MODE,
+    s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
+    s1_scale: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """lvrev 出厂基线 vs 影子 Final Board on one frame, one engine.
 
     ``delta = shadow − lvrev``. ``index_close`` (optional ``date → close``)
     adds an excess-return line; missing → ``None`` (never fabricated).
     ``arbitration`` is the offline seat-allocation experiment knob (default
-    ``"d"`` = factory); the lvrev arm is untouched by it, so the baseline column
-    stays comparable across runs.
+    ``"d"`` = factory); ``s1_mode`` is the S1 board-regime experiment knob
+    (default ``"pick"`` = factory). The lvrev arm is untouched by either, so the
+    baseline column stays comparable across runs.
     """
     from ..book_replay import screener_entry_provider
 
@@ -371,14 +552,27 @@ def compare_shadow_vs_lvrev(
         }
     base_loop = replay_book(feats, entry_provider=screener_entry_provider(), params=p)
     base = _arm(base_loop, p.initial_capital)
-    shadow = run_shadow_book(
-        feats,
-        name_map=name_map,
-        params=p,
-        top_k=top_k,
-        arbitration=arbitration,
-        min_seats=min_seats,
-    )
+    if _check_s1_mode(s1_mode, s1_gate_weak) == DEFAULT_S1_MODE:
+        shadow = run_shadow_book(
+            feats,
+            name_map=name_map,
+            params=p,
+            top_k=top_k,
+            arbitration=arbitration,
+            min_seats=min_seats,
+        )
+    else:
+        shadow = run_shadow_book(
+            feats,
+            name_map=name_map,
+            params=p,
+            top_k=top_k,
+            arbitration=arbitration,
+            min_seats=min_seats,
+            s1_mode=s1_mode,
+            s1_gate_weak=s1_gate_weak,
+            s1_scale=s1_scale,
+        )
     bench = _benchmark_return(base_loop["equity_curve"], index_close)
     for arm in (base, shadow):
         tr = (arm["metrics"] or {}).get("total_return")
@@ -422,6 +616,23 @@ def _num(v: Any, d: int = 3) -> str:
         return "-"
 
 
+def _s1_mode_lines(sh: Mapping[str, Any]) -> list[str]:
+    """Extra header lines for the S1 experiment; empty in factory ``pick`` mode."""
+    mode = sh.get("s1Mode")
+    if not mode:
+        return []
+    detail = ""
+    if mode == "gate":
+        detail = f"（弱势日动作 {sh.get('s1GateWeak')}）"
+    elif mode == "scale":
+        detail = f"（系数 {sh.get('s1Scale')}；cap=0 评估日 {sh.get('scaleCapZeroDays')}）"
+    reg = sh.get("s1Regime") or {}
+    return [
+        f"- S1 模式：`{mode}`{detail}（离线实验，非出厂）",
+        f"- S1 regime 全部交易日：{reg.get('allDays')}；评估日：{reg.get('evaluatedDays')}",
+    ]
+
+
 def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
     """Markdown side-by-side report (JSON is the machine contract)."""
     if not payload.get("ok"):
@@ -454,6 +665,7 @@ def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
         f"- 影子空榜比例：{_pct(sh.get('emptyBoardRatio'))}"
         f"（{sh.get('emptyBoardDays')}/{sh.get('evaluatedDays')} 个评估日），"
         f"平均席位 {_num(sh.get('avgBoardSize'), 2)}",
+        *_s1_mode_lines(sh),
         "",
         "| 指标 | lvrev 基线 | 影子终榜 |",
         "|------|-----------|----------|",
