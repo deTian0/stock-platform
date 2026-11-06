@@ -41,8 +41,10 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 from __future__ import annotations
 
 import os
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterator, Mapping, Sequence
 
 import pandas as pd
 
@@ -561,6 +563,56 @@ def load_picks_ledger(path: str | Path) -> list[dict[str, Any]]:
     return normalize_picks(load_jsonl(path))
 
 
+PICK_LEDGER_LOCK_TIMEOUT_S = 10.0
+PICK_LEDGER_LOCK_POLL_S = 0.05
+
+
+class PicksLedgerLockError(RuntimeError):
+    """The ledger lock could not be acquired in time. Fail-closed: nothing is written."""
+
+
+@contextmanager
+def _picks_ledger_lock(path: str | Path) -> Iterator[None]:
+    """Cross-process exclusive lock held around one ledger read-judge-append.
+
+    Implemented as an ``O_CREAT | O_EXCL`` sidecar file ``<ledger>.lock`` next to the
+    ledger, polled until ``PICK_LEDGER_LOCK_TIMEOUT_S``. Chosen over ``msvcrt`` /
+    ``fcntl`` byte-range locks because ``O_EXCL`` behaves the same on Windows and
+    POSIX with the stdlib alone. A crashed holder leaves the sidecar behind; that
+    blocks further writers with an explicit error (fail-closed) until an operator
+    removes it, instead of silently letting a second writer through.
+    """
+    target = Path(path)
+    lock_path = target.with_name(target.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + PICK_LEDGER_LOCK_TIMEOUT_S
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                raise PicksLedgerLockError(
+                    f"picks 账本锁超时（{PICK_LEDGER_LOCK_TIMEOUT_S:g}s）：{lock_path}。"
+                    "若确认无进程在写入，请手动删除该锁文件后重试。"
+                ) from None
+            time.sleep(PICK_LEDGER_LOCK_POLL_S)
+    try:
+        os.write(fd, str(os.getpid()).encode("ascii"))
+    except BaseException:
+        os.close(fd)
+        os.unlink(lock_path)
+        raise
+    os.close(fd)
+    try:
+        yield
+    finally:
+        try:
+            os.unlink(lock_path)
+        except FileNotFoundError:
+            pass
+
+
 def append_picks_ledger(
     path: str | Path,
     picks: Sequence[Mapping[str, Any]] | None,
@@ -571,20 +623,25 @@ def append_picks_ledger(
 
     Idempotent by default: re-running the same ``asof`` (or the same brief
     regeneration) appends nothing. Returns only the rows actually written.
+
+    The read-existing / dedupe / append sequence runs under
+    :func:`_picks_ledger_lock`, so two processes regenerating the same ``asof``
+    cannot both see a key as absent and both append it.
     """
     rows = normalize_picks(picks)
     if not rows:
         return []
-    existing: set[tuple[str, str]] = set()
-    if skip_existing:
-        for e in load_picks_ledger(path):
-            existing.add((str(e["date"]), str(e["code"])))
     appended: list[dict[str, Any]] = []
-    for row in rows:
-        key = (str(row["date"]), str(row["code"]))
-        if skip_existing and key in existing:
-            continue
-        append_jsonl(path, row)
-        appended.append(row)
-        existing.add(key)
+    with _picks_ledger_lock(path):
+        existing: set[tuple[str, str]] = set()
+        if skip_existing:
+            for e in load_picks_ledger(path):
+                existing.add((str(e["date"]), str(e["code"])))
+        for row in rows:
+            key = (str(row["date"]), str(row["code"]))
+            if skip_existing and key in existing:
+                continue
+            append_jsonl(path, row)
+            appended.append(row)
+            existing.add(key)
     return appended
