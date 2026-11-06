@@ -37,6 +37,7 @@
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
 **下一刀**（v4.14.0 之后）：**签核 ADR 0094**（是否把 lvrev 出厂退出改为 `trail_tp=True`；依据 [`plans/lvrev-enhancement.md`](plans/lvrev-enhancement.md) §5，其余四变体不通过、不起 ADR）；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；S4「短期反转」候选（E1）已按事先登记标准判不通过（[`plans/shadow-s4-s5-diagnosis.md`](plans/shadow-s4-s5-diagnosis.md) §9），S5 PIT 资金流（E3）仍为后续前向研究待办；全量 R5 仍等生产侧 ETF 回补。  
+**补充行情库**（ADR [`0095`](architecture/0095-aux-market-store.md)）：5 指数日线已入 `local/aux_market/`（2020-01-02~2026-11-05），离线回测超额可算；日循环 settle 仍不读、需定期跑 `stock-platform-aux-market` 增量；data_quality 读 OHLC 未接。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
 
 ## v4.14 已落地
