@@ -71,11 +71,13 @@
 
 ### 2.2 文件
 
+文件名日期用**运行日（reportDay）**，不用 `asof`。依据 ADR 0083 v4.13.1 修正：盘前与盘后共用同一 asof，若文件名用 asof，就和正文 `开盘(T)/收盘(T)` 列错位。
+
 | 文件 | 含义 |
 |---|---|
-| `data/digests/{asof}-pre.md` / `.html` | 盘前。后一次盘后渲染**不得删除** |
-| `data/digests/{asof}-post.md` / `.html` | 盘后。不得删除盘前文件 |
-| `data/digests/{asof}.md` / `.html` | **最后一次成功渲染的别名**（拷贝，不是第三套正文） |
+| `data/digests/{reportDay}-pre.md` / `.html` | 盘前。后一次盘后渲染**不得删除** |
+| `data/digests/{reportDay}-post.md` / `.html` | 盘后。不得删除盘前文件 |
+| `data/digests/{reportDay}.md` / `.html` | **最后一次成功渲染的别名**（拷贝，不是第三套正文） |
 | `data/digests/latest.md` / `latest.html` | 仍是最后一次成功渲染 |
 | `data/digests/latest-pre.*` / `latest-post.*` | 各会话最新指针，增量，不替换 `latest.md` |
 
@@ -91,7 +93,7 @@
 
 - 库里一个 asof 只留**最新一条**。15:30 跑批覆盖 08:30 写入的那一行。`payload["session"]`、`runDate`、`quoteDate` 描述的是最后一次写入。
 - 盘前、盘后各留一份的是 **digest 文件**（§2.2），不是两行 brief。
-- 覆盖之后，库里不再有上午的 `generated_at`。若两次跑批之间 `holdings.json` 变了，上午的 ③B 也不能从库里找回，以已经写出的 `{asof}-pre.md` 为准。
+- 覆盖之后，库里不再有上午的 `generated_at`。若两次跑批之间 `holdings.json` 变了，上午的 ③B 也不能从库里找回，以已经写出的 `{reportDay}-pre.md` 为准。
 - 重渲另一会话靠命令行：`--session pre --run-date <那天>`。因子与 picks 仍来自这唯一一行（同一 asof 截面）。盘前渲染不填运行日 OHLC。
 
 ### 2.4 正文骨架
@@ -278,7 +280,7 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 | `daily_digest.py` | 正文标题、stub 标题、写出 `{asof}-pre\|post`、`{asof}` 别名、`latest`、`latest-pre\|post` |
 | `report_html.py` | digest 路径去掉双 H1 |
 
-验收：同一 asof 连跑 pre 与 post，两份文件都在，标题不同，`{asof}.md` 与 `latest.md` 等于后一次，盘前文件仍在。库里仍是一行 brief。
+验收：同一 asof 连跑 pre 与 post，两份文件都在，标题不同，`{reportDay}.md` 与 `latest.md` 等于后一次，盘前文件仍在。库里仍是一行 brief。
 
 ### P1 · 行情列与理由
 
@@ -305,7 +307,7 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 
 | 类型 | 位置 | 断言 |
 |---|---|---|
-| 改 | `test_daily_digest.py` | 新标题；`{asof}-pre` 与 `{asof}-post` 共存；`{asof}.md` 等于最后一次；`latest.md` 仍在 |
+| 改 | `test_daily_digest.py` | 新标题；`{reportDay}-pre` 与 `{reportDay}-post` 共存；`{reportDay}.md` 等于最后一次；`latest.md` 仍在 |
 | 新增 | 同上 | 盘前三列是 `—`；未传 `--run-date` 且 payload 无 `runDate` 时不出现「今天」的伪造报价；理由长文完整，不断成 `...`；HTML 只有一个 `<h1>`；③B 含触发规则、持有天数、可卖/不可卖、集中度，且无固定句「无 T+1 冻结」；ETF 样例不出现 T+1 |
 | 新增 | `test_secondary_pick.py` | ST 两套 profile 都剔除；`amount` 按元比较（`29999999` 落选，`30000000` 不因流动性落选）；`rev_chg=-0.26` 触发 E3，`rev_chg=-0.25` 不触发；`rs20=-3.01` 触发 S4，`rs20=-3` 与 `rs20=-0.03` 都不触发；不足 5 只不补齐；同一输入两种 profile 排序不同；长线在 `|rs20|` 更大时趋势分更低；缺字段的行落选，且结果不等于「删掉该维再归一」的排名；可评分不足 2 只时 `selected` 为空 |
 | 新增 | `test_rankings.py` | `pool` 宽 10，`items` 宽 5；pool 的代码与 ②A 头部不相交；`hit_tracking` 仍只读生产 items |
@@ -314,7 +316,7 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 
 验收清单：
 
-- [x] 盘前/盘后标题可分；`-pre`/`-post` 都保留；`{asof}.md` 与 `latest.md` 是最后一次
+- [x] 盘前/盘后标题可分；`-pre`/`-post` 都保留；`{reportDay}.md` 与 `latest.md` 是最后一次
 - [x] 调度参数仍含 `-PrevSession -SettleAfter`；asof 仍是 T-1
 - [x] 盘后开/收来自外部日线的 quoteDate，不是 panel，也不是引擎最后一根
 - [x] 涨跌自算；`quoteDate == asof` 时分母是前一交易日
@@ -334,8 +336,8 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 |---|---|
 | 东财失败 | `em_get` 统一限流；整列 `—` + `dataNote`；缓存命中则同日不再请求 |
 | 外部 close 与引擎 asof close 的复权不一致 | 正常盘后前收规定用引擎 asof close，报价用外部 T 日 close。两者相除是规格，不是 A6 的「收盘也走引擎」。除权日可能难看，失败时整列 `—`，不改规则去混用 |
-| 覆盖 brief 丢掉上午 ③B | 已在 §2.3 写明。上午内容以 `{asof}-pre.md` 为准。不为此改主键 |
-| `{asof}.md` 旧读者 | 别名保留为最后一次。文档与测试按 §2.2 改。盘前原文只在 `{asof}-pre.md` |
+| 覆盖 brief 丢掉上午 ③B | 已在 §2.3 写明。上午内容以 `{reportDay}-pre.md` 为准。不为此改主键 |
+| `{reportDay}.md` 旧读者 | 别名保留为最后一次。文档与测试按 §2.2 改。盘前原文只在 `{reportDay}-pre.md` |
 | 二次精选被当成加仓建议 | 报告固定 §3.3 那一行。同花顺仍导出生产榜 |
 | pool 被误当成生产榜 | `items` 宽度测试锁死；命中与回测不读 `pool` |
 | 阈值被拍脑袋定死 | 已用 `2026-10-27` 截面校准，并记录了首版门槛导致 ②B 10 进 0 的实证；常量、§3.2、ADR §5 三处必须一致 |
@@ -355,7 +357,7 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 | `scripts/check_docs.ps1` 的 `$required` | **必须**列入 0083。0082 已在列；只在 `docs/architecture/` 新建文件，检查不会因此失败 |
 | `CHANGELOG.md` | 已写入 `v4.13.0` 节 |
 | 版本号 | 已同步根 `VERSION` 与五个包共 11 处至 `4.13.0` |
-| `docs/ops/scheduler.md`、`docs/ops/daily-pipeline.md` | 写上 `-Session`、新文件名、`{asof}.md` 仍是最后一次的别名 |
+| `docs/ops/scheduler.md`、`docs/ops/daily-pipeline.md` | 写上 `-Session`、新文件名、`{reportDay}.md` 仍是最后一次的别名 |
 | `docs/plans/trading-system-roadmap.md` | 已在 §8 修订记录追加 `v4.13.0` 一行；`T3` 改记顺延 `v4.14.0` |
 
 不改 `docs/ROADMAP.md`。不提交 `data/quotes`、`data/digests` 或数据库。
