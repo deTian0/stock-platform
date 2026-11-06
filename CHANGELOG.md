@@ -10,6 +10,10 @@
 - **Y1 采纳闸门透传影子 S1 大势开关**：`stock-platform-strategy-adoption --include-shadow --shadow-s1-mode pick|gate|scale [--shadow-s1-gate-weak empty|s3]`（`CandidateSpec.s1_mode / s1_gate_weak`）；默认 `pick` 时调用与 summary 逐位不变。§11.7 按事先登记标准复核 gate/弱日空榜：分年夏普仅 3/6 年 ≥ D、2024 单年贡献超额 81%，判不通过，影子默认维持 D、不起 ADR（[`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.7）。
 - **影子 S4/S5 只读诊断模块**（`stock_platform_research.shadow_board.diagnostics`，`python -m` 运行，只读 market.db、产物写 `local/shadow/diagnostics/`）：逐日重建 S3/S4/S5 Round1 候选池，与反向池、成交额池、随机池对照，统计 1/3/5/10/20 日前向收益、超额、IC、五分位、入场涨停特征和引擎退出模拟。结论：S4 短动量方向反了，S5 历史上退化为按代码排序（成交额 8 亿处饱和），建议均下线、待签核（[`docs/plans/shadow-s4-s5-diagnosis.md`](docs/plans/shadow-s4-s5-diagnosis.md)）。不改任何学校、仲裁逻辑或默认值。
 
+### Changed
+
+- **影子终榜 S4 / S5 下线**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md) 增补 2，用户 2026-11-06 签核）：学校启用表 `schools.DEFAULT_ENABLED_SCHOOLS=(S1,S2,S3)`，日循环影子链与 walk-forward 回测中 S4/S5 恒空池，`reason="retired: see shadow-s4-s5-diagnosis"`、`retired=true`。原实现保留；`run_round1(enabled_schools=...)` 或 `STOCK_PLATFORM_SHADOW_SCHOOLS=S1,S2,S3,S4,S5` 可重新开启（显式开启后行为与下线前一致，单测钉住）。S3 不升权，S1 维持 `pick`，仲裁维持 `d`；回测报告新增 `shadow.enabledSchools` 并在 `limitations` 注明下线学校；`loop_health.shadowBoard` 不因下线空池告警。下线后回测对照见 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.8。
+
 ## [4.14.0] - 2026-11-06
 
 ### Added

@@ -36,7 +36,7 @@
 **已知偏置**：回测 402 日 `schoolCoverage` 显示 S1 有 235 天非空池却 **0 席**、S5 仅 3 席——Round2 把学校优先级排在分数之前，S3/S4 先填满 10 席。现象、证据与可选改法记在 [`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11；**改仲裁须先签核 + ADR**，本轮未改。S2 数据源规划见 [`plans/s2-event-theme-data.md`](plans/s2-event-theme-data.md)。  
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
-**下一刀**（v4.14.0 之后）：S1 整板开关对照已收口——gate/弱日空榜 按 §11.7 事先标准**不通过**（分年夏普 3/6、2024 单年贡献 81%），影子默认维持 D、不起 ADR；S4/S5 下线建议待签核（[`plans/shadow-s4-s5-diagnosis.md`](plans/shadow-s4-s5-diagnosis.md)）；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；全量 R5 仍等生产侧 ETF 回补。  
+**下一刀**（v4.14.0 之后）：S1 整板开关对照已收口——gate/弱日空榜 按 §11.7 事先标准**不通过**（分年夏普 3/6、2024 单年贡献 81%），影子默认维持 D、不起 ADR；**S4/S5 已下线**（2026-11-06 签核，ADR 0093 增补 2；启用表默认 `S1,S2,S3`，`STOCK_PLATFORM_SHADOW_SCHOOLS` 可回退；依据 [`plans/shadow-s4-s5-diagnosis.md`](plans/shadow-s4-s5-diagnosis.md)，下线后回测见计划 §11.8）；S4「短期反转」候选（E1）与 S5 PIT 资金流（E3）列为后续前向研究待办；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；全量 R5 仍等生产侧 ETF 回补。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
 
 ## v4.14 已落地

@@ -54,8 +54,12 @@ def _universe() -> list[dict]:
 
 
 def test_round1_s3_s4_ok_s1_breadth_off_s2_no_provider() -> None:
-    """Default universe: rs20 all negative → S1 risk-off; S2 no DI → empty; S5 uses amount."""
-    pools = run_round1(_universe(), top_k=3)
+    """rs20 all negative → S1 risk-off; S2 no DI → empty; S5 uses amount.
+
+    S4/S5 are retired by default (ADR 0093 增补 2); re-enable all five explicitly
+    to pin the pre-retirement behaviour.
+    """
+    pools = run_round1(_universe(), top_k=3, enabled_schools="S1,S2,S3,S4,S5")
     assert pools["S1"]["status"] == "empty"
     assert "择时" in (pools["S1"].get("reason") or "") or "宽度" in (pools["S1"].get("reason") or "")
     assert pools["S2"]["status"] == "empty"

@@ -39,3 +39,16 @@
    - 预算 `STOCK_PLATFORM_S2_EM_BUDGET`，默认 **300** 逻辑请求/自然日（Asia/Shanghai），记在 `s2_snapshots/_budget.json`；实测 4 次/日，同 asof `ok` 快照复用零网络。
    - **fail-soft**：单源失败 / 超预算只记 `sources.*.status` 与 note，永不抛出、不阻断；`loop_health.shadowBoard.s2` 最多 warn。
    - PIT：龙虎榜按交易日可回放；板块排名仅 `updatedAt` 日期 == asof 才用；解禁日程有修订前视，仅作软排除。回测不读快照，S2 在回测恒空池。
+
+## 增补 2（2026-11-06，用户签核：S4 / S5 下线）
+
+- **状态**：Accepted（用户 2026-11-06 签核）
+- **依据**：[`../plans/shadow-s4-s5-diagnosis.md`](../plans/shadow-s4-s5-diagnosis.md)。S4 现有短动量口径方向反了（A 股短期反转；综合分 IC −0.097，五分位单调递减，入池追高）。S5 有实现缺陷（`min(amount/1e9, 0.8)` 封顶后按代码升序取前 8，入池 100% 为 `000` 开头），且历史库无资金流字段，按真实成交额排序同样为负。
+
+决策：
+
+1. **S4 现有短动量口径下线、S5 下线**。日循环影子链与 walk-forward 回测中，Round1 对两校输出空池，`reason = "retired: see shadow-s4-s5-diagnosis"`，`retired = true`。
+2. **可回退**：学校启用表 `schools.DEFAULT_ENABLED_SCHOOLS = (S1, S2, S3)`；`run_round1(enabled_schools=...)` 显式传参优先，否则读 `STOCK_PLATFORM_SHADOW_SCHOOLS`（逗号列表，如 `S1,S2,S3,S4,S5`），都未设则用出厂表。原实现 `school_s4_short` / `school_s5_flow` 保留不删，诊断模块直接调用，便于以后复测。未知学校 ID 报错，不静默关校。
+3. **S3 保留，不升权**；**S2 照旧**（S2-P1 前向快照继续）；**S1 维持 `pick`**（§11.7 复核不通过，`gate` 仅为实验开关）；Round2 仲裁默认 **`d`** 与学校优先级表不变。
+4. 多策略整体**仍是影子**，只积累前向证据；不改出厂 lvrev，升级仍走 Y1 → 签核 → Y2。
+5. **不在本增补内**：S4「短期反转」新候选（诊断 §6 E1）、S5 PIT 资金流（E3）。二者是后续前向研究，进入出票前须另行签核。

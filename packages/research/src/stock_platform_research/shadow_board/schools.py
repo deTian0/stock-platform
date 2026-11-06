@@ -724,6 +724,48 @@ _SCHOOL_RUNNERS = {
     "S5": school_s5_flow,
 }
 
+#: Schools retired by ADR 0093 增补 2 (signed off 2026-11-06). Their runners stay
+#: in place (diagnostics / re-tests call them directly); Round1 just emits an empty
+#: pool with :data:`RETIRED_REASON` unless the school is explicitly re-enabled.
+RETIRED_SCHOOLS: frozenset[str] = frozenset({"S4", "S5"})
+RETIRED_REASON = "retired: see shadow-s4-s5-diagnosis"
+#: Factory enable table = every school not retired.
+DEFAULT_ENABLED_SCHOOLS: tuple[str, ...] = tuple(s for s in SCHOOL_IDS if s not in RETIRED_SCHOOLS)
+#: Rollback without code change: comma list of enabled schools (e.g. ``S1,S2,S3,S4,S5``).
+ENV_SHADOW_SCHOOLS = "STOCK_PLATFORM_SHADOW_SCHOOLS"
+
+
+def resolve_enabled_schools(
+    enabled: Sequence[str] | str | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    """Explicit ``enabled`` wins; else ``STOCK_PLATFORM_SHADOW_SCHOOLS``; else factory table.
+
+    Unknown IDs raise (typos must not silently disable a school).
+    """
+    import os
+
+    raw: Any = enabled
+    if raw is None:
+        src = env if env is not None else os.environ
+        text = str(src.get(ENV_SHADOW_SCHOOLS) or "").strip()
+        if not text:
+            return DEFAULT_ENABLED_SCHOOLS
+        raw = text
+    items = raw.split(",") if isinstance(raw, str) else list(raw)
+    out = [str(x).strip().upper() for x in items if str(x).strip()]
+    bad = [x for x in out if x not in SCHOOL_IDS]
+    if bad:
+        raise ValueError(f"unknown shadow school id(s) {bad}; expected subset of {SCHOOL_IDS}")
+    return tuple(s for s in SCHOOL_IDS if s in set(out))
+
+
+def _retired(school: str) -> dict[str, Any]:
+    pool = _empty(school, RETIRED_REASON)
+    pool["retired"] = True
+    return pool
+
 
 def run_round1(
     universe: Sequence[Mapping[str, Any]] | None,
@@ -736,9 +778,16 @@ def run_round1(
     sector_fund_flow: ProviderLike = None,
     lhb: ProviderLike = None,
     unlock: ProviderLike = None,
+    enabled_schools: Sequence[str] | str | None = None,
     **hooks: Any,
 ) -> dict[str, dict[str, Any]]:
-    """Run all five schools; optional DI hooks forwarded to each runner."""
+    """Run all five schools; optional DI hooks forwarded to each runner.
+
+    Schools outside the enable table (default :data:`DEFAULT_ENABLED_SCHOOLS`, i.e.
+    S4/S5 retired) return an empty pool with ``reason=RETIRED_REASON`` and
+    ``retired=True``; their runner is not called.
+    """
+    enabled = set(resolve_enabled_schools(enabled_schools))
     out: dict[str, dict[str, Any]] = {}
     common = {
         "top_k": top_k,
@@ -752,14 +801,22 @@ def run_round1(
         **hooks,
     }
     for sid in SCHOOL_IDS:
+        if sid not in enabled:
+            out[sid] = _retired(sid)
+            continue
         runner = _SCHOOL_RUNNERS[sid]
         out[sid] = runner(universe, **common)
     return out
 
 
 __all__ = [
+    "DEFAULT_ENABLED_SCHOOLS",
+    "ENV_SHADOW_SCHOOLS",
+    "RETIRED_REASON",
+    "RETIRED_SCHOOLS",
     "SCHOOL_IDS",
     "SCHOOL_NAMES",
+    "resolve_enabled_schools",
     "run_round1",
     "school_s1_macro",
     "school_s2_theme",

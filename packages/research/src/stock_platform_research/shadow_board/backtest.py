@@ -42,7 +42,15 @@ from ..portfolio import compute_metrics, is_etf, is_fund, norm_code
 from ..secondary_pick import AMOUNT_MIN
 from ..strategy_ab import AB_METRIC_KEYS, _delta_metrics, _review_block
 from .round2 import DEFAULT_ARBITRATION, DEFAULT_MIN_SEATS, apply_round2_set_a
-from .schools import SCHOOL_IDS, S1_REGIME_STATES, run_round1, s1_regime_state
+from .schools import (
+    ENV_SHADOW_SCHOOLS,
+    RETIRED_REASON,
+    S1_REGIME_STATES,
+    SCHOOL_IDS,
+    resolve_enabled_schools,
+    run_round1,
+    s1_regime_state,
+)
 
 #: S1 experiment knob (docs/plans/multi-strategy-final-board.md §11.6).
 #: ``pick`` = factory (S1 picks like any school); ``gate`` = S1 stops picking and
@@ -579,6 +587,20 @@ def compare_shadow_vs_lvrev(
         arm["benchmarkReturn"] = bench
         arm["excessReturn"] = (float(tr) - bench) if (tr is not None and bench is not None) else None
     shadow_public = {k: v for k, v in shadow.items() if k not in ("trades", "equityCurve")}
+    enabled = resolve_enabled_schools()
+    retired = [sid for sid in SCHOOL_IDS if sid not in enabled]
+    shadow_public.setdefault("shadow", {})["enabledSchools"] = list(enabled)
+    limitations = [
+        "name/industry 取 fundamentals 当前快照（非 PIT），与 S4 中性化基线同口径限制",
+        "S2 无历史题材/事件 DI → 历史回测恒空池",
+        (
+            f"{'/'.join(retired)} 已下线（{RETIRED_REASON}；ADR 0093 增补 2）→ 恒空池；"
+            f"重新开启设 {ENV_SHADOW_SCHOOLS}"
+            if retired
+            else "S5 走 amount/illiq 流动性薄规则（无历史资金流）"
+        ),
+        "仅回放集 A（确定性仲裁）；集 B / LLM 不进回测",
+    ]
     return {
         "ok": True,
         "start": base_loop["equity_curve"][0]["date"] if base_loop["equity_curve"] else None,
@@ -593,11 +615,7 @@ def compare_shadow_vs_lvrev(
         "replacesPicks": False,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
-        "limitations": [
-            "name/industry 取 fundamentals 当前快照（非 PIT），与 S4 中性化基线同口径限制",
-            "S2 无历史题材/事件 DI → 历史回测恒空池；S5 走 amount/illiq 流动性薄规则",
-            "仅回放集 A（确定性仲裁）；集 B / LLM 不进回测",
-        ],
+        "limitations": limitations,
         "disclaimer": "影子终榜历史回测（研究指标）；非投资建议；SIMULATE；不替换主路径 picks。",
     }
 
