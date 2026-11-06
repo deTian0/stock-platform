@@ -66,6 +66,18 @@ CapabilityStatus {
 
 运行时：`stock_platform_providers.build_capability_matrix` / `register_builtin_providers`。
 
+## 全市场按日截面方法（S2-P1，非路由能力）
+
+`astock_http` 另有三个**全市场**按日方法，供影子链 S2 快照（[`../plans/s2-event-theme-data.md`](../plans/s2-event-theme-data.md) §S2-P1、ADR [0093](../architecture/0093-multi-strategy-shadow-board.md) 增补）使用。它们**不**进入上表能力清单与 `build_capability_matrix` 路由，不影响 `usable` 探测；调用方直接持有 `AStockHttpProvider`。
+
+| 方法 | 对应数据集口径 | 端点（均经 `em_get`） | 单位 | PIT 可回放性 |
+|------|----------------|------------------------|------|--------------|
+| `get_lhb_daily(trade_date)` | `lhb`（全市场日榜） | datacenter-web `RPT_DAILYBILLBOARD_DETAILSNEW`，`TRADE_DATE=asof`，分页（默认 500×4） | 金额**元**；`change_pct`/`turnover_rate` **小数** | **可回放**：按交易日过滤；盘后公布，只能用于 asof 次日入场 |
+| `get_unlock_calendar(start, end)` | `unlock`（全市场日程） | datacenter-web `RPT_LIFT_STAGE`，`start ≤ FREE_DATE ≤ end`，分页 | 股数**万股**；`ratio` **小数**（占流通股） | **有前视风险**：取当前公告日程，日程修订后不可严格回放；**仅作软排除** |
+| `get_board_rank(kind)` | `sector_fund_flow`（排名截面） | push2 `clist`，`fs=m:90+t:3`（概念）/ `m:90+t:2`（行业），按 `f62` 排序，单页 ≤100 | `main_net` **元**；`change_pct` **小数** | **不可回放**：vendor 当前快照，无日期参数；仅当 `updated_at` 日期 == asof 时有效（`pitOk`），否则 `stale` 不用 |
+
+返回含 `truncated`（分页上限截断）/ `updated_at`（板块排名）供调用方判定；fail-closed 由调用方处理（S2 快照 fail-soft 记 `sources.*.status`）。
+
 ## 插件失败隔离
 
 加载失败不得拖垮未启用插件的主流程；失败源不得出现在该能力的 `candidates` 正向列表（可进 `pending`）。
