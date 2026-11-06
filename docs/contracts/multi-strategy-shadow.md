@@ -109,7 +109,7 @@
 - 入口：`stock-platform-shadow-board --backtest --start YYYY-MM-DD [--end ...] [--db ...] [--bt-out-dir local/shadow/backtest]`（只读 `market.db`，产物不提交）。
 - 同一引擎：影子终榜与 lvrev 基线都走 `book_replay.replay_book`（X4 单点），T+1 / 涨跌停 / 冷静期 / 成本口径与主回测一致；差异只在 entry provider。
 - 无未来函数：每个交易日只用截至当日的截面（`compute_features` 为 PIT-safe），逐日调用与日循环相同的 `run_round1` → `apply_round2_set_a`。
-- 报告：总收益 / 年化 / 超额（沪深300，缺则 `None`）/ 回撤 / 夏普 / 胜率 / 笔数 / 换手 / 空榜比例 / 分校覆盖，`delta = 影子 − lvrev`。
+- 报告：总收益 / 年化 / 超额（基准经 F1 单点 `stock_platform_research.benchmark` 解析，默认 `000905`，`STOCK_PLATFORM_BENCHMARK_SYMBOL` 可覆盖；身份校验不通过或 `daily_price` 无该行 → `benchmark.available=false` + `reason`、超额列标「不可用」并写入 `limitations`，不以个股冒充指数）/ 回撤 / 夏普 / 胜率 / 笔数 / 换手 / 空榜比例 / 分校覆盖，`delta = 影子 − lvrev`。
 - 已知限制（写入报告 `limitations`）：`name`/`industry` 取 fundamentals 当前快照（非 PIT）；S2 无历史 DI → 恒空池；S4/S5 出厂下线 → 恒空池（重新开启时 S5 走流动性薄规则）；仅回放集 A，集 B / LLM 不进回测。
 
 ## 5. digest 只读附录（可选）

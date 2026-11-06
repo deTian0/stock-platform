@@ -51,7 +51,7 @@ def _render_summary(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _index_close(db: str, start: str, end: str, code: str = "000300.SH") -> dict[str, float]:
+def _index_close(db: str, start: str, end: str, code: str) -> dict[str, float]:
     """Read-only benchmark closes from ``daily_price``; empty when the index is absent."""
     import sqlite3
 
@@ -65,6 +65,36 @@ def _index_close(db: str, start: str, end: str, code: str = "000300.SH") -> dict
     finally:
         con.close()
     return {str(d)[:10]: float(c) for d, c in rows if c is not None}
+
+
+def resolve_backtest_benchmark(
+    db: str, start: str, end: str, *, names: dict[str, str] | None
+) -> tuple[dict[str, float] | None, dict[str, Any]]:
+    """Benchmark via the F1 single point (``stock_platform_research.benchmark``).
+
+    Identity check first (fail-closed: a bare index code that resolves to a stock
+    in fundamentals is never read as an index); then read-only closes for the
+    engine code. Returns ``(index_close or None, identity block with reason)``.
+    """
+    from ..benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
+
+    bench = resolve_benchmark_symbol()
+    ident = resolve_benchmark_identity(bench, names=names or {})
+    block: dict[str, Any] = {
+        "symbol": ident.get("symbol"),
+        "engineCode": ident.get("engineCode"),
+        "name": ident.get("name"),
+        "identityChecked": bool(ident.get("checked")),
+        "identityOk": bool(ident.get("ok")),
+    }
+    if not ident.get("alphaAvailable", True):
+        block["reason"] = str(ident.get("warning") or "基准身份校验未通过")
+        return None, block
+    closes = _index_close(db, start, end, str(ident.get("engineCode")))
+    if not closes:
+        block["reason"] = f"market.db daily_price 无 `{ident.get('engineCode')}` 行（{start}~{end}）"
+        return None, block
+    return closes, block
 
 
 def _parse_s1_scale(text: str | None) -> dict[str, float] | None:
@@ -131,6 +161,12 @@ def _run_backtest(args: argparse.Namespace) -> int:
     print(f"[load] rows={len(bars)} names={len(names)} industry={len(industry or {})}", file=sys.stderr)
 
     feats = prepare_shadow_frame(bars, start=args.start, end=end, industry_map=industry)
+    index_close, bench_block = resolve_backtest_benchmark(db, args.start, end, names=names)
+    print(
+        f"[bench] {bench_block.get('engineCode')} "
+        + ("ok" if index_close else f"unavailable：{bench_block.get('reason')}"),
+        file=sys.stderr,
+    )
     payload = compare_shadow_vs_lvrev(
         feats,
         name_map=names,
@@ -138,7 +174,8 @@ def _run_backtest(args: argparse.Namespace) -> int:
             initial_capital=args.initial_capital, max_positions=args.max_positions
         ),
         top_k=args.top_k,
-        index_close=_index_close(db, args.start, end) or None,
+        index_close=index_close,
+        benchmark=bench_block,
         arbitration=args.arbitration,
         min_seats=args.min_seats,
         **_s1_kwargs(args),

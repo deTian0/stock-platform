@@ -538,11 +538,16 @@ def compare_shadow_vs_lvrev(
     s1_mode: str = DEFAULT_S1_MODE,
     s1_gate_weak: str = DEFAULT_S1_GATE_WEAK,
     s1_scale: Mapping[str, float] | None = None,
+    benchmark: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """lvrev 出厂基线 vs 影子 Final Board on one frame, one engine.
 
     ``delta = shadow − lvrev``. ``index_close`` (optional ``date → close``)
     adds an excess-return line; missing → ``None`` (never fabricated).
+    ``benchmark`` (optional identity block from the CLI's ``benchmark`` resolution:
+    ``symbol`` / ``name`` / ``reason``) is echoed as ``payload.benchmark``; when no
+    excess can be computed the payload says so (``available=false`` + ``reason``,
+    also appended to ``limitations``) instead of leaving the column silently blank.
     ``arbitration`` is the offline seat-allocation experiment knob (default
     ``"d"`` = factory); ``s1_mode`` is the S1 board-regime experiment knob
     (default ``"pick"`` = factory). The lvrev arm is untouched by either, so the
@@ -586,6 +591,15 @@ def compare_shadow_vs_lvrev(
         tr = (arm["metrics"] or {}).get("total_return")
         arm["benchmarkReturn"] = bench
         arm["excessReturn"] = (float(tr) - bench) if (tr is not None and bench is not None) else None
+        arm["excessAvailable"] = bench is not None
+    bench_block: dict[str, Any] = dict(benchmark or {})
+    bench_reason: str | None = None
+    if bench is None:
+        bench_reason = str(bench_block.get("reason") or "") or (
+            "未提供基准指数序列" if not index_close else "基准序列未覆盖回测首/末交易日"
+        )
+    bench_block["available"] = bench is not None
+    bench_block["reason"] = bench_reason
     shadow_public = {k: v for k, v in shadow.items() if k not in ("trades", "equityCurve")}
     enabled = resolve_enabled_schools()
     retired = [sid for sid in SCHOOL_IDS if sid not in enabled]
@@ -601,6 +615,8 @@ def compare_shadow_vs_lvrev(
         ),
         "仅回放集 A（确定性仲裁）；集 B / LLM 不进回测",
     ]
+    if bench_reason:
+        limitations.append(f"超额不可用（fail-closed，不以个股冒充指数）：{bench_reason}")
     return {
         "ok": True,
         "start": base_loop["equity_curve"][0]["date"] if base_loop["equity_curve"] else None,
@@ -615,6 +631,7 @@ def compare_shadow_vs_lvrev(
         "replacesPicks": False,
         "environment": "SIMULATE",
         "liveTradingEnabled": False,
+        "benchmark": bench_block,
         "limitations": limitations,
         "disclaimer": "影子终榜历史回测（研究指标）；非投资建议；SIMULATE；不替换主路径 picks。",
     }
@@ -658,11 +675,17 @@ def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
     b = payload["lvrev"]
     s = payload["shadow"]
     bm, sm = b.get("metrics") or {}, s.get("metrics") or {}
+    bench = payload.get("benchmark") or {}
+    na = "不可用" if bench.get("available") is False else "-"
+
+    def _bpct(v: Any) -> str:
+        return na if v is None else _pct(v)
+
     rows = [
         ("总收益", _pct(bm.get("total_return")), _pct(sm.get("total_return"))),
         ("年化", _pct(bm.get("cagr")), _pct(sm.get("cagr"))),
-        ("基准收益", _pct(b.get("benchmarkReturn")), _pct(s.get("benchmarkReturn"))),
-        ("超额", _pct(b.get("excessReturn")), _pct(s.get("excessReturn"))),
+        ("基准收益", _bpct(b.get("benchmarkReturn")), _bpct(s.get("benchmarkReturn"))),
+        ("超额", _bpct(b.get("excessReturn")), _bpct(s.get("excessReturn"))),
         ("最大回撤", _pct(bm.get("max_drawdown")), _pct(sm.get("max_drawdown"))),
         ("夏普", _num(bm.get("sharpe")), _num(sm.get("sharpe"))),
         ("胜率", _pct(bm.get("win_rate")), _pct(sm.get("win_rate"))),
@@ -677,6 +700,15 @@ def render_shadow_backtest_markdown(payload: Mapping[str, Any]) -> str:
         "",
         f"- 区间：{payload.get('start')} ~ {payload.get('end')}",
         "- 引擎：book_replay.replay_book（T+1 / 涨跌停 / 成本与主回测同源）",
+        *(
+            [
+                f"- 基准：`{bench.get('engineCode') or bench.get('symbol') or '-'}`"
+                + (f"（{bench.get('name')}）" if bench.get("name") else "")
+                + (" · 超额可算" if bench.get("available") else f" · **超额不可用**：{bench.get('reason')}")
+            ]
+            if bench
+            else []
+        ),
         f"- 仲裁模式：`{sh.get('arbitration') or DEFAULT_ARBITRATION}`"
         + (f"（min_seats={sh.get('minSeats')}）" if sh.get("minSeats") is not None else "")
         + ("（出厂默认）" if (sh.get("arbitration") or DEFAULT_ARBITRATION) == DEFAULT_ARBITRATION else "（离线实验，非出厂）"),

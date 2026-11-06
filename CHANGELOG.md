@@ -14,6 +14,10 @@
 
 - **影子终榜 S4 / S5 下线**（ADR [`0093`](docs/architecture/0093-multi-strategy-shadow-board.md) 增补 2，用户 2026-11-06 签核）：学校启用表 `schools.DEFAULT_ENABLED_SCHOOLS=(S1,S2,S3)`，日循环影子链与 walk-forward 回测中 S4/S5 恒空池，`reason="retired: see shadow-s4-s5-diagnosis"`、`retired=true`。原实现保留；`run_round1(enabled_schools=...)` 或 `STOCK_PLATFORM_SHADOW_SCHOOLS=S1,S2,S3,S4,S5` 可重新开启（显式开启后行为与下线前一致，单测钉住）。S3 不升权，S1 维持 `pick`，仲裁维持 `d`；回测报告新增 `shadow.enabledSchools` 并在 `limitations` 注明下线学校；`loop_health.shadowBoard` 不因下线空池告警。下线后回测对照见 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.8。
 
+### Fixed
+
+- **影子终榜回测基准**：原 CLI 硬读 `000300.SH`，market.db 无此行，超额列一直静默为空。现经 F1 单点 `stock_platform_research.benchmark` 解析（默认 `000905`，可用 `STOCK_PLATFORM_BENCHMARK_SYMBOL` 覆盖），先做 fundamentals 名称身份校验，再只读 `daily_price`。payload 新增 `benchmark{symbol,engineCode,name,available,reason}` 与各臂 `excessAvailable`；不可用时报告超额列标「不可用」，`limitations` 写明原因。实测 market.db 无任何指数行（`000905.SZ`=厦门港务、`000852.SZ`=石化机械、`000016.SZ`=*ST康佳A、`000300` 不存在），因此超额按 fail-closed 标不可用。lvrev 臂同路径。不写 market.db。
+
 ## [4.14.0] - 2026-11-06
 
 ### Added
