@@ -1,6 +1,6 @@
 # 0094 — lvrev 实验退出：移动止盈（`trail_tp`）
 
-- **状态**：Proposed（等用户签核）
+- **状态**：Accepted（opt-in，出厂默认关）；2026-11-06 用户签核，生产默认未改
 - **日期**：2026-11-06
 - **相关**：计划 [`../plans/lvrev-enhancement.md`](../plans/lvrev-enhancement.md) · 契约 [`../contracts/trading-rules.md`](../contracts/trading-rules.md) · ADR [`0093`](0093-multi-strategy-shadow-board.md)
 
@@ -16,6 +16,15 @@
 2. **实现**：`ExitPolicy.trail_tp: bool = False`（出厂默认关）；开启时走上述分支。参数事先写死，不做搜索。
 3. **签核前不改出厂默认**：库默认、日循环、brief / picks 仍用 `ExitPolicy()`；仅实验开关 / CLI `stock-platform-lvrev-enhancement` 可打开。
 4. **签核后若 Accepted**：再另开提交把生产默认改为 `trail_tp=True`（或等价配置），并更新契约「出厂默认」叙述；本 ADR 不自动改默认。
+
+## 签核结论（Accepted，opt-in）
+
+用户签核接受 `trail_tp` 作为**可选开关**，接受上文列出的局限（N=5 多重比较偏差、换手上升、2021 年夏普低于基线、阈值未经搜索）。签核范围仅限开关，不含出厂默认切换。
+
+- **开关位置**：`stock_platform_research.backtest.run_portfolio_backtest(trail_tp=...)`；环境变量 `STOCK_PLATFORM_LVREV_TRAIL_TP`（`1/true/yes/on` 为开）。显式参数优先于环境变量。实现见 `resolve_trail_tp`，最终写入 `ExitPolicy.trail_tp`。
+- **默认值**：关（`trail_tp=False`）。不设环境变量、不传参时，回测输出与改动前逐位一致（单测与严格对照均已验证）。
+- **回滚方法**：去掉环境变量 `STOCK_PLATFORM_LVREV_TRAIL_TP`（或设为 `0`），并不传 `trail_tp=True`。因为默认即关，回滚无需改代码。
+- **不在本 ADR 范围**：日循环、brief / picks、库函数 `ExitPolicy()` 出厂默认仍为关。若要把生产默认改为开，须另开提交并更新 [`contracts/trading-rules.md`](../contracts/trading-rules.md) 出厂默认叙述。
 
 ## 证据（2021-01-04~2026-11-05，只读 market.db）
 
