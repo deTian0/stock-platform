@@ -345,6 +345,9 @@ def _params_echo(p: ReplayParams, *, universe: str, start: str | None, end: str 
             "min_hold": p.exit_policy.min_hold,
             "max_hold_days": p.exit_policy.max_hold_days,
             "trail_min_held": p.exit_policy.trail_min_held,
+            "tiered_stop": p.exit_policy.tiered_stop,
+            "trail_tp": p.exit_policy.trail_tp,
+            "time_stop_days": p.exit_policy.time_stop_days,
         },
     }
 

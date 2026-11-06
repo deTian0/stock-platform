@@ -110,6 +110,17 @@ def _num(x: Any) -> float | None:
 # --- policies ---------------------------------------------------------------
 
 
+#: Fixed experimental exit parameters (docs/plans/lvrev-enhancement.md).
+#: Enabled only when the matching ExitPolicy flag is on; never searched.
+TIERED_STOP_ARM1_PEAK = 5.0       # peak ≥ +5 % → floor at 0 %
+TIERED_STOP_ARM1_FLOOR = 0.0
+TIERED_STOP_ARM2_PEAK = 10.0      # peak ≥ +10 % → floor at +5 %
+TIERED_STOP_ARM2_FLOOR = 5.0
+TRAIL_TP_MIN_PEAK_RET = 8.0       # peak ≥ +8 % then …
+TRAIL_TP_GIVEBACK_PCT = 5.0       # … ≥5 % give-back from peak
+DEFAULT_TIME_STOP_DAYS = 20       # held ≥ N and ret < 0
+
+
 @dataclass(frozen=True)
 class ExitPolicy:
     """Exit knobs. Defaults are the ``B1``–``B4`` baseline values, unchanged."""
@@ -122,6 +133,10 @@ class ExitPolicy:
     min_hold: int = 45                # discretionary exits need ≥45 sessions
     max_hold_days: int = 60           # safety valve
     trail_min_held: int = 3           # trailing needs held_days > 3
+    # --- lvrev-enhancement experimental opt-ins (default OFF; factory unchanged) ---
+    tiered_stop: bool = False         # peak floors; bypasses min_hold
+    trail_tp: bool = False            # experimental trailing TP; bypasses min_hold
+    time_stop_days: int = 0           # 0 = off; held≥N & ret<0 → exit
 
     def target_price(self, entry_price: float) -> float:
         """Take-profit target for an entry fill — the *only* place this is defined."""
@@ -236,6 +251,23 @@ def evaluate_exit(
     reason: str | None = None
     if ret_pct <= -p.stop_loss:
         reason = f"stop_loss({ret_pct:+.1f}%)"
+    elif p.tiered_stop and peak_ret >= TIERED_STOP_ARM2_PEAK and ret_pct <= TIERED_STOP_ARM2_FLOOR:
+        reason = f"tiered_stop({ret_pct:+.1f}%)"
+    elif p.tiered_stop and peak_ret >= TIERED_STOP_ARM1_PEAK and ret_pct <= TIERED_STOP_ARM1_FLOOR:
+        reason = f"tiered_stop({ret_pct:+.1f}%)"
+    elif (
+        p.trail_tp
+        and peak_ret >= TRAIL_TP_MIN_PEAK_RET
+        and float(peak) > 0
+        and (float(peak) - float(px)) / float(peak) >= TRAIL_TP_GIVEBACK_PCT / 100.0
+    ):
+        reason = f"trail_tp({ret_pct:+.1f}%)"
+    elif (
+        int(p.time_stop_days) > 0
+        and int(held_days) >= int(p.time_stop_days)
+        and ret_pct < 0.0
+    ):
+        reason = f"time_stop({int(held_days)}d,{ret_pct:+.1f}%)"
     elif p.take_profit > 0 and ret_pct >= p.take_profit:
         reason = f"take_profit({ret_pct:+.1f}%)"
     elif int(held_days) >= p.min_hold:
@@ -308,7 +340,14 @@ def portfolio_weights(values: Iterable[float]) -> list[float]:
 
 
 __all__ = [
+    "DEFAULT_TIME_STOP_DAYS",
     "LIMIT_EPS",
+    "TRAIL_TP_GIVEBACK_PCT",
+    "TRAIL_TP_MIN_PEAK_RET",
+    "TIERED_STOP_ARM1_FLOOR",
+    "TIERED_STOP_ARM1_PEAK",
+    "TIERED_STOP_ARM2_FLOOR",
+    "TIERED_STOP_ARM2_PEAK",
     "CooldownPolicy",
     "DriftDecision",
     "DriftPolicy",

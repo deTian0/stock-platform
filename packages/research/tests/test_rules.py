@@ -46,6 +46,10 @@ def test_default_policy_pins_the_b1_b4_baseline_values():
     # the new B5 knobs are off by default so the baseline cannot move
     assert CooldownPolicy().active is False
     assert DriftPolicy().active is False
+    # lvrev-enhancement experimental exits stay off (factory bit-identical)
+    assert p.tiered_stop is False
+    assert p.trail_tp is False
+    assert p.time_stop_days == 0
 
 
 def test_backtest_default_params_equal_rules_defaults():
@@ -123,6 +127,51 @@ def test_missing_ma_is_treated_as_unavailable_not_zero():
 
 def test_hold_returns_none():
     assert _call(px=10.1) is None
+
+
+def test_experimental_exits_default_off_never_fire():
+    """With factory ExitPolicy(), experimental branches must not change outcomes."""
+    # Would fire tiered_stop / trail_tp / time_stop if enabled, but defaults keep hold.
+    assert _call(px=10.0, peak=11.0, held_days=1) is None
+    assert _call(px=10.4, peak=11.0, held_days=25) is None
+
+
+def test_tiered_stop_opt_in_bypasses_min_hold():
+    p = ExitPolicy(tiered_stop=True)
+    # peak +10 % → floor +5 %; ret +3 % → exit even with held_days=1
+    d = _call(px=10.3, peak=11.0, held_days=1, policy=p)
+    assert d is not None and d.reason == "tiered_stop(+3.0%)"
+    # peak +6 % → floor 0 %; ret −1 % → exit
+    d = _call(px=9.9, peak=10.6, held_days=0, policy=p)
+    assert d is not None and d.reason.startswith("tiered_stop(")
+    # still after hard stop_loss
+    d = _call(px=9.0, peak=11.0, held_days=0, policy=p)
+    assert d is not None and d.reason.startswith("stop_loss(")
+
+
+def test_trail_tp_opt_in_bypasses_min_hold():
+    p = ExitPolicy(trail_tp=True)
+    # peak +10 %, give-back 5.5 % from peak → exit
+    d = _call(px=10.45, peak=11.0, held_days=2, policy=p)
+    assert d is not None and d.reason.startswith("trail_tp(")
+    # peak only +7 % → below 8 % arm → no trail_tp
+    assert _call(px=10.0, peak=10.7, held_days=2, policy=p) is None
+
+
+def test_time_stop_opt_in():
+    p = ExitPolicy(time_stop_days=20)
+    assert _call(px=9.9, held_days=19, policy=p) is None  # too early
+    assert _call(px=10.1, held_days=20, policy=p) is None  # ret ≥ 0
+    d = _call(px=9.9, held_days=20, policy=p)
+    assert d is not None and d.reason == "time_stop(20d,-1.0%)"
+
+
+def test_experimental_exits_sit_before_factory_take_profit():
+    """Enabled experimental branch wins over factory take_profit when both match."""
+    p = ExitPolicy(tiered_stop=True, take_profit=2.0)
+    # ret +3 %, peak +10 % → tiered_stop floor +5 % fires before take_profit(+3%)
+    d = _call(px=10.3, peak=11.0, held_days=1, policy=p)
+    assert d is not None and d.reason.startswith("tiered_stop(")
 
 
 # ---------- helpers ----------

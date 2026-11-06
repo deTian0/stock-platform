@@ -46,6 +46,9 @@ backtest._Position      is rules.PositionState    # True（旧私有名是别名
 | 序 | 规则 | 触发 | `reason` 字符串 | 受 `min_hold` 约束 |
 |---|---|---|---|---|
 | 1 | `stop_loss` | `ret% ≤ −stop_loss` | `stop_loss(-10.0%)` | **否**（保护性） |
+| 1a | `tiered_stop`（实验，默认关） | `tiered_stop=True` 且（峰值 ≥ +10% 且收益 ≤ +5%，或峰值 ≥ +5% 且收益 ≤ 0%） | `tiered_stop(+0.0%)` | **否** |
+| 1b | `trail_tp`（实验，默认关） | `trail_tp=True` 且峰值 ≥ +8% 且自峰值回撤 ≥ 5% | `trail_tp(+3.0%)` | **否** |
+| 1c | `time_stop`（实验，默认关） | `time_stop_days>0` 且 `held_days ≥ time_stop_days` 且 `ret% < 0` | `time_stop(20d,-1.0%)` | **否** |
 | 2 | `take_profit` | `take_profit > 0` 且 `ret% ≥ take_profit` | `take_profit(+20.0%)` | **否**（保护性） |
 | 3 | `target` | `px ≥ target` | `target(+6.0%)` | 是（相机性） |
 | 4 | `trend_break` | `ma20 ≤ ma60`（二者均有效） | `trend_break(+1.0%)` | 是 |
@@ -58,6 +61,7 @@ backtest._Position      is rules.PositionState    # True（旧私有名是别名
 - **`peak` 必须已含当日收盘**——调用方先用 `advance_peak(peak, px)` 推进，再调 `evaluate_exit`（`peak` 只上不下）。
 - `ma20` / `ma60` 缺失（`None` / `NaN`）视为**不可用**并跳过该分支，**绝不当作 0**（否则 `0 ≤ ma60` 会假触发破位）。
 - `target` 只在 `ExitPolicy.target_price(entry)` 定义一次（`entry × (1 + target_base/100)`）。
+- **实验退出**（`tiered_stop` / `trail_tp` / `time_stop_days`）出厂默认全关；不传参时与出厂分支顺序、理由字符串逐位一致。参数事先写死于 `rules.py` 常量与 [`docs/plans/lvrev-enhancement.md`](../plans/lvrev-enhancement.md)，不做搜索。开启时插在硬止损之后、出厂其余分支之前。
 
 ---
 
