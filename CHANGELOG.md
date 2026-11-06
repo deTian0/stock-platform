@@ -6,6 +6,7 @@
 
 ### Added
 
+- **lvrev `trail_tp` 生产 opt-in 开关（ADR [`0094`](docs/architecture/0094-lvrev-trail-tp-exit.md) Accepted，出厂默认关）**：`run_portfolio_backtest(trail_tp=...)` 或环境变量 `STOCK_PLATFORM_LVREV_TRAIL_TP=1` 开启（显式参数优先）；默认关时输出与改动前逐位一致。回滚 = 去掉该环境变量。出厂 `ExitPolicy()` 与日循环默认不变。
 - **平台自有只读补充行情库**（ADR [`0095`](docs/architecture/0095-aux-market-store.md)）：`stock_platform_providers.aux_market` + CLI `stock-platform-aux-market`，经 `em_get` 拉 5 个指数日线（东财返回名称须命中别名，否则拒写）与指定个股 OHLC，写 `local/aux_market/aux_market.db`（`STOCK_PLATFORM_AUX_MARKET_DB`），每日预算 / 幂等 / fail-soft；基准单点 `benchmark.load_benchmark_closes` 在 market.db 无真实指数时回落补充库，影子回测与 lvrev 增强超额由此可算，无补充库时逐位不变；不写 market.db。
 - **lvrev 增强实验**（计划 [`docs/plans/lvrev-enhancement.md`](docs/plans/lvrev-enhancement.md)）：`ExitPolicy` 实验退出开关（`tiered_stop` / `trail_tp` / `time_stop_days`，默认关）+ Round2 二轮过滤入口 + `ReplayParams.regime` 大势闸；CLI `stock-platform-lvrev-enhancement`。通过标准跑数前登记；五变体对照后仅 **`trail_tp` 四条全过** → Proposed ADR [`0094`](docs/architecture/0094-lvrev-trail-tp-exit.md) 等签核，**出厂默认不改**。其余变体不通过、不起 ADR。
 - **影子终榜回测 S1 大势实验开关**：`stock-platform-shadow-board --backtest --s1-mode pick|gate|scale`，附 `--s1-gate-weak empty|s3`、`--s1-scale 强,中,弱`（库函数 `run_shadow_book / compare_shadow_vs_lvrev(s1_mode=...)`，regime 判定 `schools.s1_regime_state`）。出厂默认 `pick` 逐位不变，lvrev 臂不受影响；离线对照见 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.6。
