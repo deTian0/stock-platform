@@ -23,6 +23,7 @@
 
 ### Fixed
 
+- **撤回盘后引擎收盘兜底**（提交 [`9289d83`]）：`quotes.load_ohlc` 此前在外部日线源失败、且 `quote_date` 晚于 brief `asof` 时，用引擎库收盘填 `close`。该行为已撤回：外部源失败时「开盘 / 收盘 / 涨跌」一律输出 `—`，不再用引擎库数据补位。引擎 `daily_price` 不含开高低，其收盘口径与外部日线不同，见 ADR [`0083`](docs/architecture/0083-digest-pre-post-and-secondary-pick.md)。`load_engine_closes` 与 `_engine_closes_fallback` 已删除，`test_quotes_has_no_engine_close_fallback` 锁定删除结果。历史条目（`[4.13.4]` 等）不改。
 - **影子终榜回测基准**：原 CLI 硬读 `000300.SH`，market.db 无此行，超额列一直静默为空。现经 F1 单点 `stock_platform_research.benchmark` 解析（默认 `000905`，可用 `STOCK_PLATFORM_BENCHMARK_SYMBOL` 覆盖），先做 fundamentals 名称身份校验，再只读 `daily_price`。payload 新增 `benchmark{symbol,engineCode,name,available,reason}` 与各臂 `excessAvailable`；不可用时报告超额列标「不可用」，`limitations` 写明原因。实测 market.db 无任何指数行（`000905.SZ`=厦门港务、`000852.SZ`=石化机械、`000016.SZ`=*ST康佳A、`000300` 不存在），因此超额按 fail-closed 标不可用。lvrev 臂同路径。不写 market.db。
 
 ## [4.14.0] - 2026-11-06

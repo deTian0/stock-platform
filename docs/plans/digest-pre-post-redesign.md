@@ -322,7 +322,7 @@ select_secondary(items, *, profile: Literal["quality", "short"], top_k: int = 5)
 - [x] 涨跌自算；`quoteDate == asof` 时分母是前一交易日
 - [x] 理由无 `...` 截断；HTML 单 H1
 - [x] ②A 为 10 进 N 加落选原因；②B pool 为 10、items 为 5；同花顺仍是生产 10 与生产 5
-- [x] 两种 profile 的 `rs20` 用法符合 §3.2（长线惩罚偏离，短线钟形中心 +4）
+- [ ] 两种 profile 的 `rs20` 用法符合 §3.2（长线惩罚偏离，短线钟形中心 +4）。改回未勾选：§3.2 与代码现行口径是短线不用 `rs20`（不设门槛、不进打分，改用 `rev_chg` 动量）；`test_secondary_pick.py` 也没有「短线钟形中心 +4」的断言，只有 `rs20` 不做硬拒的断言。长线「惩罚偏离」由 `test_quality_penalizes_rs20_far_from_ma20` 覆盖，可单独勾选
 - [x] ③B 说明含规则、成本、持有天数、可卖数量、集中度；无全市场 T+1 固定句
 - [x] 汇总行在 `000905` 解析为个股时复用 A6 警告，不写指数超额
 - [x] `hit_tracking` 仍写 `pre_market`
