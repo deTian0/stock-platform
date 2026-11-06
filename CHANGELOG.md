@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **影子终榜回测 S1 大势实验开关**：`stock-platform-shadow-board --backtest --s1-mode pick|gate|scale`，附 `--s1-gate-weak empty|s3`、`--s1-scale 强,中,弱`（库函数 `run_shadow_book / compare_shadow_vs_lvrev(s1_mode=...)`，regime 判定 `schools.s1_regime_state`）。出厂默认 `pick` 逐位不变，lvrev 臂不受影响；离线对照见 [`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.6。
+- **影子 S4/S5 只读诊断模块**（`stock_platform_research.shadow_board.diagnostics`，`python -m` 运行，只读 market.db、产物写 `local/shadow/diagnostics/`）：逐日重建 S3/S4/S5 Round1 候选池，与反向池、成交额池、随机池对照，统计 1/3/5/10/20 日前向收益、超额、IC、五分位、入场涨停特征和引擎退出模拟。结论：S4 短动量方向反了，S5 历史上退化为按代码排序（成交额 8 亿处饱和），建议均下线、待签核（[`docs/plans/shadow-s4-s5-diagnosis.md`](docs/plans/shadow-s4-s5-diagnosis.md)）。不改任何学校、仲裁逻辑或默认值。
+
 ## [4.14.0] - 2026-11-06
 
 ### Added
