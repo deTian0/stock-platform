@@ -23,6 +23,7 @@
 | [next-milestones-t3-cli-y2-fix-r5.md](next-milestones-t3-cli-y2-fix-r5.md) | F1 · T3 · A1 · R5-P · Y2 | F1/T3/A1/R5-P 代码已落；**Y2** 等签核；全量 R5 等生产回补 |
 | [multi-strategy-final-board.md](multi-strategy-final-board.md) | 多策略五校 → 硬 Round2 → Final Board → **仅影子账本**；双轨仲裁 A/B；升级走 Y1→Y2 | **MVP 已落**（ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；S1/S2/S5 stub；不改出厂）；§11 记录 S1/S5 仲裁偏置（已离线对照，维持 D；见 ADR 0093 增补） |
 | [shadow-s4-s5-diagnosis.md](shadow-s4-s5-diagnosis.md) | 影子终榜 S4（短动量）/ S5（资金流）选股质量诊断：Round1 池前向收益、IC、退出模拟、根因与处置建议 | 诊断完成（2026-11-06）；处置待签核，未改代码默认 |
+| [lvrev-enhancement.md](lvrev-enhancement.md) | lvrev 增强实验：Round2 二轮过滤 / 大势闸门 / 退出规则（分档止损、移动止盈、时间止损），通过标准跑数前登记 | 标准已登记（2026-11-06）；实验开关默认关，不改出厂 |
 | [s2-event-theme-data.md](s2-event-theme-data.md) | S2 事件/主题数据源盘点（PIT 可回放 vs 仅当日截面）与分阶段接入 | 规划（未实现抓取） |
 
 ## 与其它文档的关系
