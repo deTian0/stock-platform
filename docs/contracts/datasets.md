@@ -228,6 +228,55 @@ asset_type ∈ { "stock", "etf", "index" }
 
 配方：东财 np-weblist `getFastNewsList`（经 `em_get`；轻量列表）。默认路径不做 LLM 摘要。
 
+## 影子链产物（平台自有 JSON，非 Provider 出口）
+
+多策略影子链（ADR [0093](../architecture/0093-multi-strategy-shadow-board.md)，契约 [`multi-strategy-shadow.md`](multi-strategy-shadow.md)）的落盘文件。根目录 `<shadow_dir>` 默认 `local/shadow/`，**跟随 `STOCK_PLATFORM_SHADOW_DIR`**；写入经 `_assert_shadow_path` 守卫（不得逃出影子根、不得命中 `recommend_decisions.jsonl` / `performance_proxy.jsonl` / `holdings.json`）。全部 `shadowOnly=true`、`excludedFromPerformance=true`，不提交、不写 `market.db`。口径：**金额元、比例小数**。
+
+| 文件 | 写入方 | 语义 |
+|------|--------|------|
+| `<shadow_dir>/s2_snapshots/s2_snapshot_{asof}.json` | `shadow_board.s2_snapshot.collect_s2_snapshot` | 当日 S2 事件/题材截面；原子写（tmp + replace）；同 asof `ok` 复用零网络，`partial`/`failed` 重抓覆盖 |
+| `<shadow_dir>/s2_snapshots/_budget.json` | 同上 | `{ "YYYY-MM-DD": 已用逻辑请求数 }`，按 Asia/Shanghai 自然日计，保留最近 60 天；best-effort |
+| `<shadow_dir>/final_board_{asof}.json` | `shadow_board.ledger.write_shadow_ledger` | 当日完整 Final Board payload（形状见 `multi-strategy-shadow.md` §3） |
+| `<shadow_dir>/final_board.jsonl` | 同上 | 每次运行追加一行摘要 |
+| `<shadow_dir>/shadow_decisions.jsonl` | `shadow_board.performance.log_shadow_board` | 影子前向绩效账本；每终榜席位一行，`(date, symbol)` 幂等，空榜不落行 |
+
+### `s2_snapshot_{asof}.json`（`schemaVersion=1`）
+
+| 字段 | 类型 | 语义 |
+|------|------|------|
+| `kind` | str | 固定 `s2_snapshot` |
+| `asof` | date | 快照所属交易日 |
+| `status` | str | `ok`（四源均 ok）/ `partial` / `failed`（四源均 failed 或 budget_exceeded）；联网关闭且无文件时返回 `disabled`（不落盘） |
+| `fetchedAt` | str | 抓取时刻（Asia/Shanghai ISO） |
+| `provider` / `transport` | str | `astock_http` / `em_get` |
+| `budget` | obj | `dailyLimit`（`STOCK_PLATFORM_S2_EM_BUDGET`，默认 300）、`runDate`、`usedThisRun`、`usedToday`、`exceeded` |
+| `sources.{lhb,concept_rank,industry_rank,unlock}` | obj | `status`（`ok`/`empty`/`stale`/`failed`/`budget_exceeded`）、`count`；lhb 另有 `symbols`、`truncated`；排名另有 `updatedAt`、`pitOk`、`note`；unlock 另有 `truncated`、`window` |
+| `lhb[]` | list | `date,symbol,name,reason,net_buy,buy_amt,sell_amt,deal_amt`（**元**）、`close`、`change_pct`、`turnover_rate`（**小数**）；只留 `date==asof` |
+| `boards.concept[]` / `boards.industry[]` | list | `code,name,kind,change_pct`（**小数**）、`main_net`（**元**）、`lead_stock,lead_name` |
+| `unlock[]` | list | `symbol,name,date,type`、`shares`/`able_shares`（**万股**）、`ratio`（**小数**，占流通股） |
+| `units` / `pit` | obj | 单位与 PIT 口径自描述 |
+
+PIT：`lhb` 盘后公布，仅可用于 asof 次日入场；板块排名仅 `pitOk`（`updatedAt` 日期 == asof）才进 S2；`unlock` 为当前公告日程，有修订前视风险，仅作软排除（`ratio ≥ 0.05`）。回测不读快照。
+
+### `final_board.jsonl` 行
+
+`schemaVersion`、`asof`、`status`（`ok`/`empty`/`degraded`）、`finalCount`、`snapshot`（对应 `final_board_{asof}.json` 路径）、`excludedFromPerformance`、`shadowOnly`。
+
+### `shadow_decisions.jsonl` 行
+
+| 字段 | 语义 |
+|------|------|
+| `date` / `symbol` / `name` | 决策日（= 终榜 asof）/ 6 位代码 / 名称 |
+| `rating` | 固定 `Buy` |
+| `holding` | 主结算持有窗口（同 `recommend_decisions.jsonl` 默认） |
+| `pending` | 未结算 `true`；结算后由 `settle_pending_entries` 回写 |
+| `raw` / `alpha` | 持有期收益 / 超额（**小数**；`alpha = raw − benchmark`）；未结算为 `null` |
+| `source` | 固定 `shadow_final_board` |
+| `rank` / `score` / `school` / `schoolHolding` | 终榜序号、分数、学校 ID、学校持有期文案 |
+| `setA` | `{ arbiter: "set_a", passed: true }` |
+| `setB` | `advisoryRank`、`advisoryScore`、`winRate`、`expectedReturn`（**小数**；无顾问为 `null`） |
+| `excludedFromPerformance` / `shadowOnly` | 恒 `true`；不并入主绩效 |
+
 ## Enriched 层（消费侧，非 Provider 原始出口）
 
 | 主题 | 规则 |
