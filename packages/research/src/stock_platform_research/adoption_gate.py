@@ -107,9 +107,21 @@ class CandidateSpec:
     engine: str = "screener"
     #: ``code -> 中文名`` for the shadow ST filter (data, not a knob; never serialised).
     name_map: Mapping[str, str] | None = field(default=None, compare=False, repr=False)
+    #: Shadow-only S1 board-regime experiment knob (``shadow_board.backtest``).
+    #: ``"pick"`` = factory; the run call and the summary are then the pre-knob ones.
+    s1_mode: str = "pick"
+    s1_gate_weak: str = "empty"
 
     def to_summary(self) -> dict[str, Any]:
         """JSON-safe description (``NeutralizeParams`` expanded, weights copied)."""
+        out = self._base_summary()
+        if self.engine == "shadow" and self.s1_mode != "pick":
+            out["s1Mode"] = self.s1_mode
+            if self.s1_mode == "gate":
+                out["s1GateWeak"] = self.s1_gate_weak
+        return out
+
+    def _base_summary(self) -> dict[str, Any]:
         return {
             "engine": self.engine,
             "name": self.name,
@@ -258,7 +270,16 @@ def run_candidate(
     if spec.engine == "shadow":
         from .shadow_board.backtest import run_shadow_book
 
-        book = run_shadow_book(feats, name_map=spec.name_map, params=params)
+        if spec.s1_mode == "pick":
+            book = run_shadow_book(feats, name_map=spec.name_map, params=params)
+        else:
+            book = run_shadow_book(
+                feats,
+                name_map=spec.name_map,
+                params=params,
+                s1_mode=spec.s1_mode,
+                s1_gate_weak=spec.s1_gate_weak,
+            )
         return {
             "metrics": book["metrics"],
             "review": book["review"],

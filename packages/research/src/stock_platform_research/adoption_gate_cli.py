@@ -95,6 +95,18 @@ def build_parser() -> argparse.ArgumentParser:
             "默认不含，不影响既有候选的裁决结果"
         ),
     )
+    p.add_argument(
+        "--shadow-s1-mode",
+        choices=("pick", "gate", "scale"),
+        default="pick",
+        help="仅 --include-shadow：影子候选的 S1 大势实验开关（默认 pick=出厂，裁决不变）",
+    )
+    p.add_argument(
+        "--shadow-s1-gate-weak",
+        choices=("empty", "s3"),
+        default="empty",
+        help="仅 --shadow-s1-mode gate：弱势日动作（默认 empty=空榜）",
+    )
     return p
 
 
@@ -200,8 +212,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[shadow] names={len(names)}（纳入影子终榜候选，逐日 Round1 较慢）", file=sys.stderr)
         from dataclasses import replace as _dc_replace
 
+        shadow_kw: dict = {"name_map": names}
+        if args.shadow_s1_mode != "pick":
+            shadow_kw.update(s1_mode=args.shadow_s1_mode, s1_gate_weak=args.shadow_s1_gate_weak)
+            print(
+                f"[shadow] s1_mode={args.shadow_s1_mode} s1_gate_weak={args.shadow_s1_gate_weak}（离线实验，非出厂）",
+                file=sys.stderr,
+            )
         candidates = [
-            _dc_replace(c, name_map=names) if c.engine == "shadow" else c for c in candidates
+            _dc_replace(c, **shadow_kw) if c.engine == "shadow" else c for c in candidates
         ]
 
     payload = evaluate_adoption(

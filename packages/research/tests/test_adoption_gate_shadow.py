@@ -96,3 +96,48 @@ def test_evaluate_adoption_with_shadow_candidate_and_unchanged_screener():
     )
     verdict = with_shadow["candidates"][1]["decision"]["verdict"]
     assert verdict in {ag.VERDICT_ADOPT, ag.VERDICT_REJECT, ag.VERDICT_INSUFFICIENT}
+
+
+def test_shadow_s1_mode_default_is_factory_and_summary_unchanged():
+    spec = ag.SHADOW_CANDIDATE_SPEC
+    assert spec.s1_mode == "pick"
+    summary = spec.to_summary()
+    assert "s1Mode" not in summary and "s1GateWeak" not in summary
+    # Screener specs never carry the shadow-only keys either.
+    assert "s1Mode" not in ag.BASELINE_SPEC.to_summary()
+
+
+def test_cli_shadow_s1_flags_default_pick():
+    args = cli.build_parser().parse_args(["--include-shadow"])
+    assert args.shadow_s1_mode == "pick"
+    assert args.shadow_s1_gate_weak == "empty"
+    args = cli.build_parser().parse_args(["--include-shadow", "--shadow-s1-mode", "gate"])
+    assert args.shadow_s1_mode == "gate"
+
+
+def test_run_candidate_shadow_pick_bitwise_equals_direct_call():
+    from stock_platform_research.shadow_board.backtest import run_shadow_book
+
+    feats = prepare_shadow_frame(_bars())
+    spec = replace(ag.SHADOW_CANDIDATE_SPEC, name_map=_names())
+    out = ag.run_candidate(feats, spec)
+    direct = run_shadow_book(feats, name_map=_names())
+    assert out["metrics"] == direct["metrics"]
+    assert out["tradeCount"] == direct["tradeCount"]
+    assert out["shadow"] == direct["shadow"]
+
+
+def test_run_candidate_shadow_gate_passes_through():
+    from stock_platform_research.shadow_board.backtest import run_shadow_book
+
+    feats = prepare_shadow_frame(_bars())
+    spec = replace(
+        ag.SHADOW_CANDIDATE_SPEC, name_map=_names(), s1_mode="gate", s1_gate_weak="empty"
+    )
+    out = ag.run_candidate(feats, spec)
+    direct = run_shadow_book(feats, name_map=_names(), s1_mode="gate", s1_gate_weak="empty")
+    assert out["metrics"] == direct["metrics"]
+    assert out["shadow"]["s1Mode"] == "gate"
+    assert out["shadow"]["s1GateWeak"] == "empty"
+    summary = spec.to_summary()
+    assert summary["s1Mode"] == "gate" and summary["s1GateWeak"] == "empty"
