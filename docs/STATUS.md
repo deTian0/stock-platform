@@ -1,8 +1,9 @@
 # 现行快照
 
-> 日期：2026-11-05  
-> 版本：`v4.13.7`（tag `v4.13.7`；**相对 v4.13.7 已有若干提交、未打新 tag**，累计后再发版）  
-> 工作区：F1/T3/A1/R5-P 已落（ADR [`0092`](architecture/0092-etf-universe-platform-side.md)）；LLM ADR [`0089`](architecture/0089-llm-provider-selection.md) / [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。**累计后再打 tag（建议并入 v4.14.0）**。  
+> 日期：2026-11-06  
+> 版本：**`v4.14.0` 已发布**（tag `v4.14.0`；收录 F1 / T3 / A1 / R5-P / 多策略影子终榜全套 / S2-P1 快照 / 影子链契约补齐，详见 [`CHANGELOG.md`](../CHANGELOG.md) `[4.14.0]`）  
+> 工作区：F1/T3/A1/R5-P 已落（ADR [`0090`](architecture/0090-benchmark-identity-and-sh-fund-prefix.md) / [`0091`](architecture/0091-data-quality-scan.md) / [`0092`](architecture/0092-etf-universe-platform-side.md)）；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)（含 2026-11-06 增补）；LLM ADR [`0089`](architecture/0089-llm-provider-selection.md) / [`0088`](architecture/0088-llm-sidecar-package-boundary.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 进行中：**S1 整板开关回测对照**（影子线，未定结论）；影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 文档放哪
@@ -24,19 +25,23 @@
 |----|------|
 | G / B / S / X / C | 收官 |
 | R | R1–R4 done。**R5-P**（平台形状）已落（ADR 0092）；全量 **R5** 仍等生产侧 ETF 日线回补 |
-| T | T1、T2 done。**T3** 代码已落（`data_quality` + CLI + `loop_health.dataQuality`）；发版目标仍 **`v4.14.0`**（累计后再打 tag） |
+| T | T1、T2 done。**T3** 代码已落（`data_quality` + CLI + `loop_health.dataQuality`）；随 **`v4.14.0`** 发布 |
 | Y | Y1 采纳闸门、Y3 负收益归因 done。**Y2** 落档必须等人工签核；没有 `adopt` 证据不改生产默认档 |
 | L | L1 立项 `Accepted`（华宝、1 万、Phase 0 纯模拟）。L2/L3 与实盘红线仍关闭 |
 
 下一组里程碑与技术方案：[`plans/next-milestones-t3-cli-y2-fix-r5.md`](plans/next-milestones-t3-cli-y2-fix-r5.md)。  
-**多策略 Final Board（影子链）**：ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；CLI `stock-platform-shadow-board`；S1/S5 薄规则已接，S2 需 DI provider，digest 可选影子附录；**不改**出厂 lvrev；升级仍走 Y1→Y2。  
+**多策略 Final Board（影子链）**：ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；CLI `stock-platform-shadow-board`；S1/S5 薄规则已接，S2 日循环读 S2-P1 每日快照（回测仍空池），digest 可选影子附录；**不改**出厂 lvrev；升级仍走 Y1→Y2。  
 生产接入（库默认仍关；生产调度已开）：日循环 `--shadow-board` / `STOCK_PLATFORM_SHADOW_BOARD=1`；`loop_health.shadowBoard`（最多 warn）；独立前向账本 `local/shadow/shadow_decisions.jsonl`（A/B 双轨，`--settle-daily` / `--perf-summary`）；理由 schema + 空话检测回落。  
 **生产已开启影子终榜**：日期 **2026-11-05**；开启方式 = 盘前/盘后调度预设加 `-ShadowBoard`（`scripts/ops/stock-platform-daily.xml` / `stock-platform-postmarket.xml` / `Invoke-ScheduledRun.ps1` 的 `TASK_PRESETS`，由 `test_scheduler_args_contract.py` 钉住）；**回滚方式** = 移除这些预设里的 `-ShadowBoard`（或单次运行传 `-NoShadowBoard`），库出厂默认本就是关，无需改代码。**前向账本起算日 `asof=2026-11-04`**（首条 2 席 pending，T+1 未到不结算）。  
 **已知偏置**：回测 402 日 `schoolCoverage` 显示 S1 有 235 天非空池却 **0 席**、S5 仅 3 席——Round2 把学校优先级排在分数之前，S3/S4 先填满 10 席。现象、证据与可选改法记在 [`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11；**改仲裁须先签核 + ADR**，本轮未改。S2 数据源规划见 [`plans/s2-event-theme-data.md`](plans/s2-event-theme-data.md)。  
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
-建议顺序：F1 / T3 / A1 / R5-P 代码已落（不打小 tag）→ 累计发版 **`v4.14.0`**。  
+**下一刀**（v4.14.0 之后）：S1 整板开关 / 仓位系数回测对照（进行中，结论前不改仲裁口径）；影子前向账本与 S2-P1 快照前向证据积累中（满 `MIN_MEANINGFUL_SAMPLE` 前不下结论）；全量 R5 仍等生产侧 ETF 回补。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
+
+## v4.14 已落地
+
+- **v4.14.0** F1 基准身份 / 沪基金前缀（ADR 0090）、T3 数据质量体检（ADR 0091）、A1 CLI 面、R5-P ETF 平台侧（ADR 0092）、多策略影子终榜全套（ADR 0093 + 增补：日循环 opt-in、生产调度 `-ShadowBoard`、前向影子账本、walk-forward 回测、Y1 `--include-shadow`、Round2 仲裁开关维持 D、S2-P1 快照）、绩效夹具 fallback 只读修复
 
 ## v4.13 已落地
 
