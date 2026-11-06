@@ -107,7 +107,9 @@ def lvrev_round2_entry_provider(
                     return []
 
         cands: list[dict[str, Any]] = []
-        close_by: dict[str, dict[str, Any]] = {}
+        # Map Round2's norm_code back to the frame's raw code so replay_book's
+        # px_by_code lookup (keyed by frame ``code``) can exit the position.
+        by_norm: dict[str, dict[str, Any]] = {}
         for _, row in elig.iterrows():
             raw = str(row["code"])
             code = norm_code(raw)
@@ -127,8 +129,8 @@ def lvrev_round2_entry_provider(
                     "industry": None if industry is None else str(industry),
                 }
             )
-            close_by[code] = {
-                "code": code,
+            by_norm[code] = {
+                "code": raw,  # frame key — required for exit price lookups
                 "close": float(row["close"]),
                 "pct_chg": row.get("pct_chg"),
             }
@@ -136,8 +138,7 @@ def lvrev_round2_entry_provider(
         board = apply_round2_set_a({"S0": {"candidates": cands}})
         out: list[dict[str, Any]] = []
         for row in board.get("passed") or []:
-            code = norm_code(row.get("code"))
-            hit = close_by.get(code)
+            hit = by_norm.get(norm_code(row.get("code")))
             if hit is not None:
                 out.append(hit)
         return out

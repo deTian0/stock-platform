@@ -126,8 +126,10 @@ def test_round2_filter_drops_st_and_illiquid(feats: pd.DataFrame):
         found = True
         codes = {norm_code(r["code"]) for r in filtered}
         assert "600003" not in codes  # ST
-        # Illiquid codes (amount 5e5) must not survive Round2
+        # Provider must return frame raw codes (with exchange suffix) so the
+        # engine can look up exit prices — shadow_entry_provider does the same.
         for r in filtered:
+            assert str(r["code"]) in set(frame["code"].astype(str))
             code = norm_code(r["code"])
             row = frame[frame["code"].map(lambda c: norm_code(c) == code)]
             if not row.empty and "amount" in row.columns:
