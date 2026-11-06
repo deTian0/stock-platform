@@ -98,6 +98,32 @@ def render_markdown(payload: dict[str, Any]) -> str:
                 f"{_pct(row.get('excess_contribution'))} |"
             )
         lines.append("")
+    ex = payload.get("excess")
+    if ex:
+        lines += [
+            "## 相对指数超额（仅报告，不进通过标准）",
+            "",
+            f"- 基准 `{(payload.get('benchmark') or {}).get('symbol')}` "
+            f"来源 {(payload.get('benchmark') or {}).get('source') or 'market.db'}；"
+            f"区间 {ex.get('start')}~{ex.get('end')}；指数收益 {_pct(ex.get('benchmarkReturn'))}",
+            "",
+        ]
+        years = list((ex.get("benchmarkByYear") or {}).keys())
+        lines.append("| 臂 | 全区间超额 | " + " | ".join(years) + " |")
+        lines.append("|----|------------|" + "|".join("----" for _ in years) + "|")
+        lines.append(
+            "| 指数年收益 | — | "
+            + " | ".join(_pct((ex.get("benchmarkByYear") or {}).get(y)) for y in years)
+            + " |"
+        )
+        for k, a in (ex.get("arms") or {}).items():
+            by = a.get("byYear") or {}
+            lines.append(
+                f"| {k} | {_pct(a.get('excessReturn'))} | "
+                + " | ".join(_pct((by.get(y) or {}).get("excessReturn")) for y in years)
+                + " |"
+            )
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -169,6 +195,20 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[feats] rows={len(feats)} days={feats['trade_date'].nunique()}", file=sys.stderr)
     print(f"[run] variants={variants} y1={not args.skip_y1}", file=sys.stderr)
 
+    # ADR 0095: benchmark via the F1 single point (market.db first, verified aux store fallback).
+    from .benchmark import load_benchmark_closes
+
+    index_close, bench_block = load_benchmark_closes(db, args.start, end, names=names)
+    print(
+        f"[bench] {bench_block.get('symbol')} "
+        + (
+            f"ok（来源 {bench_block.get('source') or 'market.db'}）"
+            if index_close
+            else f"unavailable：{bench_block.get('reason')}"
+        ),
+        file=sys.stderr,
+    )
+
     payload = compare_lvrev_enhancements(
         feats,
         variants=variants,
@@ -178,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
         name_map=names,
         run_y1=not args.skip_y1,
+        index_close=index_close,
+        benchmark=bench_block,
     )
     payload["db"] = str(db)
     payload["start"] = args.start

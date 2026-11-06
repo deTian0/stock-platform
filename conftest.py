@@ -48,6 +48,7 @@ GUARDED_ENV = (
     "STOCK_PLATFORM_HOLDINGS_PATH",
     "STOCK_PLATFORM_PICKS_LEDGER",
     "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR",
+    "STOCK_PLATFORM_AUX_MARKET_DB",
 )
 
 #: Env vars that point tests at *real* external data / credentials. They are not
@@ -75,6 +76,8 @@ _REDIRECT: dict[str, str] = {
     "STOCK_PLATFORM_HOLDINGS_PATH": str(_scratch / "holdings.json"),
     "STOCK_PLATFORM_PICKS_LEDGER": str(_scratch / "picks_ledger.jsonl"),
     "STOCK_PLATFORM_WORKBUDDY_CACHE_DIR": str(_scratch / "workbuddy_cache"),
+    # ADR 0095: never read the real local/aux_market store from tests (absent → pre-aux behaviour).
+    "STOCK_PLATFORM_AUX_MARKET_DB": str(_scratch / "aux_market" / "aux_market.db"),
 }
 os.environ.update(_REDIRECT)
 for _key in UNSET_ENV:

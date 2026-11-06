@@ -76,25 +76,10 @@ def resolve_backtest_benchmark(
     in fundamentals is never read as an index); then read-only closes for the
     engine code. Returns ``(index_close or None, identity block with reason)``.
     """
-    from ..benchmark import resolve_benchmark_identity, resolve_benchmark_symbol
+    from ..benchmark import load_benchmark_closes
 
-    bench = resolve_benchmark_symbol()
-    ident = resolve_benchmark_identity(bench, names=names or {})
-    block: dict[str, Any] = {
-        "symbol": ident.get("symbol"),
-        "engineCode": ident.get("engineCode"),
-        "name": ident.get("name"),
-        "identityChecked": bool(ident.get("checked")),
-        "identityOk": bool(ident.get("ok")),
-    }
-    if not ident.get("alphaAvailable", True):
-        block["reason"] = str(ident.get("warning") or "基准身份校验未通过")
-        return None, block
-    closes = _index_close(db, start, end, str(ident.get("engineCode")))
-    if not closes:
-        block["reason"] = f"market.db daily_price 无 `{ident.get('engineCode')}` 行（{start}~{end}）"
-        return None, block
-    return closes, block
+    # ADR 0095: market.db first; verified aux-store index rows only as fallback.
+    return load_benchmark_closes(db, start, end, names=names)
 
 
 def _parse_s1_scale(text: str | None) -> dict[str, float] | None:

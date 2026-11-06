@@ -430,8 +430,14 @@ def compare_lvrev_enhancements(
     params: ReplayParams | None = None,
     name_map: Mapping[str, str] | None = None,
     run_y1: bool = True,
+    index_close: Mapping[str, float] | None = None,
+    benchmark: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run baseline + each variant; attach year slices, criteria, optional Y1."""
+    """Run baseline + each variant; attach year slices, criteria, optional Y1.
+
+    ``index_close`` / ``benchmark`` (ADR 0095) only add a report-side ``excess``
+    block; omitted → payload identical to before (criteria never use them).
+    """
     from .adoption_gate import (
         AdoptionRule,
         CandidateSpec,
@@ -557,7 +563,7 @@ def compare_lvrev_enhancements(
             "review": arms[vid]["review"],
         }
 
-    return {
+    out = {
         "ok": True,
         "nVariants": len(variants),
         "variants": list(variants),
@@ -591,6 +597,95 @@ def compare_lvrev_enhancements(
         "disclaimer": "Research only; not investment advice. Excess vs index unavailable when market.db has no index rows.",
         "excessAvailable": False,
         "excessReason": "market.db 无指数行；超额按 fail-closed 标不可用",
+    }
+    if index_close is None and benchmark is None:
+        return out  # factory call shape: bit-identical payload
+    out["benchmark"] = dict(benchmark or {})
+    excess = _index_excess_block(
+        arms, index_close, year_keys=[int(y) for y in year_keys], initial_capital=params.initial_capital
+    )
+    if excess is None:
+        out["excessReason"] = str((benchmark or {}).get("reason") or "") or (
+            "未提供基准指数序列" if not index_close else "基准序列未覆盖回测首/末交易日"
+        )
+        return out
+    out["excessAvailable"] = True
+    out["excessReason"] = (
+        f"基准 {(benchmark or {}).get('symbol')} 来源 {(benchmark or {}).get('source') or 'market.db'}"
+    )
+    out["excess"] = excess
+    return out
+
+
+def _index_return(index_close: Mapping[str, float], first: str, last: str) -> float | None:
+    a = index_close.get(first)
+    b = index_close.get(last)
+    if not a or not b:
+        return None
+    return float(b) / float(a) - 1.0
+
+
+def _index_excess_block(
+    arms: Mapping[str, Mapping[str, Any]],
+    index_close: Mapping[str, float] | None,
+    *,
+    year_keys: Sequence[int],
+    initial_capital: float,
+) -> dict[str, Any] | None:
+    """Arm return − index return (full span + per calendar year). Report only;
+    never feeds the pre-registered criteria. ``None`` when the index series does
+    not cover the replay's first/last day."""
+    if not index_close:
+        return None
+    base_curve = list((arms.get(BASELINE) or {}).get("equity_curve") or [])
+    if not base_curve:
+        return None
+    first, last = str(base_curve[0]["date"]), str(base_curve[-1]["date"])
+    bench_full = _index_return(index_close, first, last)
+    if bench_full is None:
+        return None
+    # Per-year index return: year-end close / prior year-end close (first year: first day close).
+    curve_dates = [str(p["date"]) for p in base_curve]
+    year_bench: dict[str, float | None] = {}
+    prev_anchor = first
+    for y in year_keys:
+        ds = [d for d in curve_dates if d[:4] == str(y)]
+        if not ds:
+            year_bench[str(y)] = None
+            continue
+        r = _index_return(index_close, prev_anchor, ds[-1])
+        year_bench[str(y)] = r
+        prev_anchor = ds[-1]
+    arms_out: dict[str, Any] = {}
+    for k, arm in arms.items():
+        tr = (arm.get("metrics") or {}).get("total_return")
+        ys = year_slice_metrics(
+            arm.get("equity_curve") or [],
+            arm.get("trades") or [],
+            initial_capital=initial_capital,
+            years=list(year_keys),
+        )
+        by_year = {}
+        for y in year_keys:
+            yr = (ys.get(str(y)) or {}).get("total_return")
+            br = year_bench.get(str(y))
+            by_year[str(y)] = {
+                "return": yr,
+                "benchmarkReturn": br,
+                "excessReturn": (float(yr) - br) if (yr is not None and br is not None) else None,
+            }
+        arms_out[k] = {
+            "totalReturn": tr,
+            "excessReturn": (float(tr) - bench_full) if tr is not None else None,
+            "byYear": by_year,
+        }
+    return {
+        "start": first,
+        "end": last,
+        "benchmarkReturn": bench_full,
+        "benchmarkByYear": year_bench,
+        "arms": arms_out,
+        "note": "仅报告用；不进入事先登记的通过标准 (a)–(d)",
     }
 
 

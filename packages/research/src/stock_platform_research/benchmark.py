@@ -25,6 +25,18 @@ KNOWN_INDEX_NAME_HINTS: dict[str, tuple[str, ...]] = {
 # quote APIs still expect the **Shanghai index** secid (sh000905 etc.).
 KNOWN_SH_INDEX_CODES: frozenset[str] = frozenset(KNOWN_INDEX_NAME_HINTS)
 
+# Extra aliases used **only** by the aux-market store (ADR 0095) for indexes that
+# do not collide with stock codes. Not part of the F1 identity table above.
+AUX_EXTRA_INDEX_NAME_HINTS: dict[str, tuple[str, ...]] = {
+    "399006": ("创业板指", "创业板指数", "ChiNext"),
+}
+
+
+def aux_index_name_hints() -> dict[str, tuple[str, ...]]:
+    """Alias table the aux store verifies East Money index names against."""
+    return {**KNOWN_INDEX_NAME_HINTS, **AUX_EXTRA_INDEX_NAME_HINTS}
+
+
 ENV_BENCHMARK_SYMBOL = "STOCK_PLATFORM_BENCHMARK_SYMBOL"
 DEFAULT_BENCHMARK_SYMBOL = "000905"
 
@@ -166,7 +178,90 @@ def resolve_benchmark_identity(
     }
 
 
+def _market_db_closes(db: str, start: str, end: str, code: str) -> dict[str, float]:
+    """Read-only closes from engine ``daily_price``; empty when absent."""
+    import sqlite3
+
+    uri = "file:%s?mode=ro" % str(db).replace("\\", "/")
+    con = sqlite3.connect(uri, uri=True)
+    try:
+        rows = con.execute(
+            "SELECT date, close FROM daily_price WHERE code=? AND date>=? AND date<=?",
+            (code, start, end),
+        ).fetchall()
+    finally:
+        con.close()
+    return {str(d)[:10]: float(c) for d, c in rows if c is not None}
+
+
+def _aux_index_closes(bare: str, start: str, end: str) -> tuple[dict[str, float] | None, str | None]:
+    """Verified index closes from the aux store (ADR 0095); ``(None, None)`` if absent."""
+    try:
+        from stock_platform_providers.aux_market import read_index_closes, read_index_meta
+    except Exception:  # noqa: BLE001
+        return None, None
+    meta = read_index_meta(bare)
+    if not meta:
+        return None, None
+    hints = aux_index_name_hints().get(bare) or ()
+    name = str(meta.get("name") or "")
+    if not name or not any(h in name for h in hints):
+        return None, None
+    closes = read_index_closes(bare, start, end)
+    if not closes:
+        return None, None
+    return closes, name
+
+
+def load_benchmark_closes(
+    db: str,
+    start: str,
+    end: str,
+    *,
+    names: Mapping[str, str] | None = None,
+    symbol: str | None = None,
+) -> tuple[dict[str, float] | None, dict[str, Any]]:
+    """Benchmark ``date → close`` for offline backtests (F1 + ADR 0095).
+
+    1. Identity check (fail-closed) → read-only ``market.db`` engine-code rows.
+    2. Only when that yields nothing (stock collision or no rows), fall back to
+       the platform aux store's **verified** index rows.
+    3. No aux store / no aux rows → bit-identical to the pre-aux behaviour.
+    """
+    bench = bare_benchmark_code(symbol) if symbol else resolve_benchmark_symbol()
+    ident = resolve_benchmark_identity(bench, names=names or {})
+    block: dict[str, Any] = {
+        "symbol": ident.get("symbol"),
+        "engineCode": ident.get("engineCode"),
+        "name": ident.get("name"),
+        "identityChecked": bool(ident.get("checked")),
+        "identityOk": bool(ident.get("ok")),
+    }
+    if not ident.get("alphaAvailable", True):
+        reason = str(ident.get("warning") or "基准身份校验未通过")
+    else:
+        closes = _market_db_closes(db, start, end, str(ident.get("engineCode")))
+        if closes:
+            return closes, block
+        reason = f"market.db daily_price 无 `{ident.get('engineCode')}` 行（{start}~{end}）"
+
+    aux, aux_name = _aux_index_closes(str(ident.get("symbol")), start, end)
+    if aux:
+        block.update(
+            source="aux_market",
+            identityOk=True,
+            auxName=aux_name,
+            marketDbReason=reason,
+        )
+        return aux, block
+    block["reason"] = reason
+    return None, block
+
+
 __all__ = [
+    "AUX_EXTRA_INDEX_NAME_HINTS",
+    "aux_index_name_hints",
+    "load_benchmark_closes",
     "DEFAULT_BENCHMARK_SYMBOL",
     "ENV_BENCHMARK_SYMBOL",
     "KNOWN_INDEX_NAME_HINTS",
