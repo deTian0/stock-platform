@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from .dotenv_load import load_dotenv
+from .dotenv import load_dotenv
 from .lvrev_enhancement import VARIANTS, compare_lvrev_enhancements
 
 
