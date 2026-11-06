@@ -323,48 +323,34 @@ def test_snapshot_rows_land_in_cache_so_rerun_is_zero_network(tmp_path: Path, mo
     assert blob["rows"]["600000"] == {"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5}
 
 
-def test_engine_fallback_only_when_quote_date_is_later_than_asof(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(quotes, "load_engine_closes", lambda symbols, day: {"600000": 9.9})
+def test_external_failure_never_returns_engine_close(tmp_path: Path, monkeypatch):
+    """外部源失败时不得用引擎 bar 充当报价（ADR 0083 §3）。"""
+    import stock_platform_providers
+
+    def _engine_must_not_be_read(*_args, **_kwargs):
+        raise AssertionError("engine market.db must not be read for quotes")
+
+    monkeypatch.setattr(stock_platform_providers, "EngineSqliteProvider", _engine_must_not_be_read, raising=False)
 
     def _fail(symbols, asof):
         return {}, "down"
 
-    rows, err = load_ohlc(
-        ["600000"],
-        "2026-10-29",
-        cache_dir=tmp_path,
-        allow_network=True,
-        fetch=_fail,
-        selection_asof="2026-10-28",
-    )
-    assert rows["600000"]["close"] == 9.9
-    assert "引擎库收盘兜底" in (err or "")
-
-    # quote_date == asof 时绝不用引擎收盘冒充当日收盘
-    same_day, same_err = load_ohlc(
-        ["600000"],
-        "2026-10-29",
-        cache_dir=tmp_path,
-        allow_network=True,
-        fetch=_fail,
-        selection_asof="2026-10-29",
-    )
-    assert same_day == {}
-    assert same_err
+    for quote_date in ("2026-10-29", "2026-10-28"):
+        rows, err = load_ohlc(
+            ["600000"],
+            quote_date,
+            cache_dir=tmp_path,
+            allow_network=True,
+            fetch=_fail,
+        )
+        assert rows == {}
+        assert err
+    assert not any(tmp_path.glob("ohlc-*.json"))
 
 
-def test_engine_fallback_is_not_written_into_ohlc_cache(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(quotes, "load_engine_closes", lambda symbols, day: {"600000": 9.9})
-
-    load_ohlc(
-        ["600000"],
-        "2026-10-29",
-        cache_dir=tmp_path,
-        allow_network=True,
-        fetch=lambda symbols, day: ({}, "down"),
-        selection_asof="2026-10-28",
-    )
-    assert not (tmp_path / "ohlc-2026-10-29.json").exists()
+def test_quotes_has_no_engine_close_fallback():
+    assert not hasattr(quotes, "load_engine_closes")
+    assert not hasattr(quotes, "_engine_closes_fallback")
 
 
 def test_quotes_module_has_no_top_level_providers_import():

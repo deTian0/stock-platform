@@ -1236,7 +1236,6 @@ def build_digest(
                 cache_dir=cache,
                 allow_network=True,
                 fetch=fetch_ohlc,
-                selection_asof=record.asof,
             )
             if err:
                 notes.append(err)
