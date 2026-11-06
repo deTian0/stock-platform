@@ -26,3 +26,16 @@
 ## 非目标
 
 改出厂 `W_DEFAULT` / `min_pick_score`；写生产账本；开 live；默认开 LLM；Workbench UI；主题校绕过 `FACTOR_LIBRARY`。
+
+## 增补（2026-11-06，已签核，随 `v4.14.0`）
+
+以下均在本 ADR 决策范围内，不改出厂 lvrev，不另起 ADR。
+
+1. **生产调度 opt-in**：库与 CLI 出厂默认仍**关**（`run_daily_pipeline(shadow_board=False)`）。开启方式：`--shadow-board` / `STOCK_PLATFORM_SHADOW_BOARD=1`；生产盘前 / 盘后调度预设（`scripts/ops/stock-platform-daily.xml`、`stock-platform-postmarket.xml`、`Invoke-ScheduledRun.ps1` 的 `TASK_PRESETS`）加 `-ShadowBoard`，2026-11-05 起生效，由 `test_scheduler_args_contract.py` 钉住。**回滚**：移除预设里的 `-ShadowBoard`，或单次传 `-NoShadowBoard`（显式关优先）；无需改代码。影子链异常只落 `{ok:false,error}`，不阻断主链。
+2. **前向影子账本隔离**：`<shadow_dir>/shadow_decisions.jsonl`（字段见 [`../contracts/datasets.md`](../contracts/datasets.md)「影子链产物」）。与 `recommend_decisions.jsonl` 物理隔离（`FORBIDDEN_BASENAMES` 守卫）；结算复用 `settle_pending_entries`，集 A / 集 B 分开报告，**不**并入主绩效。起算日 `asof=2026-11-04`。
+3. **Round2 仲裁实验开关**：`apply_round2_set_a(arbitration="d"|"a"|"b")` 与 CLI `--backtest --arbitration`；出厂默认 **`d`**（学校优先级先于分数），逐位不变，硬闸三模式一致。2021-01~2026-11 离线对照 A / B 夏普均劣于 D（见计划 §11.5），**维持 D**，开关仅供回测，不起新 ADR。
+4. **S2-P1 每日快照**：影子链运行时经 `em_get` 拉当日全市场龙虎榜 / 概念与行业板块排名 / 30 日解禁日程（`astock_http` 三个按日方法，登记见 [`../contracts/capability-matrix.md`](../contracts/capability-matrix.md)「全市场按日截面方法」），落 `<shadow_dir>/s2_snapshots/s2_snapshot_{asof}.json`。
+   - 开关 `STOCK_PLATFORM_S2_SNAPSHOT`（1/0）；未设时默认开，但 replay 预设 / pytest 下不发网。
+   - 预算 `STOCK_PLATFORM_S2_EM_BUDGET`，默认 **300** 逻辑请求/自然日（Asia/Shanghai），记在 `s2_snapshots/_budget.json`；实测 4 次/日，同 asof `ok` 快照复用零网络。
+   - **fail-soft**：单源失败 / 超预算只记 `sources.*.status` 与 note，永不抛出、不阻断；`loop_health.shadowBoard.s2` 最多 warn。
+   - PIT：龙虎榜按交易日可回放；板块排名仅 `updatedAt` 日期 == asof 才用；解禁日程有修订前视，仅作软排除。回测不读快照，S2 在回测恒空池。

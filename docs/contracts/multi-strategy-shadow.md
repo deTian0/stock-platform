@@ -111,7 +111,7 @@
 | 项 | 状态 |
 |----|------|
 | 集 B 真实贝叶斯先验 + LLM 胜率 | 仍 experimental 占位（可有学校优先级 `rankHints`）；不可覆盖硬闸 |
-| S2 自动拉东财主题（无 DI 时） | 不默认发网；须调用方注入 |
+| S2 自动拉东财主题（无 DI 时） | 日循环影子链开启时经 S2-P1 每日快照（`em_get`，预算 `STOCK_PLATFORM_S2_EM_BUDGET` 默认 300/日，开关 `STOCK_PLATFORM_S2_SNAPSHOT`，fail-soft；replay / pytest 不发网）；字段见 [`datasets.md`](datasets.md)「影子链产物」；回测仍无 DI → 空池 |
 | Workbench 影子只读页 | 延后 |
 | 改 `W_DEFAULT` / 出厂 picks | 禁止（须 Y1→Y2） |
 

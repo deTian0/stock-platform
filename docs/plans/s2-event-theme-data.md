@@ -81,7 +81,7 @@ S2 怎么用快照：热门概念（净流入为正的前 20）的领涨股记�
 
 **调度时点与 PIT**（推断，待首个生产日核对 `sources.*.pitOk`）：生产调度用 `-PrevSession`，asof=T-1。盘前 08:30 那次跑时板块排名的 `updatedAt` 还是 T-1 收盘，判 `pitOk` 并落 `ok` 快照；盘后 15:30 那次同一 asof 直接复用，零网络。如果盘前那次失败、盘后才首抓，板块排名 `updatedAt` 已是 T 日，会记 `stale` 不进 S2（快照 `partial`），只有龙虎榜 / 解禁生效。这是有意为之，不用非 PIT 数据。
 
-**未做（留待签核）**：§4 提到的能力矩阵 / `datasets.md` 契约条目与 ADR 0093 增补段本轮没写，三个新 provider 方法目前只给影子链用，没注册进 capability 矩阵。
+**契约已补（2026-11-06，已签核）**：三个新 provider 方法登记在 [`../contracts/capability-matrix.md`](../contracts/capability-matrix.md)「全市场按日截面方法」（只给影子链用，不进路由矩阵）；快照 / 预算账 / 终榜 / 前向影子账本字段见 [`../contracts/datasets.md`](../contracts/datasets.md)「影子链产物」；ADR [0093](../architecture/0093-multi-strategy-shadow-board.md) 已追加增补段。
 
 **P1 验收进展**：前向积累**起算日 asof=2026-11-05**（第一次真实生产落盘要等下一次调度运行），「20 个交易日内 S2 非空池比例 ≥60%」**待观察，未达标也未失败**，目前不到 1 个交易日样本。
 
