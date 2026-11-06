@@ -62,6 +62,7 @@ SIMULATE only. ``liveTradingEnabled=False``. Not investment advice.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
@@ -248,6 +249,19 @@ def prepare_book_frame(
     return feats
 
 
+#: lvrev ``trail_tp`` opt-in (ADR 0094). Default OFF; explicit flag wins, else env.
+ENV_LVREV_TRAIL_TP = "STOCK_PLATFORM_LVREV_TRAIL_TP"
+_TRUTHY_FLAG = frozenset({"1", "true", "yes", "on"})
+
+
+def resolve_trail_tp(flag: bool | None = None, *, env: Mapping[str, str] | None = None) -> bool:
+    """Explicit ``flag`` wins; otherwise ``STOCK_PLATFORM_LVREV_TRAIL_TP``; default False."""
+    if flag is not None:
+        return bool(flag)
+    src = env if env is not None else os.environ
+    return str(src.get(ENV_LVREV_TRAIL_TP) or "").strip().lower() in _TRUTHY_FLAG
+
+
 def run_portfolio_backtest(
     bars: pd.DataFrame,
     *,
@@ -278,6 +292,7 @@ def run_portfolio_backtest(
     start: str | None = None,
     end: str | None = None,
     pct_scale: str = "auto",
+    trail_tp: bool | None = None,
 ) -> dict[str, Any]:
     """Run a long-only book over ``bars`` and return curve + trades + metrics.
 
@@ -333,6 +348,8 @@ def run_portfolio_backtest(
         trail_min_peak_ret=trail_min_peak_ret,
         min_hold=min_hold,
         max_hold_days=max_hold_days,
+        # ADR 0094 opt-in: default OFF; explicit arg wins, else env var.
+        trail_tp=resolve_trail_tp(trail_tp),
     )
     cooldown_policy = CooldownPolicy(cooldown_days=int(cooldown_days))
     drift_policy = DriftPolicy(band=drift_band)
