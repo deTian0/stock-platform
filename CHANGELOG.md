@@ -13,6 +13,7 @@
 - **Y1 采纳闸门透传影子 S1 大势开关**：`stock-platform-strategy-adoption --include-shadow --shadow-s1-mode pick|gate|scale [--shadow-s1-gate-weak empty|s3]`（`CandidateSpec.s1_mode / s1_gate_weak`）；默认 `pick` 时调用与 summary 逐位不变。§11.7 按事先登记标准复核 gate/弱日空榜：分年夏普仅 3/6 年 ≥ D、2024 单年贡献超额 81%，判不通过，影子默认维持 D、不起 ADR（[`docs/plans/multi-strategy-final-board.md`](docs/plans/multi-strategy-final-board.md) §11.7）。
 - **影子 S4/S5 只读诊断模块**（`stock_platform_research.shadow_board.diagnostics`，`python -m` 运行，只读 market.db、产物写 `local/shadow/diagnostics/`）：逐日重建 S3/S4/S5 Round1 候选池，与反向池、成交额池、随机池对照，统计 1/3/5/10/20 日前向收益、超额、IC、五分位、入场涨停特征和引擎退出模拟。结论：S4 短动量方向反了，S5 历史上退化为按代码排序（成交额 8 亿处饱和），建议均下线、待签核（[`docs/plans/shadow-s4-s5-diagnosis.md`](docs/plans/shadow-s4-s5-diagnosis.md)）。不改任何学校、仲裁逻辑或默认值。
 - **E1 短期反转候选前向池研究**（`diagnostics --e1`，只读，产物 `local/shadow/diagnostics/e1/`）：S4 综合分最低 8 只 + 近 5 日无涨停 + 成交额 ≥ 5000 万，按事先登记标准（诊断 §8）判**不通过**：2021–23 h=5 超额 −0.13%、六年仅 2 年为正、2021–23 逐票均净 −0.23%；反向池的正超额主要来自成交额 < 5000 万的小票。不进 E2、不建 S6（诊断 §9）。不改任何学校默认。
+- **S3 alpha/beta 拆解（方向 5，只读诊断）**：`stock_platform_research.shadow_board.s3_decomp` 把 S3 池日收益对沪深300 / 中证500 / 中证1000 做回归（Newey-West 标准误）；段 A 2021–23 α 年化 −19.06%（t −2.38），段 B 2024–26 +6.23%（t 0.69），全区间 t −1.04，按事先登记标准判**未证明选股 alpha**。不改学校、仲裁或默认值；产物 `local/shadow/diagnostics/s3_decomp/` 不入库（[`docs/plans/shadow-s3-decomposition.md`](docs/plans/shadow-s3-decomposition.md) §8）。
 
 ### Changed
 
