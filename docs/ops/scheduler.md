@@ -154,3 +154,17 @@ Invoke-RestMethod http://127.0.0.1:3018/api/ops/health
 关注 `marketDb` 覆盖裁决（`ok` / `thin` / `stale` / `empty` / `missing_table`，见 ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）、brief 指针文件 `{out}/briefs/latest.json`（见 [daily-pipeline.md](daily-pipeline.md)）与 `Register-ScheduledTasks.ps1 -Status` 的 `lastResult`。
 
 `liveTradingEnabled` 恒为 false。
+
+## lvrev `trail_tp` opt-in（ADR 0094）
+
+出厂默认**关**。生产日循环推荐在进程环境设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（或 `.env`）；回滚删变量。启用步骤、影响面与改出厂默认门槛见 [`lvrev-trail-tp.md`](lvrev-trail-tp.md)。**不**改本页 XML / `TASK_PRESETS` 默认参数。
+
+## 午间 midday（ADR 0096）
+
+**不**注册 schtask。交易日约 11:30 由用户手动：
+
+```powershell
+stock-platform-digest --session midday --run-date (Get-Date -Format 'yyyy-MM-dd')
+```
+
+详见 [`../plans/midday-session.md`](../plans/midday-session.md) §1.1。

@@ -6,6 +6,9 @@
 
 ### Added
 
+- **`trail_tp` 生产 opt-in 运维说明**：[`docs/ops/lvrev-trail-tp.md`](docs/ops/lvrev-trail-tp.md)（启用 / 回滚 / 影响面 / 改出厂默认门槛）；调度与日流水线文档交叉链。③B `review_positions` 在未显式传 `exit_policy` 时读取同一环境变量（默认仍关；显式 `ExitPolicy` 优先）。
+- **午间 midday 手动触发说明**：[`docs/plans/midday-session.md`](docs/plans/midday-session.md) §1.1（不装 schtask；产物表）。
+- **同花顺 mock / 真实缺口诚实说明**：[`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md) 补 mock 手跑与接真实所需缺项；无桌面自动化钩子、不伪造成交。
 - **午间休盘简报会话 `midday`（ADR [`0096`](docs/architecture/0096-midday-digest-session.md)）**：`stock-platform-digest --session midday --run-date <报告日>` 写出 `{reportDay}-midday.md`；现价取自当日分钟线最后一根（经 `em_get`，仅候选池）；不装 schtask；失败三列 `—`。计划 [`docs/plans/midday-session.md`](docs/plans/midday-session.md)。
 - **lvrev `trail_tp` 生产 opt-in 开关（ADR [`0094`](docs/architecture/0094-lvrev-trail-tp-exit.md) Accepted，出厂默认关）**：`run_portfolio_backtest(trail_tp=...)` 或环境变量 `STOCK_PLATFORM_LVREV_TRAIL_TP=1` 开启（显式参数优先）；默认关时输出与改动前逐位一致。回滚 = 去掉该环境变量。出厂 `ExitPolicy()` 与日循环默认不变。
 - **平台自有只读补充行情库**（ADR [`0095`](docs/architecture/0095-aux-market-store.md)）：`stock_platform_providers.aux_market` + CLI `stock-platform-aux-market`，经 `em_get` 拉 5 个指数日线（东财返回名称须命中别名，否则拒写）与指定个股 OHLC，写 `local/aux_market/aux_market.db`（`STOCK_PLATFORM_AUX_MARKET_DB`），每日预算 / 幂等 / fail-soft；基准单点 `benchmark.load_benchmark_closes` 在 market.db 无真实指数时回落补充库，影子回测与 lvrev 增强超额由此可算，无补充库时逐位不变；不写 market.db。

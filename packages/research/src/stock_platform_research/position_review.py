@@ -97,7 +97,13 @@ def review_positions(
     Returns a ``SIMULATE`` payload; empty input is **fail-closed**
     (``ok=False``, no rows invented).
     """
-    exit_policy = exit_policy or ExitPolicy()
+    # ADR 0094 opt-in: when caller omits exit_policy, honour
+    # STOCK_PLATFORM_LVREV_TRAIL_TP (default still off). Explicit ExitPolicy wins.
+    # Lazy import: avoid position_review ↔ backtest cycle at module load.
+    if exit_policy is None:
+        from .backtest import resolve_trail_tp
+
+        exit_policy = ExitPolicy(trail_tp=resolve_trail_tp())
     cooldown_policy = cooldown_policy or CooldownPolicy()
     drift_policy = drift_policy or DriftPolicy()
 
@@ -114,6 +120,9 @@ def review_positions(
             "min_hold": exit_policy.min_hold,
             "max_hold_days": exit_policy.max_hold_days,
             "trail_min_held": exit_policy.trail_min_held,
+            "trail_tp": exit_policy.trail_tp,
+            "tiered_stop": exit_policy.tiered_stop,
+            "time_stop_days": exit_policy.time_stop_days,
         },
         "cooldownDays": cooldown_policy.cooldown_days,
         "driftBand": drift_policy.band,

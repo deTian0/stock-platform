@@ -52,11 +52,39 @@ def test_online_review_echoes_the_same_default_policy_the_backtest_uses():
         "min_hold": 45,
         "max_hold_days": 60,
         "trail_min_held": 3,
+        "trail_tp": False,
+        "tiered_stop": False,
+        "time_stop_days": 0,
     }
     assert rev["cooldownDays"] == 0
     assert rev["driftBand"] is None
     assert rev["environment"] == "SIMULATE"
     assert rev["liveTradingEnabled"] is False
+
+
+def test_online_review_honours_trail_tp_env_when_policy_omitted(monkeypatch):
+    """ADR 0094: STOCK_PLATFORM_LVREV_TRAIL_TP=1 turns on ③B trail_tp; default still off."""
+    monkeypatch.delenv("STOCK_PLATFORM_LVREV_TRAIL_TP", raising=False)
+    off = review_positions([_holding(price=10.9, peak=11.0, held_days=5)])
+    assert off["exitPolicy"]["trail_tp"] is False
+
+    monkeypatch.setenv("STOCK_PLATFORM_LVREV_TRAIL_TP", "1")
+    # peak ret = (11-10)/10 = +10% ≥ 8%; giveback from peak = (11-10.9)/11 ≈ 0.9% < 5% → hold
+    # force giveback: price 10.4 → (11-10.4)/11 ≈ 5.45% ≥ 5%
+    on = review_positions([_holding(price=10.4, peak=11.0, held_days=5)])
+    assert on["exitPolicy"]["trail_tp"] is True
+    assert on["rows"][0]["action"] == "exit"
+    assert str(on["rows"][0]["reason"]).startswith("trail_tp(")
+
+    # Explicit ExitPolicy(trail_tp=False) wins over env
+    forced_off = review_positions(
+        [_holding(price=10.4, peak=11.0, held_days=5)],
+        exit_policy=ExitPolicy(trail_tp=False),
+    )
+    assert forced_off["exitPolicy"]["trail_tp"] is False
+    assert forced_off["rows"][0]["action"] != "exit" or not str(
+        forced_off["rows"][0].get("reason") or ""
+    ).startswith("trail_tp(")
 
 
 def test_online_review_delegates_to_the_shared_functions():
