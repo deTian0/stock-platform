@@ -6,6 +6,7 @@
 
 ### Added
 
+- **lvrev 候选过滤 / 冷静期实验**（计划 [`docs/plans/lvrev-entry-filter.md`](docs/plans/lvrev-entry-filter.md)）：`near_limit7` / `amount50m` / `cooldown5`，CLI `stock-platform-lvrev-filter`；四条预登记标准下**均不通过**，出厂默认不变。
 - **`trail_tp` 生产 opt-in 运维说明**：[`docs/ops/lvrev-trail-tp.md`](docs/ops/lvrev-trail-tp.md)（启用 / 回滚 / 影响面 / 改出厂默认门槛）；调度与日流水线文档交叉链。③B `review_positions` 在未显式传 `exit_policy` 时读取同一环境变量（默认仍关；显式 `ExitPolicy` 优先）。
 - **午间 midday 手动触发说明**：[`docs/plans/midday-session.md`](docs/plans/midday-session.md) §1.1（不装 schtask；产物表）。
 - **同花顺 mock / 真实缺口诚实说明**：[`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md) 补 mock 手跑与接真实所需缺项；无桌面自动化钩子、不伪造成交。

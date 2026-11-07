@@ -25,13 +25,14 @@
 - **`trail_tp` 生产 opt-in 文档化**：[`ops/lvrev-trail-tp.md`](ops/lvrev-trail-tp.md)；调度 / 日流水线交叉链。③B `review_positions` 未显式传 policy 时读 `STOCK_PLATFORM_LVREV_TRAIL_TP`（**默认仍关**）
 - **midday 手动触发**：[`plans/midday-session.md`](plans/midday-session.md) §1.1；明确不装 schtask
 - **同花顺**：[`ops/broker-port-honesty.md`](ops/broker-port-honesty.md) 写清 mock 手跑与接真实缺项；无桌面自动化钩子
+- **候选过滤实验**：计划 [`plans/lvrev-entry-filter.md`](plans/lvrev-entry-filter.md) + CLI `stock-platform-lvrev-filter`；`near_limit7` / `amount50m` / `cooldown5` **三变体均不通过**（过滤方向收益递减，停扫）
 
 ### 测试结果
 
 | 检查 | 结果 |
 |------|------|
-| `pytest packages apps -q`（清空 `STOCK_PLATFORM_ENGINE_MARKET_DB`，replay） | **1630 passed, 11 skipped**（+1：③B trail_tp env；含 midday） |
-| `check_docs.ps1` | OK（含 `ops/lvrev-trail-tp.md` / midday §1.1） |
+| `pytest packages apps -q`（清空 `STOCK_PLATFORM_ENGINE_MARKET_DB`，replay） | **1637 passed, 11 skipped**（+7 过滤实验；含 midday / trail_tp ③B） |
+| `check_docs.ps1` | OK（含 `ops/lvrev-trail-tp.md` / `plans/lvrev-entry-filter.md`） |
 | `check_versions.ps1` | OK（`VERSION=4.14.0`） |
 
 ### 策略实验结论
@@ -39,8 +40,9 @@
 | 项 | 结论 |
 |----|------|
 | lvrev `trail_tp` | **通过**（既有严格对照 + aux 超额：基线超额 43.26% / trail_tp 70.52%；MaxDD 不恶化）。**出厂默认仍关**（安全优先）。**推荐生产日循环 opt-in**：设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（步骤见 [`ops/lvrev-trail-tp.md`](ops/lvrev-trail-tp.md)）；若要改库默认须另开 ADR + 全量回测 |
+| lvrev 过滤 `near_limit7` / `amount50m` / `cooldown5` | **均不通过**（near 与基线逐位相同；amount50m 收益≈0、回撤−33.6%；cooldown5 收益/夏普双降）。出厂不变；不起 ADR。详见 [`plans/lvrev-entry-filter.md`](plans/lvrev-entry-filter.md) §5 |
 | S3 alpha/beta 拆解 | **不通过**（未证明选股 alpha）— 只读诊断，不改默认 |
-| Set B 贝叶斯仓位 | **不通过** — 默认关；下一刀不要再碰仓位贝叶斯，可改**退出规则**或**候选过滤**（事先登记标准） |
+| Set B 贝叶斯仓位 | **不通过** — 默认关；**勿再扫仓位贝叶斯 / 无假设过滤参数** |
 | S4 E1 短期反转 | **不通过**（既有） |
 
 ### 同花顺模拟盘
@@ -50,10 +52,10 @@
 
 ### 建议的下一刀
 
-1. **候选过滤或退出规则**实验（事先登记，默认关；不做仓位贝叶斯）  
-2. 影子前向账本攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`  
-3. 用户确认后，若要改 `trail_tp` 出厂默认 → 另开 ADR + 全量回测四条标准  
-4. 同花顺真实模拟盘：等 BASE_URL + TOKEN；此前只维持 mock
+1. **影子前向账本**攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`  
+2. 生产日循环确认已设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（opt-in 观察）；改出厂默认须另 ADR + 全量回测  
+3. 同花顺真实模拟盘：等 BASE_URL + TOKEN；此前只维持 mock  
+4. **不要**再无新假设扫过滤/仓位贝叶斯；若再做策略实验须有新机制假说 + 事先标准
 
 ## 文档放哪
 
@@ -86,7 +88,7 @@
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
 **ADR 0094 已签核 Accepted（opt-in，出厂默认关）**：开关 `STOCK_PLATFORM_LVREV_TRAIL_TP=1` 或 `run_portfolio_backtest(trail_tp=True)`，回滚去掉该环境变量；生产默认未改。运维步骤见 [`ops/lvrev-trail-tp.md`](ops/lvrev-trail-tp.md)。
-**下一刀**（v4.14.0 之后）：① 从 Set B/S3 失败挖**退出规则或候选过滤**（不做仓位贝叶斯；事先登记）；② 影子前向账本攒样本；Y2 仍等 `adopt`；③ 全量 R5 仍等 ETF 回补；④ `trail_tp` 改出厂默认须另 ADR + 全量回测。midday 由用户 11:30 手动触发（[`plans/midday-session.md`](plans/midday-session.md) §1.1）。  
+**下一刀**（v4.14.0 之后）：① 影子前向账本攒样本；Y2 仍等 `adopt`；② 全量 R5 仍等 ETF 回补；③ `trail_tp` 生产 opt-in 观察（改出厂默认须另 ADR）；④ 过滤实验本轮已递减停扫。midday 由用户 11:30 手动触发（[`plans/midday-session.md`](plans/midday-session.md) §1.1）。  
 **补充行情库**（ADR [`0095`](architecture/0095-aux-market-store.md)）：5 指数日线已入 `local/aux_market/`（2020-01-02~2026-11-05），离线回测超额可算；日循环 settle 仍不读、需定期跑 `stock-platform-aux-market` 增量；data_quality 读 OHLC 未接。  
 **Set B 贝叶斯先验仓位**（[`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11.9–§11.10）：离线对照判 **不通过**（总收益/夏普低于 D、回撤深于 D 超 2pp），实验开关默认关，出厂不变。  
 **S3 alpha/beta 拆解**（[`plans/shadow-s3-decomposition.md`](plans/shadow-s3-decomposition.md) §8）：判**未证明选股 alpha**（段 A α 年化 −19.06%，全区间 NW t −1.04）；只读诊断，不改学校 / 仲裁 / 默认值。  

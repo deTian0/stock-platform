@@ -153,6 +153,7 @@ $required = @(
   'docs/plans/s2-event-theme-data.md',
   'docs/plans/shadow-s4-s5-diagnosis.md',
   'docs/plans/lvrev-enhancement.md',
+  'docs/plans/lvrev-entry-filter.md',
   'docs/plans/midday-session.md',
   'docs/ops/local-runtime.md',
   'docs/archive/README.md',
