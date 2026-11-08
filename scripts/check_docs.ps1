@@ -131,6 +131,7 @@ $required = @(
   'docs/ops/gate-sensitivity-benchmark.md',
   'docs/ops/neutralization-benchmark.md',
   'docs/ops/broker-port-honesty.md',
+  'docs/ops/paper-cabin.md',
   'docs/ops/lvrev-trail-tp.md',
   'docs/ops/m-d6-batch-recipe-upstream-feedback.md',
   'docs/README.md',

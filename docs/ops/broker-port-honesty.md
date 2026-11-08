@@ -2,14 +2,15 @@
 
 > **状态**：done（2026-09-22）  
 > **默认**：`STOCK_PLATFORM_BROKER=paper` + **SIMULATE**；`liveTradingEnabled=false`。  
-> **M-E4（实盘 / 真实券商 HTTP）**：路线图门禁，**未立项，禁止开工**。
+> **M-E4（实盘 / 真实券商 HTTP）**：路线图门禁，**未立项，禁止开工**。  
+> **模拟买卖主路径**：本仓 [`paper-cabin.md`](paper-cabin.md)（`stock-platform-paper`）；同花顺真实模拟盘已放弃，勿再当下一刀。
 
 ## 三档语义（勿混用）
 
 | 档位 | 含义 | 如何开启 | 是否生产就绪 |
 |------|------|----------|--------------|
-| **paper（默认）** | 内部 `PaperLedger` 纸面 | 无需配置 / `STOCK_PLATFORM_BROKER=paper` | 日用纸面路径 |
-| **ths_sim + mock** | 同花顺模拟**适配器**的内存/fixtures 传输 | `STOCK_PLATFORM_BROKER=ths_sim`（`THS_MODE` 默认 mock） | CI / 演示 E2E；**非**真实券商 |
+| **paper / 模拟舱（默认）** | 内部 `PaperBroker` + `PaperLedger`；CLI 落 `local/paper_cabin/` | 无需配置 / `STOCK_PLATFORM_BROKER=paper` | **日用推荐**；见 [`paper-cabin.md`](paper-cabin.md) |
+| **ths_sim + mock** | 同花顺模拟**适配器**的内存/fixtures 传输 | `STOCK_PLATFORM_BROKER=ths_sim`（`THS_MODE` 默认 mock） | 仅演示端口 E2E；**非**真实券商、非模拟舱主路径 |
 | **ths_sim + experimental** | HTTP 扩展点；缺 URL/TOKEN **fail-closed** | `STOCK_PLATFORM_THS_MODE=experimental` + BASE_URL + TOKEN | **未接真实零售模拟盘 API**；不宣称可用 |
 
 ## 明确未接
@@ -30,16 +31,10 @@ $env:STOCK_PLATFORM_THS_MODE = "mock"   # 可省略，默认即 mock
 
 预期：`liveTradingEnabled=false`；成交来自 `MockThsTransport` 内存/fixtures。试跑日志可落 `local/ths_sim_trial/`（**不入库**）。
 
-## 接真实模拟盘还缺什么（无新凭据则停）
+## 接真实模拟盘（已放弃）
 
-| 缺项 | 说明 |
-|------|------|
-| `STOCK_PLATFORM_THS_BASE_URL` | 稳定、文档化的同花顺**模拟盘** HTTP 根地址（目前无公开零售 API） |
-| `STOCK_PLATFORM_THS_TOKEN`（或等价鉴权） | 可注入 transport 的凭证；禁止提交 git |
-| `STOCK_PLATFORM_THS_MODE=experimental` | 缺 URL/TOKEN → **fail-closed**，不静默降级 mock |
-| 可实现的 place / positions 契约 | `ExperimentalThsHttpTransport` 对下单等仍 `pending`（注入测试替身除外） |
-
-在以上齐备之前：**只宣称 mock 成功**；不得把 experimental 写成「已接通同花顺」。无凭据时不要伪造 fill。
+用户决策：同花顺真实模拟盘**放弃**。缺公开零售 API / BASE_URL / TOKEN 时**不再推进** experimental wire-up；模拟买卖用本仓 [`paper-cabin.md`](paper-cabin.md)。  
+历史缺项（BASE_URL、TOKEN、place 契约 pending）仅作档案；**只宣称 mock 端口可跑**；不得写成「已接通同花顺」。
 
 ## 文档与代码须一致的用词
 

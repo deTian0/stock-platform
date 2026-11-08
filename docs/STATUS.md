@@ -1,10 +1,10 @@
 # 现行快照
 
-> 日期：2026-11-07  
+> 日期：2026-11-08  
 > 版本：**`v4.14.0` 已发布**（tag 未动；本晚未发版，保持 4.14.0）  
-> 分支：**仅 `main`**（功能分支 `feat/multistrategy-lvrev-trail-tp-s3-setb-202611` 已 fast-forward 合入并删除本地/远端）  
-> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
-> 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。  
+> 分支：**仅 `main`**  
+> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。同花顺真实模拟盘**已放弃**。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 通宵迭代纪要（2026-11-06 → 11-07）
@@ -27,12 +27,16 @@
 - **同花顺**：[`ops/broker-port-honesty.md`](ops/broker-port-honesty.md) 写清 mock 手跑与接真实缺项；无桌面自动化钩子
 - **候选过滤实验**：计划 [`plans/lvrev-entry-filter.md`](plans/lvrev-entry-filter.md) + CLI `stock-platform-lvrev-filter`；`near_limit7` / `amount50m` / `cooldown5` **三变体均不通过**（过滤方向收益递减，停扫）
 
+#### 续轮（2026-11-08）
+
+- **同花顺真实模拟盘放弃** → 本仓模拟舱：`stock-platform-paper` 扩展 buy/sell/positions/account/fills，落盘 `local/paper_cabin/`；文档 [`ops/paper-cabin.md`](ops/paper-cabin.md)；`ths_sim` mock 仅端口演示
+
 ### 测试结果
 
 | 检查 | 结果 |
 |------|------|
-| `pytest packages apps -q`（清空 `STOCK_PLATFORM_ENGINE_MARKET_DB`，replay） | **1637 passed, 11 skipped**（+7 过滤实验；含 midday / trail_tp ③B） |
-| `check_docs.ps1` | OK（含 `ops/lvrev-trail-tp.md` / `plans/lvrev-entry-filter.md`） |
+| `pytest packages apps -q`（清空 `STOCK_PLATFORM_ENGINE_MARKET_DB`，replay） | **1642 passed, 11 skipped**（+5 模拟舱；含 midday / trail_tp / 过滤实验） |
+| `check_docs.ps1` | OK（含 `ops/paper-cabin.md` / `ops/lvrev-trail-tp.md`） |
 | `check_versions.ps1` | OK（`VERSION=4.14.0`） |
 
 ### 策略实验结论
@@ -45,16 +49,17 @@
 | Set B 贝叶斯仓位 | **不通过** — 默认关；**勿再扫仓位贝叶斯 / 无假设过滤参数** |
 | S4 E1 短期反转 | **不通过**（既有） |
 
-### 同花顺模拟盘
+### 模拟买卖 / 同花顺
 
-- **成功到**：`STOCK_PLATFORM_BROKER=ths_sim` + `THS_MODE=mock` → authenticate / build_draft / execute / positions / account 全绿；`liveTradingEnabled=false`
-- **卡点**：无 `STOCK_PLATFORM_THS_BASE_URL` / `TOKEN`；`ExperimentalThsHttpTransport` 无稳定公开零售 API，缺注入即 fail-closed（ADR 0037）。本仓无桌面 UI 自动化钩子。未伪造成交。说明：[`ops/broker-port-honesty.md`](ops/broker-port-honesty.md)；试跑日志：`local/ths_sim_trial/`（不入库）
+- **主路径（推荐）**：本仓模拟舱 `stock-platform-paper`（PaperBroker）→ buy/sell/positions/account/fills；落盘 `local/paper_cabin/state.json`；说明 [`ops/paper-cabin.md`](ops/paper-cabin.md)
+- **ths_sim mock（仅端口演示）**：`STOCK_PLATFORM_BROKER=ths_sim` + `THS_MODE=mock` 仍可跑 authenticate / draft / execute；**≠** 真实同花顺；见 [`ops/broker-port-honesty.md`](ops/broker-port-honesty.md)
+- **已放弃**：同花顺真实模拟盘 / experimental HTTP wire-up；无桌面自动化；不伪造成交
 
 ### 建议的下一刀
 
 1. **影子前向账本**攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`  
 2. 生产日循环确认已设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（opt-in 观察）；改出厂默认须另 ADR + 全量回测  
-3. 同花顺真实模拟盘：等 BASE_URL + TOKEN；此前只维持 mock  
+3. **不要**再推进同花顺真实模拟盘；模拟买卖以本仓模拟舱为准  
 4. **不要**再无新假设扫过滤/仓位贝叶斯；若再做策略实验须有新机制假说 + 事先标准
 
 ## 文档放哪

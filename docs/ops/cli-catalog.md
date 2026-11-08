@@ -44,14 +44,19 @@ stock-platform-debate --engine deterministic --symbol 600519 --asof 2026-10-07 -
 
 | 命令 | 用途 | 读 local/.env |
 |------|------|---------------|
-| `stock-platform-paper` | 纸面 SIMULATE：`status` / `ensure-default` / `draft` / `execute` / `demo`；**无 live 开关** | 否（状态默认 `local/paper_session.json`） |
+| `stock-platform-paper` | **本仓模拟舱**：`buy`/`open` / `sell`/`close` / `positions` / `account` / `fills` + `status` / `draft` / `execute` / `demo`；落 `local/paper_cabin/state.json`；**无 live 开关** | 否（`--db` 可读 market.db 收盘） |
 
 例：
 
 ```text
 stock-platform-paper demo
-stock-platform-paper status
+stock-platform-paper buy --symbol 600519 --qty 100 --price 10 --signal-date 2026-09-04 --now 2026-09-07T09:40:00+08:00
+stock-platform-paper positions
+stock-platform-paper account
+stock-platform-paper fills
 ```
+
+运维说明：[`paper-cabin.md`](paper-cabin.md)。
 
 ## workbench
 
