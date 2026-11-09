@@ -1,6 +1,6 @@
 # 计划与路线图文档
 
-> **现行快照**：[`../STATUS.md`](../STATUS.md)（`v4.13.7`）。本目录只放**仍有效**的计划。已落地的 v4.2–v4.4 交接在 [`../archive/`](../archive/README.md)。  
+> **现行快照**：[`../STATUS.md`](../STATUS.md)（`v4.14.0`）。本目录只放**仍有效**的计划。已落地的 v4.2–v4.4 交接在 [`../archive/`](../archive/README.md)。  
 > **SSOT**：`docs/`。原 `.cursor/plans/*.md` 仅保留指向此处的短链索引。
 
 | 文档 | 说明 | 状态（摘要） |
@@ -23,7 +23,7 @@
 | [next-milestones-t3-cli-y2-fix-r5.md](next-milestones-t3-cli-y2-fix-r5.md) | F1 · T3 · A1 · R5-P · Y2 | F1/T3/A1/R5-P 代码已落；**Y2** 等签核；全量 R5 等生产回补 |
 | [multi-strategy-final-board.md](multi-strategy-final-board.md) | 多策略五校 → 硬 Round2 → Final Board → **仅影子账本**；双轨仲裁 A/B；升级走 Y1→Y2 | **MVP 已落**（ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；S1/S2/S5 stub；不改出厂）；§11 记录 S1/S5 仲裁偏置（已离线对照，维持 D；见 ADR 0093 增补） |
 | [shadow-s4-s5-diagnosis.md](shadow-s4-s5-diagnosis.md) | 影子终榜 S4（短动量）/ S5（资金流）选股质量诊断：Round1 池前向收益、IC、退出模拟、根因与处置建议 | 诊断完成（2026-11-06）；处置待签核，未改代码默认 |
-| [shadow-s3-decomposition.md](shadow-s3-decomposition.md) | 影子 S3 学派收益的 alpha / beta 拆解（对中证500/1000/沪深300 与大小盘差 OLS，NW t，事先登记判定） | 事先登记（2026-11-06）；结果待回填 |
+| [shadow-s3-decomposition.md](shadow-s3-decomposition.md) | 影子 S3 学派收益的 alpha / beta 拆解（对中证500/1000/沪深300 与大小盘差 OLS，NW t，事先登记判定） | **结论：未证明选股 alpha**（§8）；只读诊断，不改默认 |
 | [lvrev-enhancement.md](lvrev-enhancement.md) | lvrev 增强实验：Round2 二轮过滤 / 大势闸门 / 退出规则（分档止损、移动止盈、时间止损），通过标准跑数前登记 | 结果：仅 `trail_tp` 四条全过 → ADR [`0094`](../architecture/0094-lvrev-trail-tp-exit.md) Accepted（opt-in）；其余不通过；出厂默认仍关 |
 | [lvrev-entry-filter.md](lvrev-entry-filter.md) | lvrev 候选过滤 / 再入场冷静期（near_limit7 / amount50m / cooldown5），四条标准事先登记 | **三变体均不通过**；出厂不变；CLI `stock-platform-lvrev-filter` |
 | [midday-session.md](midday-session.md) | 午间休盘简报会话 `midday`（分钟现价、手动 CLI） | ADR [`0096`](../architecture/0096-midday-digest-session.md)；手动触发，不装 schtask |

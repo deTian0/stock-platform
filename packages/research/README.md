@@ -2,7 +2,8 @@
 
 选股 / 回测研究内核。安装名：`stock-platform-research`。
 
-> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.13.7**）。全仓快照与下一刀见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表只保留早期里程碑锚点。
+> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.14.0**）。全仓快照与下一刀见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表只保留早期里程碑锚点。  
+> 日用短链（详见 [`docs/ops/`](../../docs/ops/)）：digest `pre|post|midday` · [`shadow-board`](../../docs/ops/shadow-board.md) · [`lvrev-trail-tp`](../../docs/ops/lvrev-trail-tp.md) · [`aux-market`](../../docs/ops/aux-market.md)。
 
 ## 状态
 

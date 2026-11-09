@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **文档对齐 `v4.14.0`**：根 / 各包 README 版本与同花顺口径（真实模拟盘已放弃，日用 paper-cabin；ths mock 仅端口）；补 workbuddy / midday / paper / aux / trail_tp / shadow 短链；`docs/plans` 回填 S3「未证明选股 alpha」；`scheduler` digest CLI 与 midday 节对齐为 `pre|post|midday`。
+
 ### Added
 
 - **WorkBuddy 运维 runbook**：[`docs/ops/workbuddy-runbook.md`](docs/ops/workbuddy-runbook.md)（trail_tp 观察、midday 手跑、paper 模拟买卖、aux 增量、影子日结）；补 [`docs/ops/midday-digest.md`](docs/ops/midday-digest.md) / [`aux-market.md`](docs/ops/aux-market.md) / [`shadow-board.md`](docs/ops/shadow-board.md)；`STATUS` 下一刀指向该清单。

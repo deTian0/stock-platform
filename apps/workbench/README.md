@@ -2,7 +2,7 @@
 
 量化研究工作台（规划吸收 tick-stock-panel）。安装名：`stock-platform-workbench`。
 
-> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.13.7**）。全仓快照见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表止于情报报告接入；其后的体检面板等见路线图，不在本表逐版复写。
+> 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.14.0**）。全仓快照见 [`docs/STATUS.md`](../../docs/STATUS.md)。下表止于情报报告接入；其后的体检面板等见路线图，不在本表逐版复写。
 
 ## 状态
 

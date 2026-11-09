@@ -2,7 +2,7 @@
 
 可发布的量化**研究与纸面决策**平台：统一 Vendor、选股/PIT、工作台 API、投研 Agent 槽位、纸面执行安全模型，收敛在单一产品仓。
 
-> 当前版本见 [`VERSION`](VERSION)（`v4.13.7`）。现行快照 [`docs/STATUS.md`](docs/STATUS.md)；文档索引 [`docs/README.md`](docs/README.md)；历史里程碑 [`docs/ROADMAP.md`](docs/ROADMAP.md)；仍有效的计划 [`docs/plans/`](docs/plans/)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
+> 当前版本见 [`VERSION`](VERSION)（`v4.14.0`）。现行快照 [`docs/STATUS.md`](docs/STATUS.md)；文档索引 [`docs/README.md`](docs/README.md)；历史里程碑 [`docs/ROADMAP.md`](docs/ROADMAP.md)；仍有效的计划 [`docs/plans/`](docs/plans/)；发版 [`docs/release-checklist.md`](docs/release-checklist.md)；上游归档 [`docs/upstream-archive.md`](docs/upstream-archive.md)。
 
 ## v1.0 交付面
 
@@ -11,14 +11,16 @@
 | Providers | `packages/providers` | CN/US/HK 归一化、replay、`em_get`、可选 live、`TradingCalendar`（CN）、能力矩阵、`MarketStrategy` |
 | Research | `packages/research` | lvrev / 闸门 / PIT / 分层宇宙 / 盘前简报 / `stock-platform-daily` / refresh / performance / portfolio |
 | Agents | `packages/agents` | 研报/复盘/确定性辩论；可选 LLM（预算/降级） |
-| Execution | `packages/execution` | 纸面 SIMULATE、`BrokerPort` / `PaperBroker`、可选 `ths_sim`（mock） |
+| Execution | `packages/execution` | 纸面 SIMULATE、`BrokerPort` / `PaperBroker`、本仓模拟舱；`ths_sim` mock 仅端口演示 |
 | Workbench | `apps/workbench` | FastAPI + 最小 UI：日用向导 / 推荐 / 纸面 / 运维 |
 
 **默认运行时（v3.9+）**：行情偏好默认 **CN live**（`astock_http` / `em_get`）；美港可切 `global_http`。  
 CI / 本地测试设 `STOCK_PLATFORM_PROVIDER_PRESET=replay` 保持零公网。详见 [`docs/ops/live-startup.md`](docs/ops/live-startup.md)。  
-**明确不做**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、同花顺真实 HTTP（backlog）。  
-**同花顺**：仅 `STOCK_PLATFORM_BROKER=ths_sim` 显式开启；默认 mock；真实 HTTP 为 experimental/pending（无稳定公开零售模拟盘 API）。分档说明见 [`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md)。**M-E4 实盘仍门禁，未开工。**
+**明确不做**：实盘券商、默认 `ths_sim`、默认开启 LLM 辩论、React SPA、第二套行情主链、同花顺真实模拟盘。  
+**同花顺**：真实模拟盘**已放弃**。日用模拟买卖走本仓 [`paper-cabin`](docs/ops/paper-cabin.md)（`stock-platform-paper`）；`ths_sim` mock **仅端口演示**（`STOCK_PLATFORM_BROKER=ths_sim` + `THS_MODE=mock`）。分档见 [`docs/ops/broker-port-honesty.md`](docs/ops/broker-port-honesty.md)。**M-E4 实盘仍门禁，未开工。**  
 **交易**：始终 paper / SIMULATE（`liveTradingEnabled=false`）——「真实」仅指行情 API。
+
+日用运维短链：[`workbuddy-runbook`](docs/ops/workbuddy-runbook.md) · [`midday-digest`](docs/ops/midday-digest.md) · [`paper-cabin`](docs/ops/paper-cabin.md) · [`aux-market`](docs/ops/aux-market.md) · [`lvrev-trail-tp`](docs/ops/lvrev-trail-tp.md) · [`shadow-board`](docs/ops/shadow-board.md)。
 
 ## LLM 理由约束
 
@@ -139,6 +141,7 @@ stock-platform/
 | **v4.2–v4.9** | 日调度、绩效闭环、循环自足、健康度与执行台账 |
 | **v4.10–v4.11** | 策略采纳闸门、负收益归因 |
 | **v4.12–v4.13.7** | 盘后行情台账、简报盘前/盘后、多源 OHLC、体检到期口径 |
+| **v4.14.0** | F1 基准身份 / T3 数据质量 / A1 CLI / R5-P ETF 平台侧；影子终榜（ADR 0093）与前向账本；lvrev `trail_tp` opt-in（ADR 0094）；补充行情库（ADR 0095）；午间 midday（ADR 0096）；本仓模拟舱（放弃同花顺真实模拟盘） |
 
 M0–M47 细节见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。现行开放项见 [`docs/STATUS.md`](docs/STATUS.md)。
 

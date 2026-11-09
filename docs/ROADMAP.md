@@ -6,7 +6,7 @@
 
 状态图例：`planned` / `in_progress` / `done`
 
-> **现行快照（2026-11-04，`v4.13.7`）**：[`STATUS.md`](STATUS.md)。本表 M0–M47 / Phase A–E **全部 done**，不要从下面的旧焦点开工。  
+> **现行快照（2026-11-09，`v4.14.0`）**：[`STATUS.md`](STATUS.md)。本表 M0–M47 / Phase A–E **全部 done**，不要从下面的旧焦点开工。  
 > 自有主线（G/B/S/X/L/C/R/T/Y **九域**）：[`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md)。开放项只剩 **T3**（数据质量体检，目标 `v4.14.0`）、**R5**（ETF 进宇宙，卡在生产侧回补）、**Y2**（采纳落地，须人工签核）。双线边界：[`plans/dual-line-responsibility.md`](plans/dual-line-responsibility.md)。  
 > 已完成且不再指导开工的交接：[`archive/`](archive/README.md)。  
 > U 线（选股推荐 + 复盘）与 MR 线（情报报告）均已 done；**M-E4 / L2 / L3 实盘仍门禁**。能力盘点与合并路线图见 [`plans/`](plans/)。  

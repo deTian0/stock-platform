@@ -3,7 +3,7 @@
 纸面执行安全内核 + SIMULATE broker 端口。安装名：`stock-platform-execution`。
 
 > 包版本与根 [`VERSION`](../../VERSION) 对齐（现行 **4.14.0**）。全仓快照见 [`docs/STATUS.md`](../../docs/STATUS.md)。执行层仍是 SIMULATE，`liveTradingEnabled=false`。  
-> **模拟舱 CLI**：`stock-platform-paper`（buy/sell/positions/account/fills），说明 [`docs/ops/paper-cabin.md`](../../docs/ops/paper-cabin.md)。
+> **同花顺真实模拟盘已放弃**；日用模拟买卖见本仓 [`paper-cabin`](../../docs/ops/paper-cabin.md)（`stock-platform-paper`：buy/sell/positions/account/fills）。`ths_sim` mock 仅端口演示。
 
 ## 状态
 

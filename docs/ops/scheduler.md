@@ -41,7 +41,7 @@
 | `-Force` | 休市日仍跑（仅排障） |
 | `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
 | `-Digest` | 流水线成功后渲染人读日报（`data/digests/` **Markdown + HTML**），并产出同花顺导入 `data/ths_import/latest.txt` |
-| `-Session pre\|post` | 展示用会话。08:30 用 `pre`，15:30 用 `post`。不改变 asof（仍是 T-1）。digest 另收显式运行日，不猜今天 |
+| `-Session pre\|post\|midday` | 展示用会话。08:30 用 `pre`，15:30 用 `post`；`midday` 仅手跑（不装 schtask）。不改变 asof（仍是 T-1）。digest 另收显式运行日，不猜今天 |
 | `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
 | `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
 
@@ -122,8 +122,8 @@ market.db 由生产侧**晚间**回补，08:30 / 15:30 时点**绝无当日 bar*
 
 每日流水线成功后自动渲染人读版日报（`-Digest`），**Markdown + 同主题 HTML 双份**（ADR [`0071`](../architecture/0071-report-html-theme.md)）：
 
-- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--session pre|post] [--run-date YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...] [--no-ohlc]`。`--run-date` 必须显式传入；不传则不猜今天，盘前/缺运行日时开盘、收盘、涨跌为 `—`。
-- 产物：`data/digests/{reportDay}-pre.md` 与 `{reportDay}-post.md` **都保留**（html 同理）。`{reportDay}.md` / `{reportDay}.html` 与 `latest.md` / `latest.html` 是**最后一次成功渲染的别名**（拷贝，不是第三套正文）。另有 `latest-pre.*` / `latest-post.*`。主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown。同花顺文件名同样是 `{reportDay}.txt`（**生产榜**）；另有 `{reportDay}_quality_sec.txt` / `{reportDay}_short_sec.txt` 导出二次精选（ADR [0084](../architecture/0084-secondary-pick-import-blocks.md)）。
+- CLI：`stock-platform-digest [--asof YYYY-MM-DD] [--session pre|post|midday] [--run-date YYYY-MM-DD] [--out-dir ...] [--no-html] [--no-ths] [--ths-dir ...] [--no-ohlc]`。`--run-date` 必须显式传入；不传则不猜今天，盘前/缺运行日时开盘、收盘、涨跌为 `—`。`midday` 见下「午间 midday」。
+- 产物：`data/digests/{reportDay}-pre.md` 与 `{reportDay}-post.md` **都保留**（html 同理）；`midday` 另写 `{reportDay}-midday.md`。`{reportDay}.md` / `{reportDay}.html` 与 `latest.md` / `latest.html` 是**最后一次成功渲染的别名**（拷贝，不是第三套正文）。另有 `latest-pre.*` / `latest-post.*`。主题对齐 `static/report-templates/`，深色 + A 股红涨绿跌；`--no-html` 可只留 Markdown。同花顺文件名同样是 `{reportDay}.txt`（**生产榜**）；另有 `{reportDay}_quality_sec.txt` / `{reportDay}_short_sec.txt` 导出二次精选（ADR [0084](../architecture/0084-secondary-pick-import-blocks.md)）。
 - 内容：环境/数据源/宇宙概览、**长线 + 短线双代码块**（见下）、当日推荐表（**代码/名称**/综合分/收盘/理由）、五榜概览、命中追踪（X3 单点渲染）、绩效台账计数
   - **口径自证行（`v4.11.2`）**：标题下固定输出一行 `> **口径**：数据基准日（asof）YYYY-MM-DD —— 取该交易日收盘截面；本简报生成于 YYYY-MM-DD HH:MM:SS +08:00 …`，把「数据日」与「运行日」并列写出，避免 asof 被误读成「报告过期」。`生成时间` 也改按**本机时区**渲染（UTC 存档值保留在括号内）
   - **同花顺导入行（`v4.5.1`；`v4.11.1` 起双线各一块）**：**长线**（当日推荐 / ②A 质量榜）与**短线**（②B 短线榜）**各给一块可整块复制**的 6 位代码行，直接粘进同花顺手机版「自选 → 导入」。**手机版一次仅支持导入 5 只**，故按 5 只/行分组（`THS_IMPORT_PER_LINE = 5`）；代码归一化为 6 位裸码（去 `.SZ` / `.SH`）、按推荐序去重、仅保留合法 6 位码；某条线无有效代码则该块整块省略（fail-closed）。`v4.13.3` 起**二次精选另出两块**：`同花顺导入 · 二次精选（长线）` / `（短线）`（ADR [0084](../architecture/0084-secondary-pick-import-blocks.md)）

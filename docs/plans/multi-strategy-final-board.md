@@ -1,7 +1,7 @@
 # 多策略 Final Board（影子链）产品设计
 
 > **状态**：MVP + 校富化（2026-11-05）— ADR [`0093`](../architecture/0093-multi-strategy-shadow-board.md)；CLI `stock-platform-shadow-board`；S1/S5 薄规则、S2 DI、digest 只读附录；**不改**出厂 lvrev、不打 tag。  
-> **版本基线**：`v4.13.7`（累计发版目标仍 `v4.14.0`）  
+> **版本基线**：`v4.14.0`（影子终榜已随本版发布；升级仍走 Y1→Y2）  
 > **现行快照**：[`../STATUS.md`](../STATUS.md)  
 > **升级路径**：影子链证据 → **Y1 采纳闸门** → 人工签核 → **Y2 落档**；禁止跳过 Y1/Y2 直接改出厂 lvrev。  
 > **红线**：执行层 SIMULATE；辩论/LLM 不进绩效；东财仍 `em_get`；不写 `market.db`。
