@@ -41,9 +41,9 @@
 | `-Force` | 休市日仍跑（仅排障） |
 | `-PrevSession` | asof 解析为**前一交易日**（T-1 收盘截面；见下「为什么 asof 是前一交易日」） |
 | `-Digest` | 流水线成功后渲染人读日报（`data/digests/` **Markdown + HTML**），并产出同花顺导入 `data/ths_import/latest.txt` |
-| `-Session pre\|post\|midday` | 展示用会话。08:30 用 `pre`，15:30 用 `post`；`midday` 仅手跑（不装 schtask）。不改变 asof（仍是 T-1）。digest 另收显式运行日，不猜今天 |
+| `-Session pre\|post\|midday` | 展示用会话。08:30 用 `pre`，15:30 用 `post`；`midday` 由 **WorkBuddy 自动化（工作日 11:30）**触发，**不**进本仓 schtask / XML（仍可手跑）。不改变 asof（仍是 T-1）。digest 另收显式运行日，不猜今天 |
 | `-StrictCoverage` | 覆盖率不可用时**不回退**、直接失败（验收 / 取证用） |
-| `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `data\holdings.json`，`-NoHoldings` 显式跳过 |
+| `-Holdings <path>` / `-NoHoldings` | 持仓 JSON（③A 持仓 / ③B 操作建议）；**默认自动探测** `local\holdings.json`（ADR 0097；`data\holdings.json` 残留**不再**作为兜底），`-NoHoldings` 显式跳过 |
 
 > **供数覆盖率守卫（`v4.4.0`，ADR [`0070`](../architecture/0070-daily-loop-self-sufficiency.md)）**：
 > 跑流水线**之前**复用 C2 单点 `EngineSqliteProvider.coverage_snapshot()` 校验解析出的 `asof`
@@ -75,7 +75,8 @@ cd <repo-root>
 
 1. `scripts/ops/stock-platform-daily.xml` 已含 `-MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session pre` 快路径、`WorkingDirectory`、`ExecutionTimeLimit=PT15M`、每日 08:30 触发；按需改 `WorkingDirectory` 为你的仓库绝对路径。`-SettleAfter` 与盘后任务**同一个** T-1 `asof`、写入幂等 ⇒ 两处都有是**冗余**，任一成功即入账（ADR [`0079`](../architecture/0079-settle-after-on-premarket.md)）。`-Session` 只区分展示，不改 asof（ADR [`0083`](../architecture/0083-digest-pre-post-and-secondary-pick.md)）。
 2. `scripts/ops/stock-platform-postmarket.xml` 是盘后 15:30 任务（`-MarketDb -PrevSession -SettleAfter -Digest -ShadowBoard -Session post`，`ExecutionTimeLimit=PT30M`）。
-3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。
+3. `scripts/ops/stock-platform-marketdb-backfill.xml` 是**行情回补**任务（每日 **18:30**，`ExecutionTimeLimit=PT20M`）：调用 `Invoke-MarketDbBackfill.ps1`，包一层**引擎自己的** `empirical/backfill_market_daily.py`（幂等：只补行数 < 3000 的交易日，`INSERT OR REPLACE`，严格顺序 + 调用间隔，CPU-safe）。**边界不变**：写库的是引擎脚本、平台仅只读（ADR [`0058`](../architecture/0058-market-db-source-of-truth.md)）。  
+   `-Mode apply` 成功后该包装脚本还跑两个**平台盘后步骤**（ADR [`0097`](../architecture/0097-holdings-single-source-and-post-close.md)，best-effort、不改退出码）：`stock-platform-loop-health --on-ok summary` 刷新 `local/health/`（含 `dataQuality`）；`stock-platform-shadow-board --settle-daily` 用当日收盘结算影子 pending 席位（`local/shadow/`）。选 18:30 是因为当日 bar 此时才进库；`-SkipPlatformPost` 可只跑引擎回补。
 4. 确认 `.env` 里有 `STOCK_PLATFORM_ENGINE_MARKET_DB`（指向 `market.db` 绝对路径）。
 5. 注册（**推荐用包装脚本**，幂等可重跑，无需管理员）：
 

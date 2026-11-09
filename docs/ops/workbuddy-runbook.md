@@ -9,7 +9,7 @@
 | # | 操作 | 何时 | 命令入口 | 专题 |
 |---|------|------|----------|------|
 | 1 | `trail_tp` 观察 | 生产日循环进程环境常开 | `$env:STOCK_PLATFORM_LVREV_TRAIL_TP='1'` | [`lvrev-trail-tp.md`](lvrev-trail-tp.md) |
-| 2 | midday 手跑 | 工作日约 **11:30** | `stock-platform-digest --session midday` | [`midday-digest.md`](midday-digest.md) |
+| 2 | midday 简报 | 工作日 **11:30**（已自动化） | `stock-platform-digest --session midday` | [`midday-digest.md`](midday-digest.md) |
 | 3 | 模拟买卖 | 演示 / 纸面闭环（随时） | `stock-platform-paper …` | [`paper-cabin.md`](paper-cabin.md) |
 | 4 | aux 增量 | 定期（建议每周或盘后） | `stock-platform-aux-market` | [`aux-market.md`](aux-market.md) |
 | 5 | 影子日结 | 盘后或与日循环配套；攒前向样本 | `-ShadowBoard` + `--settle-daily` | [`shadow-board.md`](shadow-board.md) |
@@ -59,9 +59,11 @@ $env:STOCK_PLATFORM_LVREV_TRAIL_TP = "1"
 
 ---
 
-## 2. 工作日 11:30 手跑 midday
+## 2. 工作日 11:30 午间简报（自动化，可手跑）
 
 **目的**：午间休盘简报（现价列）；**不**装仓库 schtask。
+
+> **2026-11-09 起自动**：WorkBuddy 自动化「stock-platform 午间简报」每个工作日 11:30 触发，先查交易日历再跑 CLI。下列命令是等价手跑，用于补跑 / 排障。
 
 ```powershell
 cd D:\workspace\stock_trading\stock-platform
@@ -71,7 +73,7 @@ stock-platform-digest --session midday --run-date $day
 
 | 项 | 值 |
 |----|-----|
-| 何时 | CN 交易日约 11:30（用户/助手提醒后手跑） |
+| 何时 | CN 交易日 11:30（WorkBuddy 自动化触发）；休市自动跳过；需补跑时手跑 |
 | 产物 | `local/digests/{day}-midday.md`（及 html / `latest-midday.*`；路径随本机 `local/` 配置） |
 | 失败怎么看 | 缺 `--run-date` → 行情列 `—`；东财分钟失败 → 三列 `—` 但 digest 仍成功；非交易日可 skip |
 | 禁止 | 不要用 `date.today()` 猜运行日；不要注册 midday 进 `Register-ScheduledTasks.ps1` |
@@ -132,6 +134,8 @@ stock-platform-aux-market --dry-run --json
 ## 5. 保持影子板日结（`-ShadowBoard`）攒前向样本
 
 **目的**：生产盘前/盘后已带 `-ShadowBoard` 写终榜 + pending；定期结算前向账本，攒够 `MIN_MEANINGFUL_SAMPLE` 再谈采纳。
+
+> **2026-11-09 起自动**（ADR [`0097`](../architecture/0097-holdings-single-source-and-post-close.md)）：18:30 回补任务在 `-Mode apply` 成功后自动跑 `--settle-daily`（及 `loop-health`），所以本节通常**无需手跑**；手跑只用于补历史或排障。
 
 ```powershell
 # A) 确认调度预设仍含 -ShadowBoard（盘前 08:30 / 盘后 15:30）

@@ -30,7 +30,7 @@
 
 ### 持仓快照价的过期守卫（⚠️ 别让旧价冒充最新收盘）
 
-`data/holdings.json` 的 `price` 是**人工按券商截图填的快照价**，有效期只到文档顶层的 `asof`。
+`local/holdings.json`（ADR 0097 单一真源）的 `price` 是**人工按券商截图填的快照价**，有效期只到文档顶层的 `asof`。
 `load_holdings` 把该日期盖到每一行（`holdings_asof`），`enrich_holdings` 据此判断：
 **`holdings_asof < 本次 asof` ⇒ 弃用快照价，改用 asof 截面收盘**，旧值留在 `priceStaleSnapshot` 供审计。
 同一交易日（或更新）的账本保留自己的价；截面里没有该代码（典型是 ETF）时也保留 —— 那是唯一价格。

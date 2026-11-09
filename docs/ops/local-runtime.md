@@ -47,6 +47,7 @@ stock-platform-init --force --broker 华宝证券 --capital-limit 10000
 - 幂等：已有 `platform_runtime_config` 单行则只打印现状；`--force` 才覆盖。
 - **不**打开 `liveTradingEnabled`（恒为 false / SIMULATE）。
 - 券商建议、资金上限、持仓路径元数据落库可改；真实持仓 JSON 仍在被忽略的 `local/holdings.json`。
+- **该文件是 ③A / ③B 的唯一真源**（ADR [`0097`](../architecture/0097-holdings-single-source-and-post-close.md)）：`Invoke-DailyPipeline.ps1` 默认读它，`data/holdings.json` 残留**不再**兜底（缺失即两榜为空，fail-closed）。迁移前的残留已归档到 `local/backup/holdings-legacy-2026-10-28.json`；**不要让 `data/` 下再出现同名文件**。
 - 文档 ADR 0064 / compliance 正文不因本 CLI 改字；运行时以 DB 行为准（若存在）。
 
 ## `.env`

@@ -147,3 +147,40 @@ def test_daily_cli_shadow_flags_parse() -> None:
     src = inspect.getsource(daily_cli)
     assert '"--shadow-board"' in src and '"--no-shadow-board"' in src
     assert 'dest="shadow_board"' in src
+
+
+# --- ADR 0097: holdings single source + post-close steps ---------------------
+
+BACKFILL = REPO_ROOT / "scripts" / "ops" / "Invoke-MarketDbBackfill.ps1"
+
+
+def test_holdings_default_is_local_single_source() -> None:
+    """③A/③B must read the hand-maintained ``local/holdings.json`` (ADR 0097).
+
+    The 2026-11-09 incident: the wrapper still defaulted to the pre-migration
+    ``data\\holdings.json`` residue, frozen at 2026-10-28. ③B then sized a trim
+    against 1100 stale shares (real book: 500) and, using the stale cost basis,
+    hid a -16% position that had already breached the -8% hard stop.
+    """
+    text = WRAPPER_DAILY.read_text(encoding="utf-8")
+    assert "Join-Path $repoRoot 'local\\holdings.json'" in text
+    assert "Join-Path $repoRoot 'data\\holdings.json'" not in text, (
+        "the legacy data/holdings.json must not be probed as a default (ADR 0097): "
+        "it stops being updated and silently sizes orders against a stale book"
+    )
+    assert "local\\holdings.json absent" in text, "fail-closed message drifted"
+
+
+def test_backfill_wires_platform_post_close_steps() -> None:
+    """18:30 backfill owns loop health + shadow settle (ADR 0097).
+
+    Both need today's bar, which only lands after the engine backfill; 15:30 still
+    sees T-1. They must stay best-effort so a healthy backfill is not failed.
+    """
+    text = BACKFILL.read_text(encoding="utf-8")
+    assert "[switch]$SkipPlatformPost" in text
+    assert "stock_platform_research.loop_health_cli" in text
+    assert "stock_platform_research.shadow_board.cli" in text
+    assert "--settle-daily" in text
+    assert "$Mode -eq 'apply'" in text, "post steps must not run on dry-run/validate"
+    assert "exit $ec" in text, "post steps must not replace the backfill exit code"

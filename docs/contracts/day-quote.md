@@ -51,7 +51,7 @@
 
 ## 4. 覆盖与汇总
 
-- `bucket`：`pick`（asof 归档 brief 的 picks）/ `holding`（`data/holdings.json`）/ `benchmark`。
+- `bucket`：`pick`（asof 归档 brief 的 picks）/ `holding`（`local/holdings.json`，ADR 0097 单一真源）/ `benchmark`。
 - 同一 `(symbol, bucket)` 去重；`summary` **只统计非 benchmark 行**且 `pct != null` 的行。
 - `summary`：`counted` / `upCount` / `downCount` / `flatCount` / `avgPct` / `medianPct` /
   `best` / `worst` / `tagCounts` / `missingOhlc`。

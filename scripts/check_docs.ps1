@@ -114,6 +114,7 @@ $required = @(
   'docs/architecture/0094-lvrev-trail-tp-exit.md',
   'docs/architecture/0095-aux-market-store.md',
   'docs/architecture/0096-midday-digest-session.md',
+  'docs/architecture/0097-holdings-single-source-and-post-close.md',
   'docs/contracts/benchmark-identity.md',
   'docs/contracts/data-quality.md',
   'docs/contracts/multi-strategy-shadow.md',

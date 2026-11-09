@@ -61,7 +61,7 @@ __all__ = [
     "to_ternary_verdict",
     "warn_if_truncated",
 ]
-__version__ = "4.14.0"
+__version__ = "4.14.1"
 
 # LLM-only names: resolved lazily so deterministic importers stay LLM-free.
 _LLM_EXPORTS = frozenset(

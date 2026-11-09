@@ -48,12 +48,15 @@
 
 .PARAMETER Holdings
   Holdings JSON for the ③A 持仓 / ③B 操作建议 boards (a list or {"holdings":[...]},
-  each row ``code`` / ``entry_price``). Default: repo ``data\holdings.json`` when it
-  exists — so the scheduled task picks up the real book with **no XML change**.
-  Missing file -> both boards stay empty (fail-closed, never guessed).
+  each row ``code`` / ``entry_price``). Default: ``local\holdings.json`` — the
+  hand-maintained real book (ADR 0097 / docs/ops/local-runtime.md); the scheduled
+  task picks it up with **no XML change**. Missing file -> both boards stay empty
+  (fail-closed, never guessed). The legacy ``data\holdings.json`` residue is **not**
+  read any more: it froze at its last hand edit and silently produced orders sized
+  against a stale share count.
 
 .PARAMETER NoHoldings
-  Explicitly skip holdings even when ``data\holdings.json`` exists.
+  Explicitly skip holdings even when ``local\holdings.json`` exists.
 
 .PARAMETER ShadowBoard
   ADR 0093: also build the multi-strategy shadow Final Board for the same PIT
@@ -335,11 +338,14 @@ elseif ($ShadowBoard) {
   $cliArgs += '--shadow-board'
 }
 
-# X2: ③A 持仓 / ③B 操作建议 need a holdings file. Default to the repo-local book
-# so the scheduled tasks are wired with zero XML change; fail-closed when absent.
+# X2: ③A 持仓 / ③B 操作建议 need a holdings file. ADR 0097: the single source is
+# the hand-maintained book under local/ (docs/ops/local-runtime.md). The legacy
+# data\holdings.json residue is deliberately NOT a fallback — it stopped being
+# updated, so reading it sized orders against a stale share count (2026-11-09:
+# 1100 vs the real 500) and hid a -8% hard stop. Fail-closed when absent.
 if (-not $NoHoldings) {
   if ([string]::IsNullOrWhiteSpace($Holdings)) {
-    $defaultHoldings = Join-Path $repoRoot 'data\holdings.json'
+    $defaultHoldings = Join-Path $repoRoot 'local\holdings.json'
     if (Test-Path $defaultHoldings) { $Holdings = $defaultHoldings }
   }
   if (-not [string]::IsNullOrWhiteSpace($Holdings)) {
@@ -353,7 +359,7 @@ if (-not $NoHoldings) {
     }
   }
   else {
-    Write-Host "HOLDINGS none (data\holdings.json absent) -> ③A/③B empty (fail-closed)"
+    Write-Host "HOLDINGS none (local\holdings.json absent) -> ③A/③B empty (fail-closed)"
   }
 }
 

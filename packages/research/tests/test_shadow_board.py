@@ -293,6 +293,33 @@ def test_ledger_isolation_from_production_names(tmp_path: Path) -> None:
     assert json.loads(line)["shadowOnly"] is True
 
 
+def test_final_board_index_is_idempotent_per_day(tmp_path: Path) -> None:
+    """Re-running the same asof/verdict must not duplicate the JSONL index row.
+
+    2026-11-09 maintenance: a re-run after a fix appended a second identical line
+    (11-05 already carried three), making ``final_board.jsonl`` unreadable. A
+    **different** verdict for the same day must still append, for auditability.
+    """
+    from stock_platform_research.shadow_board.ledger import write_shadow_ledger
+
+    payload = {
+        "schemaVersion": 1,
+        "asof": "2026-11-05",
+        "status": "ok",
+        "finalBoard": [{"symbol": "600000", "name": "浦发银行"}],
+    }
+    write_shadow_ledger(payload, shadow_dir=tmp_path)
+    write_shadow_ledger(payload, shadow_dir=tmp_path)
+
+    index = tmp_path / "final_board.jsonl"
+    rows = [json.loads(ln) for ln in index.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(rows) == 1 and rows[0]["finalCount"] == 1
+
+    write_shadow_ledger(dict(payload, finalBoard=[]), shadow_dir=tmp_path)
+    rows = [json.loads(ln) for ln in index.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(rows) == 2 and rows[-1]["finalCount"] == 0
+
+
 def test_write_refuses_forbidden_basename(tmp_path: Path) -> None:
     # Direct path escape via forging is blocked by basename check when name matches.
     from stock_platform_research.shadow_board.ledger import _assert_shadow_path

@@ -1,9 +1,9 @@
 # 现行快照
 
 > 日期：2026-11-09  
-> 版本：**`v4.14.0` 已发布**（tag 未动；本晚未发版，保持 4.14.0）  
+> 版本：**`v4.14.1` 已发布**（维护版：持仓单一真源 + 盘后收口，ADR [`0097`](architecture/0097-holdings-single-source-and-post-close.md)）  
 > 分支：**仅 `main`**  
-> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)；**WorkBuddy 运维清单** [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)。根/包 README 与 `plans`/`scheduler` 已对齐 `v4.14.0`。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**持仓单一真源 + 盘后收口** ADR [`0097`](architecture/0097-holdings-single-source-and-post-close.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)；**WorkBuddy 运维清单** [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)。根/包 README 与 `plans`/`scheduler` 已对齐 `v4.14.0`。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
 > 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。同花顺真实模拟盘**已放弃**。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
@@ -98,6 +98,13 @@
 **Set B 贝叶斯先验仓位**（[`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11.9–§11.10）：离线对照判 **不通过**（总收益/夏普低于 D、回撤深于 D 超 2pp），实验开关默认关，出厂不变。  
 **S3 alpha/beta 拆解**（[`plans/shadow-s3-decomposition.md`](plans/shadow-s3-decomposition.md) §8）：判**未证明选股 alpha**（段 A α 年化 −19.06%，全区间 NW t −1.04）；只读诊断，不改学校 / 仲裁 / 默认值。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
+
+## v4.14.1 已落地（维护）
+
+- **持仓单一真源**（ADR 0097）：③A/③B 改读 `local/holdings.json`，`data\holdings.json` 残留不再兜底；修掉 2026-11-09 盘前「减仓 900 股 vs 实有 500 股」与「−16% 未触发 −8% 止损」两个错判。残留归档 `local/backup/holdings-legacy-2026-10-28.json`
+- **盘后收口自动化**：18:30 回补成功后自动跑 `loop-health` + `shadow-board --settle-daily`（best-effort）；影子账本不再永久 pending
+- **WorkBuddy 自动化对齐 `local/`**：盘前/盘后/回补/周度四条提示词改路径；**新增午间 11:30 自动化**（仓外触发，仍不装 schtask）
+- **影子索引幂等**：同 asof 同裁决复跑不再重复追加 `final_board.jsonl`
 
 ## v4.14 已落地
 

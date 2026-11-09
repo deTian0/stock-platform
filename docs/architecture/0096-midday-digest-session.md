@@ -16,7 +16,7 @@
 2. **文件名**：`{reportDay}-midday.md` / `.html`，另写 `latest-midday.*`；`{reportDay}.md` 与 `latest.md` 仍是「最后一次成功渲染」别名（与盘后相同规则）。**不删除**同日 `-pre` / `-post`。
 3. **数据源**：仍读 brief 库唯一 `asof` 行（T-1 截面）；不新建 brief 主键、不改 picks / 命中 / 绩效 / 同花顺生产语义。
 4. **行情**：午间默认取运行日分钟线（经 `em_get`），**仅候选池**——生产 picks + ②B `short_term.pool`（无 pool 则 `items`）+ 基准码。行形状仍用 `open` / `close`，其中 `close` = 当日已拿到的**最后一根分钟收盘**（现价），不是日线收盘。表头第二价列写 **现价**，避免与盘后「收盘」混淆。
-5. **触发**：仅 `stock-platform-digest --session midday --run-date <报告日>`（及库函数等价参数）。**不**注册计划任务 XML / schtask；用户自建 11:30 触发。
+5. **触发**：仅 `stock-platform-digest --session midday --run-date <报告日>`（及库函数等价参数）。**不**注册计划任务 XML / schtask。**增补（2026-11-09）**：由 WorkBuddy 自动化「stock-platform 午间简报」在工作日 11:30 触发 —— 仓外触发器，不进 `scripts/ops/*.xml`，仍可手跑同一条 CLI。
 6. **失败**：分钟源失败 → 三列 `—` + 数据备注，digest 本身成功（fail-soft）。禁止用 `market.db` 日线冒充现价。
 
 ## 非目标

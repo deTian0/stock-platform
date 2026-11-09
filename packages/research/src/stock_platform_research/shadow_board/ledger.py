@@ -71,8 +71,32 @@ def write_shadow_ledger(
         "shadowOnly": True,
         "snapshot": str(json_path),
     }
-    with jsonl_path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    # Idempotent re-runs: a same-``asof`` row with the same verdict is not appended
+    # again. The daily pipeline may be re-run after a fix (2026-11-09); appending a
+    # duplicate index line each time made ``final_board.jsonl`` unreadable (11-05
+    # had three identical rows). A **different** verdict for the same day still
+    # appends, so a corrected board stays auditable.
+    duplicate = False
+    if jsonl_path.exists():
+        previous = [
+            ln for ln in jsonl_path.read_text(encoding="utf-8").splitlines() if ln.strip()
+        ]
+        for ln in reversed(previous):
+            try:
+                prev = json.loads(ln)
+            except json.JSONDecodeError:
+                continue
+            if str(prev.get("asof")) != str(day):
+                break
+            if (prev.get("status"), prev.get("finalCount")) == (
+                summary["status"],
+                summary["finalCount"],
+            ):
+                duplicate = True
+            break
+    if not duplicate:
+        with jsonl_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
 
     return {"json": str(json_path), "jsonl": str(jsonl_path)}
 

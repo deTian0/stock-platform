@@ -9,7 +9,7 @@
 | 动作 | 时机 |
 |------|------|
 | 日循环写终榜 + pending | 盘前 08:30 / 盘后 15:30（调度已带 `-ShadowBoard`） |
-| `--settle-daily` | 盘后或定期；结算 pending，攒前向样本 |
+| `--settle-daily` | **自动**：18:30 回补成功后由 `Invoke-MarketDbBackfill.ps1` 调用（ADR [0097](../architecture/0097-holdings-single-source-and-post-close.md)，best-effort）；手跑仍可随时补 |
 | `--perf-summary` | 随时只读摘要 |
 
 目标：前向账本攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`。

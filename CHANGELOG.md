@@ -38,6 +38,25 @@
 - **撤回盘后引擎收盘兜底**（提交 [`9289d83`]）：`quotes.load_ohlc` 此前在外部日线源失败、且 `quote_date` 晚于 brief `asof` 时，用引擎库收盘填 `close`。该行为已撤回：外部源失败时「开盘 / 收盘 / 涨跌」一律输出 `—`，不再用引擎库数据补位。引擎 `daily_price` 不含开高低，其收盘口径与外部日线不同，见 ADR [`0083`](docs/architecture/0083-digest-pre-post-and-secondary-pick.md)。`load_engine_closes` 与 `_engine_closes_fallback` 已删除，`test_quotes_has_no_engine_close_fallback` 锁定删除结果。历史条目（`[4.13.4]` 等）不改。
 - **影子终榜回测基准**：原 CLI 硬读 `000300.SH`，market.db 无此行，超额列一直静默为空。现经 F1 单点 `stock_platform_research.benchmark` 解析（默认 `000905`，可用 `STOCK_PLATFORM_BENCHMARK_SYMBOL` 覆盖），先做 fundamentals 名称身份校验，再只读 `daily_price`。payload 新增 `benchmark{symbol,engineCode,name,available,reason}` 与各臂 `excessAvailable`；不可用时报告超额列标「不可用」，`limitations` 写明原因。实测 market.db 无任何指数行（`000905.SZ`=厦门港务、`000852.SZ`=石化机械、`000016.SZ`=*ST康佳A、`000300` 不存在），因此超额按 fail-closed 标不可用。lvrev 臂同路径。不写 market.db。
 
+## [4.14.1] - 2026-11-09
+
+### Fixed
+
+- **③A / ③B 读陈旧持仓文件（P0，ADR [0097](docs/architecture/0097-holdings-single-source-and-post-close.md)）**：`Invoke-DailyPipeline.ps1` 的默认持仓仍是迁移前的 `data\holdings.json`，该文件最后人工编辑停在 **2026-10-28**；真账本是 `local/holdings.json`（asof 2026-11-05）。实测 2026-11-09 盘前：③B 按旧账本（000533 **1100 股 / 成本 9.977**）建议「减仓 **900 股**」，而真实只有 **500 股可卖**（不可执行）；按真实成本 11-06 收盘 9.61 计为 **−16.1%**，早已击穿 −8% 硬止损，正确动作应是 exit 全 500 股 —— 陈旧成本（−3.68%）把止损掩盖成「按权重 trim」。现在默认读 `local\holdings.json`，`data\` 残留**不再**兜底（缺失即两榜为空，fail-closed）；本机残留已归档到 `local/backup/holdings-legacy-2026-10-28.json`。
+- **影子终榜索引重复追加**：同 `asof` + 同裁决的复跑不再重复写 `final_board.jsonl`（11-05 曾有 3 条相同行），裁决变化仍追加以保留审计痕迹。
+
+### Changed
+
+- **18:30 回补成功后自动跑平台盘后步骤**（ADR 0097）：`Invoke-MarketDbBackfill.ps1` 在 `-Mode apply` 成功后追加 `stock-platform-loop-health --on-ok summary`（刷新 `local/health/`）与 `stock-platform-shadow-board --settle-daily`（结算影子 pending）；两者 best-effort、不改变回补退出码，`-SkipPlatformPost` 可只跑引擎回补。此前 `local/health/` 停在 2026-11-06，影子账本 8 条 pending 从未被结算。
+- **WorkBuddy 自动化提示词对齐 `local/`**：盘前 / 盘后 / 回补 / 周度四条改读 `local/digests/latest-pre|post.md`、`local/logs/runs.jsonl`、`local/holdings.json`（此前指向已停更的 `data/`，一直读到 11-04 的旧日报）；盘前取 asof 改为读标题括号里的**选股基准**，不再误取报告日。
+- **文档路径校正**：`scheduler.md` / `daily-pipeline.md` / `local-runtime.md` / `shadow-board.md` / `workbuddy-runbook.md` / `contracts/day-quote.md` / `contracts/rankings.md` 的持仓与产物路径统一到 `local/`。
+
+### Added
+
+- **ADR [0097](docs/architecture/0097-holdings-single-source-and-post-close.md)**：持仓单一真源与盘后收口。
+- **午间简报 WorkBuddy 自动化**（工作日 11:30）：仓外触发器，仍不注册 schtask、不写 `scripts/ops/*.xml`；产物与手跑一致（`local/digests/{reportDay}-midday.*`）。
+- **契约测试**：`test_scheduler_args_contract.py` 钉住「持仓默认必须是 `local`、不得回落 `data`」与「回补脚本必须带两个盘后步骤 + `-SkipPlatformPost`」；`test_shadow_board.py` 钉住索引幂等。
+
 ## [4.14.0] - 2026-11-06
 
 ### Added

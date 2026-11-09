@@ -1,12 +1,13 @@
 # 午间 midday 手跑（ADR 0096）
 
-> **状态**：已落地；**不**注册 schtask。  
+> **状态**：已落地；**不**注册 schtask，也**不**写 `scripts/ops/*.xml`。  
+> **触发**：2026-11-09 起由 **WorkBuddy 自动化「stock-platform 午间简报」**（工作日 11:30）执行；仓外触发器，等价于手跑同一条 CLI。  
 > **操作员清单**（WorkBuddy / 人）：[`workbuddy-runbook.md`](workbuddy-runbook.md) §2。  
 > **计划细节**：[`../plans/midday-session.md`](../plans/midday-session.md) §1.1。
 
 ## 何时
 
-CN **交易日约 11:30**（午间休盘）。用户或 WorkBuddy 提醒后手跑；仓库 `Register-ScheduledTasks.ps1` / XML **不含** midday。
+CN **交易日约 11:30**（午间休盘）。自动化先查交易日历（非交易日直接跳过），再跑 CLI。仓库 `Register-ScheduledTasks.ps1` / XML **不含** midday；手跑仍完全等价。
 
 ## 命令
 

@@ -23,6 +23,13 @@
   Path to the archived a-stock-engine clone. Required unless STOCK_PLATFORM_ENGINE_REPO is set.
   No hardcoded sibling default — fail-closed when unset.
 
+.PARAMETER SkipPlatformPost
+  ADR 0097: after a successful ``apply`` the wrapper also runs the platform
+  post-close steps that need today's bar — ``stock-platform-loop-health``
+  (local/health/) and ``stock-platform-shadow-board --settle-daily``
+  (local/shadow/). Both are best-effort and never change the exit code. Pass this
+  switch to run the engine backfill alone (debugging only).
+
 .EXAMPLE
   .\scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode dry-run -EngineRoot <engine-root>
   .\scripts\ops\Invoke-MarketDbBackfill.ps1 -Mode apply
@@ -31,7 +38,10 @@
 param(
   [ValidateSet('apply', 'dry-run', 'validate')]
   [string]$Mode = 'apply',
-  [string]$EngineRoot = ''
+  [string]$EngineRoot = '',
+  # ADR 0097: skip the platform post-close steps (loop health + shadow settle).
+  # Only useful for debugging the engine backfill itself.
+  [switch]$SkipPlatformPost
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,4 +84,42 @@ finally {
 }
 
 Write-Host "BACKFILL mode=$Mode exit=$ec"
+
+# --- platform post-close steps (ADR 0097) ------------------------------------
+# The engine backfill is the thing that pushes **today's** bar into market.db, so
+# the platform-side work that depends on that bar belongs here rather than in the
+# 15:30 pipeline (which still sees T-1):
+#   1. loop_health  -> recompute coverage / brief / hits / performance / dataQuality
+#      against the just-updated warehouse (writes local/health/).
+#   2. shadow --settle-daily -> settle pending shadow ledger rows with closes that
+#      only exist now (local/shadow/, ADR 0093 forward samples). Without this the
+#      forward ledger stays pending forever and Y2 never gets evidence.
+# Both are best-effort: a failure is reported but never turns a successful backfill
+# into a failed task, and never changes $ec.
+if ($ec -eq 0 -and $Mode -eq 'apply' -and -not $SkipPlatformPost) {
+  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+  $platformPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
+  if (-not (Test-Path $platformPy)) { $platformPy = 'python' }
+
+  Push-Location $repoRoot
+  try {
+    Write-Host 'POST loop-health'
+    & $platformPy -m stock_platform_research.loop_health_cli --on-ok summary
+    Write-Host "POST loop-health exit=$LASTEXITCODE"
+
+    Write-Host 'POST shadow-settle'
+    & $platformPy -m stock_platform_research.shadow_board.cli --settle-daily
+    Write-Host "POST shadow-settle exit=$LASTEXITCODE"
+  }
+  catch {
+    Write-Warning "platform post-close step failed: $($_.Exception.Message)"
+  }
+  finally {
+    Pop-Location
+  }
+}
+elseif (-not $SkipPlatformPost) {
+  Write-Host "POST skipped (mode=$Mode exit=$ec; platform steps only run after a successful apply)"
+}
+
 exit $ec
