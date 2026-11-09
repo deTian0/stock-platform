@@ -8,17 +8,17 @@
 | 命令 | 用途 | 读 local/.env |
 |------|------|---------------|
 | `stock-platform-init` | 初始化 `local/` 运行时配置行 | 是 |
-| `stock-platform-shadow-board` | 多策略影子 Final Board（五校→硬 Round2→只写 `local/shadow/`；不改出厂；`--perf-summary` / `--settle-daily` 前向账本；`--backtest` 历史对照 lvrev） | 是（`--universe` JSON；`--backtest` 读 market.db） |
+| `stock-platform-shadow-board` | 多策略影子 Final Board（五校→硬 Round2→只写 `local/shadow/`；不改出厂；`--perf-summary` / `--settle-daily` 前向账本；`--backtest` 历史对照 lvrev）；运维 [`shadow-board.md`](shadow-board.md) | 是（`--universe` JSON；`--backtest` 读 market.db） |
 | `stock-platform-daily` | 日更流水线 | 是 |
 | `stock-platform-brief` | 只建 brief | 是 |
-| `stock-platform-digest` | 盘前/盘后/午间简报（`--session pre|post|midday`） | 是 |
+| `stock-platform-digest` | 盘前/盘后/午间简报（`--session pre|post|midday`）；midday 手跑见 [`midday-digest.md`](midday-digest.md) | 是 |
 | `stock-platform-day-quote` | 当日行情台账 | 是 |
 | `stock-platform-sameday` | 选股→次日收盘战绩 | 是 |
 | `stock-platform-performance` | 绩效 JSONL / settle | 是 |
 | `stock-platform-performance-proxy` | 代理台账 | 是 |
 | `stock-platform-loop-health` | 日用循环体检 | 是 |
 | `stock-platform-data-quality` | market.db 数据质量（T3） | 是 |
-| `stock-platform-aux-market` | 平台自有补充库 `local/aux_market/aux_market.db`（指数日线名称校验 + `--codes` 个股 OHLC；经 `em_get`；`--indices/--codes/--start/--end/--dry-run`；不写 market.db；ADR 0095） | 是 |
+| `stock-platform-aux-market` | 平台自有补充库 `local/aux_market/aux_market.db`（指数日线名称校验 + `--codes` 个股 OHLC；经 `em_get`；`--indices/--codes/--start/--end/--dry-run`；不写 market.db；ADR 0095）；运维 [`aux-market.md`](aux-market.md) | 是 |
 | `stock-platform-ops-ledger` | 调度执行台账 | 是 |
 | `stock-platform-attribution` | 收益归因 | 是 |
 | `stock-platform-strategy-adoption` | 采纳闸门 | 是 |
@@ -71,3 +71,5 @@ stock-platform-paper fills
 - Workbench 向导多步状态机的完整 UI 流
 
 Agent 编排优先本表 CLI；缺能力再开 workbench API。
+
+**WorkBuddy 操作员五项清单**（trail_tp / midday / paper / aux / 影子日结）：[`workbuddy-runbook.md`](workbuddy-runbook.md)。

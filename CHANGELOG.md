@@ -6,6 +6,7 @@
 
 ### Added
 
+- **WorkBuddy 运维 runbook**：[`docs/ops/workbuddy-runbook.md`](docs/ops/workbuddy-runbook.md)（trail_tp 观察、midday 手跑、paper 模拟买卖、aux 增量、影子日结）；补 [`docs/ops/midday-digest.md`](docs/ops/midday-digest.md) / [`aux-market.md`](docs/ops/aux-market.md) / [`shadow-board.md`](docs/ops/shadow-board.md)；`STATUS` 下一刀指向该清单。
 - **本仓模拟舱（放弃同花顺真实模拟盘）**：扩展 `stock-platform-paper` 为 PaperBroker 买卖闭环（`buy`/`open`、`sell`/`close`、`positions`、`account`、`fills`），状态落 `local/paper_cabin/state.json`；运维 [`docs/ops/paper-cabin.md`](docs/ops/paper-cabin.md)；`ths_sim` mock 仅保留端口演示。
 - **lvrev 候选过滤 / 冷静期实验**（计划 [`docs/plans/lvrev-entry-filter.md`](docs/plans/lvrev-entry-filter.md)）：`near_limit7` / `amount50m` / `cooldown5`，CLI `stock-platform-lvrev-filter`；四条预登记标准下**均不通过**，出厂默认不变。
 - **`trail_tp` 生产 opt-in 运维说明**：[`docs/ops/lvrev-trail-tp.md`](docs/ops/lvrev-trail-tp.md)（启用 / 回滚 / 影响面 / 改出厂默认门槛）；调度与日流水线文档交叉链。③B `review_positions` 在未显式传 `exit_policy` 时读取同一环境变量（默认仍关；显式 `ExitPolicy` 优先）。

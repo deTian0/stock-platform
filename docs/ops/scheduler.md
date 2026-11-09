@@ -167,4 +167,12 @@ Invoke-RestMethod http://127.0.0.1:3018/api/ops/health
 stock-platform-digest --session midday --run-date (Get-Date -Format 'yyyy-MM-dd')
 ```
 
-详见 [`../plans/midday-session.md`](../plans/midday-session.md) §1.1。
+运维短文：[`midday-digest.md`](midday-digest.md)；操作员清单：[`workbuddy-runbook.md`](workbuddy-runbook.md) §2；计划：[`../plans/midday-session.md`](../plans/midday-session.md) §1.1。
+
+## 影子 `-ShadowBoard` / 前向日结
+
+生产盘前/盘后预设已含 `-ShadowBoard`。日结账本与产物见 [`shadow-board.md`](shadow-board.md)；WorkBuddy 清单 [`workbuddy-runbook.md`](workbuddy-runbook.md) §5。
+
+## 补充行情库增量
+
+调度**不含** aux 任务；定期手跑 `stock-platform-aux-market`，见 [`aux-market.md`](aux-market.md)。

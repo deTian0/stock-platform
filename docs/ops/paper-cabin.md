@@ -53,6 +53,7 @@ stock-platform-paper sell --symbol 600519 --all --price 1810 `
 
 ## 交叉链
 
+- WorkBuddy 操作员清单：[`workbuddy-runbook.md`](workbuddy-runbook.md) §3
 - [`broker-port-honesty.md`](broker-port-honesty.md)
 - ADR [0036](../architecture/0036-broker-port.md) / [0037](../architecture/0037-ths-sim-broker.md) / [0038](../architecture/0038-ths-sim-gates.md)
 - [`cli-catalog.md`](cli-catalog.md)

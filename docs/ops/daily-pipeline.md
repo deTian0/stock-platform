@@ -154,8 +154,8 @@ Windows Task Scheduler / cron 包装：[`scheduler.md`](scheduler.md)
 
 ## lvrev `trail_tp` opt-in
 
-推荐生产进程设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（影响组合回测与有持仓时的 ③B；**不**改选股默认）。步骤与回滚：[`lvrev-trail-tp.md`](lvrev-trail-tp.md)。出厂 `ExitPolicy()` 仍关。
+推荐生产进程设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（影响组合回测与有持仓时的 ③B；**不**改选股默认）。步骤与回滚：[`lvrev-trail-tp.md`](lvrev-trail-tp.md)；操作员清单 [`workbuddy-runbook.md`](workbuddy-runbook.md) §1。出厂 `ExitPolicy()` 仍关。
 
 ## 午间 midday
 
-流水线不含 midday。用户 11:30 自触发：`stock-platform-digest --session midday --run-date <今天>`（[`../plans/midday-session.md`](../plans/midday-session.md)）。
+流水线不含 midday。用户 11:30 自触发：见 [`midday-digest.md`](midday-digest.md)；操作员清单 [`workbuddy-runbook.md`](workbuddy-runbook.md) §2。

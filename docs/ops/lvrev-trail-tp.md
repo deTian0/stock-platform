@@ -64,5 +64,6 @@ Task Scheduler 任务本身不内置该开关。任选其一：
 
 ## 交叉链
 
+- WorkBuddy 操作员清单：[`workbuddy-runbook.md`](workbuddy-runbook.md) §1  
 - 调度：[`scheduler.md`](scheduler.md) · 日流水线：[`daily-pipeline.md`](daily-pipeline.md)  
 - 现行快照：[`../STATUS.md`](../STATUS.md)

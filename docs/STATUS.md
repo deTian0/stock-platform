@@ -1,9 +1,9 @@
 # 现行快照
 
-> 日期：2026-11-08  
+> 日期：2026-11-09  
 > 版本：**`v4.14.0` 已发布**（tag 未动；本晚未发版，保持 4.14.0）  
 > 分支：**仅 `main`**  
-> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)；**WorkBuddy 运维清单** [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
 > 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。同花顺真实模拟盘**已放弃**。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
@@ -57,10 +57,10 @@
 
 ### 建议的下一刀
 
-1. **影子前向账本**攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`  
-2. 生产日循环确认已设 `STOCK_PLATFORM_LVREV_TRAIL_TP=1`（opt-in 观察）；改出厂默认须另 ADR + 全量回测  
+1. **按 WorkBuddy 运维清单照做**：[`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)（`trail_tp=1` 观察、工作日 11:30 midday、paper 模拟买卖、aux 增量、影子 `-ShadowBoard` 日结攒样本）  
+2. **影子前向账本**攒满 `MIN_MEANINGFUL_SAMPLE` 再下结论；Y2 仍等 `adopt`  
 3. **不要**再推进同花顺真实模拟盘；模拟买卖以本仓模拟舱为准  
-4. **不要**再无新假设扫过滤/仓位贝叶斯；若再做策略实验须有新机制假说 + 事先标准
+4. **不要**再无新假设扫过滤/仓位贝叶斯；若再做策略实验须有新机制假说 + 事先标准；改 `trail_tp` 出厂默认须另 ADR + 全量回测
 
 ## 文档放哪
 
@@ -93,8 +93,8 @@
 证据（2026-11-05）：walk-forward 回测 2021-01-04~2026-11-05 影子 夏普 0.198 / 总收益 10.37% / 回撤 -27.83%，lvrev 0.559 / 47.24% / -18.91%；Y1 `--include-shadow` 3×1y 判 **不采纳**（1/3 窗通过，w1/w2 夏普不达标）。**仍是影子**；缺：前向账本真实天数、S2 历史题材 DI；不降门槛、不伪造证据。
 
 **ADR 0094 已签核 Accepted（opt-in，出厂默认关）**：开关 `STOCK_PLATFORM_LVREV_TRAIL_TP=1` 或 `run_portfolio_backtest(trail_tp=True)`，回滚去掉该环境变量；生产默认未改。运维步骤见 [`ops/lvrev-trail-tp.md`](ops/lvrev-trail-tp.md)。
-**下一刀**（v4.14.0 之后）：① 影子前向账本攒样本；Y2 仍等 `adopt`；② 全量 R5 仍等 ETF 回补；③ `trail_tp` 生产 opt-in 观察（改出厂默认须另 ADR）；④ 过滤实验本轮已递减停扫。midday 由用户 11:30 手动触发（[`plans/midday-session.md`](plans/midday-session.md) §1.1）。  
-**补充行情库**（ADR [`0095`](architecture/0095-aux-market-store.md)）：5 指数日线已入 `local/aux_market/`（2020-01-02~2026-11-05），离线回测超额可算；日循环 settle 仍不读、需定期跑 `stock-platform-aux-market` 增量；data_quality 读 OHLC 未接。  
+**下一刀**（v4.14.0 之后）：以 [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md) 为准跑运维五项；① 影子前向账本攒样本；Y2 仍等 `adopt`；② 全量 R5 仍等 ETF 回补；③ `trail_tp` 生产 opt-in 观察（改出厂默认须另 ADR）；④ 过滤实验本轮已递减停扫。midday 见 [`ops/midday-digest.md`](ops/midday-digest.md)。  
+**补充行情库**（ADR [`0095`](architecture/0095-aux-market-store.md)）：5 指数日线已入 `local/aux_market/`（2020-01-02~2026-11-05），离线回测超额可算；日循环 settle 仍不读、需定期跑 `stock-platform-aux-market` 增量（[`ops/aux-market.md`](ops/aux-market.md)）；data_quality 读 OHLC 未接。  
 **Set B 贝叶斯先验仓位**（[`plans/multi-strategy-final-board.md`](plans/multi-strategy-final-board.md) §11.9–§11.10）：离线对照判 **不通过**（总收益/夏普低于 D、回撤深于 D 超 2pp），实验开关默认关，出厂不变。  
 **S3 alpha/beta 拆解**（[`plans/shadow-s3-decomposition.md`](plans/shadow-s3-decomposition.md) §8）：判**未证明选股 alpha**（段 A α 年化 −19.06%，全区间 NW t −1.04）；只读诊断，不改学校 / 仲裁 / 默认值。  
 **Y2 暂停**：`local/strategy/adoption_gate.json` 现为 `adopt=0 / reject=4`，无签核对象；有 `adopt` + 你确认后再开工。
@@ -113,7 +113,8 @@
 ## LLM 边界（现行）
 
 - **确定性主链**（默认、无 key）：`research` 日更 / digest / 回测 / attribution / adoption / 绩效；`agents` 研报·复盘·`engine=off|deterministic` 辩论；执行 SIMULATE。
-- **LLM 提供商**（ADR [`0089`](architecture/0089-llm-provider-selection.md)，运维 [`ops/llm-providers.md`](ops/llm-providers.md)）：`STOCK_PLATFORM_LLM_PROVIDER` 默认 **`workbuddy`**（进程内不打商业 LLM；数据用 workbuddy bridge）。生产 LLM 选 **`deepseek`**，只用 `DEEPSEEK_*`；或 `openai` 兼容栈。另需 `STOCK_PLATFORM_LLM_DEBATE=1` + `[llm]` extra。
+- **LLM 提供商**（ADR [`0089`](architecture/0089-llm-provider-selection.md)，运维 [`ops/llm-providers.md`](ops/llm-providers.md)）：`STOCK_PLATFORM_LLM_PROVIDER` 默认 **`workbuddy`**（进程内不打商业 LLM；数据用 workbuddy bridge）。生产 LLM 选 **`deepseek`**，只用 `DEEPSEEK_*`；或 `openai` 兼容栈。另需 `STOCK_PLATFORM_LLM_DEBATE=1` + `[llm]` extra。  
+- **WorkBuddy 操作员**：定时/手跑运维五项见 [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)（外部助手，非仓内业务组件）；会话限额 [`ops/workbuddy-runtime-limits.md`](ops/workbuddy-runtime-limits.md)。
 - **可选 LLM 侧车**：`stock_platform_agents.llm`；CLI `--debate-engine llm`；API `engine=llm` / `/api/debate/status` / deep-graph。
 - **不变量**：辩论判决不进 brief / picks 账本 / 命中 / 绩效（ADR 0065 测试锁）。
 

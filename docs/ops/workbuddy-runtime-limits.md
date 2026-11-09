@@ -3,6 +3,7 @@
 - 检测日期：2026-10-09
 - 检测方法：读取 `~/.workbuddy/settings.json`、`app/`、`workspace/`、`logs/sandbox/`、`security/`，解析程序本体 `D:\soft\agent\workbuddy\resources\app.asar.unpacked\cli\product.json`，并实测本机硬件与电源状态。
 - 适用范围：本机（Windows / WorkBuddy SaaS 版）；跨项目通用。
+- **运维命令清单**（何时跑 / 怎么跑）：[`workbuddy-runbook.md`](workbuddy-runbook.md)。
 
 ## 结论
 

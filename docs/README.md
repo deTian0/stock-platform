@@ -17,7 +17,13 @@
 | [`architecture/`](architecture/) | ADR（编号递增） |
 | [`contracts/`](contracts/) | 对外契约（数据集、能力矩阵、市场策略、东财 HTTP 等） |
 | [`ops/`](ops/) | 运维：刷新、调度、live 启动、LLM 提供商、Skills 治理、诚实性说明 |
+| [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md) | **WorkBuddy 操作员清单**：trail_tp / midday / paper / aux / 影子日结 |
 | [`ops/llm-providers.md`](ops/llm-providers.md) | LLM：`workbuddy` 默认 / `deepseek`（`DEEPSEEK_*`）/ `openai` |
+| [`ops/midday-digest.md`](ops/midday-digest.md) | 午间 midday 手跑（11:30；不装 schtask） |
+| [`ops/aux-market.md`](ops/aux-market.md) | 补充行情库 `stock-platform-aux-market` 增量 |
+| [`ops/shadow-board.md`](ops/shadow-board.md) | 影子终榜 `-ShadowBoard` 与前向日结 |
+| [`ops/paper-cabin.md`](ops/paper-cabin.md) | 本仓模拟舱 `stock-platform-paper` |
+| [`ops/lvrev-trail-tp.md`](ops/lvrev-trail-tp.md) | lvrev `trail_tp` 生产 opt-in |
 | [`engineering/`](engineering/) | OpenAPI、测试分层、CI |
 | [`upstream/`](upstream/) | 上游配方只读归档（摘要副本，非运行时） |
 | [`upstream-archive.md`](upstream-archive.md) | 上游仓总清单与红线 |

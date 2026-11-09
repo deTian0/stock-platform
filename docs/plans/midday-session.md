@@ -59,6 +59,8 @@ stock-platform-digest --session midday --run-date $day
 
 可选自建触发（用户侧，非仓库制品）：Windows 任务计划 / 手机闹钟提醒后手跑上述命令。仓库 XML / `Register-ScheduledTasks.ps1` **不含** midday。
 
+运维短文：[`../ops/midday-digest.md`](../ops/midday-digest.md)；WorkBuddy 操作员清单：[`../ops/workbuddy-runbook.md`](../ops/workbuddy-runbook.md) §2。
+
 ## 2. 验收
 
 - [x] ADR 0096 + 本计划登记
@@ -74,3 +76,4 @@ stock-platform-digest --session midday --run-date $day
 |------|------|
 | 2026-11-07 | 立项 + ADR Accepted；通宵迭代实现 |
 | 2026-11-07 | 补 §1.1 手动触发步骤与产物表；明确不装 schtask |
+| 2026-11-09 | 链到 ops/midday-digest.md 与 workbuddy-runbook.md |

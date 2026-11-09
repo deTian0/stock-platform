@@ -28,8 +28,9 @@ if (Test-Path .env) { Copy-Item .env local\.env -Force }
 | `sqlite:///./data/stock_platform.db` | `sqlite:///./local/stock_platform.db` |
 | `./data/recommend_decisions.jsonl` | `./local/recommend_decisions.jsonl` |
 | `./data/digests` 等 | `./local/` 下同名子目录 |
-| （新）多策略影子账本 | `./local/shadow/`（`STOCK_PLATFORM_SHADOW_DIR`；**禁止**混入主绩效 JSONL） |
+| （新）多策略影子账本 | `./local/shadow/`（`STOCK_PLATFORM_SHADOW_DIR`；**禁止**混入主绩效 JSONL；见 [`shadow-board.md`](shadow-board.md)） |
 | （新）本仓模拟舱 | `./local/paper_cabin/state.json`（`stock-platform-paper`；见 [`paper-cabin.md`](paper-cabin.md)） |
+| （新）补充行情库 | `./local/aux_market/aux_market.db`（见 [`aux-market.md`](aux-market.md)） |
 | 仓库根 `.env` | `local/.env`（过渡期仍可读根 `.env`） |
 
 ## 配置初始化 CLI
