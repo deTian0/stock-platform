@@ -38,6 +38,19 @@
 - **撤回盘后引擎收盘兜底**（提交 [`9289d83`]）：`quotes.load_ohlc` 此前在外部日线源失败、且 `quote_date` 晚于 brief `asof` 时，用引擎库收盘填 `close`。该行为已撤回：外部源失败时「开盘 / 收盘 / 涨跌」一律输出 `—`，不再用引擎库数据补位。引擎 `daily_price` 不含开高低，其收盘口径与外部日线不同，见 ADR [`0083`](docs/architecture/0083-digest-pre-post-and-secondary-pick.md)。`load_engine_closes` 与 `_engine_closes_fallback` 已删除，`test_quotes_has_no_engine_close_fallback` 锁定删除结果。历史条目（`[4.13.4]` 等）不改。
 - **影子终榜回测基准**：原 CLI 硬读 `000300.SH`，market.db 无此行，超额列一直静默为空。现经 F1 单点 `stock_platform_research.benchmark` 解析（默认 `000905`，可用 `STOCK_PLATFORM_BENCHMARK_SYMBOL` 覆盖），先做 fundamentals 名称身份校验，再只读 `daily_price`。payload 新增 `benchmark{symbol,engineCode,name,available,reason}` 与各臂 `excessAvailable`；不可用时报告超额列标「不可用」，`limitations` 写明原因。实测 market.db 无任何指数行（`000905.SZ`=厦门港务、`000852.SZ`=石化机械、`000016.SZ`=*ST康佳A、`000300` 不存在），因此超额按 fail-closed 标不可用。lvrev 臂同路径。不写 market.db。
 
+## [4.15.0] - 2026-11-10
+
+### Added
+
+- **影子附录回答「怎么选、为什么」（ADR [`0098`](docs/architecture/0098-shadow-explanation-and-paper-capital.md)）**：`digest_hook.render_shadow_board_appendix` 从「5 列结果表」扩为三段式 —— `Round1 · 各校入池`（每校状态 / 入池数 / 空池原因原文，`retired` 标「（已下线）」）、`Round2 · 硬闸淘汰`（入闸 N / 过闸 M + 逐票淘汰原因）、`入选席位`（触发理由 / 预期 / 失效条件 / 理由来源）。数据本就存在于 `final_board_{asof}.json`，此前渲染时被丢弃。实测 2026-11-09：S1 空池原因「择时关闭：截面宽度 16%（842/5218），低于地板 35%」、Round2 16 进 2 淘汰 14 只（集中度上限）首次进入报告。三份报告（pre / midday / post）同源生效；快照缺失或损坏仍整段省略（fail-closed）。
+- **③B 拆「金额(毛) / 费用 / 净额」（ADR 0098）**：`position_sizing.plan_orders` 新增 `cost_model` 参数（缺省 `portfolio.CostModel()`），每笔委托补 `fee` / `netAmount`，汇总补 `totalFee` / `totalNetAmount` / `costModel`；digest ③B 表与合计行同步。实测 2026-11-09 两笔清仓：毛 5,181.40 → 费用 2.97 → 净 5,178.43；ETF 588080 因免印花税仅 0.01 元。费用仍只走 `CostModel`，无第二套费率。
+- **模拟盘本金默认 20,000（ADR 0098）**：新增 `broker.DEFAULT_PAPER_CAPITAL = 20_000.0` 作唯一定义，`paper_cabin.DEFAULT_CASH` 与 `MockThsTransport(cash=)` 均引用它（原 1,000,000，与小账户差两个数量级）。`PaperBroker` 增加可选 duck-typed `cost_model`：`None` ⇒ 零费用（保持既有行为），注入后按 `costs()` 扣现金并累计 `total_fees`。
+
+### Changed
+
+- **③B 合计行措辞**：`本表合计卖出 X 元` → `本表合计卖出（毛） X 元；佣金/印花税合计 Y 元，净到账 Z 元`；旧 brief 缺 `totalFee` 时显示「（未计费用）」，不假装已扣。
+- **三个 WorkBuddy 自动化（盘前 / 午间 / 盘后）汇报要求**：均新增「影子策略（必报）」段，要求引用空池校 reason 原文、Round2 入闸过闸与淘汰原因、逐席触发/预期/失效；持仓段要求报净额与合计费用而非毛额。
+
 ## [4.14.1] - 2026-11-09
 
 ### Fixed

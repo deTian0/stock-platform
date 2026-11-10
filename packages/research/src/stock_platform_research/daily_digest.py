@@ -863,8 +863,18 @@ def _rankings_section(
             continue
         if slug == "actions" and any(it.get("suggestQty") for it in items):
             # ADR 0081：操作建议必须可执行 —— 给出股数 / 金额，而不只是一句 reason。
-            lines.append("| # | 代码 | 名称 | 动作 | 卖出数量 | 参考价 | 金额 | 权重 | 备注 |")
-            lines.append("|---|---|---|---|---|---|---|---|---|")
+            # ADR 0098：卖出所得区分毛额 / 费用 / 净额，费用走 portfolio.CostModel
+            #（佣金万0.854 双边 + 印花税万5 卖出单边 + ETF 免印花）。
+            orders_by_code = {
+                str(o.get("code")): o
+                for o in ((rankings.get("positionSizing") or {}).get("orders") or [])
+                if isinstance(o, dict)
+            }
+            lines.append(
+                "| # | 代码 | 名称 | 动作 | 卖出数量 | 参考价 | 金额(毛) "
+                "| 费用 | 净额 | 权重 | 备注 |"
+            )
+            lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
             for i, it in enumerate(items[:10], start=1):
                 qty = it.get("suggestQty")
                 px = float(it.get("price") or it.get("close") or 0) or None
@@ -877,20 +887,36 @@ def _rankings_section(
                 )
                 note = str(it.get("reason") or "").replace("|", "\\|")
                 code = str(it.get("symbol") or "-")
+                order = orders_by_code.get(code) or {}
+                fee = order.get("fee")
+                net = order.get("netAmount")
                 lines.append(
                     f"| {i} | {code} | {it.get('name') or name_by_code.get(code) or '-'} "
                     f"| {_ACTION_LABELS.get(it.get('action'), it.get('action') or '-')} "
                     f"| **{qty} 股** | {'-' if px is None else f'{px:.3f}'} "
-                    f"| {'-' if amt is None else f'{amt:,.2f}'} | {weight} | {note or '-'} |"
+                    f"| {'-' if amt is None else f'{amt:,.2f}'} "
+                    f"| {'-' if fee is None else f'{fee:,.2f}'} "
+                    f"| {'-' if net is None else f'{net:,.2f}'} "
+                    f"| {weight} | {note or '-'} |"
                 )
             lines.append("")
             lines.extend(_action_details(payload, list(items[:10])))
             sizing = rankings.get("positionSizing") or {}
             if sizing:
+                total_amt = float(sizing.get("totalAmount") or 0)
+                total_fee = sizing.get("totalFee")
+                total_net = sizing.get("totalNetAmount")
+                if total_fee is None or total_net is None:
+                    tail = "（未计费用）"
+                else:
+                    tail = (
+                        f"；佣金/印花税合计 **{float(total_fee):,.2f}** 元，"
+                        f"净到账 **{float(total_net):,.2f}** 元"
+                    )
                 lines.append(
                     f"> 单票上限 {float(sizing.get('capWeight') or 0) * 100:.0f}%；"
-                    f"整手 {sizing.get('lot') or 100} 股；本表合计卖出 "
-                    f"**{float(sizing.get('totalAmount') or 0):,.2f}** 元。不产生加仓建议。"
+                    f"整手 {sizing.get('lot') or 100} 股；本表合计卖出（毛） "
+                    f"**{total_amt:,.2f}** 元{tail}。不产生加仓建议。"
                 )
                 lines.append("")
             continue

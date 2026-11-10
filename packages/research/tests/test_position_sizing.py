@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from stock_platform_research.position_sizing import (
     DEFAULT_CAP_WEIGHT,
     DEFAULT_LOT,
@@ -118,3 +120,48 @@ def test_total_value_override_changes_weights():
     big = plan_orders(book, review, total_value=21007.2)["orders"][0]
     assert small["weightBefore"] > big["weightBefore"]
     assert small["qty"] > big["qty"]
+
+
+def test_sell_orders_carry_fee_and_net_amount():
+    """ADR 0098: amount 是毛额，netAmount 才是真到账（佣金万0.854 + 印花税万5）。"""
+    book = [
+        _row("000533", 500, 10.10, entry=11.456, avail=500),
+        _row("588080", 100, 1.314, entry=2.243, avail=100),
+    ]
+    review = _review(
+        {"code": "000533", "action": "exit", "reason": "stop_loss(-11.8%)"},
+        {"code": "588080", "action": "exit", "reason": "stop_loss(-41.4%)"},
+    )
+    plan = plan_orders(book, review, lot=100)
+    by_code = {o["code"]: o for o in plan["orders"]}
+
+    stock = by_code["000533"]
+    assert stock["amount"] == pytest.approx(5050.0)
+    # fee / netAmount 落库时四舍五入到分，故用 abs 容差。
+    assert stock["fee"] == pytest.approx(5050.0 * (0.0000854 + 0.0005), abs=0.01)
+    assert stock["netAmount"] == pytest.approx(stock["amount"] - stock["fee"], abs=0.01)
+
+    # ETF 免印花税，只有佣金腿。
+    etf = by_code["588080"]
+    assert etf["amount"] == pytest.approx(131.4)
+    assert etf["fee"] == pytest.approx(131.4 * 0.0000854, abs=0.01)
+    assert etf["fee"] < stock["fee"]
+
+    assert plan["totalFee"] == pytest.approx(stock["fee"] + etf["fee"], abs=0.02)
+    assert plan["totalNetAmount"] == pytest.approx(
+        5050.0 + 131.4 - plan["totalFee"], abs=0.02
+    )
+    assert plan["costModel"]["commissionRate"] == pytest.approx(0.0000854)
+    assert plan["costModel"]["etfStampExempt"] is True
+
+
+def test_zero_qty_orders_have_no_fee():
+    book = [_row("600963", 100, 3.65, entry=3.40, avail=100)]
+    # cap_weight=None 关掉集中度 trim，才能拿到「不动」的行。
+    plan = plan_orders(
+        book, _review({"code": "600963", "action": "hold"}), cap_weight=None
+    )
+    order = plan["orders"][0]
+    assert order["qty"] == 0
+    assert order["fee"] == 0.0
+    assert order["netAmount"] == 0.0

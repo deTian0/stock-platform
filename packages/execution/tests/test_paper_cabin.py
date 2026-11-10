@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from stock_platform_execution.paper_cabin import (
+    DEFAULT_CASH,
     hydrate_broker,
     load_state,
     resolve_fill_price,
@@ -57,11 +58,11 @@ def test_cabin_buy_sell_positions_account_fills(tmp_path: Path, capsys) -> None:
     assert buy_out["priceSource"] == "cli:--price"
     assert buy_out["execute"]["accepted"] is True
     assert any(p["symbol"] == "600519" and p["qty"] == 100 for p in buy_out["positions"])
-    assert buy_out["account"]["cash"] == pytest.approx(1_000_000.0 - 1000.0)
+    assert buy_out["account"]["cash"] == pytest.approx(DEFAULT_CASH - 1000.0)
 
     assert state.is_file()
     raw = json.loads(state.read_text(encoding="utf-8"))
-    assert raw["cash"] == pytest.approx(999_000.0)
+    assert raw["cash"] == pytest.approx(DEFAULT_CASH - 1000.0)
     assert "600519" in raw["positions"]
 
     assert main(["--state", str(state), "positions"]) == 0
@@ -97,7 +98,7 @@ def test_cabin_buy_sell_positions_account_fills(tmp_path: Path, capsys) -> None:
     assert rc == 0
     sell_out = json.loads(capsys.readouterr().out)
     assert sell_out["positions"] == []
-    assert sell_out["account"]["cash"] == pytest.approx(999_000.0 + 1100.0)
+    assert sell_out["account"]["cash"] == pytest.approx(DEFAULT_CASH - 1000.0 + 1100.0)
 
     broker = hydrate_broker(load_state(state))
     assert broker.get_positions() == []
@@ -147,5 +148,5 @@ def test_cabin_persist_roundtrip(tmp_path: Path) -> None:
     persist_broker(state, broker)
     save_state(path, state)
     again = hydrate_broker(load_state(path))
-    assert again.get_account().cash == pytest.approx(1_000_000.0 - 900.0)
+    assert again.get_account().cash == pytest.approx(DEFAULT_CASH - 900.0)
     assert again.get_positions()[0].qty == 200

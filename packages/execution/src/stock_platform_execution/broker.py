@@ -10,6 +10,10 @@ from .contracts import AccountSnapshot, Fill, OrderIntent, Position
 from .errors import BrokerConfigError, DraftBlocked
 from .paper import PaperLedger
 
+#: Default paper-account capital (ADR 0098). One definition — ``paper_cabin``
+#: re-exports this rather than keeping its own copy.
+DEFAULT_PAPER_CAPITAL = 20_000.0
+
 
 @runtime_checkable
 class BrokerPort(Protocol):
@@ -64,12 +68,14 @@ class PaperBroker:
     name = "paper"
     venue = "paper_ledger"
 
-    def __init__(self, ledger: PaperLedger | None = None) -> None:
+    def __init__(self, ledger: PaperLedger | None = None, *, cost_model: Any | None = None) -> None:
         self.ledger = ledger or PaperLedger()
         self._fills: list[Fill] = []
         self._positions: dict[str, Position] = {}
-        self._cash: float = 1_000_000.0
+        self._cash: float = DEFAULT_PAPER_CAPITAL
         self._last_errors: list[str] = []
+        self._cost_model = cost_model
+        self._fees: float = 0.0
 
     def build_draft(
         self,
@@ -145,6 +151,31 @@ class PaperBroker:
                     symbol=intent.symbol, qty=new_qty, avg_price=avg
                 )
             self._cash -= signed * px
+            fee = self._fee_for(intent.symbol, abs(intent.qty) * px, is_buy=intent.side == "buy")
+            if fee:
+                self._cash -= fee
+                self._fees += fee
+
+    def _fee_for(self, symbol: str, notional: float, *, is_buy: bool) -> float:
+        """Per-leg cost from the injected model (duck-typed ``costs()``).
+
+        No model injected → zero cost, which is the pre-ADR-0098 behaviour every
+        existing paper test relies on. ``research.CostModel`` satisfies the duck
+        type, so there is exactly one fee definition in the codebase.
+        """
+        model = self._cost_model
+        if model is None or notional <= 0:
+            return 0.0
+        try:
+            return float(model.costs(notional, symbol, is_buy=is_buy))
+        except Exception:  # noqa: BLE001 — a bad model must not block the fill
+            self._last_errors.append(f"cost_model failed for {symbol}")
+            return 0.0
+
+    @property
+    def total_fees(self) -> float:
+        """Cumulative costs charged by this broker so far."""
+        return self._fees
 
     def status(self) -> dict[str, Any]:
         base = self.ledger.status()

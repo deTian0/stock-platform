@@ -1,10 +1,10 @@
 # 现行快照
 
-> 日期：2026-11-09  
-> 版本：**`v4.14.1` 已发布**（维护版：持仓单一真源 + 盘后收口，ADR [`0097`](architecture/0097-holdings-single-source-and-post-close.md)）  
+> 日期：2026-11-10  
+> 版本：**`v4.15.0` 已发布**（影子附录说明 + ③B 费用净额 + 模拟盘 2 万本金，ADR [`0098`](architecture/0098-shadow-explanation-and-paper-capital.md)）  
 > 分支：**仅 `main`**  
-> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**持仓单一真源 + 盘后收口** ADR [`0097`](architecture/0097-holdings-single-source-and-post-close.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)；**WorkBuddy 运维清单** [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)。根/包 README 与 `plans`/`scheduler` 已对齐 `v4.14.0`。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
-> 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。同花顺真实模拟盘**已放弃**。  
+> 工作区：F1/T3/A1/R5-P 已落；影子终榜 ADR [`0093`](architecture/0093-multi-strategy-shadow-board.md)；lvrev `trail_tp` ADR [`0094`](architecture/0094-lvrev-trail-tp-exit.md) **Accepted（opt-in，默认关）**；补充行情库 ADR [`0095`](architecture/0095-aux-market-store.md)；午间会话 ADR [`0096`](architecture/0096-midday-digest-session.md)；**持仓单一真源 + 盘后收口** ADR [`0097`](architecture/0097-holdings-single-source-and-post-close.md)；**影子说明 / 卖出费用 / 模拟盘本金** ADR [`0098`](architecture/0098-shadow-explanation-and-paper-capital.md)；**本仓模拟舱** [`ops/paper-cabin.md`](ops/paper-cabin.md)；**WorkBuddy 运维清单** [`ops/workbuddy-runbook.md`](ops/workbuddy-runbook.md)。根/包 README 与 `plans`/`scheduler` 已对齐 `v4.14.0`。`local/` 见 [`ops/local-runtime.md`](ops/local-runtime.md)。  
+> 进行中：影子前向账本与 S2-P1 快照**前向证据积累中**；**Y2 暂停**（无 `adopt`）。同花顺真实模拟盘**已放弃**。**模拟盘每日自动开平仓账本尚未建**（`PaperBroker` 仍命令驱动，报告只出费用列与净额）。  
 > 这是**现在**读仓库的入口。历史里程碑叙事留在 [`ROADMAP.md`](ROADMAP.md) 与 [`plans/trading-system-roadmap.md`](plans/trading-system-roadmap.md) 的修订记录里，不要从那些旧焦点段开工。
 
 ## 通宵迭代纪要（2026-11-06 → 11-07）

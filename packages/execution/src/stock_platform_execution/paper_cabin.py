@@ -12,12 +12,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .broker import PaperBroker
+from .broker import DEFAULT_PAPER_CAPITAL, PaperBroker
 from .contracts import Fill, Position
 from .paper import PaperLedger
 
 DEFAULT_STATE = Path("local") / "paper_cabin" / "state.json"
-DEFAULT_CASH = 1_000_000.0
+#: ADR 0098: paper capital defaults to ¥20,000 (small-account口径), not ¥1,000,000.
+DEFAULT_CASH = DEFAULT_PAPER_CAPITAL
 
 
 def load_state(path: Path) -> dict[str, Any]:

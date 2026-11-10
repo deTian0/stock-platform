@@ -68,6 +68,7 @@ def plan_orders(
     cap_weight: float | None = DEFAULT_CAP_WEIGHT,
     lot: int = DEFAULT_LOT,
     total_value: float | None = None,
+    cost_model: Any | None = None,
 ) -> dict[str, Any]:
     """把复核裁决翻译成具体委托数量。
 
@@ -75,9 +76,19 @@ def plan_orders(
     ``review_positions`` 的返回。``total_value`` 缺省时按账本市值合计
     （不含现金）——传总资产可以拿到更贴近账户的权重口径。
 
-    每笔委托：``{code, action, reason, qty, price, amount, weightBefore,
-    weightAfter, available, unsellable, capped}``；``qty == 0`` 表示不动。
+    ``cost_model`` 缺省时用 ``portfolio.CostModel()``（佣金万0.854 双边 +
+    印花税万5 卖出单边 + ETF 免印花），因为委托全部是卖出腿。每笔委托额外带
+    ``fee`` / ``netAmount``：``amount`` 是**毛额**，``netAmount`` 才是真到账。
+
+    每笔委托：``{code, action, reason, qty, price, amount, fee, netAmount,
+    weightBefore, weightAfter, available, unsellable, capped}``；``qty == 0``
+    表示不动。
     """
+    if cost_model is None:
+        from .portfolio import CostModel  # local: keep module import-light
+
+        cost_model = CostModel()
+
     rows = [r for r in (book or []) if isinstance(r, Mapping)]
     verdicts = {
         _code_of(r): r
@@ -135,6 +146,7 @@ def plan_orders(
 
         remaining = qty - sell_qty
         amount = sell_qty * px
+        fee = float(cost_model.costs(amount, code, is_buy=False)) if amount > 0 else 0.0
         orders.append(
             {
                 "code": code,
@@ -148,6 +160,8 @@ def plan_orders(
                 "unsellable": qty - avail,
                 "price": px,
                 "amount": round(amount, 2),
+                "fee": round(fee, 2),
+                "netAmount": round(amount - fee, 2),
                 "weightBefore": None if weight_before is None else round(weight_before, 6),
                 "weightAfter": (
                     None
@@ -176,8 +190,17 @@ def plan_orders(
             "none": len(orders) - len(actionable),
         },
         "totalAmount": round(sum(o["amount"] for o in actionable), 2),
+        "totalFee": round(sum(o["fee"] for o in actionable), 2),
+        "totalNetAmount": round(sum(o["netAmount"] for o in actionable), 2),
+        "costModel": {
+            "commissionRate": getattr(cost_model, "commission_rate", None),
+            "stampSellRate": getattr(cost_model, "stamp_sell_rate", None),
+            "minCommission": getattr(cost_model, "min_commission", None),
+            "etfStampExempt": getattr(cost_model, "etf_stamp_exempt", None),
+        },
         "disclaimer": (
-            "数量按整手取整；exit=b 全部可卖，trim=减到单票上限；"
+            "数量按整手取整；exit=全部可卖，trim=减到单票上限；"
+            "amount 为毛额，netAmount 已扣佣金(万0.854)与印花税(万5，ETF 免)；"
             "不产生加仓建议。SIMULATE，非投资建议。"
         ),
     }

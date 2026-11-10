@@ -1019,3 +1019,173 @@ def test_secondary_ths_txt_absent_when_nothing_selected(env):
     assert "thsQualitySecPath" not in result
     assert "thsShortSecPath" not in result
 
+
+
+def test_shadow_appendix_explains_why_not_just_who(tmp_path: Path):
+    """ADR 0098：附录要说清「怎么选、为什么」—— 各校入池 / 硬闸淘汰 / 逐席理由。"""
+    import json as _json
+
+    from stock_platform_research.shadow_board.digest_hook import (
+        render_shadow_board_appendix,
+    )
+
+    payload = {
+        "schemaVersion": 1,
+        "asof": "2026-11-09",
+        "status": "ok",
+        "excludedFromPerformance": True,
+        "shadowOnly": True,
+        "schools": {
+            "S1": {
+                "school": "S1",
+                "schoolName": "宏观/择时",
+                "status": "empty",
+                "reason": "择时关闭：截面宽度 16%，低于地板 35%",
+                "candidates": [],
+            },
+            "S3": {
+                "school": "S3",
+                "schoolName": "质量/防守",
+                "status": "ok",
+                "reason": None,
+                "profile": {"trend": "长线选稳：低波动 + 反转钟形 + 贴近 MA20"},
+                "candidates": [{"code": "601336"}, {"code": "600021"}],
+            },
+            "S4": {
+                "school": "S4",
+                "schoolName": "短线动量",
+                "status": "empty",
+                "reason": "retired: see diagnosis",
+                "retired": True,
+                "candidates": [],
+            },
+        },
+        "round2": {
+            "rejected": [
+                {"code": "600884", "name": "杉杉股份", "school": "S3", "reason": "集中度上限"}
+            ],
+            "stats": {"input": 16, "passed": 2, "rejected": 1},
+        },
+        "finalBoard": [
+            {
+                "code": "601336",
+                "name": "新华保险",
+                "school": "S3",
+                "schoolName": "质量/防守",
+                "score": 0.8948,
+                "holdingPeriod": "10–20 交易日",
+                "trigger": "20 日波动 1.55%，落在 −10% 弹性最优区间",
+                "expectation": "收益不低于同校池中位数",
+                "invalidation": "收盘跌破 MA20",
+                "reasonSource": "rule",
+            }
+        ],
+    }
+    (tmp_path / "final_board_2026-11-09.json").write_text(
+        _json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+    )
+
+    text = "\n".join(render_shadow_board_appendix("2026-11-09", shadow_dir=tmp_path))
+
+    # 谁入选
+    assert "601336" in text and "0.895" in text
+    # 为什么入选
+    assert "落在 −10% 弹性最优区间" in text
+    assert "收益不低于同校池中位数" in text
+    assert "收盘跌破 MA20" in text
+    assert "`rule`" in text
+    # 怎么淘出来的
+    assert "Round1 · 各校入池" in text
+    assert "择时关闭：截面宽度 16%" in text
+    assert "长线选稳" in text
+    assert "（已下线）" in text
+    assert "Round2 · 硬闸淘汰" in text
+    assert "入闸 16 / 过闸 2" in text
+    assert "杉杉股份" in text and "集中度上限" in text
+    # 生产语义未变
+    assert "同花顺导入" in text
+
+
+def test_shadow_appendix_explains_why_not_just_who(tmp_path: Path):
+    """ADR 0098：附录要说清「怎么选、为什么」—— 各校入池 / 硬闸淘汰 / 逐席理由。"""
+    import json as _json
+
+    from stock_platform_research.shadow_board.digest_hook import (
+        render_shadow_board_appendix,
+    )
+
+    payload = {
+        "schemaVersion": 1,
+        "asof": "2026-11-09",
+        "status": "ok",
+        "excludedFromPerformance": True,
+        "shadowOnly": True,
+        "schools": {
+            "S1": {
+                "school": "S1",
+                "schoolName": "宏观/择时",
+                "status": "empty",
+                "reason": "择时关闭：截面宽度 16%，低于地板 35%",
+                "candidates": [],
+            },
+            "S3": {
+                "school": "S3",
+                "schoolName": "质量/防守",
+                "status": "ok",
+                "reason": None,
+                "profile": {"trend": "长线选稳：低波动 + 反转钟形 + 贴近 MA20"},
+                "candidates": [{"code": "601336"}, {"code": "600021"}],
+            },
+            "S4": {
+                "school": "S4",
+                "schoolName": "短线动量",
+                "status": "empty",
+                "reason": "retired: see diagnosis",
+                "retired": True,
+                "candidates": [],
+            },
+        },
+        "round2": {
+            "rejected": [
+                {"code": "600884", "name": "杉杉股份", "school": "S3", "reason": "集中度上限"}
+            ],
+            "stats": {"input": 16, "passed": 2, "rejected": 1},
+        },
+        "finalBoard": [
+            {
+                "code": "601336",
+                "name": "新华保险",
+                "school": "S3",
+                "schoolName": "质量/防守",
+                "score": 0.8948,
+                "holdingPeriod": "10–20 交易日",
+                "trigger": "20 日波动 1.55%，落在 −10% 弹性最优区间",
+                "expectation": "收益不低于同校池中位数",
+                "invalidation": "收盘跌破 MA20",
+                "reasonSource": "rule",
+            }
+        ],
+    }
+    (tmp_path / "final_board_2026-11-09.json").write_text(
+        _json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+    )
+
+    text = "\n".join(render_shadow_board_appendix("2026-11-09", shadow_dir=tmp_path))
+
+    # 谁入选
+    assert "601336" in text and "0.895" in text
+    # 为什么入选
+    assert "落在 −10% 弹性最优区间" in text
+    assert "收益不低于同校池中位数" in text
+    assert "收盘跌破 MA20" in text
+    assert "`rule`" in text
+    # 怎么淘出来的
+    assert "Round1 · 各校入池" in text
+    assert "择时关闭：截面宽度 16%" in text
+    assert "长线选稳" in text
+    assert "（已下线）" in text
+    assert "Round2 · 硬闸淘汰" in text
+    assert "入闸 16 / 过闸 2" in text
+    assert "杉杉股份" in text and "集中度上限" in text
+    # 生产语义未变
+    assert "同花顺导入" in text

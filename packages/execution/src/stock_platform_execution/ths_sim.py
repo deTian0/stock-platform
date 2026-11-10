@@ -24,6 +24,10 @@ from .contracts import AccountSnapshot, Fill, OrderIntent, Position
 from .errors import BrokerConfigError, BrokerTransportError, DraftBlocked, IdempotentReplay
 from .paper import PaperLedger
 
+#: ADR 0098: same ¥20,000 small-account capital as the paper broker. Imported
+#: from ``broker`` (which only imports ``ths_sim`` lazily) to keep one definition.
+from .broker import DEFAULT_PAPER_CAPITAL as _DEFAULT_CASH  # noqa: E402
+
 
 JsonGet = Callable[..., dict[str, Any]]
 
@@ -47,7 +51,7 @@ class ThsTransport(Protocol):
 class MockThsTransport:
     """In-memory THS sim venue for CI / local E2E (no network)."""
 
-    def __init__(self, *, cash: float = 1_000_000.0, fixture_dir: Path | None = None) -> None:
+    def __init__(self, *, cash: float = _DEFAULT_CASH, fixture_dir: Path | None = None) -> None:
         self.cash = cash
         self.positions: dict[str, dict[str, Any]] = {}
         self.orders: list[dict[str, Any]] = []
